@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        3%{?dist}
+Release:        8%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -70,7 +70,7 @@ BuildRequires:  kf6-knewstuff-devel
 BuildRequires:  kf6-kxmlgui-devel
 BuildRequires:  kf6-krunner-devel
 BuildRequires:  kf6-knotifications-devel
-BuildRequires:  kf6-kirigami
+BuildRequires:  kf6-kirigami-devel
 
 # Plasma / KDE
 BuildRequires:  kwayland-devel
@@ -135,14 +135,28 @@ Requires:       qt6-qtdeclarative
 Requires:       qt6-qtsvg
 Requires:       qt6-qtwayland
 Requires:       kf6-kglobalaccel
+Requires:       kf6-kio
+Requires:       kf6-kidletime
+Requires:       kf6-ksvg
+Requires:       kf6-krunner
 Requires:       kf6-kirigami
 Requires:       kwayland
 Requires:       kdecoration
 Requires:       kscreenlocker
+Requires:       knighttime
+Requires:       libplasma
+Requires:       plasma-workspace
+Requires:       plasma-milou
+Requires:       aurorae
+Requires:       plasma-breeze
+Requires:       kscreen
+Requires:       qaccessibilityclient-qt6
 Requires:       xorg-x11-server-Xwayland
 Requires:       hwdata
+Requires:       xdg-desktop-portal
+Requires:       xdg-desktop-portal-kde
 
-# Noctalia is a soft dependency — users must install it from lionheartp/Hyprland COPR
+# Soft deps — nice to have for full experience
 Recommends:     noctalia-git
 
 %description
@@ -199,7 +213,7 @@ popd
 # --- Phase 2: Build kwin-we against the kglobalacceld we just built ---
 # We install kglobalacceld into a temp dir so kwin-we's CMake can find it
 mkdir -p ${KGA_TMP_PREFIX}
-DESTDIR=${KGA_TMP_PREFIX} ninja -C ../kglobalacceld/build install
+DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 
 %cmake \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -216,14 +230,28 @@ DESTDIR=${KGA_TMP_PREFIX} ninja -C ../kglobalacceld/build install
 
 %install
 # Install kglobalacceld to the buildroot
-DESTDIR=%{buildroot} ninja -C ../kglobalacceld/build install
+DESTDIR=%{buildroot} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 
 # Install kwin-we to the buildroot
 %cmake_install
 
 # Remove unnecessary devel files from main package (they go in -devel if needed)
 rm -f %{buildroot}%{_libdir}/cmake/KGlobalAccelD/*.cmake 2>/dev/null || true
+
+# Remove .so symlinks (devel files) — prevents conflict with system kwin-devel
+rm -f %{buildroot}%{_libdir}/libKGlobalAccelD.so 2>/dev/null || true
+
+# Remove header files installed by kglobalacceld and kwin-we (devel content)
+rm -rf %{buildroot}%{_includedir}/KGlobalAccelD/ 2>/dev/null || true
+rm -rf %{buildroot}%{_includedir}/kwin/ 2>/dev/null || true
+
+# Remove knotifications6 .notifyrc file to avoid conflict with system kwin-notifications
+# The directory will be owned via %dir in %files
 rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
+
+# Remove .so symlink (devel file) from libkwin — only versioned .so.* belongs in main pkg
+rm -f %{buildroot}%{_libdir}/libkwin.so 2>/dev/null || true
+rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 
 # =============================================================================
 # Files
@@ -233,35 +261,52 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 %license LICENSES/*
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
+%{_bindir}/kwindowprop
+%{_bindir}/kwin-we_wayland_wrapper
 %{_libdir}/libkwin.so.*
-%{_libdir}/libkwin*.so.*
-%{_libdir}/qt6/plugins/kwin/
-%{_libdir}/qt6/plugins/org.kde.kwin.platforms/
-%{_libdir}/qt6/plugins/plasma/kcms/
-%{_libdir}/qt6/plugins/kf6/kded/
-%{_libdir}/qt6/plugins/kf5/kded/
-%{_libdir}/qt6/qml/org/kde/kwin/
-%{_libdir}/qt6/qml/org/kde/plasma/private/kwin/
+%{_libdir}/libkcmkwincommon.so.*
+%{_libdir}/plugins/kwin/
+%{_libdir}/plugins/plasma/kcms/
+%{_libdir}/plugins/kf6/packagestructure/
+%{_libdir}/qml/org/kde/kwin/
+%{_libdir}/libexec/kwin*
+%{_libdir}/kconf_update_bin/kwin*
 %{_datadir}/kconf_update/
-%{_datadir}/kwin/
-%{_datadir}/knotifications6/
+%dir %{_datadir}/knotifications6/
 %{_datadir}/knsrcfiles/
 %{_datadir}/qlogging-categories6/
-%{_datadir}/wayland-sessions/kineticwe.desktop 2>/dev/null || true
+%{_datadir}/kwin-wayland/
+%{_datadir}/krunner/
+%{_datadir}/locale/
 %{_userunitdir}/plasma-kwin_wayland.service
 %{_datadir}/dbus-1/interfaces/
 
 %files -n kineticwe-kglobalacceld
 %license ../kglobalacceld/LICENSES/*
-%{_libdir}/libKF6GlobalAccelD.so.*
-%{_libdir}/libkglobalacceld.so.*
+%{_libdir}/libKGlobalAccelD.so.*
 
 # =============================================================================
 # Changelog
 # =============================================================================
 
 %changelog
-* Fri Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
+* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-8
+- Remove unpackaged devel headers (%%{_includedir}/KGlobalAccelD/ and
+  %%{_includedir}/kwin/) that caused "Installed (but unpackaged) file(s)"
+  errors on COPR
+- Remove libKGlobalAccelD.so symlink from main package
+- Fix bogus changelog dates (Fri → Sat)
+
+* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-7
+- Fix %%files: remove bogus qt6/ prefix from plugin/qml paths
+- Add missing %%files entries: kwindowprop, kwin-we_wayland_wrapper,
+  libkcmkwincommon, libexec/kwin*, kconf_update_bin/kwin*, plugins/kf6/,
+  kwin-wayland/, krunner/, locale/
+- Fix BuildRequires: kf6-kirigami → kf6-kirigami-devel (cmake config)
+- Clean up .so symlinks (libkwin.so, libkcmkwincommon.so) from main package
+- Fix knotifications6/ to use %%dir (empty after .notifyrc cleanup)
+
+* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
 - Initial COPR packaging of KineticWE
 - Bundled kglobalacceld from git master (post-6.7.0 API)
 - Binary renamed from kwin-we_wayland to kinetic-we
