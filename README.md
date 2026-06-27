@@ -133,14 +133,6 @@ A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of k
 }
 ```
 
-**NixOS module:**
-```nix
-{
-  imports = [ inputs.kineticwe.nixosModules.default ];
-  programs.kineticwe.enable = true;
-}
-```
-
 **Home Manager module:**
 ```nix
 {
