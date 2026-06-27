@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -70,7 +70,7 @@ BuildRequires:  kf6-knewstuff-devel
 BuildRequires:  kf6-kxmlgui-devel
 BuildRequires:  kf6-krunner-devel
 BuildRequires:  kf6-knotifications-devel
-BuildRequires:  kf6-kirigami
+BuildRequires:  kf6-kirigami-devel
 
 # Plasma / KDE
 BuildRequires:  kwayland-devel
@@ -237,7 +237,14 @@ DESTDIR=%{buildroot} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 
 # Remove unnecessary devel files from main package (they go in -devel if needed)
 rm -f %{buildroot}%{_libdir}/cmake/KGlobalAccelD/*.cmake 2>/dev/null || true
+
+# Remove knotifications6 .notifyrc file to avoid conflict with system kwin-notifications
+# The directory will be owned via %dir in %files
 rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
+
+# Remove .so symlink (devel file) from libkwin — only versioned .so.* belongs in main pkg
+rm -f %{buildroot}%{_libdir}/libkwin.so 2>/dev/null || true
+rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 
 # =============================================================================
 # Files
@@ -247,14 +254,23 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 %license LICENSES/*
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
-%{_libdir}/libkwin*.so.*
-%{_libdir}/qt6/plugins/kwin/
-%{_libdir}/qt6/plugins/plasma/kcms/
-%{_libdir}/qt6/qml/org/kde/kwin/
+%{_bindir}/kwindowprop
+%{_bindir}/kwin-we_wayland_wrapper
+%{_libdir}/libkwin.so.*
+%{_libdir}/libkcmkwincommon.so.*
+%{_libdir}/plugins/kwin/
+%{_libdir}/plugins/plasma/kcms/
+%{_libdir}/plugins/kf6/packagestructure/
+%{_libdir}/qml/org/kde/kwin/
+%{_libdir}/libexec/kwin*
+%{_libdir}/kconf_update_bin/kwin*
 %{_datadir}/kconf_update/
-%{_datadir}/knotifications6/
+%dir %{_datadir}/knotifications6/
 %{_datadir}/knsrcfiles/
 %{_datadir}/qlogging-categories6/
+%{_datadir}/kwin-wayland/
+%{_datadir}/krunner/
+%{_datadir}/locale/
 %{_userunitdir}/plasma-kwin_wayland.service
 %{_datadir}/dbus-1/interfaces/
 
@@ -267,6 +283,15 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 # =============================================================================
 
 %changelog
+* Fri Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-7
+- Fix %%files: remove bogus qt6/ prefix from plugin/qml paths
+- Add missing %%files entries: kwindowprop, kwin-we_wayland_wrapper,
+  libkcmkwincommon, libexec/kwin*, kconf_update_bin/kwin*, plugins/kf6/,
+  kwin-wayland/, krunner/, locale/
+- Fix BuildRequires: kf6-kirigami → kf6-kirigami-devel (cmake config)
+- Clean up .so symlinks (libkwin.so, libkcmkwincommon.so) from main package
+- Fix knotifications6/ to use %%dir (empty after .notifyrc cleanup)
+
 * Fri Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
 - Initial COPR packaging of KineticWE
 - Bundled kglobalacceld from git master (post-6.7.0 API)
