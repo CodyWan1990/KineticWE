@@ -134,6 +134,20 @@ nix develop
 
 **How it works:** The flake uses `nixpkgs/master` (for Plasma 6.7 / KF6 6.27) and includes a custom `kglobalacceld-git` derivation that builds the global shortcuts daemon from KDE invent git master. This provides the newer `KGlobalAccelD` API (`keyEvent`, `pointerPressed`, `axisTriggered`, `resetModifierOnlyState`) that kwin-we requires.
 
+**Add to your flake.nix inputs:**
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    kineticwe = {
+      url = "codeberg:theblackdon/kineticwe";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+}
+```
+
 **NixOS module:**
 ```nix
 {
