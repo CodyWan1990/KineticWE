@@ -7,7 +7,7 @@
 
 ---
 
-> ## ⚠️ Alpha Stage
+> ## ⚠️ BETA Stage
 >
 > **KineticWE is currently in BETA.**
 >
