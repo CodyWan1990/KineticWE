@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -204,6 +204,7 @@ DESTDIR=${KGA_TMP_PREFIX} ninja -C ../kglobalacceld/build install
 %cmake \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
     -DCMAKE_PREFIX_PATH="${KGA_TMP_PREFIX}%{_prefix}" \
+    -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_TESTING=OFF \
     -DKWIN_BUILD_GLOBALSHORTCUTS=ON
