@@ -37,7 +37,7 @@ stdenv.mkDerivation {
   shellHook = ''
     echo "KineticWE development shell"
     echo "  kwin-we source: $(pwd)"
-    echo "  kwin-we:       ${kwinWe}/bin/kwin-we_wayland"
+    echo "  kwin-we:       ${kwinWe}/bin/kinetic-we"
     echo "  noctalia:      ${noctalia}/bin/noctalia"
     echo
     echo "Build & install into a custom prefix:"

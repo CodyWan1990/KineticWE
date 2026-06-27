@@ -105,7 +105,7 @@ stdenv.mkDerivation {
 
     mkdir -p "$out/bin"
     substitute ${lib.escapeShellArg startScript} "$out/bin/start-kineticwe" \
-      --subst-var-by kwinWeBin     "${kwinWe}/bin/kwin-we_wayland" \
+      --subst-var-by kwinWeBin     "${kwinWe}/bin/kinetic-we" \
       --subst-var-by noctaliaBin   "${noctalia}/bin/noctalia" \
       --subst-var-by xdpBin        "${xdg-desktop-portal}/libexec/xdg-desktop-portal" \
       --subst-var-by xdpKdeBin     "${kdePackages.xdg-desktop-portal-kde}/libexec/xdg-desktop-portal-kde" \

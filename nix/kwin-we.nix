@@ -5,6 +5,7 @@
   ninja,
   pkg-config,
   kdePackages,           # all KF6 / Plasma / KDE deps live here
+  kglobalacceldGit,      # git master build (replaces system kglobalacceld)
   # Qt6
   qt6,
   # Other libraries
@@ -39,7 +40,7 @@
 let
   inherit (kdePackages)
     kauth kcolorscheme kconfig kcoreaddons kcrash kdbusaddons
-    kglobalaccel kglobalacceld kguiaddons ki18n kidletime
+    kglobalaccel kguiaddons ki18n kidletime
     kcmutils knewstuff knotifications kpackage krunner
     kservice ksvg kwidgetsaddons kwindowsystem kdeclarative kxmlgui
     kirigami
@@ -80,7 +81,7 @@ stdenv.mkDerivation {
     kcrash
     kdbusaddons
     kglobalaccel
-    kglobalacceld
+    kglobalacceldGit
     kguiaddons
     ki18n
     kidletime
@@ -152,9 +153,9 @@ stdenv.mkDerivation {
 
   meta = with lib; {
     description = "KineticWE — KWin window environment with native tiling";
-    homepage = "https://github.com/anomalyco/kwin-we";
+    homepage = "https://codeberg.org/theblackdon/kineticwe";
     license = licenses.gpl2Plus;
     platforms = platforms.linux;
-    mainProgram = "kwin-we_wayland";
+    mainProgram = "kinetic-we";
   };
 }

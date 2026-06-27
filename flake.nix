@@ -46,7 +46,9 @@
           config.allowUnfree = true;
         };
 
-        kwinWe = pkgs.callPackage ./nix/kwin-we.nix { };
+        kwinWe = pkgs.callPackage ./nix/kwin-we.nix {
+          kglobalacceldGit = pkgs.callPackage ./nix/kglobalacceld-git.nix { };
+        };
 
         # The session package wires kwin-we + noctalia + xdg-desktop-portal
         # together and produces `bin/start-kineticwe`.
@@ -72,7 +74,7 @@
           };
           kwin-we = {
             type = "app";
-            program = "${kwinWe}/bin/kwin-we_wayland";
+            program = "${kwinWe}/bin/kinetic-we";
             meta.description = "Run the kwin-we Wayland compositor directly";
           };
         };
