@@ -33,3 +33,6 @@ CMakeLists.txt.user*
 result
 result-*
 /.direnv/
+
+# Allow COPR build Makefile
+!copr/Makefile

@@ -137,4 +137,4 @@ pkill -x kglobalacceld 2>/dev/null || true
 # ---------------------------------------------------------------------------
 # KWin will run the startup payload as a child process. The child inherits
 # the environment captured here (including QT_PLUGIN_PATH).
-exec kwin-we_wayland --xwayland "$STARTUP_PAYLOAD"
+exec kinetic-we --xwayland "$STARTUP_PAYLOAD"

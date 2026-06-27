@@ -28,4 +28,4 @@ cmake --build "$BUILD_DIR" --parallel "$(nproc)"
 echo "Installing kwin-we to $INSTALL_PREFIX..."
 cmake --install "$BUILD_DIR"
 
-echo "Done. Binary installed to: $INSTALL_PREFIX/bin/kwin-we_wayland"
+echo "Done. Binary installed to: $INSTALL_PREFIX/bin/kinetic-we"

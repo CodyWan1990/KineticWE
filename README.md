@@ -37,6 +37,27 @@ Convenience scripts are provided that install all dependencies, build kglobalacc
 
 > **Why kglobalacceld is built from source:** kwin-we calls `keyEvent()`, `pointerPressed()`, `axisTriggered()` and `resetModifierOnlyState()` directly on the `KGlobalAccelD` object — an API introduced in kglobalacceld git master (post-6.7.0). The system package on most distros is still 6.7.0 or older and routes those calls through a separate `KGlobalAccelInterface` class, so kwin-we cannot compile against it. The install scripts clone kglobalacceld from `invent.kde.org/plasma/kglobalacceld.git` and build it into `$INSTALL_PREFIX` so kwin-we's CMake finds the newer version first. This requires **Qt ≥ 6.10** and **KF6 ≥ 6.26** (satisfied on Fedora 44+, Arch rolling, and Debian Trixie/Ubuntu 24.04+ with backports).
 
+### Quick Install via COPR (Fedora)
+
+The easiest way to install KineticWE on Fedora is through COPR:
+
+```bash
+# 1. Enable the Noctalia COPR and install the shell (required runtime dependency)
+sudo dnf copr enable lionheartp/Hyprland
+sudo dnf install noctalia-git
+
+# 2. Enable the KineticWE COPR and install
+sudo dnf copr enable theblackdon/kineticwe
+sudo dnf install kineticwe
+```
+
+After installation, select **KineticWE** from your display manager's session
+menu, or run `kinetic-we` from a TTY.
+
+> **Note:** The COPR package bundles the required newer version of
+> `kglobalacceld` (git master) so you don't need to build it separately.
+
+### Manual Install via Scripts
 Pick the script that matches your distribution:
 
 | Distro | Script |

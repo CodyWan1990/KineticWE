@@ -416,36 +416,36 @@ ecm_qt_declare_logging_category(kwin
     CATEGORY_NAME kwin_output_config
 )
 
-add_executable(kwin-we_wayland main_wayland.cpp)
+add_executable(kinetic-we main_wayland.cpp)
 
 if(TARGET PkgConfig::libsystemd)
-    ecm_qt_declare_logging_category(kwin-we_wayland
+    ecm_qt_declare_logging_category(kinetic-we
         HEADER watchdoglogging.h
         IDENTIFIER KWIN_WATCHDOG
         CATEGORY_NAME kwin_watchdog
         DEFAULT_SEVERITY Info
     )
 
-    target_sources(kwin-we_wayland PRIVATE watchdog.cpp)
-    target_link_libraries(kwin-we_wayland PkgConfig::libsystemd)
+    target_sources(kinetic-we PRIVATE watchdog.cpp)
+    target_link_libraries(kinetic-we PkgConfig::libsystemd)
 endif()
 
-target_link_libraries(kwin-we_wayland
+target_link_libraries(kinetic-we
     kwin
     KF6::Crash
     KF6::I18n
 )
 if (KWIN_BUILD_X11)
-    target_link_libraries(kwin-we_wayland KWinXwaylandServerModule)
+    target_link_libraries(kinetic-we KWinXwaylandServerModule)
 endif()
-target_compile_definitions(kwin-we_wayland PRIVATE
+target_compile_definitions(kinetic-we PRIVATE
     -DTRANSLATION_DOMAIN=\"kwin\"
 )
-kcoreaddons_target_static_plugins(kwin-we_wayland NAMESPACE "kwin/effects/plugins")
+kcoreaddons_target_static_plugins(kinetic-we NAMESPACE "kwin/effects/plugins")
 
-install(TARGETS kwin-we_wayland ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+install(TARGETS kinetic-we ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
-target_link_libraries(kwin-we_wayland
+target_link_libraries(kinetic-we
     KWinQpaPlugin
     KF6WindowSystemKWinPlugin
     KF6IdleTimeKWinPlugin
