@@ -65,7 +65,7 @@ Pick the script that matches your distribution:
 | Fedora / RHEL | `./install-fedora.sh` |
 | Arch Linux / Arch-derivatives | `./install-arch.sh` |
 | Debian / Ubuntu | `./install-debian.sh` |
-| NixOS / Nix (flake) | **Coming soon** — see below |
+| NixOS / Nix (flake) | `nix build .#session` — see below |
 
 In all cases, by default binaries are installed to `$HOME/.local`. You can change this with the `INSTALL_PREFIX` environment variable:
 
@@ -115,18 +115,42 @@ After installation:
 
 ### NixOS / Nix
 
-> **🚧 Coming soon — not yet buildable.**
->
-> A [Nix flake](https://nixos.wiki/wiki/Flakes) (`flake.nix` + `nix/`) is already in this repo and the package set, dev shell, home-manager and NixOS modules all evaluate cleanly (`nix flake check` passes). However, the kwin-we build itself is **blocked on upstream nixpkgs**:
->
-> - kwin-we requires **Plasma 6.7 / KF6 6.27**, which are not yet on `nixos-unstable` or `release-26.05` (the latest is Plasma 6.6.5).
-> - Even on nixpkgs `master` (Plasma 6.7.0), the build currently fails because the source uses `KGlobalAccelD` methods (`keyEvent`, `pointerPressed`, `axisTriggered`, `resetModifierOnlyState`) that aren't in the version of `kglobalacceld` shipped by nixpkgs yet.
->
-> **What works today:** `nix flake check`, `nix develop` (the dev shell resolves), and the module / overlay wiring.
->
-> **What doesn't yet:** `nix build .#kwin-we` and the user-facing install paths.
->
-> We'll flip this section back on once nixpkgs catches up and the upstream `KGlobalAccelD` API is available. The flake is left in the tree as a preview so it's easy to enable the moment that happens — just edit the `Note` in `flake.nix` and update this section.
+A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kwin-we, the full KineticWE session (kwin-we + noctalia), a dev shell, and Home Manager / NixOS modules.
+
+```bash
+# Build the compositor
+nix build .#kwin-we
+
+# Full session (kwin-we + noctalia + xdg-desktop-portal)
+nix build .#session
+
+# Run directly
+nix run .#kwin-we
+nix run .#session
+
+# Development shell (cmake, ninja, all KDE/Qt deps)
+nix develop
+```
+
+**How it works:** The flake uses `nixpkgs/master` (for Plasma 6.7 / KF6 6.27) and includes a custom `kglobalacceld-git` derivation that builds the global shortcuts daemon from KDE invent git master. This provides the newer `KGlobalAccelD` API (`keyEvent`, `pointerPressed`, `axisTriggered`, `resetModifierOnlyState`) that kwin-we requires.
+
+**NixOS module:**
+```nix
+{
+  imports = [ inputs.kineticwe.nixosModules.default ];
+  programs.kineticwe.enable = true;
+}
+```
+
+**Home Manager module:**
+```nix
+{
+  imports = [ inputs.kineticwe.homeModules.default ];
+  programs.kineticwe.enable = true;
+}
+```
+
+> **Note:** On the first build, Nix will error with a hash mismatch for `kglobalacceld-git`. Copy the expected hash from the error into `nix/kglobalacceld-git.nix` and rebuild.
 
 ---
 
