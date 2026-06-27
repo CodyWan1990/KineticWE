@@ -135,11 +135,22 @@ Requires:       qt6-qtdeclarative
 Requires:       qt6-qtsvg
 Requires:       qt6-qtwayland
 Requires:       kf6-kglobalaccel
+Requires:       kf6-kio
+Requires:       kf6-kidletime
+Requires:       kf6-ksvg
+Requires:       kf6-krunner
 Requires:       kf6-kirigami
 Requires:       kwayland
 Requires:       kdecoration
 Requires:       kscreenlocker
+Requires:       knighttime
+Requires:       libplasma
 Requires:       plasma-workspace
+Requires:       plasma-milou
+Requires:       aurorae
+Requires:       plasma-breeze
+Requires:       kscreen
+Requires:       qaccessibilityclient-qt6
 Requires:       xorg-x11-server-Xwayland
 Requires:       hwdata
 Requires:       xdg-desktop-portal
@@ -147,10 +158,6 @@ Requires:       xdg-desktop-portal-kde
 
 # Soft deps — nice to have for full experience
 Recommends:     noctalia-git
-Recommends:     plasma-milou
-Recommends:     aurorae
-Recommends:     plasma-breeze
-Recommends:     kscreen
 
 %description
 KineticWE is a fork of KWin that adds native tiling support for Wayland.
