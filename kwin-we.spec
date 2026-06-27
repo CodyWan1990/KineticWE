@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -236,18 +236,12 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 %{_libdir}/libkwin.so.*
 %{_libdir}/libkwin*.so.*
 %{_libdir}/qt6/plugins/kwin/
-%{_libdir}/qt6/plugins/org.kde.kwin.platforms/
 %{_libdir}/qt6/plugins/plasma/kcms/
-%{_libdir}/qt6/plugins/kf6/kded/
-%{_libdir}/qt6/plugins/kf5/kded/
 %{_libdir}/qt6/qml/org/kde/kwin/
-%{_libdir}/qt6/qml/org/kde/plasma/private/kwin/
 %{_datadir}/kconf_update/
-%{_datadir}/kwin/
 %{_datadir}/knotifications6/
 %{_datadir}/knsrcfiles/
 %{_datadir}/qlogging-categories6/
-%{_datadir}/wayland-sessions/kineticwe.desktop 2>/dev/null || true
 %{_userunitdir}/plasma-kwin_wayland.service
 %{_datadir}/dbus-1/interfaces/
 
