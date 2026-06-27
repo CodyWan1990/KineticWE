@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -199,7 +199,7 @@ popd
 # --- Phase 2: Build kwin-we against the kglobalacceld we just built ---
 # We install kglobalacceld into a temp dir so kwin-we's CMake can find it
 mkdir -p ${KGA_TMP_PREFIX}
-make -C ../kglobalacceld/build install DESTDIR=${KGA_TMP_PREFIX}
+DESTDIR=${KGA_TMP_PREFIX} ninja -C ../kglobalacceld/build install
 
 %cmake \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -215,7 +215,7 @@ make -C ../kglobalacceld/build install DESTDIR=${KGA_TMP_PREFIX}
 
 %install
 # Install kglobalacceld to the buildroot
-make -C ../kglobalacceld/build install DESTDIR=%{buildroot}
+DESTDIR=%{buildroot} ninja -C ../kglobalacceld/build install
 
 # Install kwin-we to the buildroot
 %cmake_install
@@ -260,7 +260,7 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 # =============================================================================
 
 %changelog
-* Thu Jun 26 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
+* Fri Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
 - Initial COPR packaging of KineticWE
 - Bundled kglobalacceld from git master (post-6.7.0 API)
 - Binary renamed from kwin-we_wayland to kinetic-we
