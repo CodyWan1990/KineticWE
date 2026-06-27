@@ -117,21 +117,6 @@ After installation:
 
 A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kwin-we, the full KineticWE session (kwin-we + noctalia), a dev shell, and Home Manager / NixOS modules.
 
-```bash
-# Build the compositor
-nix build .#kwin-we
-
-# Full session (kwin-we + noctalia + xdg-desktop-portal)
-nix build .#session
-
-# Run directly
-nix run .#kwin-we
-nix run .#session
-
-# Development shell (cmake, ninja, all KDE/Qt deps)
-nix develop
-```
-
 **How it works:** The flake uses `nixpkgs/master` (for Plasma 6.7 / KF6 6.27) and includes a custom `kglobalacceld-git` derivation that builds the global shortcuts daemon from KDE invent git master. This provides the newer `KGlobalAccelD` API (`keyEvent`, `pointerPressed`, `axisTriggered`, `resetModifierOnlyState`) that kwin-we requires.
 
 **Add to your flake.nix inputs:**
