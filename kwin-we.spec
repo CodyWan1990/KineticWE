@@ -139,11 +139,18 @@ Requires:       kf6-kirigami
 Requires:       kwayland
 Requires:       kdecoration
 Requires:       kscreenlocker
+Requires:       plasma-workspace
 Requires:       xorg-x11-server-Xwayland
 Requires:       hwdata
+Requires:       xdg-desktop-portal
+Requires:       xdg-desktop-portal-kde
 
-# Noctalia is a soft dependency — users must install it from lionheartp/Hyprland COPR
+# Soft deps — nice to have for full experience
 Recommends:     noctalia-git
+Recommends:     plasma-milou
+Recommends:     aurorae
+Recommends:     plasma-breeze
+Recommends:     kscreen
 
 %description
 KineticWE is a fork of KWin that adds native tiling support for Wayland.
@@ -199,7 +206,7 @@ popd
 # --- Phase 2: Build kwin-we against the kglobalacceld we just built ---
 # We install kglobalacceld into a temp dir so kwin-we's CMake can find it
 mkdir -p ${KGA_TMP_PREFIX}
-DESTDIR=${KGA_TMP_PREFIX} ninja -C ../kglobalacceld/build install
+DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 
 %cmake \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -216,7 +223,7 @@ DESTDIR=${KGA_TMP_PREFIX} ninja -C ../kglobalacceld/build install
 
 %install
 # Install kglobalacceld to the buildroot
-DESTDIR=%{buildroot} ninja -C ../kglobalacceld/build install
+DESTDIR=%{buildroot} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 
 # Install kwin-we to the buildroot
 %cmake_install
@@ -233,7 +240,6 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 %license LICENSES/*
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
-%{_libdir}/libkwin.so.*
 %{_libdir}/libkwin*.so.*
 %{_libdir}/qt6/plugins/kwin/
 %{_libdir}/qt6/plugins/plasma/kcms/
@@ -248,7 +254,6 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 %files -n kineticwe-kglobalacceld
 %license ../kglobalacceld/LICENSES/*
 %{_libdir}/libKGlobalAccelD.so.*
-%{_libdir}/libKGlobalAccelD.so
 
 # =============================================================================
 # Changelog
