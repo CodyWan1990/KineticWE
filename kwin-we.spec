@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -238,6 +238,13 @@ DESTDIR=%{buildroot} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 # Remove unnecessary devel files from main package (they go in -devel if needed)
 rm -f %{buildroot}%{_libdir}/cmake/KGlobalAccelD/*.cmake 2>/dev/null || true
 
+# Remove .so symlinks (devel files) — prevents conflict with system kwin-devel
+rm -f %{buildroot}%{_libdir}/libKGlobalAccelD.so 2>/dev/null || true
+
+# Remove header files installed by kglobalacceld and kwin-we (devel content)
+rm -rf %{buildroot}%{_includedir}/KGlobalAccelD/ 2>/dev/null || true
+rm -rf %{buildroot}%{_includedir}/kwin/ 2>/dev/null || true
+
 # Remove knotifications6 .notifyrc file to avoid conflict with system kwin-notifications
 # The directory will be owned via %dir in %files
 rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
@@ -283,7 +290,14 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 # =============================================================================
 
 %changelog
-* Fri Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-7
+* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-8
+- Remove unpackaged devel headers (%%{_includedir}/KGlobalAccelD/ and
+  %%{_includedir}/kwin/) that caused "Installed (but unpackaged) file(s)"
+  errors on COPR
+- Remove libKGlobalAccelD.so symlink from main package
+- Fix bogus changelog dates (Fri → Sat)
+
+* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-7
 - Fix %%files: remove bogus qt6/ prefix from plugin/qml paths
 - Add missing %%files entries: kwindowprop, kwin-we_wayland_wrapper,
   libkcmkwincommon, libexec/kwin*, kconf_update_bin/kwin*, plugins/kf6/,
@@ -292,7 +306,7 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 - Clean up .so symlinks (libkwin.so, libkcmkwincommon.so) from main package
 - Fix knotifications6/ to use %%dir (empty after .notifyrc cleanup)
 
-* Fri Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
+* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
 - Initial COPR packaging of KineticWE
 - Bundled kglobalacceld from git master (post-6.7.0 API)
 - Binary renamed from kwin-we_wayland to kinetic-we
