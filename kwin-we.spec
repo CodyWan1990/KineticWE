@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
