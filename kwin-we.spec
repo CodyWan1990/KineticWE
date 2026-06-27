@@ -21,7 +21,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -247,8 +247,8 @@ rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 
 %files -n kineticwe-kglobalacceld
 %license ../kglobalacceld/LICENSES/*
-%{_libdir}/libKF6GlobalAccelD.so.*
-%{_libdir}/libkglobalacceld.so.*
+%{_libdir}/libKGlobalAccelD.so.*
+%{_libdir}/libKGlobalAccelD.so
 
 # =============================================================================
 # Changelog
