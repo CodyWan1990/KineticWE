@@ -57,17 +57,39 @@ void CenterTileLayoutEngine::addWindow(Window *window)
         return;
     }
 
-    // Insert new window as the last item in the layout order. The actual
-    // column (left stack / master / right stack) is determined by reflow()
-    // based on masterSize and the current window count.
-    CustomTile *leaf = m_root->createChildAt(RectF(0, 0, 1, 1), Tile::LayoutDirection::Floating, m_leaves.count());
-    m_leaves.append(leaf);
-    m_weights.append(DefaultWeight);
+    CustomTile *leaf = m_root->createChildAt(RectF(0, 0, 1, 1), Tile::LayoutDirection::Floating,
+                                              totalLeafCount());
+
+    // If the master column still has room, fill it.  Otherwise add the new
+    // window to a side stack, alternating left / right.
+    if (m_masterLeaves.count() < m_masterSize) {
+        m_masterLeaves.append(leaf);
+        m_masterWeights.append(DefaultWeight);
+    } else if (m_nextWindowGoesRight) {
+        m_rightLeaves.append(leaf);
+        m_rightWeights.append(DefaultWeight);
+        m_nextWindowGoesRight = false;
+    } else {
+        m_leftLeaves.append(leaf);
+        m_leftWeights.append(DefaultWeight);
+        m_nextWindowGoesRight = true;
+    }
+
     if (!leaf->manage(window)) {
-        qWarning() << "CenterTileLayoutEngine: failed to manage window" << window->caption() << "in leaf, desktop mismatch?";
+        qWarning() << "CenterTileLayoutEngine: failed to manage window" << window->caption()
+                    << "in leaf, desktop mismatch?";
         m_root->destroyChild(leaf);
-        m_leaves.removeLast();
-        m_weights.removeLast();
+        // Undo the list append.
+        if (!m_masterLeaves.isEmpty() && m_masterLeaves.last() == leaf) {
+            m_masterLeaves.removeLast();
+            m_masterWeights.removeLast();
+        } else if (!m_leftLeaves.isEmpty() && m_leftLeaves.last() == leaf) {
+            m_leftLeaves.removeLast();
+            m_leftWeights.removeLast();
+        } else if (!m_rightLeaves.isEmpty() && m_rightLeaves.last() == leaf) {
+            m_rightLeaves.removeLast();
+            m_rightWeights.removeLast();
+        }
         return;
     }
 
@@ -76,18 +98,42 @@ void CenterTileLayoutEngine::addWindow(Window *window)
 
 void CenterTileLayoutEngine::removeWindow(Window *window)
 {
-    const int idx = indexOfWindow(window);
-    if (idx < 0) {
-        return;
+    // Find which column and index the window is in, then remove it from that
+    // column's leaf and weight lists.
+
+    // Search left stack.
+    for (int i = 0; i < m_leftLeaves.count(); ++i) {
+        if (m_leftLeaves[i] && m_leftLeaves[i]->windows().contains(window)) {
+            m_leftWeights.removeAt(i);
+            CustomTile *leaf = m_leftLeaves.takeAt(i);
+            leaf->unmanage(window);
+            m_root->destroyChild(leaf);
+            reflow();
+            return;
+        }
     }
-
-    // Drop the weight before the leaf so the parallel-list invariant holds.
-    m_weights.removeAt(idx);
-    CustomTile *leaf = m_leaves.takeAt(idx);
-    leaf->unmanage(window);
-    m_root->destroyChild(leaf);
-
-    reflow();
+    // Search master column.
+    for (int i = 0; i < m_masterLeaves.count(); ++i) {
+        if (m_masterLeaves[i] && m_masterLeaves[i]->windows().contains(window)) {
+            m_masterWeights.removeAt(i);
+            CustomTile *leaf = m_masterLeaves.takeAt(i);
+            leaf->unmanage(window);
+            m_root->destroyChild(leaf);
+            reflow();
+            return;
+        }
+    }
+    // Search right stack.
+    for (int i = 0; i < m_rightLeaves.count(); ++i) {
+        if (m_rightLeaves[i] && m_rightLeaves[i]->windows().contains(window)) {
+            m_rightWeights.removeAt(i);
+            CustomTile *leaf = m_rightLeaves.takeAt(i);
+            leaf->unmanage(window);
+            m_root->destroyChild(leaf);
+            reflow();
+            return;
+        }
+    }
 }
 
 void CenterTileLayoutEngine::pruneEmptyLeaves()
@@ -97,20 +143,23 @@ void CenterTileLayoutEngine::pruneEmptyLeaves()
     }
 
     bool changed = false;
-    // Iterate high-to-low so removing a leaf doesn't shift the indices of
-    // leaves we haven't inspected yet.
-    for (int i = m_leaves.count() - 1; i >= 0; --i) {
-        const auto &leaf = m_leaves[i];
-        if (leaf && !leaf->windows().isEmpty()) {
-            continue;
+    auto pruneColumn = [&](QList<QPointer<CustomTile>> &leaves, QList<qreal> &weights) {
+        for (int i = leaves.count() - 1; i >= 0; --i) {
+            const auto &leaf = leaves[i];
+            if (leaf && !leaf->windows().isEmpty()) {
+                continue;
+            }
+            weights.removeAt(i);
+            if (leaf) {
+                m_root->destroyChild(leaf);
+            }
+            leaves.removeAt(i);
+            changed = true;
         }
-        m_weights.removeAt(i);
-        if (leaf) {
-            m_root->destroyChild(leaf);
-        }
-        m_leaves.removeAt(i);
-        changed = true;
-    }
+    };
+    pruneColumn(m_rightLeaves, m_rightWeights);
+    pruneColumn(m_masterLeaves, m_masterWeights);
+    pruneColumn(m_leftLeaves, m_leftWeights);
 
     if (changed) {
         reflow();
@@ -119,52 +168,88 @@ void CenterTileLayoutEngine::pruneEmptyLeaves()
 
 void CenterTileLayoutEngine::moveWindow(Window *window, int delta)
 {
+    // Build flat representations of the three columns so we can swap items
+    // at a flat index and then redistribute back.
+    QList<QPointer<CustomTile>> flatLeaves = m_leftLeaves + m_masterLeaves + m_rightLeaves;
+    QList<qreal> flatWeights = m_leftWeights + m_masterWeights + m_rightWeights;
+
     const int idx = indexOfWindow(window);
     if (idx < 0) {
         return;
     }
 
-    const int newIdx = qBound(0, idx + delta, m_leaves.count() - 1);
+    const int newIdx = qBound(0, idx + delta, flatLeaves.count() - 1);
     if (newIdx == idx) {
         return;
     }
 
-    m_leaves.swapItemsAt(idx, newIdx);
-    m_weights.swapItemsAt(idx, newIdx);
+    flatLeaves.swapItemsAt(idx, newIdx);
+    flatWeights.swapItemsAt(idx, newIdx);
+
+    // Redistribute back using the original column counts.
+    const int leftCount = m_leftLeaves.count();
+    const int masterCount = m_masterLeaves.count();
+    m_leftLeaves = flatLeaves.mid(0, leftCount);
+    m_leftWeights = flatWeights.mid(0, leftCount);
+    m_masterLeaves = flatLeaves.mid(leftCount, masterCount);
+    m_masterWeights = flatWeights.mid(leftCount, masterCount);
+    m_rightLeaves = flatLeaves.mid(leftCount + masterCount);
+    m_rightWeights = flatWeights.mid(leftCount + masterCount);
+
     reflow();
 }
 
 void CenterTileLayoutEngine::beginMoveWindow(Window *window)
 {
-    const int idx = indexOfWindow(window);
-    if (idx < 0 || idx >= m_leaves.count()) {
-        return;
+    // Remember which column and index the dragged window originated from so
+    // endMoveWindow / cancelMoveWindow can act on the correct list.
+    m_moveSourceLeaf.clear();
+    m_moveSourceColumn = -1;
+    m_moveSourceColumnIndex = -1;
+
+    int idx;
+    if (findInColumn(m_leftLeaves, window, idx)) {
+        m_moveSourceLeaf = m_leftLeaves[idx];
+        m_moveSourceColumn = 0;
+        m_moveSourceColumnIndex = idx;
+    } else if (findInColumn(m_masterLeaves, window, idx)) {
+        m_moveSourceLeaf = m_masterLeaves[idx];
+        m_moveSourceColumn = 1;
+        m_moveSourceColumnIndex = idx;
+    } else if (findInColumn(m_rightLeaves, window, idx)) {
+        m_moveSourceLeaf = m_rightLeaves[idx];
+        m_moveSourceColumn = 2;
+        m_moveSourceColumnIndex = idx;
     }
-    m_moveSourceLeaf = m_leaves[idx];
-    m_moveSourceIndex = idx;
 }
 
 bool CenterTileLayoutEngine::endMoveWindow(Window *window, Window *target)
 {
     QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;
     m_moveSourceLeaf.clear();
-    m_moveSourceIndex = -1;
+    m_moveSourceColumn = -1;
+    m_moveSourceColumnIndex = -1;
 
     if (!sourceLeaf) {
         return false;
     }
 
     if (target && target != window) {
-        const int targetIdx = indexOfWindow(target);
-        if (targetIdx >= 0 && m_leaves[targetIdx]) {
-            CustomTile *targetLeaf = m_leaves[targetIdx];
-            // Swap the two windows: the dragged window takes the target's leaf,
-            // and the target takes the dragged window's original leaf.
-            targetLeaf->unmanage(target);
-            targetLeaf->manage(window);
-            sourceLeaf->manage(target);
-            reflow();
-            return true;
+        // Find the target window's leaf via columnOfWindow and swap.
+        const int tgtCol = columnIndexOfWindow(target);
+        if (tgtCol >= 0) {
+            auto *targetLeaves = (tgtCol == 0) ? &m_leftLeaves
+                                : (tgtCol == 1) ? &m_masterLeaves
+                                                : &m_rightLeaves;
+            int tgtIdx;
+            if (findInColumn(*targetLeaves, target, tgtIdx)) {
+                CustomTile *targetLeaf = targetLeaves->at(tgtIdx);
+                targetLeaf->unmanage(target);
+                targetLeaf->manage(window);
+                sourceLeaf->manage(target);
+                reflow();
+                return true;
+            }
         }
     }
 
@@ -179,10 +264,20 @@ bool CenterTileLayoutEngine::endMoveWindow(Window *window, Window *target)
 void CenterTileLayoutEngine::cancelMoveWindow(Window *window)
 {
     QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;
+    const int srcCol = m_moveSourceColumn;
     m_moveSourceLeaf.clear();
-    m_moveSourceIndex = -1;
+    m_moveSourceColumn = -1;
+    m_moveSourceColumnIndex = -1;
 
-    if (!sourceLeaf || !m_leaves.contains(sourceLeaf)) {
+    if (!sourceLeaf) {
+        return;
+    }
+
+    // Verify the source leaf is still in one of our columns.
+    bool found = m_leftLeaves.contains(sourceLeaf)
+              || m_masterLeaves.contains(sourceLeaf)
+              || m_rightLeaves.contains(sourceLeaf);
+    if (!found) {
         return;
     }
 
@@ -192,7 +287,13 @@ void CenterTileLayoutEngine::cancelMoveWindow(Window *window)
         if (sourceLeaf->windows().contains(window)) {
             sourceLeaf->unmanage(window);
         }
-        m_leaves.removeOne(sourceLeaf);
+        if (srcCol == 0) {
+            m_leftLeaves.removeOne(sourceLeaf);
+        } else if (srcCol == 1) {
+            m_masterLeaves.removeOne(sourceLeaf);
+        } else if (srcCol == 2) {
+            m_rightLeaves.removeOne(sourceLeaf);
+        }
         m_root->destroyChild(sourceLeaf);
         reflow();
     }
@@ -200,34 +301,29 @@ void CenterTileLayoutEngine::cancelMoveWindow(Window *window)
 
 void CenterTileLayoutEngine::reflow()
 {
-    if (!m_root || m_leaves.isEmpty()) {
+    const int totalCount = totalLeafCount();
+    if (!m_root || totalCount == 0) {
         return;
     }
 
-    const int count = m_leaves.count();
-
-    if (count == 1) {
-        if (CustomTile *leaf = m_leaves.first()) {
-            leaf->setRelativeGeometry(RectF(0, 0, 1, 1));
+    if (totalCount == 1) {
+        // Single window takes the full screen.
+        if (!m_masterLeaves.isEmpty() && m_masterLeaves.first()) {
+            m_masterLeaves.first()->setRelativeGeometry(RectF(0, 0, 1, 1));
+        } else if (!m_leftLeaves.isEmpty() && m_leftLeaves.first()) {
+            m_leftLeaves.first()->setRelativeGeometry(RectF(0, 0, 1, 1));
+        } else if (!m_rightLeaves.isEmpty() && m_rightLeaves.first()) {
+            m_rightLeaves.first()->setRelativeGeometry(RectF(0, 0, 1, 1));
         }
-        m_weights = {DefaultWeight};
+        m_masterWeights = {DefaultWeight};
+        m_leftWeights.clear();
+        m_rightWeights.clear();
         Q_EMIT layoutChanged();
         return;
     }
 
-    // Defensive: keep m_weights in lock-step with m_leaves.
-    while (m_weights.size() < count) {
-        m_weights.append(DefaultWeight);
-    }
-    while (m_weights.size() > count) {
-        m_weights.removeLast();
-    }
-
-    const ColumnSizes sizes = columnSizes(count);
-
     // Helper: distribute a contiguous run of leaves by their weights over a
-    // column's full height, with the same floor/renormalisation strategy
-    // used by MasterStackLayoutEngine.
+    // column's full height.
     auto distribute = [](const QList<qreal> &weights, qreal columnH) {
         QList<qreal> heights(weights.size(), 0.0);
         if (weights.isEmpty() || columnH <= 0.0) {
@@ -269,10 +365,7 @@ void CenterTileLayoutEngine::reflow()
         return heights;
     };
 
-    // Decide horizontal column widths. When there are no side stacks, the
-    // master column takes the full width so windows are still visible. When
-    // at least one side stack is populated, masterRatio determines the centre
-    // column's width; both side stacks share the remainder equally.
+    // Decide horizontal column widths.
     qreal leftWidth = 0.0;
     qreal masterWidth = 1.0;
     qreal rightWidth = 0.0;
@@ -280,16 +373,11 @@ void CenterTileLayoutEngine::reflow()
     qreal masterStart = 0.0;
     qreal rightStart = 0.0;
 
-    if (sizes.leftStack > 0 || sizes.rightStack > 0) {
-        // CustomTile::setRelativeGeometry bumps each leaf's requested width
-        // up to the tile's minimumSize (0.15, see Tile::m_minimumSize). If
-        // the requested side-stack width is narrower than that floor and
-        // the rightmost column sits at rightStart > (1 - 0.15), the bumped
-        // geometry would exceed the screen bounds and be silently rejected
-        // by CustomTile — leaving the leaf at its stale full-screen
-        // geometry and effectively hiding every other column. Clamp the
-        // effective side column width to that floor and shrink the master
-        // column to whatever's left so all three columns fit on screen.
+    const int leftCount = m_leftLeaves.count();
+    const int masterCount = m_masterLeaves.count();
+    const int rightCount = m_rightLeaves.count();
+
+    if (leftCount > 0 || rightCount > 0) {
         constexpr qreal minColumnWidth = 0.15;
         const qreal requestedMasterWidth = m_masterRatio;
         const qreal requestedSideWidth = (1.0 - requestedMasterWidth) / 2.0;
@@ -302,52 +390,36 @@ void CenterTileLayoutEngine::reflow()
         rightStart = leftWidth + masterWidth;
     }
 
-    // Left stack column (if any).
-    if (sizes.leftStack > 0) {
-        QList<qreal> leftWeights;
-        leftWeights.reserve(sizes.leftStack);
-        for (int i = 0; i < sizes.leftStack; ++i) {
-            leftWeights.append(m_weights[i]);
-        }
-        const QList<qreal> heights = distribute(leftWeights, 1.0);
+    // Left stack
+    if (leftCount > 0) {
+        const QList<qreal> heights = distribute(m_leftWeights, 1.0);
         qreal y = 0.0;
-        for (int i = 0; i < sizes.leftStack; ++i) {
-            if (CustomTile *leaf = m_leaves[i]) {
+        for (int i = 0; i < leftCount; ++i) {
+            if (CustomTile *leaf = m_leftLeaves[i]) {
                 leaf->setRelativeGeometry(RectF(leftStart, y, leftWidth, heights[i]));
                 y += heights[i];
             }
         }
     }
 
-    // Master column.
-    if (sizes.masterColumn > 0) {
-        QList<qreal> masterWeights;
-        masterWeights.reserve(sizes.masterColumn);
-        for (int i = 0; i < sizes.masterColumn; ++i) {
-            masterWeights.append(m_weights[sizes.leftStack + i]);
-        }
-        const QList<qreal> heights = distribute(masterWeights, 1.0);
+    // Master column
+    if (masterCount > 0) {
+        const QList<qreal> heights = distribute(m_masterWeights, 1.0);
         qreal y = 0.0;
-        for (int i = 0; i < sizes.masterColumn; ++i) {
-            if (CustomTile *leaf = m_leaves[sizes.leftStack + i]) {
+        for (int i = 0; i < masterCount; ++i) {
+            if (CustomTile *leaf = m_masterLeaves[i]) {
                 leaf->setRelativeGeometry(RectF(masterStart, y, masterWidth, heights[i]));
                 y += heights[i];
             }
         }
     }
 
-    // Right stack column (if any).
-    if (sizes.rightStack > 0) {
-        QList<qreal> rightWeights;
-        rightWeights.reserve(sizes.rightStack);
-        const int rightStartIdx = sizes.leftStack + sizes.masterColumn;
-        for (int i = 0; i < sizes.rightStack; ++i) {
-            rightWeights.append(m_weights[rightStartIdx + i]);
-        }
-        const QList<qreal> heights = distribute(rightWeights, 1.0);
+    // Right stack
+    if (rightCount > 0) {
+        const QList<qreal> heights = distribute(m_rightWeights, 1.0);
         qreal y = 0.0;
-        for (int i = 0; i < sizes.rightStack; ++i) {
-            if (CustomTile *leaf = m_leaves[rightStartIdx + i]) {
+        for (int i = 0; i < rightCount; ++i) {
+            if (CustomTile *leaf = m_rightLeaves[i]) {
                 leaf->setRelativeGeometry(RectF(rightStart, y, rightWidth, heights[i]));
                 y += heights[i];
             }
@@ -357,58 +429,33 @@ void CenterTileLayoutEngine::reflow()
     Q_EMIT layoutChanged();
 }
 
-CenterTileLayoutEngine::ColumnSizes CenterTileLayoutEngine::columnSizes(int windowCount) const
+CenterTileLayoutEngine::ColumnSizes CenterTileLayoutEngine::columnSizes() const
 {
-    ColumnSizes sizes{0, 0, 0};
-
-    const int effectiveMasters = qMin(m_masterSize, windowCount);
-    sizes.masterColumn = effectiveMasters;
-
-    // The remaining windows split equally between the left and right stacks
-    // (with the right stack taking the extra one if the count is odd), which
-    // matches the truetile CenterTileLayout behaviour:
-    //   rstackSize = floor((N - masterSize) / 2)
-    //   lstackSize = N - masterSize - rstackSize
-    const int remainder = windowCount - effectiveMasters;
-    if (remainder > 0) {
-        sizes.rightStack = remainder / 2;
-        sizes.leftStack = remainder - sizes.rightStack;
-    }
-    return sizes;
+    return {m_leftLeaves.count(), m_masterLeaves.count(), m_rightLeaves.count()};
 }
 
 int CenterTileLayoutEngine::columnIndexOfWindow(Window *window) const
 {
-    const int idx = indexOfWindow(window);
-    if (idx < 0) {
-        return -1;
-    }
-    const int count = m_leaves.count();
-    const ColumnSizes sizes = columnSizes(count);
-
-    // The layout order in m_leaves is: left stack, master column, right stack.
-    if (idx < sizes.leftStack) {
+    int idx;
+    if (findInColumn(m_leftLeaves, window, idx)) {
         return 0;
     }
-    if (idx < sizes.leftStack + sizes.masterColumn) {
+    if (findInColumn(m_masterLeaves, window, idx)) {
         return 1;
     }
-    return 2;
+    if (findInColumn(m_rightLeaves, window, idx)) {
+        return 2;
+    }
+    return -1;
 }
 
 int CenterTileLayoutEngine::masterIndexOfWindow(Window *window) const
 {
-    const int idx = indexOfWindow(window);
-    if (idx < 0) {
-        return -1;
+    int idx;
+    if (findInColumn(m_masterLeaves, window, idx)) {
+        return idx;
     }
-    const ColumnSizes sizes = columnSizes(m_leaves.count());
-    const int masterStart = sizes.leftStack;
-    const int masterEnd = masterStart + sizes.masterColumn;
-    if (idx < masterStart || idx >= masterEnd) {
-        return -1;
-    }
-    return idx - masterStart;
+    return -1;
 }
 
 void CenterTileLayoutEngine::setMasterRatio(qreal ratio)
@@ -428,6 +475,21 @@ void CenterTileLayoutEngine::setMasterSize(int count)
     if (m_masterSize == count) {
         return;
     }
+
+    // If shrinking the master, demote excess masters to alternating side stacks.
+    while (m_masterLeaves.count() > count) {
+        CustomTile *leaf = m_masterLeaves.takeLast();
+        qreal weight = m_masterWeights.takeLast();
+        if (m_nextWindowGoesRight) {
+            m_rightLeaves.append(leaf);
+            m_rightWeights.append(weight);
+        } else {
+            m_leftLeaves.append(leaf);
+            m_leftWeights.append(weight);
+        }
+        m_nextWindowGoesRight = !m_nextWindowGoesRight;
+    }
+
     m_masterSize = count;
     reflow();
 }
@@ -435,26 +497,53 @@ void CenterTileLayoutEngine::setMasterSize(int count)
 void CenterTileLayoutEngine::adjustTileSize(Window *window, qreal weightDelta, Qt::Orientation axis)
 {
     if (axis == Qt::Horizontal) {
-        // Horizontal resize moves the centre column's share of the screen
-        // width (and, by symmetry, shrinks/grows both side stacks).
+        // Horizontal resize moves the centre column's share of the screen width.
         setMasterRatio(m_masterRatio + weightDelta);
         return;
     }
 
     // Vertical resize: change the leaf's weight inside its column.
-    const int idx = indexOfWindow(window);
-    if (idx < 0) {
+    const int col = columnIndexOfWindow(window);
+    QList<qreal> *weights = nullptr;
+    if (col == 0) {
+        weights = &m_leftWeights;
+    } else if (col == 1) {
+        weights = &m_masterWeights;
+    } else if (col == 2) {
+        weights = &m_rightWeights;
+    }
+    if (!weights) {
         return;
     }
-    m_weights[idx] = std::clamp(m_weights[idx] + weightDelta, m_minWeight, m_maxWeight);
+
+    int idx;
+    if (col == 0) {
+        if (!findInColumn(m_leftLeaves, window, idx)) return;
+    } else if (col == 1) {
+        if (!findInColumn(m_masterLeaves, window, idx)) return;
+    } else {
+        if (!findInColumn(m_rightLeaves, window, idx)) return;
+    }
+
+    (*weights)[idx] = std::clamp((*weights)[idx] + weightDelta, m_minWeight, m_maxWeight);
     reflow();
 }
 
 QList<Window *> CenterTileLayoutEngine::windows() const
 {
     QList<Window *> result;
-    result.reserve(m_leaves.count());
-    for (const auto &leaf : m_leaves) {
+    result.reserve(totalLeafCount());
+    for (const auto &leaf : m_leftLeaves) {
+        if (leaf && !leaf->windows().isEmpty()) {
+            result.append(leaf->windows().first());
+        }
+    }
+    for (const auto &leaf : m_masterLeaves) {
+        if (leaf && !leaf->windows().isEmpty()) {
+            result.append(leaf->windows().first());
+        }
+    }
+    for (const auto &leaf : m_rightLeaves) {
         if (leaf && !leaf->windows().isEmpty()) {
             result.append(leaf->windows().first());
         }
@@ -464,14 +553,14 @@ QList<Window *> CenterTileLayoutEngine::windows() const
 
 Window *CenterTileLayoutEngine::primaryWindow() const
 {
-    // The primary window is the topmost master, which is the first leaf
-    // after the left stack.
-    const int leftCount = columnSizes(m_leaves.count()).leftStack;
-    if (leftCount < 0 || leftCount >= m_leaves.count() || !m_leaves[leftCount]) {
-        return nullptr;
+    // The primary window is the topmost master.
+    if (!m_masterLeaves.isEmpty() && m_masterLeaves.first()) {
+        const QList<Window *> ws = m_masterLeaves.first()->windows();
+        if (!ws.isEmpty()) {
+            return ws.first();
+        }
     }
-    const QList<Window *> ws = m_leaves[leftCount]->windows();
-    return ws.isEmpty() ? nullptr : ws.first();
+    return nullptr;
 }
 
 Window *CenterTileLayoutEngine::windowInDirection(Window *from, FocusDirection direction) const
@@ -487,12 +576,13 @@ Window *CenterTileLayoutEngine::windowInDirection(Window *from, FocusDirection d
     }
 
     const int count = ws.count();
-    const ColumnSizes sizes = columnSizes(count);
-    const int leftEnd = sizes.leftStack;
-    const int masterEnd = leftEnd + sizes.masterColumn;
-    const int rightEnd = masterEnd + sizes.rightStack;
+    const int leftCount = m_leftLeaves.count();
+    const int masterCount = m_masterLeaves.count();
+    const int rightCount = m_rightLeaves.count();
+    const int leftEnd = leftCount;
+    const int masterEnd = leftEnd + masterCount;
+    const int rightEnd = masterEnd + rightCount;
 
-    // Helper: validate a candidate index.
     auto neighbour = [&](int candidateIdx) -> Window * {
         if (candidateIdx < 0 || candidateIdx >= count) {
             return nullptr;
@@ -503,113 +593,126 @@ Window *CenterTileLayoutEngine::windowInDirection(Window *from, FocusDirection d
     switch (direction) {
     case FocusDirection::Up: {
         if (idx >= leftEnd && idx < masterEnd) {
-            // Master column: step up within it; from master[0] jump to the
-            // topmost left-stack leaf (if present).
             const int masterIdx = idx - leftEnd;
             if (masterIdx > 0) {
                 return ws[leftEnd + masterIdx - 1];
             }
-            if (sizes.leftStack > 0) {
-                return ws[sizes.leftStack - 1];
+            if (leftCount > 0) {
+                return ws[leftEnd - 1];
             }
             return nullptr;
         }
         if (idx < leftEnd) {
-            // Left stack: step up within it.
             return neighbour(idx - 1);
         }
-        // Right stack: step up within it; from top, jump to topmost master.
         if (idx > masterEnd) {
             return neighbour(idx - 1);
         }
-        if (idx == masterEnd && sizes.masterColumn > 0) {
-            return ws[leftEnd + sizes.masterColumn - 1];
+        if (idx == masterEnd && masterCount > 0) {
+            return ws[leftEnd + masterCount - 1];
         }
         return nullptr;
     }
     case FocusDirection::Down: {
         if (idx < leftEnd) {
-            // Left stack: step down within it; from bottom, jump to top master.
             if (idx < leftEnd - 1) {
                 return ws[idx + 1];
             }
-            if (sizes.masterColumn > 0) {
+            if (masterCount > 0) {
                 return ws[leftEnd];
             }
-            if (sizes.rightStack > 0) {
+            if (rightCount > 0) {
                 return ws[masterEnd];
             }
             return nullptr;
         }
         if (idx >= leftEnd && idx < masterEnd) {
-            // Master: step down within it; from bottom, jump to top of right.
             const int masterIdx = idx - leftEnd;
-            if (masterIdx < sizes.masterColumn - 1) {
+            if (masterIdx < masterCount - 1) {
                 return ws[leftEnd + masterIdx + 1];
             }
-            if (sizes.rightStack > 0) {
+            if (rightCount > 0) {
                 return ws[masterEnd];
             }
             return nullptr;
         }
-        // Right stack: step down within it.
         return neighbour(idx + 1);
     }
     case FocusDirection::Left: {
         if (idx >= masterEnd && idx < rightEnd) {
-            // Right stack: jump to top of master column.
-            if (sizes.masterColumn > 0) {
+            if (masterCount > 0) {
                 return ws[leftEnd];
             }
-            if (sizes.leftStack > 0) {
-                return ws[sizes.leftStack - 1];
+            if (leftCount > 0) {
+                return ws[leftEnd - 1];
             }
             return nullptr;
         }
         if (idx >= leftEnd && idx < masterEnd) {
-            // Master: jump to top of left stack.
-            if (sizes.leftStack > 0) {
-                return ws[0];
+            if (leftCount > 0) {
+                return ws[leftEnd - 1];
             }
             return nullptr;
         }
-        // Already at the leftmost column.
         return nullptr;
     }
     case FocusDirection::Right: {
         if (idx < leftEnd) {
-            // Left stack: jump to top of master column.
-            if (sizes.masterColumn > 0) {
+            if (masterCount > 0) {
                 return ws[leftEnd];
             }
-            if (sizes.rightStack > 0) {
+            if (rightCount > 0) {
                 return ws[masterEnd];
             }
             return nullptr;
         }
         if (idx >= leftEnd && idx < masterEnd) {
-            // Master: jump to top of right stack.
-            if (sizes.rightStack > 0) {
+            if (rightCount > 0) {
                 return ws[masterEnd];
             }
             return nullptr;
         }
-        // Already at the rightmost column.
         return nullptr;
     }
     }
-
     return nullptr;
 }
 
 int CenterTileLayoutEngine::indexOfWindow(Window *window) const
 {
-    for (int i = 0; i < m_leaves.count(); ++i) {
-        if (m_leaves[i] && m_leaves[i]->windows().contains(window)) {
+    // Left stack
+    for (int i = 0; i < m_leftLeaves.count(); ++i) {
+        if (m_leftLeaves[i] && m_leftLeaves[i]->windows().contains(window)) {
             return i;
         }
     }
+    // Master column
+    const int leftOffset = m_leftLeaves.count();
+    for (int i = 0; i < m_masterLeaves.count(); ++i) {
+        if (m_masterLeaves[i] && m_masterLeaves[i]->windows().contains(window)) {
+            return leftOffset + i;
+        }
+    }
+    // Right stack
+    const int masterOffset = leftOffset + m_masterLeaves.count();
+    for (int i = 0; i < m_rightLeaves.count(); ++i) {
+        if (m_rightLeaves[i] && m_rightLeaves[i]->windows().contains(window)) {
+            return masterOffset + i;
+        }
+    }
     return -1;
+}
+
+bool CenterTileLayoutEngine::findInColumn(const QList<QPointer<CustomTile>> &leaves,
+                                           Window *window, int &idx) const
+{
+    for (int i = 0; i < leaves.count(); ++i) {
+        if (leaves[i] && leaves[i]->windows().contains(window)) {
+            idx = i;
+            return true;
+        }
+    }
+    return false;
 }
 
 void CenterTileLayoutEngine::interactiveResizeEnded(Window *window, const RectF &before, const RectF &after,
@@ -620,26 +723,21 @@ void CenterTileLayoutEngine::interactiveResizeEnded(Window *window, const RectF 
         return;
     }
 
-    const int idx = indexOfWindow(window);
-    if (idx < 0) {
+    const int col = columnIndexOfWindow(window);
+    if (col < 0) {
         return;
     }
 
     // --- Horizontal resize: move both dividers symmetrically (adjust masterRatio) ---
     if (edge == Qt::LeftEdge || edge == Qt::RightEdge) {
-        const int col = columnIndexOfWindow(window);
-
         // Screen-edge checks
-        if (col == 0 && edge == Qt::LeftEdge)  return; // left stack flush with screen
-        if (col == 2 && edge == Qt::RightEdge) return; // right stack flush with screen
+        if (col == 0 && edge == Qt::LeftEdge)  return;
+        if (col == 2 && edge == Qt::RightEdge) return;
 
-        // Compute the signed pixel movement of the window edge.
         const qreal edgeDelta = (edge == Qt::RightEdge)
             ? (after.right() - before.right())
             : (before.left() - after.left());
 
-        // Master column:    positive edgeDelta = center wider → masterRatio increases
-        // Side stack:       positive edgeDelta = side wider → center narrower → masterRatio decreases
         const qreal sign = (col == 1) ? 1.0 : -1.0;
         const qreal ratioDelta = sign * edgeDelta / outputSize.width();
         if (qFuzzyIsNull(ratioDelta)) {
@@ -651,24 +749,32 @@ void CenterTileLayoutEngine::interactiveResizeEnded(Window *window, const RectF 
 
     // --- Vertical resize: push / pull within the window's column ---
 
-    // Determine contiguous index range for this column.
-    const ColumnSizes sizes = columnSizes(m_leaves.count());
-    int colStart = 0, colEnd = m_leaves.count();
-    if (idx < sizes.leftStack) {
-        colEnd = sizes.leftStack;
-    } else if (idx < sizes.leftStack + sizes.masterColumn) {
-        colStart = sizes.leftStack;
-        colEnd = colStart + sizes.masterColumn;
+    QList<qreal> *weights = nullptr;
+    if (col == 0) {
+        weights = &m_leftWeights;
+    } else if (col == 1) {
+        weights = &m_masterWeights;
     } else {
-        colStart = sizes.leftStack + sizes.masterColumn;
+        weights = &m_rightWeights;
     }
-    const int colIdx = idx - colStart;
-    const int neighbourIdx = (edge == Qt::BottomEdge) ? colIdx + 1 : colIdx - 1;
-    if (neighbourIdx < 0 || neighbourIdx >= (colEnd - colStart)) {
-        return; // No neighbour in that direction.
+    if (!weights || weights->isEmpty()) {
+        return;
     }
 
-    // Compute the weight delta from the geometry change.
+    int colIdx;
+    if (col == 0) {
+        if (!findInColumn(m_leftLeaves, window, colIdx)) return;
+    } else if (col == 1) {
+        if (!findInColumn(m_masterLeaves, window, colIdx)) return;
+    } else {
+        if (!findInColumn(m_rightLeaves, window, colIdx)) return;
+    }
+
+    const int neighbourIdx = (edge == Qt::BottomEdge) ? colIdx + 1 : colIdx - 1;
+    if (neighbourIdx < 0 || neighbourIdx >= weights->count()) {
+        return;
+    }
+
     const qreal weightDelta = (edge == Qt::BottomEdge)
         ? (after.bottom() - before.bottom()) / outputSize.height()
         : (before.top() - after.top()) / outputSize.height();
@@ -676,18 +782,15 @@ void CenterTileLayoutEngine::interactiveResizeEnded(Window *window, const RectF 
         return;
     }
 
-    // Push / pull: window takes weightDelta from its neighbour.
-    const int globalSelf = colStart + colIdx;
-    const int globalNeighbour = colStart + neighbourIdx;
-    qreal newSelf = std::clamp(m_weights[globalSelf] + weightDelta, m_minWeight, m_maxWeight);
-    qreal actualDelta = newSelf - m_weights[globalSelf];
-    qreal newNeighbour = std::clamp(m_weights[globalNeighbour] - actualDelta, m_minWeight, m_maxWeight);
-    if (qFuzzyCompare(m_weights[globalSelf], newSelf) && qFuzzyCompare(m_weights[globalNeighbour], newNeighbour)) {
+    qreal newSelf = std::clamp((*weights)[colIdx] + weightDelta, m_minWeight, m_maxWeight);
+    qreal actualDelta = newSelf - (*weights)[colIdx];
+    qreal newNeighbour = std::clamp((*weights)[neighbourIdx] - actualDelta, m_minWeight, m_maxWeight);
+    if (qFuzzyCompare((*weights)[colIdx], newSelf) && qFuzzyCompare((*weights)[neighbourIdx], newNeighbour)) {
         return;
     }
 
-    m_weights[globalSelf] = newSelf;
-    m_weights[globalNeighbour] = newNeighbour;
+    (*weights)[colIdx] = newSelf;
+    (*weights)[neighbourIdx] = newNeighbour;
     reflow();
 }
 
