@@ -21,11 +21,11 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
-URL:            https://codeberg.org/theblackdon/kineticwe
+URL:            https://gitlab.com/theblackdon/kineticwe
 Source0:        %{url}/archive/v%{version}.tar.gz
 Source1:        https://invent.kde.org/plasma/kglobalacceld/-/archive/master/kglobalacceld-master.tar.gz
 
@@ -265,10 +265,10 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 %{_bindir}/kwin-we_wayland_wrapper
 %{_libdir}/libkwin.so.*
 %{_libdir}/libkcmkwincommon.so.*
-%{_libdir}/plugins/kwin/
-%{_libdir}/plugins/plasma/kcms/
-%{_libdir}/plugins/kf6/packagestructure/
-%{_libdir}/qml/org/kde/kwin/
+%{_libdir}/qt6/plugins/kwin/
+%{_libdir}/qt6/plugins/plasma/kcms/
+%{_libdir}/qt6/plugins/kf6/packagestructure/
+%{_libdir}/qt6/qml/org/kde/kwin/
 %{_libdir}/libexec/kwin*
 %{_libdir}/kconf_update_bin/kwin*
 %{_datadir}/kconf_update/
@@ -290,14 +290,18 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 # =============================================================================
 
 %changelog
-* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-8
+* Sat Jun 28 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-9
+- Fix %%files qt6/ prefix for plugin/qml paths (required by COPR build env)
+- Update URL and Source0 from codeberg.org to gitlab.com
+
+* Sat Jun 27 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-8
 - Remove unpackaged devel headers (%%{_includedir}/KGlobalAccelD/ and
   %%{_includedir}/kwin/) that caused "Installed (but unpackaged) file(s)"
   errors on COPR
 - Remove libKGlobalAccelD.so symlink from main package
 - Fix bogus changelog dates (Fri → Sat)
 
-* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-7
+* Sat Jun 27 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-7
 - Fix %%files: remove bogus qt6/ prefix from plugin/qml paths
 - Add missing %%files entries: kwindowprop, kwin-we_wayland_wrapper,
   libkcmkwincommon, libexec/kwin*, kconf_update_bin/kwin*, plugins/kf6/,
@@ -306,7 +310,7 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 - Clean up .so symlinks (libkwin.so, libkcmkwincommon.so) from main package
 - Fix knotifications6/ to use %%dir (empty after .notifyrc cleanup)
 
-* Sat Jun 27 2026 TheBlackDon <theblackdon@codeberg.org> - 6.7.80-1
+* Sat Jun 27 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-1
 - Initial COPR packaging of KineticWE
 - Bundled kglobalacceld from git master (post-6.7.0 API)
 - Binary renamed from kwin-we_wayland to kinetic-we
