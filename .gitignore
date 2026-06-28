@@ -37,3 +37,4 @@ result-*
 # Allow COPR build Makefiles
 !copr/Makefile
 !lgl-kineticwe-copr/Makefile
+!.copr/Makefile
