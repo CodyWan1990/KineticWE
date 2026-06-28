@@ -1,17 +1,22 @@
 # COPR SCM build driver for KineticWE.
 #
-# Expected COPR SCM command from the repository root:
-#   make -f lgl-kineticwe-copr/Makefile srpm
+# Works whether invoked from the repo root or this directory:
+#   make -f lgl-kineticwe-copr/Makefile srpm   (from repo root)
+#   make srpm                                   (from lgl-kineticwe-copr/)
+#
+# COPR SCM usage: set Subdirectory = lgl-kineticwe-copr, Make targets = srpm
+
+SELF_DIR  := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+REPO_ROOT := $(abspath $(SELF_DIR)/..)
 
 PACKAGE := kineticwe
-SPECFILE := lgl-kineticwe-copr/kineticwe.spec
-VERSION := $(shell awk '/^Version:/ {print $$2; exit}' $(SPECFILE))
-OUTDIR := $(shell pwd)/lgl-kineticwe-copr/results
-SOURCE_PREFIX := $(PACKAGE)-$(VERSION)
-KINETICWE_SRC := $(PACKAGE)-$(VERSION).tar.gz
+SPECFILE := $(SELF_DIR)kineticwe.spec
+VERSION  := $(shell awk '/^Version:/ {print $$2; exit}' $(SPECFILE))
+OUTDIR   := $(SELF_DIR)results
 
-# Override this in COPR if a newer fixed kglobalacceld ref is required:
-#   make -f lgl-kineticwe-copr/Makefile srpm KGLOBALACCELD_REF=<commit-or-tag>
+SOURCE_PREFIX    := $(PACKAGE)-$(VERSION)
+KINETICWE_SRC    := $(PACKAGE)-$(VERSION).tar.gz
+
 KGLOBALACCELD_REF ?= master
 KGLOBALACCELD_SRC := kglobalacceld-$(KGLOBALACCELD_REF).tar.gz
 KGLOBALACCELD_URL := https://invent.kde.org/plasma/kglobalacceld/-/archive/$(KGLOBALACCELD_REF)/$(KGLOBALACCELD_SRC)
@@ -24,13 +29,13 @@ $(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/sta
 	rpmbuild -bs \
 		--define "_sourcedir $(OUTDIR)" \
 		--define "_srcrpmdir $(OUTDIR)" \
-		--define "_specdir $(shell pwd)/lgl-kineticwe-copr" \
+		--define "_specdir $(SELF_DIR)" \
 		--define "kglobalacceld_ref $(KGLOBALACCELD_REF)" \
 		$(SPECFILE)
 
 $(OUTDIR)/$(KINETICWE_SRC):
 	mkdir -p $(OUTDIR)
-	git archive \
+	git -C $(REPO_ROOT) archive \
 		--prefix=$(SOURCE_PREFIX)/ \
 		-o $(OUTDIR)/$(KINETICWE_SRC) \
 		HEAD
@@ -40,11 +45,11 @@ $(OUTDIR)/$(KGLOBALACCELD_SRC):
 	curl -fsSL -o $(OUTDIR)/$(KGLOBALACCELD_SRC) $(KGLOBALACCELD_URL) || \
 		wget -q -O $(OUTDIR)/$(KGLOBALACCELD_SRC) $(KGLOBALACCELD_URL)
 
-$(OUTDIR)/start-kineticwe: lgl-kineticwe-copr/SOURCES/start-kineticwe
+$(OUTDIR)/start-kineticwe: $(SELF_DIR)SOURCES/start-kineticwe
 	mkdir -p $(OUTDIR)
 	cp $< $@
 
-$(OUTDIR)/kineticwe.desktop: lgl-kineticwe-copr/SOURCES/kineticwe.desktop
+$(OUTDIR)/kineticwe.desktop: $(SELF_DIR)SOURCES/kineticwe.desktop
 	mkdir -p $(OUTDIR)
 	cp $< $@
 
