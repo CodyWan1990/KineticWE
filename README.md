@@ -40,11 +40,8 @@ Convenience scripts are provided that install all dependencies, build kglobalacc
 The easiest way to install KineticWE on Fedora is through COPR:
 
 ```bash
-# 1. Enable the Noctalia COPR and install the shell (required runtime dependency)
-sudo dnf copr enable lionheartp/Hyprland
-sudo dnf install noctalia-git
 
-# 2. Enable the KineticWE COPR and install
+# Enable the KineticWE COPR and install
 sudo dnf copr enable theblackdon/kineticwe
 sudo dnf install kineticwe
 ```
@@ -54,6 +51,24 @@ menu, or run `kinetic-we` from a TTY.
 
 > **Note:** The COPR package bundles the required newer version of
 > `kglobalacceld` (git master) so you don't need to build it separately.
+
+### Quick Install via AUR (Arch Linux)
+
+KineticWE is available on the [AUR](https://aur.archlinux.org/packages/kineticwe):
+
+```bash
+# Using an AUR helper (e.g. yay, paru):
+yay -S kineticwe
+
+# Or manually with makepkg:
+git clone https://aur.archlinux.org/kineticwe.git
+cd kineticwe
+makepkg -si
+```
+
+> **Note:** The AUR package builds `kglobalacceld` from KDE invent git master
+> automatically. `noctalia-git` is a required runtime dependency, and
+> `kglobalacceld` from the Arch repos will be replaced by the bundled build.
 
 ### Manual Install via Scripts
 Pick the script that matches your distribution:
