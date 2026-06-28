@@ -35,10 +35,18 @@ $(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/sta
 
 $(OUTDIR)/$(KINETICWE_SRC):
 	mkdir -p $(OUTDIR)
-	git -C $(REPO_ROOT) archive \
-		--prefix=$(SOURCE_PREFIX)/ \
-		-o $(OUTDIR)/$(KINETICWE_SRC) \
-		HEAD
+	if command -v git >/dev/null 2>&1; then \
+		git -C $(REPO_ROOT) archive \
+			--prefix=$(SOURCE_PREFIX)/ \
+			-o $(OUTDIR)/$(KINETICWE_SRC) \
+			HEAD; \
+	else \
+		tar czf $(OUTDIR)/$(KINETICWE_SRC) \
+			--exclude='.git' \
+			--exclude='lgl-kineticwe-copr/results' \
+			--transform "s|^\./|$(SOURCE_PREFIX)/|" \
+			-C $(REPO_ROOT) .; \
+	fi
 
 $(OUTDIR)/$(KGLOBALACCELD_SRC):
 	mkdir -p $(OUTDIR)
