@@ -34,5 +34,6 @@ result
 result-*
 /.direnv/
 
-# Allow COPR build Makefile
+# Allow COPR build Makefiles
 !copr/Makefile
+!lgl-kineticwe-copr/Makefile
