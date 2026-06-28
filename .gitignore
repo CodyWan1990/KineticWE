@@ -36,3 +36,5 @@ result-*
 
 # Allow COPR build Makefile
 !copr/Makefile
+!.copr/Makefile
+results/

@@ -1,14 +1,15 @@
 # COPR SCM Build Driver
 # =============================================================================
 # When COPR builds from SCM, it clones the repo and runs:
-#     make -f copr/Makefile srpm
+#     make -f .copr/Makefile srpm outdir=<path> spec=<path>
 # from the repository root directory.
 # =============================================================================
 
 PACKAGE := kineticwe
-VERSION := $(shell grep '^Version:' kwin-we.spec | awk '{print $$2}')
-SPECFILE := kwin-we.spec
-OUTDIR := $(shell pwd)/results
+# COPR passes 'outdir' and 'spec' as make variables; fall back to defaults
+OUTDIR := $(or $(outdir),$(shell pwd)/results)
+SPECFILE := $(or $(spec),kwin-we.spec)
+VERSION := $(shell grep '^Version:' $(SPECFILE) | awk '{print $2}')
 SRCTARBALL := v$(VERSION).tar.gz        # must match basename of Source0 in spec
 KGA_SRC := kglobalacceld-master.tar.gz
 KGA_URL := https://invent.kde.org/plasma/kglobalacceld/-/archive/master/$(KGA_SRC)
@@ -21,8 +22,8 @@ $(SRPM): $(OUTDIR)/$(SRCTARBALL) $(OUTDIR)/$(KGA_SRC)
 	rpmbuild -bs \
 		--define "_sourcedir $(OUTDIR)" \
 		--define "_srcrpmdir $(OUTDIR)" \
-		--define "_specdir $(shell pwd)" \
-		$(shell pwd)/$(SPECFILE)
+		--define "_specdir $(dir $(abspath $(SPECFILE)))" \
+		$(SPECFILE)
 
 $(OUTDIR)/$(SRCTARBALL):
 	@echo "Creating source tarball from git archive..."
