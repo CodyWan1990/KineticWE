@@ -1,16 +1,14 @@
 # KineticWE
 
 > **This repository is a fork of [KWin](https://github.com/KDE/kwin) from the [KDE](https://kde.org) project.**
->
-> KineticWE adds native tiling support and bundles a turn-key install workflow for **KineticWE** — a KWin Window Environment that pairs the [Noctalia](https://github.com/noctalia-dev/noctalia) shell with this compositor.
 
-KWin is an easy to use, but flexible, compositor for Wayland on Linux. Its primary usage is in conjunction with a Desktop Shell (e.g. KDE Plasma Desktop). KWin is designed to go out of the way; users should not notice that they use a window manager at all. Nevertheless KWin provides a steep learning curve for advanced features, which are available, if they do not conflict with the primary mission. KWin does not have a dedicated targeted user group, but follows the targeted user group of the Desktop Shell using KWin as it's window manager.
+KineticWE adds native tiling support to Kwin. It gives you a Desktop Environment like experience with Window Manager Features and Feel. Best of both worlds — a KWin Window Environment that pairs the [Noctalia](https://github.com/noctalia-dev/noctalia) shell with this compositor.
 
 ---
 
-> ## ⚠️ Alpha Stage
+> ## ⚠️ BETA Stage
 >
-> **KineticWE is currently in ALPHA.**
+> **KineticWE is currently in BETA.**
 >
 > Expect:
 > - Bugs, crashes, and visual glitches.
@@ -19,15 +17,15 @@ KWin is an easy to use, but flexible, compositor for Wayland on Linux. Its prima
 >
 > Please do **not** use KineticWE as your daily driver on a production system. Feedback and bug reports are welcome, but you are running pre-release software.
 
-> ## 🤖 AI-Generated Code Disclaimer
+> ## 🤖 LLM-Generated Code Disclaimer
 >
-> Portions of this project — including (but not limited to) installer scripts, build glue, configuration files, documentation, and some C++/QML/JS source files — were **authored with the assistance of AI tools** (large language models and AI coding assistants).
+> Portions of this project — including (but not limited to) installer scripts, build glue, configuration files, documentation, and some C++/QML/JS source files — were **authored with the assistance of AI tools** (large language models coding assistants).
 >
-> All AI-generated content has been reviewed by the maintainers, but it has **not** been audited to the same standard as hand-written code. You may encounter:
+> All LLM-generated content has been reviewed by the maintainers, but it has **not** been audited to the same standard as hand-written code. You may encounter:
 > - Subtle bugs or edge cases that a human author would have caught.
 > - Stylistic inconsistencies with the surrounding KWin codebase.
 >
-> **If you are not comfortable running code that was written (in whole or in part) by an AI, do not use this project and keep it movin.** By using KineticWE you acknowledge and accept this.
+> **If you are not comfortable running code that was written (in whole or in part) by an LLM, do not use this project and keep it movin.** By using KineticWE you acknowledge and accept this.
 
 ---
 
