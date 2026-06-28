@@ -1,19 +1,65 @@
 # SPDX-FileCopyrightText: None
 # SPDX-License-Identifier: CC0-1.0
 
-include:
-  - project: sysadmin/ci-utilities
-    file:
-      - /gitlab-templates/linux-qt6.yml
-      - /gitlab-templates/linux-qt6-next.yml
-      - /gitlab-templates/freebsd-qt6.yml
-      - /gitlab-templates/xml-lint.yml
-      - /gitlab-templates/yaml-lint.yml
-      - /gitlab-templates/qml-lint.yml
-      - /gitlab-templates/cppcheck.yml
+# =============================================================================
+# KineticWE GitLab CI — Fedora 44 and Rawhide
+# =============================================================================
+# Only runs on the master branch, matching the project's COPR packaging.
+# =============================================================================
 
-suse_tumbleweed_qt611_reduced_featureset:
-  extends: suse_tumbleweed_qt611
+stages:
+  - build
+
+# ---------------------------------------------------------------------------
+# Shared: install build dependencies from the spec file
+# ---------------------------------------------------------------------------
+.install_deps:
+  before_script:
+    - dnf install -y --setopt=install_weak_deps=False dnf-plugins-core
+    - dnf builddep -y --spec kwin-we.spec
+    - dnf install -y cmake ninja-build gcc-c++ git
+
+# ---------------------------------------------------------------------------
+# Shared: configure and build (same flags as the COPR reduced-feature build)
+# ---------------------------------------------------------------------------
+.build:
   script:
-    - git config --global --add safe.directory $CI_PROJECT_DIR
-    - python3 -u ci-utilities/run-ci-build.py --project $CI_PROJECT_NAME --branch $CI_COMMIT_REF_NAME --platform Linux --extra-cmake-args="-DKWIN_BUILD_KCMS=OFF -DKWIN_BUILD_SCREENLOCKER=OFF -DKWIN_BUILD_TABBOX=OFF -DKWIN_BUILD_ACTIVITIES=OFF -DKWIN_BUILD_RUNNERS=OFF -DKWIN_BUILD_NOTIFICATIONS=OFF -DKWIN_BUILD_GLOBALSHORTCUTS=OFF -DKWIN_BUILD_X11=OFF -DKWIN_BUILD_EIS=OFF -DKWIN_BUILD_QACCESSIBILITYCLIENT=OFF" --skip-publishing --only-build
+    - >
+      cmake -B build -G Ninja
+      -DCMAKE_BUILD_TYPE=Release
+      -DKWIN_BUILD_KCMS=OFF
+      -DKWIN_BUILD_SCREENLOCKER=OFF
+      -DKWIN_BUILD_TABBOX=OFF
+      -DKWIN_BUILD_ACTIVITIES=OFF
+      -DKWIN_BUILD_RUNNERS=OFF
+      -DKWIN_BUILD_NOTIFICATIONS=OFF
+      -DKWIN_BUILD_GLOBALSHORTCUTS=OFF
+      -DKWIN_BUILD_X11=OFF
+      -DKWIN_BUILD_EIS=OFF
+      -DKWIN_BUILD_QACCESSIBILITYCLIENT=OFF
+    - cmake --build build --parallel $(nproc)
+
+# ---------------------------------------------------------------------------
+# Fedora 44 — mirrors the primary COPR target
+# ---------------------------------------------------------------------------
+fedora44:
+  extends:
+    - .install_deps
+    - .build
+  stage: build
+  image: fedora:44
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+
+# ---------------------------------------------------------------------------
+# Fedora Rawhide — bleeding-edge compatibility check
+# ---------------------------------------------------------------------------
+rawhide:
+  extends:
+    - .install_deps
+    - .build
+  stage: build
+  image: fedora:rawhide
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+
