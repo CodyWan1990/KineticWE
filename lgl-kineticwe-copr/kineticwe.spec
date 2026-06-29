@@ -125,9 +125,12 @@ Provides:       kwin-common = %{version}-%{release}
 Provides:       kwin-common%{?_isa} = %{version}-%{release}
 Provides:       kwin-libs = %{version}-%{release}
 Provides:       kwin-libs%{?_isa} = %{version}-%{release}
+Provides:       kwin-wayland = %{version}-%{release}
+Provides:       kwin-wayland%{?_isa} = %{version}-%{release}
 Obsoletes:      kwin < %{version}-%{release}
 Obsoletes:      kwin-common < %{version}-%{release}
 Obsoletes:      kwin-libs < %{version}-%{release}
+Obsoletes:      kwin-wayland < %{version}-%{release}
 
 %description
 KineticWE is a fork of KWin that adds native tiling support for Wayland.
