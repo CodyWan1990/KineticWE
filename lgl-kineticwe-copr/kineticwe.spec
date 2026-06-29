@@ -110,7 +110,7 @@ Requires:       plasma-milou
 Requires:       aurorae
 Requires:       plasma-breeze
 Requires:       kscreen
-Requires:       (noctalia-shell-v5 >= 5.0.0 or noctalia-git >= 5.0.0)
+Recommends:     (noctalia-shell-v5 >= 5.0.0 or noctalia-git >= 5.0.0)
 Requires:       xorg-x11-server-Xwayland
 Requires:       hwdata
 Requires:       xdg-desktop-portal
@@ -145,20 +145,20 @@ mkdir -p ../kglobalacceld
 tar xf %{SOURCE1} -C ../kglobalacceld --strip-components=1
 
 %build
+KGA_SRC=%{_builddir}/kglobalacceld
+KGA_BUILD=%{_builddir}/kglobalacceld-build
 KGA_TMP_PREFIX=%{_builddir}/kga-install
 
-mkdir -p ../kglobalacceld/build
-pushd ../kglobalacceld/build
-%cmake \
+cmake -S "${KGA_SRC}" \
+    -B "${KGA_BUILD}" \
+    -GNinja \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DBUILD_TESTING=OFF \
-    ..
-%cmake_build
-popd
+    -DBUILD_TESTING=OFF
+cmake --build "${KGA_BUILD}"
 
 mkdir -p "${KGA_TMP_PREFIX}"
-DESTDIR="${KGA_TMP_PREFIX}" cmake --install ../kglobalacceld/build --prefix %{_prefix}
+DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 
 %cmake \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -170,7 +170,8 @@ DESTDIR="${KGA_TMP_PREFIX}" cmake --install ../kglobalacceld/build --prefix %{_p
 %cmake_build
 
 %install
-DESTDIR=%{buildroot} cmake --install ../kglobalacceld/build --prefix %{_prefix}
+KGA_BUILD=%{_builddir}/kglobalacceld-build
+DESTDIR=%{buildroot} cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 %cmake_install
 
 install -Dpm 0755 %{SOURCE2} %{buildroot}%{_bindir}/start-kineticwe
