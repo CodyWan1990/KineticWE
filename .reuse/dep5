@@ -9,7 +9,7 @@ Copyright: 1999-2026, KDE Developers
 License: GPL-2.0-or-later
 
 # Configuration and CI files
-Files: .clang-format .gitignore .git-blame-ignore-revs .kde-ci.yml .gitlab-ci.yml cppcheck-suppressions.xml kwin-cppcheck.xml
+Files: .clang-format .gitignore .git-blame-ignore-revs .kde-ci.yml cppcheck-suppressions.xml kwin-cppcheck.xml
 Copyright: 2014-2026, KDE Developers
 License: CC0-1.0
 
@@ -24,7 +24,7 @@ Copyright: 2024-2026, The KineticWE Developers
 License: GPL-2.0-or-later
 
 # Install and build helper scripts
-Files: install-*.sh build-kwin-we.sh Makefile
+Files: install-*.sh build-kwin-we.sh
 Copyright: 2025-2026, The KineticWE Developers
 License: GPL-2.0-or-later
 
@@ -34,7 +34,7 @@ Copyright: 2025-2026, The KineticWE Developers
 License: GPL-2.0-or-later
 
 # RPM packaging
-Files: kwin-we.spec .copr/*
+Files: kwin-we.spec
 Copyright: 2025-2026, The KineticWE Developers
 License: GPL-2.0-or-later
 
