@@ -92,22 +92,28 @@ Q_SIGNALS:
     void masterRatioChanged(qreal ratio);
 
 private:
+    /**
+     * Returns the flat (0-based) index of @p window across all three
+     * columns, ordered left stack → master column → right stack.
+     * Returns -1 if the window is not in this engine.
+     */
     int indexOfWindow(Window *window) const;
 
-    /**
-     * Split @p windowCount tiles into left-stack, master-column, right-stack
-     * groups according to masterSize. Returns the size of each group.
-     */
+    /** Returns the current number of leaves in each column. */
     struct ColumnSizes {
-        int leftStack;
-        int masterColumn;
-        int rightStack;
+        int leftStack = 0;
+        int masterColumn = 0;
+        int rightStack = 0;
     };
-    ColumnSizes columnSizes(int windowCount) const;
+    ColumnSizes columnSizes() const;
+
+    int totalLeafCount() const {
+        return m_leftLeaves.count() + m_masterLeaves.count() + m_rightLeaves.count();
+    }
 
     /**
      * Index of @p window inside the master column, or -1 if it lives in a
-     * side stack. Used for vertical resize within the master column.
+     * side stack.
      */
     int masterIndexOfWindow(Window *window) const;
     /**
@@ -116,25 +122,35 @@ private:
      */
     int columnIndexOfWindow(Window *window) const;
 
-    QPointer<RootTile> m_root;
-    QList<QPointer<CustomTile>> m_leaves;
-    // Per-tile weight parallel to m_leaves. Each new leaf starts at 1.0;
-    // reflow() distributes each column's height proportionally to its
-    // members' weights. See the distribute() helper in reflow() for the
-    // floor/renormalisation details.
-    QList<qreal> m_weights;
+    /**
+     * Find @p window in a specific column list, returning its index within
+     * that column. Sets @p idx to the found index, or leaves it unchanged and
+     * returns false when the window is not found.
+     */
+    bool findInColumn(const QList<QPointer<CustomTile>> &leaves,
+                      Window *window, int &idx) const;
 
-    // Master-column width fraction of the output. Initial default is 0.75;
-    // updated at runtime from the persisted CenterTileLastMasterRatio config
-    // value (see TilingController). When the user interactively adjusts the
-    // centre column width, the new ratio is saved back to kwinrc so it
-    // survives restarts.
+    QPointer<RootTile> m_root;
+
+    // Three explicit column-wise leaf lists.  The logical layout order is
+    // left stack, then master column, then right stack.
+    QList<QPointer<CustomTile>> m_leftLeaves;
+    QList<QPointer<CustomTile>> m_masterLeaves;
+    QList<QPointer<CustomTile>> m_rightLeaves;
+
+    // Per-column weight lists parallel to the leaf lists above.
+    QList<qreal> m_leftWeights;
+    QList<qreal> m_masterWeights;
+    QList<qreal> m_rightWeights;
+
+    // Toggle for alternating newly-added windows between the left and right
+    // side stacks once the master column is full.
+    bool m_nextWindowGoesRight = false;
+
+    // Master-column width fraction of the output.  Initial default is 0.75;
+    // updated from the persisted CenterTileLastMasterRatio config value.
     qreal m_masterRatio = 0.75;
     int m_masterSize = 1;
-    // Bounds for setMasterRatio(). The lower bound matches truetile
-    // (0.2); the upper bound is bumped from truetile's 0.75 to 0.95 so the
-    // user can make the centre column as wide as Image 2 in the design
-    // screenshots.
     static constexpr qreal m_minMasterRatio = 0.2;
     static constexpr qreal m_maxMasterRatio = 0.95;
     static constexpr int m_minMasterSize = 1;
@@ -142,11 +158,11 @@ private:
     static constexpr qreal m_minWeight = 0.1;
     static constexpr qreal m_maxWeight = 10.0;
 
-    // Source leaf remembered during an interactive drag-move so the window
-    // can be swapped with another tiled window or restored to its original
-    // place.
+    // Source leaf and column position remembered during an interactive
+    // drag-move so the window can be restored or swapped on release.
     QPointer<CustomTile> m_moveSourceLeaf;
-    int m_moveSourceIndex = -1;
+    int m_moveSourceColumn = -1;      // 0=left, 1=master, 2=right
+    int m_moveSourceColumnIndex = -1; // index within that column
 };
 
 } // namespace KWin

@@ -1,0 +1,64 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: kineticwe
+Upstream-Contact: https://gitlab.com/theblackdon/kineticwe
+Source: https://gitlab.com/theblackdon/kineticwe
+
+# Build system files
+Files: CMakeLists.txt */CMakeLists.txt *.cmake *.cmake.in cmake/modules/* cmake/modules/*.cmake
+Copyright: 1999-2026, KDE Developers
+License: GPL-2.0-or-later
+
+# Configuration and CI files
+Files: .clang-format .gitignore .git-blame-ignore-revs .kde-ci.yml cppcheck-suppressions.xml kwin-cppcheck.xml
+Copyright: 2014-2026, KDE Developers
+License: CC0-1.0
+
+# Data files (icons, desktop files, etc.)
+Files: data/icons/* data/kinetic-hidden-kcms/overrides/*.desktop data/org_kde_kwin.categories
+Copyright: 1999-2026, KDE Developers
+License: GPL-2.0-or-later
+
+# Nix build files
+Files: flake.nix nix/*.nix
+Copyright: 2024-2026, The KineticWE Developers
+License: GPL-2.0-or-later
+
+# Install and build helper scripts
+Files: install-*.sh build-kwin-we.sh
+Copyright: 2025-2026, The KineticWE Developers
+License: GPL-2.0-or-later
+
+# Arch Linux packaging
+Files: PKGBUILD .SRCINFO
+Copyright: 2025-2026, The KineticWE Developers
+License: GPL-2.0-or-later
+
+# RPM packaging
+Files: kwin-we.spec
+Copyright: 2025-2026, The KineticWE Developers
+License: GPL-2.0-or-later
+
+# Plasma service file
+Files: plasma-kwin_wayland.service.in
+Copyright: 2018-2026, KDE Developers
+License: GPL-2.0-or-later
+
+# KConf update scripts
+Files: kconf_update/*.cpp kconf_update/*.upd kconf_update/CMakeLists.txt
+Copyright: 2023-2026, KDE Developers
+License: GPL-2.0-or-later
+
+# Logo
+Files: logo.png
+Copyright: 2025-2026, The KineticWE Developers
+License: CC0-1.0
+
+# Translation files
+Files: po/*/*.po po/*/*.pot
+Copyright: 2002-2026, This_file_is_part_of_KDE
+License: LGPL-2.1-or-later
+
+# Documentation
+Files: doc/* doc/*/*
+Copyright: 2014-2026, KDE Developers
+License: CC0-1.0

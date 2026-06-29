@@ -12,6 +12,7 @@ Source0:        %{name}-%{version}.tar.gz
 Source1:        kglobalacceld-%{kglobalacceld_ref}.tar.gz
 Source2:        start-kineticwe
 Source3:        kineticwe.desktop
+Source4:        kglobalacceld-mask.conf
 
 BuildRequires:  cmake
 BuildRequires:  ninja-build
@@ -125,9 +126,15 @@ Provides:       kwin-common = %{version}-%{release}
 Provides:       kwin-common%{?_isa} = %{version}-%{release}
 Provides:       kwin-libs = %{version}-%{release}
 Provides:       kwin-libs%{?_isa} = %{version}-%{release}
+Provides:       kwin-wayland = %{version}-%{release}
+Provides:       kwin-wayland%{?_isa} = %{version}-%{release}
+Provides:       kglobalacceld = %{version}-%{release}
+Provides:       kglobalacceld%{?_isa} = %{version}-%{release}
 Obsoletes:      kwin < %{version}-%{release}
 Obsoletes:      kwin-common < %{version}-%{release}
 Obsoletes:      kwin-libs < %{version}-%{release}
+Obsoletes:      kwin-wayland < %{version}-%{release}
+Obsoletes:      kglobalacceld < %{version}-%{release}
 
 %description
 KineticWE is a fork of KWin that adds native tiling support for Wayland.
@@ -176,6 +183,7 @@ DESTDIR=%{buildroot} cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 
 install -Dpm 0755 %{SOURCE2} %{buildroot}%{_bindir}/start-kineticwe
 install -Dpm 0644 %{SOURCE3} %{buildroot}%{_datadir}/wayland-sessions/kineticwe.desktop
+install -Dpm 0644 %{SOURCE4} %{buildroot}%{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 # Compatibility symlinks so the Plasma session can find its compositor
 ln -s kinetic-we %{buildroot}%{_bindir}/kwin_wayland
@@ -194,6 +202,12 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so
 # Avoid owning files that conflict with Fedora's stock KWin notification data.
 rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc
 rm -rf %{buildroot}%{_datadir}/dbus-1/interfaces
+
+%post
+systemctl daemon-reload 2>/dev/null || true
+
+%postun
+systemctl daemon-reload 2>/dev/null || true
 
 %files
 %license LICENSES/* ../kglobalacceld/LICENSES/*
@@ -226,6 +240,8 @@ rm -rf %{buildroot}%{_datadir}/dbus-1/interfaces
 %{_datadir}/krunner/
 %{_datadir}/locale/
 %{_userunitdir}/plasma-kwin_wayland.service
+%dir %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/
+%{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
 * Sun Jun 28 2026 LGL <lgl@localhost> - 6.7.80-1

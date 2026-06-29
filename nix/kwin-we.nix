@@ -4,6 +4,7 @@
   cmake,
   ninja,
   pkg-config,
+  python3,
   kdePackages,           # all KF6 / Plasma / KDE deps live here
   kglobalacceldGit,      # git master build (replaces system kglobalacceld)
   # Qt6
@@ -56,10 +57,17 @@ stdenv.mkDerivation {
 
   src = lib.cleanSource ../.;
 
+  # Scripts in the KWin source use #!/usr/bin/env python3; patchShebangs
+  # in stdenv can miss them if coreutils (env) is missing from the sandbox.
+  postPatch = ''
+    patchShebangs src/plugins/
+  '';
+
   nativeBuildInputs = [
     cmake
     ninja
     pkg-config
+    python3
     qt6.wrapQtAppsHook
     kdePackages.extra-cmake-modules
   ];
