@@ -41,6 +41,7 @@ stdenv.mkDerivation rec {
     cmake
     ninja
     pkg-config
+    qt6.wrapQtAppsHook
     extra-cmake-modules
   ];
 
