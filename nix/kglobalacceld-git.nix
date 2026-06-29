@@ -33,9 +33,8 @@ stdenv.mkDerivation rec {
     domain = "invent.kde.org";
     owner = "plasma";
     repo = "kglobalacceld";
-    rev = "master";
-    # nix-prefetch-git or leave empty then fill after first attempt
-    hash = "";
+    rev = "099b1e9dcb52ea2524718ac56f4ce3339b534873";
+    hash = "sha256-jdCHpWE+MxI4tu/BV1QI+eR0NcLX5ofZd0Z6F8gGprE=";
   };
 
   nativeBuildInputs = [
