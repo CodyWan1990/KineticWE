@@ -177,6 +177,10 @@ DESTDIR=%{buildroot} cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 install -Dpm 0755 %{SOURCE2} %{buildroot}%{_bindir}/start-kineticwe
 install -Dpm 0644 %{SOURCE3} %{buildroot}%{_datadir}/wayland-sessions/kineticwe.desktop
 
+# Compatibility symlinks so the Plasma session can find its compositor
+ln -s kinetic-we %{buildroot}%{_bindir}/kwin_wayland
+ln -s kwin-we_wayland_wrapper %{buildroot}%{_bindir}/kwin_wayland_wrapper
+
 # Drop development files. This COPR package intentionally ships runtime only.
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD
 rm -rf %{buildroot}%{_includedir}/kwin
@@ -195,6 +199,8 @@ rm -rf %{buildroot}%{_datadir}/dbus-1/interfaces
 %license LICENSES/* ../kglobalacceld/LICENSES/*
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
+%{_bindir}/kwin_wayland
+%{_bindir}/kwin_wayland_wrapper
 %{_bindir}/kwindowprop
 %{_bindir}/kwin-we_wayland_wrapper
 %{_bindir}/start-kineticwe
