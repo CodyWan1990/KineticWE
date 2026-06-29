@@ -35,42 +35,7 @@ Convenience scripts are provided that install all dependencies, build kglobalacc
 
 > **Why kglobalacceld is built from source:** kwin-we calls `keyEvent()`, `pointerPressed()`, `axisTriggered()` and `resetModifierOnlyState()` directly on the `KGlobalAccelD` object — an API introduced in kglobalacceld git master (post-6.7.0). The system package on most distros is still 6.7.0 or older and routes those calls through a separate `KGlobalAccelInterface` class, so kwin-we cannot compile against it. The install scripts clone kglobalacceld from `invent.kde.org/plasma/kglobalacceld.git` and build it into `$INSTALL_PREFIX` so kwin-we's CMake finds the newer version first. This requires **Qt ≥ 6.10** and **KF6 ≥ 6.26** (satisfied on Fedora 44+, Arch rolling, and Debian Trixie/Ubuntu 24.04+ with backports).
 
-### Quick Install via COPR (Fedora)
-
-The easiest way to install KineticWE on Fedora is through COPR:
-
-```bash
-
-# Enable the KineticWE COPR and install
-sudo dnf copr enable theblackdon/kineticwe
-sudo dnf install kineticwe
-```
-
-After installation, select **KineticWE** from your display manager's session
-menu, or run `kinetic-we` from a TTY.
-
-> **Note:** The COPR package bundles the required newer version of
-> `kglobalacceld` (git master) so you don't need to build it separately.
-
-### Quick Install via AUR (Arch Linux)
-
-KineticWE is available on the [AUR](https://aur.archlinux.org/packages/kineticwe):
-
-```bash
-# Using an AUR helper (e.g. yay, paru):
-yay -S kineticwe
-
-# Or manually with makepkg:
-git clone https://aur.archlinux.org/kineticwe.git
-cd kineticwe
-makepkg -si
-```
-
-> **Note:** The AUR package builds `kglobalacceld` from KDE invent git master
-> automatically. `noctalia-git` is a required runtime dependency, and
-> `kglobalacceld` from the Arch repos will be replaced by the bundled build.
-
-### Manual Install via Scripts
+### Install via Scripts
 Pick the script that matches your distribution:
 
 | Distro | Script |
@@ -78,7 +43,7 @@ Pick the script that matches your distribution:
 | Fedora / RHEL | `./install-fedora.sh` |
 | Arch Linux / Arch-derivatives | `./install-arch.sh` |
 | Debian / Ubuntu | `./install-debian.sh` |
-| NixOS / Nix (flake) | `nix build .#session` — see below |
+| NixOS / Nix (flake) | — see below |
 
 In all cases, by default binaries are installed to `$HOME/.local`. You can change this with the `INSTALL_PREFIX` environment variable:
 
@@ -92,7 +57,7 @@ After installation:
   ```bash
   $HOME/.local/bin/start-kineticwe
   ```
-- Or select **KineticWE** from the session menu in SDDM or another Wayland-compatible greeter.
+- Or select **KineticWE** from the session menu in SDDM or another Wayland-compatible greeter. (This does not work well with PlasmaLogin, please use SDDM, LightDM, or another wayland greeter)
 - If `$HOME/.local/bin` is not in your `PATH`, add the following lines to your shell profile (`~/.bashrc` or `~/.zshrc`):
   ```bash
   export PATH="$HOME/.local/bin:$PATH"
@@ -124,11 +89,11 @@ After installation:
 ./install-debian.sh
 ```
 
-> **Note:** Tested on **Debian 13 (Trixie)** and **Ubuntu 24.04+** with Plasma 6 packages available. On older releases you may need to enable backports (Debian) or the Kubuntu backports PPA (Ubuntu) so that KF6, Qt6 and Plasma 6 are available. The `sdbus-cpp-dev` package is not in the official Debian/Ubuntu repos; it is only needed for a small portion of the codebase and the build will succeed without it.
+> **Note:** Should work on **Debian 13 (Trixie)** and **Ubuntu 24.04+** with Plasma 6 packages available. On older releases you may need to enable backports (Debian) or the Kubuntu backports PPA (Ubuntu) so that KF6, Qt6 and Plasma 6 are available. The `sdbus-cpp-dev` package is not in the official Debian/Ubuntu repos; it is only needed for a small portion of the codebase and the build will succeed without it.
 
 ### NixOS / Nix
 
-A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kwin-we, the full KineticWE session (kwin-we + noctalia), a dev shell, and Home Manager / NixOS modules.
+A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kwin-we, the full KineticWE session (kwin-we + noctalia), and Home Manager / NixOS modules.
 
 **How it works:** The flake uses `nixpkgs/master` (for Plasma 6.7 / KF6 6.27) and includes a custom `kglobalacceld-git` derivation that builds the global shortcuts daemon from KDE invent git master. This provides the newer `KGlobalAccelD` API (`keyEvent`, `pointerPressed`, `axisTriggered`, `resetModifierOnlyState`) that kwin-we requires.
 
@@ -154,7 +119,7 @@ A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of k
 }
 ```
 
-> **Note:** On the first build, Nix will error with a hash mismatch for `kglobalacceld-git`. Copy the expected hash from the error into `nix/kglobalacceld-git.nix` and rebuild.
+> **Note:** On the first build, Nix will error with a hash mismatch for `kglobalacceld-git`. Copy the expected hash from the error into `nix/kglobalacceld-git.nix` and rebuild. (This should be resolved)
 
 ---
 
