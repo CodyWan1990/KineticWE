@@ -4,6 +4,7 @@
   cmake,
   ninja,
   pkg-config,
+  python3,
   kdePackages,           # all KF6 / Plasma / KDE deps live here
   kglobalacceldGit,      # git master build (replaces system kglobalacceld)
   # Qt6
@@ -60,6 +61,7 @@ stdenv.mkDerivation {
     cmake
     ninja
     pkg-config
+    python3
     qt6.wrapQtAppsHook
     kdePackages.extra-cmake-modules
   ];
