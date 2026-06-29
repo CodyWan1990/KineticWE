@@ -34,17 +34,13 @@ in
     environment.systemPackages = [ cfg.package ];
 
     # system-wide wayland-sessions entry.
-    environment.etc."wayland-sessions/kineticwe.desktop".source =
-      pkgs.runCommand "kineticwe.desktop" { } ''
-        mkdir -p "$out"
-        cat > "$out/kineticwe.desktop" <<EOF
-        [Desktop Entry]
-        Name=KineticWE
-        Comment=A Kwin Window Environment
-        Type=Application
-        Exec=${cfg.package}/bin/start-kineticwe
-        DesktopNames=KDE
-        EOF
-      '';
+    environment.etc."wayland-sessions/kineticwe.desktop".text = ''
+      [Desktop Entry]
+      Name=KineticWE
+      Comment=A Kwin Window Environment
+      Type=Application
+      Exec=${cfg.package}/bin/start-kineticwe
+      DesktopNames=KDE
+    '';
   };
 }
