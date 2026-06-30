@@ -5,6 +5,10 @@
 > KineticWE adds native tiling support while keeping the Destktop Enviroment Feel.**KineticWE** — a KWin Window Environment that pairs the [Noctalia](https://github.com/noctalia-dev/noctalia) shell with this compositor.
 
 
+## ❤️ Support the Project
+
+If you want to support this project, you can donate here: [Ko-fi — theblackdon](https://ko-fi.com/theblackdon)
+
 ---
 
 > ## ⚠️ BETA Stage
