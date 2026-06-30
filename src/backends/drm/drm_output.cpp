@@ -23,6 +23,7 @@
 #include "core/session.h"
 #include "drm_layer.h"
 #include "drm_logging.h"
+#include "utils/envvar.h"
 #include "utils/kernel.h"
 // Qt
 #include <QCryptographicHash>
@@ -38,8 +39,7 @@
 namespace KWin
 {
 
-static bool s_disableTripleBufferingSet = false;
-static const bool s_disableTripleBuffering = qEnvironmentVariableIntValue("KWIN_DRM_DISABLE_TRIPLE_BUFFERING", &s_disableTripleBufferingSet) == 1;
+static const auto s_disableTripleBuffering = environmentVariableBoolValue("KWIN_DRM_DISABLE_TRIPLE_BUFFERING");
 
 DrmOutput::DrmOutput(const std::shared_ptr<DrmConnector> &conn, DrmPipeline *pipeline)
     : m_gpu(conn->gpu())
@@ -47,7 +47,7 @@ DrmOutput::DrmOutput(const std::shared_ptr<DrmConnector> &conn, DrmPipeline *pip
     , m_connector(conn)
 {
     m_pipeline->setOutput(this);
-    if (m_gpu->atomicModeSetting() && ((!s_disableTripleBufferingSet && !m_gpu->drmDevice()->isNvidia()) || (s_disableTripleBufferingSet && !s_disableTripleBuffering))) {
+    if (m_gpu->atomicModeSetting() && !s_disableTripleBuffering.value_or(false)) {
         m_renderLoop->setMaxPendingFrameCount(2);
     }
 
@@ -239,7 +239,7 @@ BackendOutput::Capabilities DrmOutput::computeCapabilities() const
             capabilities |= Capability::AutomaticBrightness;
         }
     }
-    if (m_connector->edid()->isValid() && m_connector->edid()->defaultColorimetry().has_value()) {
+    if (m_connector->edid()->isValid() && m_connector->edid()->nativeColorimetry().has_value()) {
         capabilities |= Capability::BuiltInColorProfile;
     }
     if (m_state.detectedDdcCi) {
@@ -490,8 +490,8 @@ std::shared_ptr<ColorDescription> DrmOutput::createColorDescription(const State 
         }
         break;
     case ColorProfileSource::EDID:
-        if (m_information.edid.isValid() && m_information.edid.defaultColorimetry()) {
-            nativeColorimetry = *m_information.edid.defaultColorimetry();
+        if (m_information.edid.isValid() && m_information.edid.nativeColorimetry()) {
+            nativeColorimetry = *m_information.edid.nativeColorimetry();
         }
         if (effectiveWcg) {
             containerColorimetry = Colorimetry::BT2020;
@@ -790,7 +790,7 @@ void DrmOutput::tryKmsColorOffloading(State &next)
         }
     }
     m_pipeline->setCrtcColorPipeline(colorPipeline);
-    if (DrmPipeline::commitPipelines({m_pipeline}, DrmPipeline::CommitMode::Test) == DrmPipeline::Error::None) {
+    if (DrmPipeline::commitPipelines({m_pipeline}, m_gpu, DrmPipeline::CommitMode::Test) == DrmPipeline::Error::None) {
         m_pipeline->applyPendingChanges();
         next.layerBlendingColor = next.blendingColor;
         m_needsShadowBuffer = false;
@@ -803,7 +803,7 @@ void DrmOutput::tryKmsColorOffloading(State &next)
         ColorPipeline simplerPipeline(ValueRange{0, 1}, ColorspaceType::NonLinearRGB);
         simplerPipeline.addMatrix(next.blendingColor->toOther(*encoding, RenderingIntent::AbsoluteColorimetricNoAdaptation), colorPipeline.currentOutputRange(), ColorspaceType::NonLinearRGB);
         m_pipeline->setCrtcColorPipeline(simplerPipeline);
-        if (DrmPipeline::commitPipelines({m_pipeline}, DrmPipeline::CommitMode::Test) == DrmPipeline::Error::None) {
+        if (DrmPipeline::commitPipelines({m_pipeline}, m_gpu, DrmPipeline::CommitMode::Test) == DrmPipeline::Error::None) {
             m_pipeline->applyPendingChanges();
             next.layerBlendingColor = next.blendingColor;
             m_needsShadowBuffer = false;

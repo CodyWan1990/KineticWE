@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2024 David Redondo <kde@david-redondo>
+    SPDX-FileCopyrightText: 2024 David Redondo <kde@david-redondo.de>
 
     SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
@@ -16,6 +16,7 @@
 #include "input_event_spy.h"
 #include "keyboard_input.h"
 #include "keyboard_layout.h"
+#include "pointer_input.h"
 #include "workspace.h"
 #include "xkb.h"
 
@@ -53,7 +54,7 @@ public:
                 // Both current and previous positions are on the barrier but there was an orthogonal delta
                 if (barrier.hitTest(event->position) && barrier.hitTest(previousPos) && ((barrier.orientation == Qt::Vertical && event->delta.x() != 0) || (barrier.orientation == Qt::Horizontal && event->delta.y() != 0))) {
                     qCDebug(KWIN_INPUTCAPTURE) << "Activating input capture, crossing"
-                                               << "barrier(" << barrier.orientation << barrier.position << "[" << barrier.start << "," << barrier.end << "])"
+                                               << "barrier(" << barrier.orientation << barrier.position << "[" << barrier.start << "," << barrier.end << "] barrier id" << barrier.id << ")"
                                                << "at" << event->position << "with" << event->delta;
                     manager->barrierHit(capture.get(), barrier.id, event->position + event->delta);
                     break;
@@ -196,9 +197,6 @@ QDBusObjectPath EisInputCaptureManager::addInputCapture(uint capabilities)
         input()->installInputEventSpy(m_barrierSpy.get());
     }
     auto &capture = m_inputCaptures.emplace_back(std::make_unique<EisInputCapture>(this, dbusService, eisCapabilities));
-    connect(capture.get(), &EisInputCapture::deactivated, this, [this] {
-        deactivate();
-    });
     return QDBusObjectPath(capture->dbusPath());
 }
 
@@ -214,12 +212,15 @@ void EisInputCaptureManager::barrierHit(KWin::EisInputCapture *capture, uint bar
     Cursors::self()->hideCursor();
 }
 
-void EisInputCaptureManager::deactivate()
+void EisInputCaptureManager::deactivate(const std::optional<QPointF> &releasePosition)
 {
     m_activeCapture = nullptr;
     m_inputFilter->clearTouches();
     m_inputFilter->setPendingModifierChange(false);
     input()->uninstallInputEventFilter(m_inputFilter.get());
+    if (releasePosition) {
+        input()->pointer()->warp(*releasePosition);
+    }
     Cursors::self()->showCursor();
 }
 

@@ -12,15 +12,15 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kcmkwinrules\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-05-22 00:45+0000\n"
-"PO-Revision-Date: 2026-05-10 18:28+0900\n"
+"POT-Creation-Date: 2026-06-24 01:25+0000\n"
+"PO-Revision-Date: 2026-06-14 17:51+0900\n"
 "Last-Translator: Mint <5602mint@gmail.com>\n"
 "Language-Team: Japanese <kde-i18n-doc@kde.org>\n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Lokalize 26.04.1\n"
+"X-Generator: Lokalize 26.04.2\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Accelerator-Marker: &\n"
 "X-Text-Markup: kde4\n"
@@ -41,29 +41,25 @@ msgid "Window settings for %1"
 msgstr "%1 のウィンドウ設定"
 
 #: optionsmodel.cpp:199 optionsmodel.cpp:204
-#, fuzzy, kde-format
-#| msgid "Unimportant"
+#, kde-format
 msgctxt "@item:inlistbox"
 msgid "Unimportant"
 msgstr "指定しない"
 
 #: optionsmodel.cpp:200
-#, fuzzy, kde-format
-#| msgid "Exact match"
+#, kde-format
 msgctxt "@item:inlistbox"
 msgid "Exact match"
 msgstr "完全一致"
 
 #: optionsmodel.cpp:201
-#, fuzzy, kde-format
-#| msgid "Substring match"
+#, kde-format
 msgctxt "@item:inlistbox"
 msgid "Substring match"
 msgstr "部分一致"
 
 #: optionsmodel.cpp:202
-#, fuzzy, kde-format
-#| msgid "Regular expression"
+#, kde-format
 msgctxt "@item:inlistbox"
 msgid "Regular expression"
 msgstr "正規表現"
@@ -72,7 +68,7 @@ msgstr "正規表現"
 #, kde-format
 msgctxt "@item:inlistbox This is a noun"
 msgid "Match"
-msgstr ""
+msgstr "一致"
 
 #: optionsmodel.cpp:210
 #, kde-format
@@ -620,7 +616,7 @@ msgstr "ティアリングを許可"
 #: rulesmodel.cpp:738
 #, kde-format
 msgid "Hide from screenshots and screen recordings"
-msgstr ""
+msgstr "画面撮影と録画から消す"
 
 #: rulesmodel.cpp:791
 #, kde-format
@@ -974,40 +970,40 @@ msgstr[0] "%1 秒後"
 msgid "Add property to the rule"
 msgstr "ルールにプロパティを追加"
 
-#: ui/RulesEditor.qml:271
+#: ui/RulesEditor.qml:269
 #, kde-format
 msgctxt "@info:placeholder"
 msgid "No properties left to add"
 msgstr "追加できるプロパティが残っていません"
 
-#: ui/RulesEditor.qml:273
+#: ui/RulesEditor.qml:271
 #, kde-format
 msgctxt "@info:placeholder %1 is a filter text introduced by the user"
 msgid "No properties match \"%1\""
 msgstr "\"%1\" の検索結果はありません"
 
-#: ui/RulesEditor.qml:294 ui/ValueEditor.qml:54
+#: ui/RulesEditor.qml:292 ui/ValueEditor.qml:54
 #, kde-format
 msgid "Yes"
 msgstr "はい"
 
-#: ui/RulesEditor.qml:294 ui/ValueEditor.qml:60
+#: ui/RulesEditor.qml:292 ui/ValueEditor.qml:60
 #, kde-format
 msgid "No"
 msgstr "いいえ"
 
-#: ui/RulesEditor.qml:296 ui/ValueEditor.qml:168 ui/ValueEditor.qml:175
+#: ui/RulesEditor.qml:294 ui/ValueEditor.qml:168 ui/ValueEditor.qml:175
 #, kde-format
 msgid "%1 %"
 msgstr "%1%"
 
-#: ui/RulesEditor.qml:298
+#: ui/RulesEditor.qml:296
 #, kde-format
 msgctxt "Coordinates (x, y)"
 msgid "(%1, %2)"
 msgstr "(%1, %2)"
 
-#: ui/RulesEditor.qml:300
+#: ui/RulesEditor.qml:298
 #, kde-format
 msgctxt "Size (width, height)"
 msgid "(%1, %2)"
