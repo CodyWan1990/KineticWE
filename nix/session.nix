@@ -91,7 +91,7 @@ fi
 PAYLOAD
 
 chmod +x "$STARTUP_PAYLOAD"
-exec "$KWIN_WE_BIN" --xwayland "$STARTUP_PAYLOAD"
+exec "$KWIN_WE_BIN" --xwayland -- "$STARTUP_PAYLOAD"
 SCRIPTEOF
     chmod +x "$out/bin/start-kineticwe"
 
