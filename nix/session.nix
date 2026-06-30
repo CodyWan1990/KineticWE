@@ -26,7 +26,18 @@ stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p "$out/bin"
+    mkdir -p "$out/bin" "$out/share/wayland-sessions"
+
+    # Desktop entry so SDDM / greetd can list KineticWE.
+    cat > "$out/share/wayland-sessions/kineticwe.desktop" << DESKTOPEOF
+[Desktop Entry]
+Name=KineticWE
+Comment=A Kwin Window Environment
+Type=Application
+Exec=$out/bin/start-kineticwe
+DesktopNames=KDE
+DESKTOPEOF
+
     cat > "$out/bin/start-kineticwe" << 'SCRIPTEOF'
 #!/bin/bash
 # KineticWE — session startup script (Nix-built).

@@ -33,14 +33,8 @@ in
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ cfg.package ];
 
-    # system-wide wayland-sessions entry.
-    environment.etc."wayland-sessions/kineticwe.desktop".text = ''
-      [Desktop Entry]
-      Name=KineticWE
-      Comment=A Kwin Window Environment
-      Type=Application
-      Exec=${cfg.package}/bin/start-kineticwe
-      DesktopNames=KDE
-    '';
+    # Register the session with the display manager so SDDM / greetd
+    # picks up share/wayland-sessions/kineticwe.desktop from the package.
+    services.xserver.displayManager.sessionPackages = [ cfg.package ];
   };
 }
