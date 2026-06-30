@@ -3,7 +3,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -135,6 +135,7 @@ Obsoletes:      kwin-common < %{version}-%{release}
 Obsoletes:      kwin-libs < %{version}-%{release}
 Obsoletes:      kwin-wayland < %{version}-%{release}
 Obsoletes:      kglobalacceld < %{version}-%{release}
+Obsoletes:      kglobalacceld-devel < %{version}-%{release}
 
 %description
 KineticWE is a fork of KWin that adds native tiling support for Wayland.
@@ -244,6 +245,15 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Tue Jun 30 2026 LGL <lgl@localhost> - 6.7.80-2
+- Fix xdg-desktop-portal-kde launch: override XDG_CURRENT_DESKTOP=KDE for
+  that process so ScreenCast/Screenshot/RemoteDesktop/Clipboard/
+  GlobalShortcuts/InputCapture/Background/Wallpaper portals register
+  (xdg-desktop-portal-kde requires an exact "KDE" match, not a colon list)
+- Obsolete kglobalacceld-devel: it requires the exact-matching system
+  kglobalacceld runtime, which kineticwe already replaces, so leaving it
+  installed blocks the kineticwe transaction with an unresolvable conflict
+
 * Sun Jun 28 2026 LGL <lgl@localhost> - 6.7.80-1
 - Initial COPR package: KineticWE compositor with bundled kglobalacceld runtime
 - Install RPM-safe session launcher and Wayland session desktop file
