@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2024 David Redondo <kde@david-redondo>
+    SPDX-FileCopyrightText: 2024 David Redondo <kde@david-redondo.de>
 
     SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
@@ -12,6 +12,7 @@
 #include <QDBusObjectPath>
 #include <QDBusUnixFileDescriptor>
 #include <QObject>
+#include <QPointF>
 
 #include <memory>
 
@@ -50,7 +51,7 @@ public:
 
     void barrierHit(EisInputCapture *capture, uint barrier, const QPointF &position);
     EisInputCapture *activeCapture();
-    void deactivate();
+    void deactivate(const std::optional<QPointF> &releasePosition = std::nullopt);
 
 private:
     RamFile m_keymapFile;

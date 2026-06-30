@@ -10,7 +10,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kwin\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-06-18 00:45+0000\n"
+"POT-Creation-Date: 2026-06-25 00:45+0000\n"
 "PO-Revision-Date: 2026-05-10 16:23+0530\n"
 "Last-Translator: Kishore G <kishore96@gmail.com>\n"
 "Language-Team: Tamil <kde-l10n-ta@kde.org>\n"
@@ -73,7 +73,7 @@ msgstr "உள்ளீட்டை கைபற்ற வலது Ctrl வி�
 msgid "KDE Wayland Compositor"
 msgstr "கே.டீ.யீ. Wayland சாளரநிரல்"
 
-#: compositor.cpp:652
+#: compositor.cpp:650
 #, kde-format
 msgid "Desktop effects were restarted due to a graphics reset"
 msgstr "வரைகலை முறிவடைந்து மீட்டமைக்கப்பட்டதால் பணிமேடை அசைவூட்டங்கள் மீள்துவக்கப்பட்டன"
@@ -1589,12 +1589,12 @@ msgstr "ஜாவர் ஹுகுல்"
 msgid "Disable configuration options"
 msgstr "விருப்பத்தேர்வுகளை முடக்கு"
 
-#: main_wayland.cpp:319
+#: main_wayland.cpp:322
 #, kde-format
 msgid "Start a rootless Xwayland server."
 msgstr "ரூட்டாக இயங்காத (rootless) Xwayland சேவையகத்தை துவக்கும்."
 
-#: main_wayland.cpp:322
+#: main_wayland.cpp:325
 #, kde-format
 msgid ""
 "Name of the Wayland socket to listen on. If not set \"wayland-0\" is used."
@@ -1602,43 +1602,43 @@ msgstr ""
 "கவனிக்க வேண்டிய Wayland சாக்கெட். அமைக்கப்படவில்லையெனில், \"wayland-0\" "
 "பயன்படுத்தப்படும்."
 
-#: main_wayland.cpp:326
+#: main_wayland.cpp:329
 #, kde-format
 msgid "The X11 Display to use in windowed mode on platform X11."
 msgstr "X11 இயக்குதளத்தில், சாளரப்பயன்முறையில் இருக்கும்போது பயன்படுத்தவேண்டிய X11 திரை."
 
-#: main_wayland.cpp:330
+#: main_wayland.cpp:333
 #, kde-format
 msgid "The Wayland Display to use in windowed mode on platform Wayland."
 msgstr ""
 "Wayland இயக்குதளத்தில், சாளரப்பயன்முறையில் இருக்கும்போது பயன்படுத்தவேண்டிய Wayland திரை."
 
-#: main_wayland.cpp:332
+#: main_wayland.cpp:335
 #, kde-format
 msgid "Render to a virtual framebuffer."
 msgstr ""
 
-#: main_wayland.cpp:334
+#: main_wayland.cpp:337
 #, kde-format
 msgid "The width for windowed mode. Default width is 1024."
 msgstr "சாளரப் பயன்முறைக்கான அகலம். இயல்பிருப்பு 1024 ஆகும்."
 
-#: main_wayland.cpp:338
+#: main_wayland.cpp:341
 #, kde-format
 msgid "The height for windowed mode. Default height is 768."
 msgstr "சாளரப் பயன்முறைக்கான உயரம். இயல்பிருப்பு 768 ஆகும்."
 
-#: main_wayland.cpp:343
+#: main_wayland.cpp:346
 #, kde-format
 msgid "Whether or not to make windowed mode fullscreen"
 msgstr ""
 
-#: main_wayland.cpp:347
+#: main_wayland.cpp:350
 #, kde-format
 msgid "The scale for windowed mode. Default value is 1."
 msgstr "சாளரப் பயன்முறைக்கான அளவுகோல். இயல்பிருப்பு 1 ஆகும்."
 
-#: main_wayland.cpp:352
+#: main_wayland.cpp:355
 #, kde-format
 msgid ""
 "The number of windows to open as outputs in windowed mode. Default value is 1"
@@ -1646,89 +1646,89 @@ msgstr ""
 "சாளர பயன்முறையில் வெளியீடுகளாக திறக்க வேண்டிய சாளரங்களின் எண்ணிக்கை. இயல்பிருப்பு "
 "மதிப்பு 1 ஆகும்"
 
-#: main_wayland.cpp:357
+#: main_wayland.cpp:360
 #, kde-format
 msgid ""
 "Wayland socket to use for incoming connections. This can be combined with --"
 "socket to name the socket"
 msgstr ""
 
-#: main_wayland.cpp:361
+#: main_wayland.cpp:364
 #, kde-format
 msgid ""
 "XWayland socket to use for Xwayland's incoming connections. This can be set "
 "multiple times"
 msgstr ""
 
-#: main_wayland.cpp:365
+#: main_wayland.cpp:368
 #, kde-format
 msgid "Name of the xwayland display that has been pre-set up"
 msgstr "ஏற்கனவே அமைக்கப்பட்டுள்ள xwayland திரையின் பெயர்"
 
-#: main_wayland.cpp:369
+#: main_wayland.cpp:372
 #, kde-format
 msgid "XWayland socket to use for Xwayland's init connections"
 msgstr ""
 
-#: main_wayland.cpp:373
+#: main_wayland.cpp:376
 #, fuzzy, kde-format
 #| msgid "Name of the xwayland display that has been pre-set up"
 msgid "Name of the xwayland init display that has been pre-set up"
 msgstr "ஏற்கனவே அமைக்கப்பட்டுள்ள xwayland திரையின் பெயர்"
 
-#: main_wayland.cpp:377
+#: main_wayland.cpp:380
 #, kde-format
 msgid "Name of the xauthority file "
 msgstr "xauthority கோப்பின் பெயர்"
 
-#: main_wayland.cpp:381
+#: main_wayland.cpp:384
 #, kde-format
 msgid "Exits this instance so it can be restarted by kwin_wayland_wrapper."
 msgstr "kwin_wayland_wrapper-ஐ பயன்படுத்தி மீள்துவக்க‍க்கூடிய வித‍த்தில் வெளியேறும்."
 
-#: main_wayland.cpp:383
+#: main_wayland.cpp:386
 #, kde-format
 msgid "Render through drm node."
 msgstr ""
 
-#: main_wayland.cpp:384
+#: main_wayland.cpp:387
 #, kde-format
 msgid ""
 "Extract locale information from locale1 rather than the user's configuration"
 msgstr ""
 "வட்டார அமைப்புகளை பயனரின் அமைப்புகளிலிருந்து கண்டறியாமல் locale1-இலிருந்து கண்டறி"
 
-#: main_wayland.cpp:413
+#: main_wayland.cpp:416
 #, kde-format
 msgid "Input method that KWin starts."
 msgstr "கேவின் துவக்கும் உள்ளீட்டு முறை."
 
-#: main_wayland.cpp:419
+#: main_wayland.cpp:422
 #, kde-format
 msgid "Starts the session in locked mode."
 msgstr "அமர்வை பூட்டிய நிலையில் தொடங்கும்."
 
-#: main_wayland.cpp:423
+#: main_wayland.cpp:426
 #, kde-format
 msgid "Starts the session without lock screen support."
 msgstr "திரையை பூட்டும் ஆதரவில்லாமல் அமர்வை துவக்கும்."
 
-#: main_wayland.cpp:428
+#: main_wayland.cpp:431
 #, kde-format
 msgid "Starts the session without global shortcuts support."
 msgstr "பொது சுருக்குவழிகளுக்கான ஆதரவில்லாமல் அமர்வை துவக்கும்."
 
-#: main_wayland.cpp:433
+#: main_wayland.cpp:436
 #, kde-format
 msgid "Disable KActivities integration."
 msgstr "KActivities ஒருங்கிணைப்பை முடக்கு."
 
-#: main_wayland.cpp:438
+#: main_wayland.cpp:441
 #, kde-format
 msgid "Exit after the session application, which is started by KWin, closed."
 msgstr "அமர்வு நிரல் (கேவின்னால் துவக்கப்படுவது) வெளியேறும்போது வெளியேறு."
 
-#: main_wayland.cpp:443
+#: main_wayland.cpp:446
 #, kde-format
 msgid "Applications to start once Wayland and Xwayland server are started"
 msgstr "Wayland மற்றும் Xwayland சேவையகத்தை துவக்கிய பின் துவக்கப்பட வேண்டிய செயலிகள்"
@@ -1828,7 +1828,7 @@ msgstr "சாளர தொகுப்பை (window group-ஐ) பொறுத
 msgid "Fullscreen windows"
 msgstr "முழுத்திரை சாளரங்கள்"
 
-#: plugins/eis/eisinputcapturemanager.cpp:139
+#: plugins/eis/eisinputcapturemanager.cpp:140
 #, kde-format
 msgctxt "@action shortcut"
 msgid "Disable Active Input Capture"
@@ -2518,13 +2518,13 @@ msgctxt "@action Grid View and Overview are the name of KWin effects"
 msgid "Cycle through Overview and Grid View"
 msgstr "கிரிட் பார்வை மற்றும் மேலோட்டப் பார்வைக்கிடையே மாறு"
 
-#: plugins/overview/overvieweffect.cpp:150
+#: plugins/overview/overvieweffect.cpp:152
 #, kde-format
 msgctxt "@action Overview is the name of a Kwin effect"
 msgid "Toggle Overview"
 msgstr "மேலோட்டத்தை காட்டு/மறை"
 
-#: plugins/overview/overvieweffect.cpp:156
+#: plugins/overview/overvieweffect.cpp:158
 #, kde-format
 msgctxt "@action Grid view is the name of a Kwin effect"
 msgid "Toggle Grid View"
@@ -2631,17 +2631,17 @@ msgstr "திரையை கண்டுபிடிக்க முடிய�
 msgid "Invalid region"
 msgstr "செல்லுபடியாகாத பரப்பளவு"
 
-#: plugins/screencast/screencaststream.cpp:374
+#: plugins/screencast/screencaststream.cpp:378
 #, kde-format
 msgid "OpenGL compositing is required for screencasting"
 msgstr "திரைப்பகிர்வுக்கு OpenGL சாளரவரைவு தேவை"
 
-#: plugins/screencast/screencaststream.cpp:382
+#: plugins/screencast/screencaststream.cpp:386
 #, kde-format
 msgid "Failed to create PipeWire stream"
 msgstr ""
 
-#: plugins/screenshot/screenshotdbusinterface2.cpp:425
+#: plugins/screenshot/screenshotdbusinterface2.cpp:388
 #, kde-format
 msgid ""
 "Select window to screen shot with left click or enter.\n"
@@ -2650,7 +2650,7 @@ msgstr ""
 "இடது கிளிக் அல்லது enter விசையை கொண்டு திரைப்பிடிப்புக்கான  சாளரத்தை தேர்ந்தெடுங்கள்.\n"
 "கைவிட, Escape விசையையோ வலது க்ளிக்கையோ பயன்படுத்துங்கள்."
 
-#: plugins/screenshot/screenshotdbusinterface2.cpp:443
+#: plugins/screenshot/screenshotdbusinterface2.cpp:406
 #, kde-format
 msgid ""
 "Create screen shot with left click or enter.\n"
@@ -3079,32 +3079,32 @@ msgstr "குறைவு"
 msgid "More"
 msgstr "அதிகம்"
 
-#: plugins/zoom/zoom.cpp:83
+#: plugins/zoom/zoom.cpp:89
 #, kde-format
 msgid "Move Zoomed Area to Left"
 msgstr "உருப்பெருக்கப்பட்ட பரப்பளவை இடதுபுறமாக நகர்த்து"
 
-#: plugins/zoom/zoom.cpp:89
+#: plugins/zoom/zoom.cpp:96
 #, kde-format
 msgid "Move Zoomed Area to Right"
 msgstr "உருப்பெருக்கப்பட்ட பரப்பளவை வலதுபுறமாக நகர்த்து"
 
-#: plugins/zoom/zoom.cpp:95
+#: plugins/zoom/zoom.cpp:105
 #, kde-format
 msgid "Move Zoomed Area Upwards"
 msgstr "உருப்பெருக்கப்பட்ட பரப்பளவை மேலே நகர்த்து"
 
-#: plugins/zoom/zoom.cpp:101
+#: plugins/zoom/zoom.cpp:112
 #, kde-format
 msgid "Move Zoomed Area Downwards"
 msgstr "உருப்பெருக்கப்பட்ட பரப்பளவை கீழே நகர்த்து"
 
-#: plugins/zoom/zoom.cpp:108
+#: plugins/zoom/zoom.cpp:122
 #, kde-format
 msgid "Move Mouse to Focus"
 msgstr "குவியத்திற்கு சுட்டியை நகர்த்து"
 
-#: plugins/zoom/zoom.cpp:114
+#: plugins/zoom/zoom.cpp:128
 #, kde-format
 msgid "Move Mouse to Center"
 msgstr "மையத்திற்கு சுட்டியை நகர்த்து"
@@ -3736,35 +3736,35 @@ msgctxt "@info:placeholder no entries in the task switcher"
 msgid "No open windows"
 msgstr "திறந்துள்ள சாளரங்கள் இல்லை"
 
-#: tabbox/tabbox.cpp:318
+#: tabbox/tabbox.cpp:319
 msgid "Walk Through Windows"
 msgstr "சாளரங்களின் பட்டியலில் முன்னே செல்"
 
-#: tabbox/tabbox.cpp:319
+#: tabbox/tabbox.cpp:320
 msgid "Walk Through Windows (Reverse)"
 msgstr "சாளரங்களின் பட்டியலில் பின்னே செல்"
 
-#: tabbox/tabbox.cpp:320
+#: tabbox/tabbox.cpp:321
 msgid "Walk Through Windows Alternative"
 msgstr "சாளரங்களின் பட்டியலில் வேறுவிதமாக முன்னே செல்"
 
-#: tabbox/tabbox.cpp:321
+#: tabbox/tabbox.cpp:322
 msgid "Walk Through Windows Alternative (Reverse)"
 msgstr "சாளரங்களின் பட்டியலில் வேறுவிதமாக பின்னே செல்"
 
-#: tabbox/tabbox.cpp:322
+#: tabbox/tabbox.cpp:323
 msgid "Walk Through Windows of Current Application"
 msgstr "தற்போதைய செயலியின் சாளரங்களின் பட்டியலில் முன்னே செல்"
 
-#: tabbox/tabbox.cpp:323
+#: tabbox/tabbox.cpp:324
 msgid "Walk Through Windows of Current Application (Reverse)"
 msgstr "தற்போதைய செயலியின் சாளரங்களின் பட்டியலில் பின்னே செல்"
 
-#: tabbox/tabbox.cpp:324
+#: tabbox/tabbox.cpp:325
 msgid "Walk Through Windows of Current Application Alternative"
 msgstr "தற்போதைய செயலியின் சாளரங்களின் பட்டியலில் இப்படியும் முன்னே செல்"
 
-#: tabbox/tabbox.cpp:325
+#: tabbox/tabbox.cpp:326
 msgid "Walk Through Windows of Current Application Alternative (Reverse)"
 msgstr "தற்போதைய செயலியின் சாளரங்களின் பட்டியலில் இப்படியும் பின்னே செல்"
 
@@ -3929,356 +3929,356 @@ msgctxt "keyboard shortcut '%1' is used by action '%2' in application '%3'"
 msgid "<b>%1</b> is used by %2 in %3"
 msgstr "<b>%1</b> %2 என்பதால் %3 என்பதற்கு பயன்படுத்தப்படுகிறது"
 
-#: useractions.cpp:825
+#: useractions.cpp:826
 #, kde-format
 msgid "Window Menu"
 msgstr "சாளரப் பட்டி"
 
-#: useractions.cpp:827
+#: useractions.cpp:828
 #, kde-format
 msgid "Close Window"
 msgstr "சாளரத்தை மூடு"
 
-#: useractions.cpp:829
+#: useractions.cpp:830
 #, kde-format
 msgid "Maximize Window"
 msgstr "சாளரத்தை அதிகபட்ச பெரிதாக்கு"
 
-#: useractions.cpp:831
+#: useractions.cpp:832
 #, kde-format
 msgid "Maximize Window Vertically"
 msgstr "சாளரத்தை செங்குத்தாக அதிகபட்ச பெரிதாக்கு"
 
-#: useractions.cpp:833
+#: useractions.cpp:834
 #, kde-format
 msgid "Maximize Window Horizontally"
 msgstr "சாளரத்தை கிடைமட்டமாக அதிகபட்ச பெரிதாக்கு"
 
-#: useractions.cpp:835
+#: useractions.cpp:836
 #, kde-format
 msgid "Restore Window"
 msgstr "சாளரத்தை மீட்டெடு"
 
-#: useractions.cpp:837
+#: useractions.cpp:838
 #, kde-format
 msgid "Minimize Window"
 msgstr "சாளரத்தை ஒதுக்கு"
 
-#: useractions.cpp:839
+#: useractions.cpp:840
 #, kde-format
 msgid "Move Window"
 msgstr "சாளரத்தை நகர்த்து"
 
-#: useractions.cpp:841
+#: useractions.cpp:842
 #, kde-format
 msgid "Resize Window"
 msgstr "சாளரத்தின் அளவை மாற்று"
 
-#: useractions.cpp:843
+#: useractions.cpp:844
 #, kde-format
 msgid "Raise Window"
 msgstr "சாளரத்தை உயர்த்து"
 
-#: useractions.cpp:845
+#: useractions.cpp:846
 #, kde-format
 msgid "Lower Window"
 msgstr "சாளரத்தை இறக்கு"
 
-#: useractions.cpp:847
+#: useractions.cpp:850
 #, kde-format
 msgid "Toggle Window Raise/Lower"
 msgstr "சாளரத்தை உயர்த்து/இறக்கு"
 
-#: useractions.cpp:849
+#: useractions.cpp:852
 #, kde-format
 msgid "Make Window Fullscreen"
 msgstr "சாளரத்தை முழுத் திரையாக்கு"
 
-#: useractions.cpp:851
+#: useractions.cpp:854
 #, kde-format
 msgid "Toggle Window Titlebar and Frame"
 msgstr "விளிம்பையும் தலைப்புப்பட்டையையும் நிலைமாற்று"
 
-#: useractions.cpp:853
+#: useractions.cpp:856
 #, kde-format
 msgid "Keep Window Above Others"
 msgstr "சாளரத்தை மற்றவற்றிற்கு மேலே வை"
 
-#: useractions.cpp:855
+#: useractions.cpp:858
 #, kde-format
 msgid "Keep Window Below Others"
 msgstr "சாளரத்தை மற்றவற்றிற்கு கீழே வை"
 
-#: useractions.cpp:857
+#: useractions.cpp:860
 #, kde-format
 msgid "Activate Window Demanding Attention"
 msgstr "கவனம் கோரும் சாளரத்தை செயல்படுத்து"
 
-#: useractions.cpp:859
+#: useractions.cpp:862
 #, kde-format
 msgid "Setup Window Shortcut"
 msgstr "சாளர சருக்குவழியை அமை"
 
-#: useractions.cpp:861
+#: useractions.cpp:864
 #, kde-format
 msgid "Move Window to the Center"
 msgstr "சாளரத்தை நடுப்பகுதிக்கு நகர்த்து"
 
-#: useractions.cpp:863
+#: useractions.cpp:866
 #, kde-format
 msgid "Move Window Right"
 msgstr "சாளரத்தை வலதுபுறமாக நகர்த்து"
 
-#: useractions.cpp:865
+#: useractions.cpp:868
 #, kde-format
 msgid "Move Window Left"
 msgstr "சாளரத்தை இடதுபுறமாக நகர்த்து"
 
-#: useractions.cpp:867
+#: useractions.cpp:872
 #, kde-format
 msgid "Move Window Up"
 msgstr "சாளரத்தை மேலே நகர்த்து"
 
-#: useractions.cpp:869
+#: useractions.cpp:874
 #, kde-format
 msgid "Move Window Down"
 msgstr "சாளரத்தை கீழே நகர்த்து"
 
-#: useractions.cpp:871
+#: useractions.cpp:878
 #, kde-format
 msgid "Expand Window Horizontally"
 msgstr "சாளரத்தை கிடைமட்டமாக பெரிதாக்கு"
 
-#: useractions.cpp:873
-#, kde-format
-msgid "Expand Window Vertically"
-msgstr "சாளரத்தை செங்குத்தாக பெரிதாக்கு"
-
-#: useractions.cpp:875
+#: useractions.cpp:880
 #, kde-format
 msgid "Shrink Window Horizontally"
 msgstr "சாளரத்தை கிடைமட்டமாக சுருக்கு"
 
-#: useractions.cpp:877
+#: useractions.cpp:884
+#, kde-format
+msgid "Expand Window Vertically"
+msgstr "சாளரத்தை செங்குத்தாக பெரிதாக்கு"
+
+#: useractions.cpp:886
 #, kde-format
 msgid "Shrink Window Vertically"
 msgstr "சாளரத்தை செங்குத்தாக சுருக்கு"
 
-#: useractions.cpp:879
+#: useractions.cpp:890
 #, kde-format
 msgid "Quick Tile Window to the Left"
 msgstr "சாளரத்தை இடது பாதிக்கு பொருத்து"
 
-#: useractions.cpp:881
+#: useractions.cpp:892
 #, kde-format
 msgid "Quick Tile Window to the Right"
 msgstr "சாளரத்தை வலது பாதிக்கு பொருத்து"
 
-#: useractions.cpp:883
+#: useractions.cpp:894
 #, kde-format
 msgid "Quick Tile Window to the Top"
 msgstr "சாளரத்தை மேல் பாதிக்கு பொருத்து"
 
-#: useractions.cpp:885
+#: useractions.cpp:896
 #, kde-format
 msgid "Quick Tile Window to the Bottom"
 msgstr "சாளரத்தை கீழ் பாதிக்கு பொருத்து"
 
-#: useractions.cpp:887
+#: useractions.cpp:898
 #, kde-format
 msgid "Quick Tile Window to the Top Left"
 msgstr "சாளரத்தை மேல்-இடது காற்பங்குக்கு பொருத்து"
 
-#: useractions.cpp:889
+#: useractions.cpp:900
 #, kde-format
 msgid "Quick Tile Window to the Bottom Left"
 msgstr "சாளரத்தை கீழ்-இடது காற்பங்குக்கு பொருத்து"
 
-#: useractions.cpp:891
+#: useractions.cpp:902
 #, kde-format
 msgid "Quick Tile Window to the Top Right"
 msgstr "சாளரத்தை மேல்-வலது காற்பங்குக்கு பொருத்து"
 
-#: useractions.cpp:893
+#: useractions.cpp:904
 #, kde-format
 msgid "Quick Tile Window to the Bottom Right"
 msgstr "சாளரத்தை கீழ்-வலது காற்பங்குக்கு பொருத்து"
 
-#: useractions.cpp:895
+#: useractions.cpp:906
 #, kde-format
 msgid "Switch to Window Above"
 msgstr "மேலுள்ள சாளரத்திற்கு தாவு"
 
-#: useractions.cpp:897
+#: useractions.cpp:908
 #, kde-format
 msgid "Switch to Window Below"
 msgstr "கீழுள்ள சாளரத்திற்கு தாவு"
 
-#: useractions.cpp:899
+#: useractions.cpp:912
 #, kde-format
 msgid "Switch to Window to the Right"
 msgstr "வலதிலுள்ள சாளரத்திற்கு தாவு"
 
-#: useractions.cpp:901
+#: useractions.cpp:914
 #, kde-format
 msgid "Switch to Window to the Left"
 msgstr "இடதிலுள்ள சாளரத்திற்கு தாவு"
 
-#: useractions.cpp:903
+#: useractions.cpp:918
 #, kde-format
 msgid "Increase Opacity of Active Window by 5%"
 msgstr "செயலிலுள்ள சாளரத்தின் ஒளிபுகுமையை 5% அதிகமாக்கு"
 
-#: useractions.cpp:905
+#: useractions.cpp:920
 #, kde-format
 msgid "Decrease Opacity of Active Window by 5%"
 msgstr "செயலிலுள்ள சாளரத்தின் ஒளிபுகுமையை 5% குறை"
 
-#: useractions.cpp:908
+#: useractions.cpp:924
 #, kde-format
 msgid "Keep Window on All Desktops"
 msgstr "சாளரத்தை எல்லா பணிமேடைகளிலும் வைத்திரு"
 
-#: useractions.cpp:911
+#: useractions.cpp:927
 #, fuzzy, kde-format
 #| msgid "Quick Tile Window to the Left"
 msgid "Custom Quick Tile Window to the Left"
 msgstr "சாளரத்தை இடது பாதிக்கு பொருத்து"
 
-#: useractions.cpp:913
+#: useractions.cpp:929
 #, fuzzy, kde-format
 #| msgid "Quick Tile Window to the Right"
 msgid "Custom Quick Tile Window to the Right"
 msgstr "சாளரத்தை வலது பாதிக்கு பொருத்து"
 
-#: useractions.cpp:915
+#: useractions.cpp:931
 #, fuzzy, kde-format
 #| msgid "Quick Tile Window to the Top"
 msgid "Custom Quick Tile Window to the Top"
 msgstr "சாளரத்தை மேல் பாதிக்கு பொருத்து"
 
-#: useractions.cpp:917
+#: useractions.cpp:933
 #, fuzzy, kde-format
 #| msgid "Quick Tile Window to the Bottom"
 msgid "Custom Quick Tile Window to the Bottom"
 msgstr "சாளரத்தை கீழ் பாதிக்கு பொருத்து"
 
-#: useractions.cpp:928
+#: useractions.cpp:944
 #, kde-format
 msgid "Window to Desktop %1"
 msgstr "பணிமேடை %1-க்கு சாளரத்தை அனுப்பு"
 
-#: useractions.cpp:930
+#: useractions.cpp:946
 #, kde-format
 msgid "Window to Next Desktop"
 msgstr "சாளரத்தை அடுத்த பணிமேடைக்கு அனுப்பு"
 
-#: useractions.cpp:931
+#: useractions.cpp:947
 #, kde-format
 msgid "Window to Previous Desktop"
 msgstr "சாளரத்தை முந்தைய பணிமேடைக்கு அனுப்பு"
 
-#: useractions.cpp:932
+#: useractions.cpp:950
 #, kde-format
 msgid "Window One Desktop to the Right"
 msgstr "சாளரத்தை வலதிலுள்ள பணிமேடைக்கு அனுப்பு"
 
-#: useractions.cpp:934
+#: useractions.cpp:952
 #, kde-format
 msgid "Window One Desktop to the Left"
 msgstr "சாளரத்தை இடதிலுள்ள பணிமேடைக்கு அனுப்பு"
 
-#: useractions.cpp:936
+#: useractions.cpp:956
 #, kde-format
 msgid "Window One Desktop Up"
 msgstr "சாளரத்தை மேலுள்ள பணிமேடைக்கு அனுப்பு"
 
-#: useractions.cpp:938
+#: useractions.cpp:958
 #, kde-format
 msgid "Window One Desktop Down"
 msgstr "சாளரத்தை கீழுள்ள பணிமேடைக்கு அனுப்பு"
 
-#: useractions.cpp:942
+#: useractions.cpp:963
 #, kde-format
 msgid "Move Window to Screen %1"
 msgstr "சாளரத்தை திரை %1-க்கு அனுப்பு"
 
-#: useractions.cpp:949
+#: useractions.cpp:970
 #, kde-format
 msgid "Move Window to Next Screen"
 msgstr "சாளரத்தை அடுத்த திரைக்கு அனுப்பு"
 
-#: useractions.cpp:951
+#: useractions.cpp:972
 #, kde-format
 msgid "Move Window to Previous Screen"
 msgstr "சாளரத்தை முந்தைய திரைக்கு அனுப்பு"
 
-#: useractions.cpp:953
+#: useractions.cpp:976
 #, kde-format
 msgid "Move Window One Screen to the Right"
 msgstr "சாளரத்தை வலதிலுள்ள திரைக்கு அனுப்பு"
 
-#: useractions.cpp:955
+#: useractions.cpp:978
 #, kde-format
 msgid "Move Window One Screen to the Left"
 msgstr "சாளரத்தை இடதிலுள்ள திரைக்கு அனுப்பு"
 
-#: useractions.cpp:957
+#: useractions.cpp:982
 #, kde-format
 msgid "Move Window One Screen Up"
 msgstr "சாளரத்தை மேலுள்ள திரைக்கு அனுப்பு"
 
-#: useractions.cpp:959
+#: useractions.cpp:984
 #, kde-format
 msgid "Move Window One Screen Down"
 msgstr "சாளரத்தை கீழுள்ள திரைக்கு அனுப்பு"
 
-#: useractions.cpp:963
+#: useractions.cpp:989
 #, kde-format
 msgid "Switch to Screen %1"
 msgstr "திரை %1-க்கு தாவு"
 
-#: useractions.cpp:970
+#: useractions.cpp:996
 #, kde-format
 msgid "Switch to Next Screen"
 msgstr "அடுத்த காட்சிக் கருவிக்கு தாவு"
 
-#: useractions.cpp:971
+#: useractions.cpp:997
 #, kde-format
 msgid "Switch to Previous Screen"
 msgstr "முந்தைய காட்சிக் கருவிக்கு தாவு"
 
-#: useractions.cpp:972
+#: useractions.cpp:1000
 #, kde-format
 msgid "Switch to Screen to the Right"
 msgstr "வலதிலுள்ள திரைக்கு தாவு"
 
-#: useractions.cpp:974
+#: useractions.cpp:1002
 #, kde-format
 msgid "Switch to Screen to the Left"
 msgstr "இடதிலுள்ள திரைக்கு தாவு"
 
-#: useractions.cpp:976
+#: useractions.cpp:1006
 #, kde-format
 msgid "Switch to Screen Above"
 msgstr "மேலுள்ள திரைக்கு தாவு"
 
-#: useractions.cpp:978
+#: useractions.cpp:1008
 #, kde-format
 msgid "Switch to Screen Below"
 msgstr "கீழுள்ள திரைக்கு தாவு"
 
-#: useractions.cpp:981
+#: useractions.cpp:1012
 #, kde-format
 msgid "Peek at Desktop"
 msgstr "பணிமேடையைக் காட்டு"
 
-#: useractions.cpp:984
+#: useractions.cpp:1015
 #, kde-format
 msgid "Kill Window"
 msgstr "சாளரத்தை கட்டாயமாக மூடு"
 
-#: useractions.cpp:1049
+#: useractions.cpp:1080
 #, kde-format
 msgid "Activate Window (%1)"
 msgstr "சாளரத்தை செயல்படுத்து (%1)"
@@ -4303,27 +4303,27 @@ msgstr "அடுத்த பணிமேடைக்கு தாவு"
 msgid "Switch to Previous Desktop"
 msgstr "முந்தைய பணிமேடைக்கு தாவு"
 
-#: virtualdesktops.cpp:773
+#: virtualdesktops.cpp:775
 #, kde-format
 msgid "Switch One Desktop to the Right"
 msgstr "வலதிலுள்ள பணிமேடைக்கு தாவு"
 
-#: virtualdesktops.cpp:774
+#: virtualdesktops.cpp:776
 #, kde-format
 msgid "Switch One Desktop to the Left"
 msgstr "இடதிலுள்ள பணிமேடைக்கு தாவு"
 
-#: virtualdesktops.cpp:775
+#: virtualdesktops.cpp:777
 #, kde-format
 msgid "Switch One Desktop Up"
 msgstr "மேலுள்ள பணிமேடைக்கு தாவு"
 
-#: virtualdesktops.cpp:776
+#: virtualdesktops.cpp:778
 #, kde-format
 msgid "Switch One Desktop Down"
 msgstr "கீழுள்ள பணிமேடைக்கு தாவு"
 
-#: virtualdesktops.cpp:877
+#: virtualdesktops.cpp:882
 #, kde-format
 msgid "Switch to Desktop %1"
 msgstr "பணிமேடை %1-க்கு தாவு"
@@ -4383,7 +4383,7 @@ msgstr "சாதனநிரல் அமைப்புகளை நிரா�
 msgid "The session is not active"
 msgstr "அமர்வு செயலிலில்லை"
 
-#: window.cpp:3108
+#: window.cpp:3107
 #, kde-format
 msgctxt "Application is not responding, appended to window title"
 msgid "(Not Responding)"

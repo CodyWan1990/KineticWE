@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: KDE 4.2\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-06-18 00:45+0000\n"
-"PO-Revision-Date: 2026-05-26 22:37+0200\n"
+"POT-Creation-Date: 2026-06-25 00:45+0000\n"
+"PO-Revision-Date: 2026-06-25 22:17+0200\n"
 "Last-Translator: Kristof Kiszel <ulysses@fsf.hu>\n"
 "Language-Team: Hungarian <kde-l10n-hu@kde.org>\n"
 "Language: hu\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Lokalize 26.04.1\n"
+"X-Generator: Lokalize 26.04.2\n"
 
 #, kde-format
 msgctxt "NAME OF TRANSLATORS"
@@ -46,14 +46,12 @@ msgid "KDE Wayland Compositor %1"
 msgstr "KDE Wayland kompozitor %1"
 
 #: backends/wayland/wayland_output.cpp:489
-#, fuzzy, kde-format
-#| msgid "- Output disabled"
+#, kde-format
 msgid "- Output disabled"
 msgstr "- Kimenet letiltva"
 
 #: backends/wayland/wayland_output.cpp:491
-#, fuzzy, kde-format
-#| msgid "- Output dimmed"
+#, kde-format
 msgid "- Output dimmed"
 msgstr "- Kimenet halványítva"
 
@@ -72,7 +70,7 @@ msgstr "Nyomja meg a jobb Controlt a bemenet elkapásához"
 msgid "KDE Wayland Compositor"
 msgstr "KDE Wayland kompozitor"
 
-#: compositor.cpp:652
+#: compositor.cpp:650
 #, kde-format
 msgid "Desktop effects were restarted due to a graphics reset"
 msgstr ""
@@ -157,10 +155,9 @@ msgid "Color profile is missing TRC tags"
 msgstr "A színprofilból hiányoznak a TRC címkék"
 
 #: core/iccprofile.cpp:540
-#, fuzzy, kde-format
-#| msgid "Failed to open ICC profile \"%1\""
+#, kde-format
 msgid "Couldn't invert tone curves of ICC profile \"%1\""
-msgstr "Nem sikerült megnyitni a(z) „%1” ICC-profilt"
+msgstr "Nem sikerült invertálni a(z) „%1” ICC-profil tónusgörbéit"
 
 #: debug_console.cpp:86
 #, kde-format
@@ -651,12 +648,10 @@ msgstr "Húzás megszakítva"
 #, kde-format
 msgctxt "A hold gesture is started"
 msgid "Hold start"
-msgstr ""
+msgstr "Lenyomás kezdése"
 
 #: debug_console.cpp:473
-#, fuzzy, kde-format
-#| msgctxt "Number of fingers in this pinch gesture"
-#| msgid "Finger count"
+#, kde-format
 msgctxt "Number of fingers in this hold gesture"
 msgid "Finger count"
 msgstr "Ujjszám"
@@ -665,15 +660,13 @@ msgstr "Ujjszám"
 #, kde-format
 msgctxt "A hold gesture ended"
 msgid "Hold end"
-msgstr ""
+msgstr "Lenyomás vége"
 
 #: debug_console.cpp:496
-#, fuzzy, kde-format
-#| msgctxt "A pinch gesture got cancelled"
-#| msgid "Pinch cancelled"
+#, kde-format
 msgctxt "A hold gesture got cancelled"
 msgid "Hold cancelled"
-msgstr "Csippentés megszakítva"
+msgstr "Lenyomás megszakítva"
 
 #: debug_console.cpp:508
 #, kde-format
@@ -754,10 +747,9 @@ msgid "Rotation"
 msgstr "Forgás"
 
 #: debug_console.cpp:549 debug_console.cpp:568
-#, fuzzy, kde-format
-#| msgid "Distance:"
+#, kde-format
 msgid "Distance"
-msgstr "Távolság:"
+msgstr "Távolság"
 
 #: debug_console.cpp:558
 #, kde-format
@@ -790,10 +782,9 @@ msgid "Up"
 msgstr "Fel"
 
 #: debug_console.cpp:588
-#, fuzzy, kde-format
-#| msgid "Position"
+#, kde-format
 msgid "Slider Position"
-msgstr "Pozíció"
+msgstr "Csúszkapozíció"
 
 #: debug_console.cpp:597
 #, kde-format
@@ -824,19 +815,17 @@ msgstr "Rajztábla gomb"
 #: debug_console.cpp:616 debug_console.cpp:634 debug_console.cpp:651
 #, kde-format
 msgid "Group"
-msgstr ""
+msgstr "Csoport"
 
 #: debug_console.cpp:617 debug_console.cpp:635 debug_console.cpp:652
-#, fuzzy, kde-format
-#| msgctxt "@label"
-#| msgid "Mode:"
+#, kde-format
 msgid "Mode"
-msgstr "Mód:"
+msgstr "Mód"
 
 #: debug_console.cpp:618
 #, kde-format
 msgid "Is Mode Switch"
-msgstr ""
+msgstr "Módváltás"
 
 #: debug_console.cpp:629
 #, kde-format
@@ -1284,7 +1273,7 @@ msgstr "idő"
 #: helpers/dialoghelper/dialoghelper.cpp:46
 #, kde-format
 msgid "The message to show (fullscreen, noborder)"
-msgstr ""
+msgstr "A megjelenítendő üzenet (teljes képernyős, keret nélkül)"
 
 #: helpers/dialoghelper/dialoghelper.cpp:48 helpers/killer/killer.cpp:146
 #, kde-format
@@ -1298,13 +1287,7 @@ msgid "This helper utility is not supposed to be called directly."
 msgstr "Ezt a segédprogram nem közvetlen használatra való."
 
 #: helpers/dialoghelper/dialoghelper.cpp:79
-#, fuzzy, kde-format
-#| msgid ""
-#| "You have selected to show a window in fullscreen mode.\n"
-#| "If the application itself does not have an option to turn the fullscreen "
-#| "mode off you will not be able to disable it again using the mouse: use "
-#| "the window operations menu instead, activated using the %1 keyboard "
-#| "shortcut."
+#, kde-format
 msgid ""
 "You have selected to show a window in fullscreen mode.\n"
 "If the application itself does not have an option to turn the fullscreen "
@@ -1313,18 +1296,11 @@ msgid ""
 msgstr ""
 "Teljes képernyős ablakmegjelenítést választott.\n"
 "Ha az alkalmazásból nem lehet valamilyen külön opcióval normál méretre "
-"visszaváltani, akkor a visszaváltás csak egérrel nem hajtható végre. Erre a "
-"célra az Ablakműveletek menü használható, melynek előhívásához nyomja meg "
-"ezt a billentyűkombinációt: %1"
+"visszaváltani, akkor a visszaváltás csak egérrel nem hajtható végre, "
+"használja helyette a(z) %1 gyorsbillentyűt."
 
 #: helpers/dialoghelper/dialoghelper.cpp:85
-#, fuzzy, kde-format
-#| msgid ""
-#| "You have selected to show a window in fullscreen mode.\n"
-#| "If the application itself does not have an option to turn the fullscreen "
-#| "mode off you will not be able to disable it again using the mouse: use "
-#| "the window operations menu instead, activated using the %1 keyboard "
-#| "shortcut."
+#, kde-format
 msgid ""
 "You have selected to show a window in fullscreen mode.\n"
 "If the application itself does not have an option to turn the fullscreen "
@@ -1334,17 +1310,11 @@ msgstr ""
 "Teljes képernyős ablakmegjelenítést választott.\n"
 "Ha az alkalmazásból nem lehet valamilyen külön opcióval normál méretre "
 "visszaváltani, akkor a visszaváltás csak egérrel nem hajtható végre. Erre a "
-"célra az Ablakműveletek menü használható, melynek előhívásához nyomja meg "
-"ezt a billentyűkombinációt: %1"
+"célra az ablakmenü használható, melynek előhívásához nyomja meg a(z) %1 "
+"billentyűkombinációt."
 
 #: helpers/dialoghelper/dialoghelper.cpp:93
-#, fuzzy, kde-format
-#| msgid ""
-#| "You have selected to show a window in fullscreen mode.\n"
-#| "If the application itself does not have an option to turn the fullscreen "
-#| "mode off you will not be able to disable it again using the mouse: use "
-#| "the window operations menu instead, activated using the %1 keyboard "
-#| "shortcut."
+#, kde-format
 msgid ""
 "You have selected to show a window in fullscreen mode.\n"
 "If the application itself does not have an option to turn the fullscreen "
@@ -1352,24 +1322,16 @@ msgid ""
 msgstr ""
 "Teljes képernyős ablakmegjelenítést választott.\n"
 "Ha az alkalmazásból nem lehet valamilyen külön opcióval normál méretre "
-"visszaváltani, akkor a visszaváltás csak egérrel nem hajtható végre. Erre a "
-"célra az Ablakműveletek menü használható, melynek előhívásához nyomja meg "
-"ezt a billentyűkombinációt: %1"
+"visszaváltani, akkor a visszaváltás csak egérrel nem hajtható végre."
 
 #: helpers/dialoghelper/dialoghelper.cpp:98
-#, fuzzy, kde-format
-#| msgid "Fullscreen"
+#, kde-format
 msgctxt "@action:button Un-fullscreen"
 msgid "Undo Fullscreen"
-msgstr "Teljes képernyő"
+msgstr "Kilépés teljes képernyőből"
 
 #: helpers/dialoghelper/dialoghelper.cpp:101
-#, fuzzy, kde-format
-#| msgid ""
-#| "You have selected to show a window without its border.\n"
-#| "Without the border, you will not be able to enable the border again using "
-#| "the mouse: use the window operations menu instead, activated using the %1 "
-#| "keyboard shortcut."
+#, kde-format
 msgid ""
 "You have selected to show a window without its border.\n"
 "Without the border, you will not be able to enable the border again using "
@@ -1377,16 +1339,10 @@ msgid ""
 msgstr ""
 "Keret nélküli ablakmegjelenítést választott.\n"
 "Keret nélkül módban csak az egér használatával nem lehet visszakapcsolni a "
-"keretet. Erre a célra az Ablakműveletek menü használható, melynek "
-"előhívásához nyomja meg ezt a billentyűkombinációt: %1"
+"keretet, használja a(z) %1 billentyűkombinációt."
 
 #: helpers/dialoghelper/dialoghelper.cpp:106
-#, fuzzy, kde-format
-#| msgid ""
-#| "You have selected to show a window without its border.\n"
-#| "Without the border, you will not be able to enable the border again using "
-#| "the mouse: use the window operations menu instead, activated using the %1 "
-#| "keyboard shortcut."
+#, kde-format
 msgid ""
 "You have selected to show a window without its border.\n"
 "Without the border, you will not be able to enable the border again using "
@@ -1395,16 +1351,11 @@ msgid ""
 msgstr ""
 "Keret nélküli ablakmegjelenítést választott.\n"
 "Keret nélkül módban csak az egér használatával nem lehet visszakapcsolni a "
-"keretet. Erre a célra az Ablakműveletek menü használható, melynek "
-"előhívásához nyomja meg ezt a billentyűkombinációt: %1"
+"keretet. Erre a célra az ablakmenü használható, melynek előhívásához nyomja "
+"meg a(z) %1 billentyűkombinációt."
 
 #: helpers/dialoghelper/dialoghelper.cpp:112
-#, fuzzy, kde-format
-#| msgid ""
-#| "You have selected to show a window without its border.\n"
-#| "Without the border, you will not be able to enable the border again using "
-#| "the mouse: use the window operations menu instead, activated using the %1 "
-#| "keyboard shortcut."
+#, kde-format
 msgid ""
 "You have selected to show a window without its border.\n"
 "Without the border, you will not be able to enable the border again using "
@@ -1412,20 +1363,18 @@ msgid ""
 msgstr ""
 "Keret nélküli ablakmegjelenítést választott.\n"
 "Keret nélkül módban csak az egér használatával nem lehet visszakapcsolni a "
-"keretet. Erre a célra az Ablakműveletek menü használható, melynek "
-"előhívásához nyomja meg ezt a billentyűkombinációt: %1"
+"keretet."
 
 #: helpers/dialoghelper/dialoghelper.cpp:116
-#, fuzzy, kde-format
-#| msgid "&No Border"
+#, kde-format
 msgctxt "@action:button"
 msgid "Restore Border"
-msgstr "Az &ablakkeret elrejtése"
+msgstr "Keret visszaállítása"
 
 #: helpers/dialoghelper/dialoghelper.cpp:133
 #, kde-format
 msgid "Do not show again"
-msgstr ""
+msgstr "Ne jelenjen meg újra"
 
 #: helpers/killer/killdialog.cpp:37
 #, kde-kuit-format
@@ -1455,11 +1404,9 @@ msgstr ""
 "elvesznek.</emphasis></para>"
 
 #: helpers/killer/killdialog.cpp:66
-#, fuzzy, kde-format
-#| msgctxt "@action:button Terminate app"
-#| msgid "&Terminate %1"
+#, kde-format
 msgid "Terminating %1…"
-msgstr "%1 leállí&tása"
+msgstr "%1 megszakítása…"
 
 #: helpers/killer/killdialog.cpp:69
 #, kde-format
@@ -1496,7 +1443,7 @@ msgstr "Nem válaszol"
 #: helpers/killer/killdialog.ui:53
 #, kde-format
 msgid "&Details"
-msgstr ""
+msgstr "&Részletek"
 
 #: helpers/killer/killer.cpp:134
 #, kde-format
@@ -1624,12 +1571,12 @@ msgstr "Xaver Hugl"
 msgid "Disable configuration options"
 msgstr "A beállítási lehetőségek letiltása"
 
-#: main_wayland.cpp:319
+#: main_wayland.cpp:322
 #, kde-format
 msgid "Start a rootless Xwayland server."
 msgstr "Rootless Xwayland kiszolgáló indítása."
 
-#: main_wayland.cpp:322
+#: main_wayland.cpp:325
 #, kde-format
 msgid ""
 "Name of the Wayland socket to listen on. If not set \"wayland-0\" is used."
@@ -1637,42 +1584,42 @@ msgstr ""
 "A figyelendő Wayland socket neve. Ha nincs megadva, „wayland-0” az "
 "alapértelmezett."
 
-#: main_wayland.cpp:326
+#: main_wayland.cpp:329
 #, kde-format
 msgid "The X11 Display to use in windowed mode on platform X11."
 msgstr "Az ablakos módon használandó X11 kijelző X11 platformon."
 
-#: main_wayland.cpp:330
+#: main_wayland.cpp:333
 #, kde-format
 msgid "The Wayland Display to use in windowed mode on platform Wayland."
 msgstr "Az ablakos módon használandó Wayland kijelző Wayland platformon."
 
-#: main_wayland.cpp:332
+#: main_wayland.cpp:335
 #, kde-format
 msgid "Render to a virtual framebuffer."
 msgstr "Renderelés egy virtuális framebufferbe."
 
-#: main_wayland.cpp:334
+#: main_wayland.cpp:337
 #, kde-format
 msgid "The width for windowed mode. Default width is 1024."
 msgstr "Az ablakos mód szélessége. Alapértelmezett érték: 1024."
 
-#: main_wayland.cpp:338
+#: main_wayland.cpp:341
 #, kde-format
 msgid "The height for windowed mode. Default height is 768."
 msgstr "Az ablakos mód magassága. Alapértelmezett érték: 768."
 
-#: main_wayland.cpp:343
+#: main_wayland.cpp:346
 #, kde-format
 msgid "Whether or not to make windowed mode fullscreen"
 msgstr "Legyen-e ablakos teljes képernyős mód vagy sem"
 
-#: main_wayland.cpp:347
+#: main_wayland.cpp:350
 #, kde-format
 msgid "The scale for windowed mode. Default value is 1."
 msgstr "Az ablakoos mód skálázása. Alapértelmezett érték: 1."
 
-#: main_wayland.cpp:352
+#: main_wayland.cpp:355
 #, kde-format
 msgid ""
 "The number of windows to open as outputs in windowed mode. Default value is 1"
@@ -1680,7 +1627,7 @@ msgstr ""
 "Az ablakos módban kimenetként megnyitandó ablakok száma. Alapértelmezett "
 "érték: 1"
 
-#: main_wayland.cpp:357
+#: main_wayland.cpp:360
 #, kde-format
 msgid ""
 "Wayland socket to use for incoming connections. This can be combined with --"
@@ -1689,7 +1636,7 @@ msgstr ""
 "A bejövő kapcsolatokhoz használandó Wayland socket. Ez kombinálható a --"
 "socket kapcsolóval annak elnevezéséhez"
 
-#: main_wayland.cpp:361
+#: main_wayland.cpp:364
 #, kde-format
 msgid ""
 "XWayland socket to use for Xwayland's incoming connections. This can be set "
@@ -1698,12 +1645,12 @@ msgstr ""
 "Az Xwayland bejövő kapcsolataihoz használandó XWayland socket. Ez többször "
 "is megadható"
 
-#: main_wayland.cpp:365
+#: main_wayland.cpp:368
 #, kde-format
 msgid "Name of the xwayland display that has been pre-set up"
 msgstr "Az előre beállított xwayland kijelző neve"
 
-#: main_wayland.cpp:369
+#: main_wayland.cpp:372
 #, fuzzy, kde-format
 #| msgid ""
 #| "XWayland socket to use for Xwayland's incoming connections. This can be "
@@ -1713,30 +1660,30 @@ msgstr ""
 "Az Xwayland bejövő kapcsolataihoz használandó XWayland socket. Ez többször "
 "is megadható"
 
-#: main_wayland.cpp:373
+#: main_wayland.cpp:376
 #, fuzzy, kde-format
 #| msgid "Name of the xwayland display that has been pre-set up"
 msgid "Name of the xwayland init display that has been pre-set up"
 msgstr "Az előre beállított xwayland kijelző neve"
 
-#: main_wayland.cpp:377
+#: main_wayland.cpp:380
 #, kde-format
 msgid "Name of the xauthority file "
 msgstr "Az xauthority fájl neve "
 
-#: main_wayland.cpp:381
+#: main_wayland.cpp:384
 #, kde-format
 msgid "Exits this instance so it can be restarted by kwin_wayland_wrapper."
 msgstr ""
 "Kilépés ebből a példányból, hogy újra lehessen indítani "
 "kwin_wayland_wrapperrel."
 
-#: main_wayland.cpp:383
+#: main_wayland.cpp:386
 #, kde-format
 msgid "Render through drm node."
 msgstr "Renderelés drm node-on."
 
-#: main_wayland.cpp:384
+#: main_wayland.cpp:387
 #, kde-format
 msgid ""
 "Extract locale information from locale1 rather than the user's configuration"
@@ -1744,37 +1691,37 @@ msgstr ""
 "Területi beállítások információinak kibontása a locale1-ből a felhasználó "
 "beállításai helyett"
 
-#: main_wayland.cpp:413
+#: main_wayland.cpp:416
 #, kde-format
 msgid "Input method that KWin starts."
 msgstr "A KWin által indított beviteli mód."
 
-#: main_wayland.cpp:419
+#: main_wayland.cpp:422
 #, kde-format
 msgid "Starts the session in locked mode."
 msgstr "Munkamenet indítása zárolt módban."
 
-#: main_wayland.cpp:423
+#: main_wayland.cpp:426
 #, kde-format
 msgid "Starts the session without lock screen support."
 msgstr "Munkamenet indítása képernyőzár támogatás nélkül."
 
-#: main_wayland.cpp:428
+#: main_wayland.cpp:431
 #, kde-format
 msgid "Starts the session without global shortcuts support."
 msgstr "Munkamenet indítás a globális billentyűparancsok támogatása nélkül."
 
-#: main_wayland.cpp:433
+#: main_wayland.cpp:436
 #, kde-format
 msgid "Disable KActivities integration."
 msgstr "KActivities intergráció kikapcsolása."
 
-#: main_wayland.cpp:438
+#: main_wayland.cpp:441
 #, kde-format
 msgid "Exit after the session application, which is started by KWin, closed."
 msgstr "Kilépés a KWin által indított munkamenet alkalmazás bezárása után."
 
-#: main_wayland.cpp:443
+#: main_wayland.cpp:446
 #, kde-format
 msgid "Applications to start once Wayland and Xwayland server are started"
 msgstr ""
@@ -1810,10 +1757,9 @@ msgstr "Zajerősség:"
 
 #. i18n: ectx: property (text), widget (QLabel, labelSaturation)
 #: plugins/blur/blur_config.ui:128
-#, fuzzy, kde-format
-#| msgid "Duration:"
+#, kde-format
 msgid "Saturation:"
-msgstr "Időtartam:"
+msgstr "Telítettség:"
 
 #. i18n: ectx: property (text), widget (QLabel, ignoreLabel)
 #. i18n: ectx: property (text), widget (QLabel, labelSaturationStrong)
@@ -1874,31 +1820,25 @@ msgstr "Ablakcsoport szerint"
 msgid "Fullscreen windows"
 msgstr "Teljes képernyős ablakok"
 
-#: plugins/eis/eisinputcapturemanager.cpp:139
+#: plugins/eis/eisinputcapturemanager.cpp:140
 #, kde-format
 msgctxt "@action shortcut"
 msgid "Disable Active Input Capture"
 msgstr "Aktív bemenetrögzítés letiltása"
 
 #: plugins/eis/eisprompter.cpp:51
-#, fuzzy, kde-format
-#| msgctxt "A keyboard modifier"
-#| msgid "Control"
+#, kde-format
 msgctxt "@title:window"
 msgid "Remote Control"
-msgstr "Control"
+msgstr "Távoli hozzáférés"
 
 #: plugins/eis/eisprompter.cpp:52
-#, fuzzy, kde-kuit-format
-#| msgctxt "@info"
-#| msgid ""
-#| "<para><application>%1</application> is not responding. Do you want to "
-#| "terminate this application?</para>"
+#, kde-kuit-format
 msgctxt "@info"
 msgid "<application>%1</application> is asking to control input devices"
 msgstr ""
-"<para>A(z) <application>%1</application> nem válaszol. Szeretné leállítani "
-"ezt az alkalmazást?</para>"
+"A(z) <application>%1</application> engedélyt kér a beviteli eszközök "
+"vezérléséhez"
 
 #: plugins/eis/eisprompter.cpp:64
 #, kde-format
@@ -1907,6 +1847,7 @@ msgctxt ""
 "claiming to be a given application name to control input devices"
 msgid "Always allow apps claiming to be %1"
 msgstr ""
+"Mindig engedélyezze a magukat a következőként feltüntető alkalmazásokat: %1"
 
 #: plugins/eis/eisprompter.cpp:66
 #, kde-kuit-format
@@ -1917,18 +1858,23 @@ msgid ""
 "revoke this permission later on <application>System Settings</application>’ "
 "“Legacy X11 App Support” page."
 msgstr ""
+"Az örökölt X11-es alkalmazások identitása nem ellenőrizhető. Bármely "
+"alkalmazás, amely azt állítja, hogy <application>%1</application> nevű, "
+"képes lesz a beviteli eszközök vezérlésére. Ezt a jogosultságot később "
+"visszavonhatja a <application>Rendszerbeállítások</application> Örökölt X11-"
+"es alkalmazások támogatása” oldalon."
 
 #: plugins/eis/eisprompter.cpp:69
 #, kde-format
 msgctxt "@action:button Allow control of input devices"
 msgid "Allow"
-msgstr ""
+msgstr "Engedélyezés"
 
 #: plugins/eis/eisprompter.cpp:70
 #, kde-format
 msgctxt "@action:button Deny control of input devices"
 msgid "Deny"
-msgstr ""
+msgstr "Tiltás"
 
 #. i18n: ectx: property (text), widget (QLabel, label_3)
 #. i18n: ectx: property (text), widget (QLabel, label)
@@ -2037,17 +1983,15 @@ msgstr[1] "%1 másodperc"
 
 #. i18n: ectx: property (text), widget (QLabel, label_InactivityDuration)
 #: plugins/hidecursor/hidecursor_config.ui:17
-#, fuzzy, kde-format
-#| msgid "Hide cursor on inactivity:"
+#, kde-format
 msgid "Hide pointer on inactivity:"
-msgstr "Kurzor elrejtése inaktivitáskor:"
+msgstr "Mutató elrejtése inaktivitáskor:"
 
 #. i18n: ectx: property (text), widget (QCheckBox, kcfg_HideOnTyping)
 #: plugins/hidecursor/hidecursor_config.ui:24
-#, fuzzy, kde-format
-#| msgid "Hide cursor on typing"
+#, kde-format
 msgid "Hide pointer on typing"
-msgstr "Kurzor elrejtése gépeléskor"
+msgstr "Mutató elrejtése gépeléskor"
 
 #: plugins/invert/invert.cpp:44
 #, kde-format
@@ -2567,13 +2511,13 @@ msgctxt "@action Grid View and Overview are the name of KWin effects"
 msgid "Cycle through Overview and Grid View"
 msgstr "Áttekintés és Rácsnézet ciklikusan"
 
-#: plugins/overview/overvieweffect.cpp:150
+#: plugins/overview/overvieweffect.cpp:152
 #, kde-format
 msgctxt "@action Overview is the name of a Kwin effect"
 msgid "Toggle Overview"
 msgstr "Áttekintés ki-be"
 
-#: plugins/overview/overvieweffect.cpp:156
+#: plugins/overview/overvieweffect.cpp:158
 #, kde-format
 msgctxt "@action Grid view is the name of a Kwin effect"
 msgid "Toggle Grid View"
@@ -2590,10 +2534,9 @@ msgid "Add Virtual Desktop"
 msgstr "Virtuális asztal hozzáadása"
 
 #: plugins/overview/qml/DesktopBar.qml:262
-#, fuzzy, kde-format
-#| msgid "Add Virtual Desktop"
+#, kde-format
 msgid "Virtual Desktop limit reached"
-msgstr "Virtuális asztal hozzáadása"
+msgstr "Virtuális asztalok korlátja elérve"
 
 #: plugins/overview/qml/Main.qml:427
 #, kde-format
@@ -2662,10 +2605,9 @@ msgstr "Nem sikerült kapcsolódni a PipeWire környezethez"
 #: plugins/screencast/screencastmanager.cpp:81
 #: plugins/screencast/screencastmanager.cpp:97
 #: plugins/screencast/screencastmanager.cpp:142
-#, fuzzy, kde-format
-#| msgid "Suspend Compositing"
+#, kde-format
 msgid "Unsupported compositing type"
-msgstr "A kompozit kiterjesztés felfüggesztése"
+msgstr "Nem támogatott kompozíciótípus"
 
 #: plugins/screencast/screencastmanager.cpp:62
 #, kde-format
@@ -2682,17 +2624,17 @@ msgstr "A kimenet nem található"
 msgid "Invalid region"
 msgstr "Érvénytelen terület"
 
-#: plugins/screencast/screencaststream.cpp:374
+#: plugins/screencast/screencaststream.cpp:378
 #, kde-format
 msgid "OpenGL compositing is required for screencasting"
 msgstr "A képernyőfelvételhez OpenGL kompozitálás szükséges"
 
-#: plugins/screencast/screencaststream.cpp:382
+#: plugins/screencast/screencaststream.cpp:386
 #, kde-format
 msgid "Failed to create PipeWire stream"
 msgstr "A PipeWire adatfolyam létrehozása sikertelen"
 
-#: plugins/screenshot/screenshotdbusinterface2.cpp:425
+#: plugins/screenshot/screenshotdbusinterface2.cpp:388
 #, kde-format
 msgid ""
 "Select window to screen shot with left click or enter.\n"
@@ -2701,7 +2643,7 @@ msgstr ""
 "Válassza ki a fotózandó ablakot bal egérgombbal vagy Enterrel.\n"
 "Megszakításhoz nyomja meg az Escape-et vagy a jobb egérgombot."
 
-#: plugins/screenshot/screenshotdbusinterface2.cpp:443
+#: plugins/screenshot/screenshotdbusinterface2.cpp:406
 #, kde-format
 msgid ""
 "Create screen shot with left click or enter.\n"
@@ -2946,10 +2888,9 @@ msgstr "Menük:"
 
 #. i18n: ectx: property (text), widget (QCheckBox, kcfg_ExcludeFullScreen)
 #: plugins/translucency/package/contents/ui/config.ui:201
-#, fuzzy, kde-format
-#| msgid "Fullscreen windows"
+#, kde-format
 msgid "Exclude fullscreen windows"
-msgstr "Teljes képernyős ablakok"
+msgstr "Teljes képernyős ablakok kizárása"
 
 #. i18n: ectx: property (text), widget (QLabel, moveresize_label)
 #: plugins/translucency/package/contents/ui/config.ui:217
@@ -3130,32 +3071,32 @@ msgstr "Kisebb"
 msgid "More"
 msgstr "Nagyobb"
 
-#: plugins/zoom/zoom.cpp:83
+#: plugins/zoom/zoom.cpp:89
 #, kde-format
 msgid "Move Zoomed Area to Left"
 msgstr "Nagyított terület mozgatása balra"
 
-#: plugins/zoom/zoom.cpp:89
+#: plugins/zoom/zoom.cpp:96
 #, kde-format
 msgid "Move Zoomed Area to Right"
 msgstr "Nagyított terület mozgatása jobbra"
 
-#: plugins/zoom/zoom.cpp:95
+#: plugins/zoom/zoom.cpp:105
 #, kde-format
 msgid "Move Zoomed Area Upwards"
 msgstr "Nagyított terület mozgatása felfelé"
 
-#: plugins/zoom/zoom.cpp:101
+#: plugins/zoom/zoom.cpp:112
 #, kde-format
 msgid "Move Zoomed Area Downwards"
 msgstr "Nagyított terület mozgatása lefelé"
 
-#: plugins/zoom/zoom.cpp:108
+#: plugins/zoom/zoom.cpp:122
 #, kde-format
 msgid "Move Mouse to Focus"
 msgstr "Egér mozgatása a fókuszra"
 
-#: plugins/zoom/zoom.cpp:114
+#: plugins/zoom/zoom.cpp:128
 #, kde-format
 msgid "Move Mouse to Center"
 msgstr "Egér mozgatása középre"
@@ -3264,18 +3205,15 @@ msgstr "Ablakcímke illesztési típus"
 
 #. i18n: ectx: label, entry (hastransientparent), group ($(ruleDescriptionOrNumber))
 #: rulesettings.kcfg:78
-#, fuzzy, kde-format
-#| msgctxt "@info:placeholder no entries in the task switcher"
-#| msgid "No open windows"
+#, kde-format
 msgid "Has parent window"
-msgstr "Nincsenek megnyitott ablakok"
+msgstr "Van szülőablaka"
 
 #. i18n: ectx: label, entry (hastransientparentmatch), group ($(ruleDescriptionOrNumber))
 #: rulesettings.kcfg:82
-#, fuzzy, kde-format
-#| msgid "Set window type to"
+#, kde-format
 msgid "Has parent window match type"
-msgstr "Ablaktípus beállítása"
+msgstr "Van a szülőablakra illeszkedő típusa"
 
 #. i18n: ectx: label, entry (types), group ($(ruleDescriptionOrNumber))
 #: rulesettings.kcfg:89
@@ -3729,17 +3667,15 @@ msgstr "Törés szabálytípus"
 
 #. i18n: ectx: label, entry (excludefromcapture), group ($(ruleDescriptionOrNumber))
 #: rulesettings.kcfg:478
-#, fuzzy, kde-format
-#| msgid "Fullscreen rule type"
+#, kde-format
 msgid "Hide from screenshots and screen recordings"
-msgstr "Teljes képernyő szabálytípus"
+msgstr "Elrejtés a képernyőképekből és a képernyőfelvételekből"
 
 #. i18n: ectx: label, entry (excludefromcapturerule), group ($(ruleDescriptionOrNumber))
 #: rulesettings.kcfg:482
-#, fuzzy, kde-format
-#| msgid "Fullscreen rule type"
+#, kde-format
 msgid "Hide from screenshots and screen recordings rule type"
-msgstr "Teljes képernyő szabálytípus"
+msgstr "Elrejtés a képernyőképekből és a képernyőfelvételekből szabálytípus"
 
 #. i18n: ectx: property (windowTitle), widget (QDialog, ShortcutDialog)
 #: shortcutdialog.ui:14
@@ -3777,8 +3713,7 @@ msgstr ""
 "Kijelentkezés 2 perc múlva."
 
 #: tabbox/clientmodel.cpp:58
-#, fuzzy, kde-format
-#| msgid "Peek at Desktop"
+#, kde-format
 msgctxt "Special entry in alt+tab list for temporarily hiding all windows"
 msgid "Peek at Desktop"
 msgstr "Pillantás az asztalra"
@@ -3789,35 +3724,35 @@ msgctxt "@info:placeholder no entries in the task switcher"
 msgid "No open windows"
 msgstr "Nincsenek megnyitott ablakok"
 
-#: tabbox/tabbox.cpp:318
+#: tabbox/tabbox.cpp:319
 msgid "Walk Through Windows"
 msgstr "Lépegetés az ablakok között"
 
-#: tabbox/tabbox.cpp:319
+#: tabbox/tabbox.cpp:320
 msgid "Walk Through Windows (Reverse)"
 msgstr "Lépegetés az ablakok között (visszafelé)"
 
-#: tabbox/tabbox.cpp:320
+#: tabbox/tabbox.cpp:321
 msgid "Walk Through Windows Alternative"
 msgstr "Lépegetés az ablakalternatívák között (visszafelé)"
 
-#: tabbox/tabbox.cpp:321
+#: tabbox/tabbox.cpp:322
 msgid "Walk Through Windows Alternative (Reverse)"
 msgstr "Lépegetés az ablakalternatívák között (visszafelé)"
 
-#: tabbox/tabbox.cpp:322
+#: tabbox/tabbox.cpp:323
 msgid "Walk Through Windows of Current Application"
 msgstr "Lépegetés a jelenlegi alkalmazások ablakai között"
 
-#: tabbox/tabbox.cpp:323
+#: tabbox/tabbox.cpp:324
 msgid "Walk Through Windows of Current Application (Reverse)"
 msgstr "Lépegetés a jelenlegi alkalmazások ablakai között (visszafelé)"
 
-#: tabbox/tabbox.cpp:324
+#: tabbox/tabbox.cpp:325
 msgid "Walk Through Windows of Current Application Alternative"
 msgstr "Lépegetés a jelenlegi alkalmazásalternatívák ablakai között"
 
-#: tabbox/tabbox.cpp:325
+#: tabbox/tabbox.cpp:326
 msgid "Walk Through Windows of Current Application Alternative (Reverse)"
 msgstr ""
 "Lépegetés a jelenlegi alkalmazásalternatívák ablakai között (visszafelé)"
@@ -3874,7 +3809,7 @@ msgstr "&Nincs címsor és keret"
 #: useractions.cpp:248
 #, kde-format
 msgid "&Hide from Screenshots and Screen Recordings"
-msgstr ""
+msgstr "Elre&jtés a képernyőképekből és a képernyőfelvételekből"
 
 #: useractions.cpp:256
 #, kde-format
@@ -3985,354 +3920,352 @@ msgstr ""
 "A(z) <b>%1</b> gyorsbillentyűt a(z) %2 művelet használja a(z) %3 "
 "alkalmazásban"
 
-#: useractions.cpp:825
-#, fuzzy, kde-format
-#| msgid "Window role"
+#: useractions.cpp:826
+#, kde-format
 msgid "Window Menu"
-msgstr "Ablakszerep"
+msgstr "Ablakmenü"
 
-#: useractions.cpp:827
+#: useractions.cpp:828
 #, kde-format
 msgid "Close Window"
 msgstr "Ablak bezárása"
 
-#: useractions.cpp:829
+#: useractions.cpp:830
 #, kde-format
 msgid "Maximize Window"
 msgstr "Ablak maximalizálása"
 
-#: useractions.cpp:831
+#: useractions.cpp:832
 #, kde-format
 msgid "Maximize Window Vertically"
 msgstr "Ablak függőleges maximalizálása"
 
-#: useractions.cpp:833
+#: useractions.cpp:834
 #, kde-format
 msgid "Maximize Window Horizontally"
 msgstr "Ablak vízszintes maximalizálása"
 
-#: useractions.cpp:835
-#, fuzzy, kde-format
-#| msgid "Resize Window"
+#: useractions.cpp:836
+#, kde-format
 msgid "Restore Window"
-msgstr "Ablak átméretezése"
+msgstr "Ablak visszaállítása"
 
-#: useractions.cpp:837
+#: useractions.cpp:838
 #, kde-format
 msgid "Minimize Window"
 msgstr "Ablak minimalizálása"
 
-#: useractions.cpp:839
+#: useractions.cpp:840
 #, kde-format
 msgid "Move Window"
 msgstr "Ablak mozgatása"
 
-#: useractions.cpp:841
+#: useractions.cpp:842
 #, kde-format
 msgid "Resize Window"
 msgstr "Ablak átméretezése"
 
-#: useractions.cpp:843
+#: useractions.cpp:844
 #, kde-format
 msgid "Raise Window"
 msgstr "Ablak előrehozása"
 
-#: useractions.cpp:845
+#: useractions.cpp:846
 #, kde-format
 msgid "Lower Window"
 msgstr "Ablak hátraengedése"
 
-#: useractions.cpp:847
+#: useractions.cpp:850
 #, kde-format
 msgid "Toggle Window Raise/Lower"
 msgstr "Ablak előre/hátra váltása"
 
-#: useractions.cpp:849
+#: useractions.cpp:852
 #, kde-format
 msgid "Make Window Fullscreen"
 msgstr "Ablak teljes képernyőre váltása"
 
-#: useractions.cpp:851
+#: useractions.cpp:854
 #, kde-format
 msgid "Toggle Window Titlebar and Frame"
 msgstr "Ablak címsorának és keretének kapcsolása"
 
-#: useractions.cpp:853
+#: useractions.cpp:856
 #, kde-format
 msgid "Keep Window Above Others"
 msgstr "Az ablak a többi fölé kerüljön"
 
-#: useractions.cpp:855
+#: useractions.cpp:858
 #, kde-format
 msgid "Keep Window Below Others"
 msgstr "Az ablak a többi alá kerüljön"
 
-#: useractions.cpp:857
+#: useractions.cpp:860
 #, kde-format
 msgid "Activate Window Demanding Attention"
 msgstr "Beavatkozást igénylő ablak aktiválása"
 
-#: useractions.cpp:859
+#: useractions.cpp:862
 #, kde-format
 msgid "Setup Window Shortcut"
 msgstr "Billentyűparancs rendelése ablakhoz"
 
-#: useractions.cpp:861
+#: useractions.cpp:864
 #, kde-format
 msgid "Move Window to the Center"
 msgstr "Ablak mozgatása középre"
 
-#: useractions.cpp:863
+#: useractions.cpp:866
 #, kde-format
 msgid "Move Window Right"
 msgstr "Ablak mozgatása jobbra"
 
-#: useractions.cpp:865
+#: useractions.cpp:868
 #, kde-format
 msgid "Move Window Left"
 msgstr "Ablak mozgatása balra"
 
-#: useractions.cpp:867
+#: useractions.cpp:872
 #, kde-format
 msgid "Move Window Up"
 msgstr "Ablak mozgatása felfelé"
 
-#: useractions.cpp:869
+#: useractions.cpp:874
 #, kde-format
 msgid "Move Window Down"
 msgstr "Ablak mozgatása lefelé"
 
-#: useractions.cpp:871
+#: useractions.cpp:878
 #, kde-format
 msgid "Expand Window Horizontally"
 msgstr "Ablak kiterjesztése vízszintesen"
 
-#: useractions.cpp:873
-#, kde-format
-msgid "Expand Window Vertically"
-msgstr "Ablak kiterjesztése függőlegesen"
-
-#: useractions.cpp:875
+#: useractions.cpp:880
 #, kde-format
 msgid "Shrink Window Horizontally"
 msgstr "Ablak zsugorítása vízszintesen"
 
-#: useractions.cpp:877
+#: useractions.cpp:884
+#, kde-format
+msgid "Expand Window Vertically"
+msgstr "Ablak kiterjesztése függőlegesen"
+
+#: useractions.cpp:886
 #, kde-format
 msgid "Shrink Window Vertically"
 msgstr "Ablak zsugorítása függőlegesen"
 
-#: useractions.cpp:879
+#: useractions.cpp:890
 #, kde-format
 msgid "Quick Tile Window to the Left"
 msgstr "Ablak áthelyezése balra"
 
-#: useractions.cpp:881
+#: useractions.cpp:892
 #, kde-format
 msgid "Quick Tile Window to the Right"
 msgstr "Ablak áthelyezése jobbra"
 
-#: useractions.cpp:883
+#: useractions.cpp:894
 #, kde-format
 msgid "Quick Tile Window to the Top"
 msgstr "Ablakcsempe áthelyezése fentre"
 
-#: useractions.cpp:885
+#: useractions.cpp:896
 #, kde-format
 msgid "Quick Tile Window to the Bottom"
 msgstr "Ablakcsempe áthelyezése lentre"
 
-#: useractions.cpp:887
+#: useractions.cpp:898
 #, kde-format
 msgid "Quick Tile Window to the Top Left"
 msgstr "Ablak áthelyezése bal felülre"
 
-#: useractions.cpp:889
+#: useractions.cpp:900
 #, kde-format
 msgid "Quick Tile Window to the Bottom Left"
 msgstr "Ablak áthelyezése bal alulra"
 
-#: useractions.cpp:891
+#: useractions.cpp:902
 #, kde-format
 msgid "Quick Tile Window to the Top Right"
 msgstr "Ablak áthelyezése jobb felülre"
 
-#: useractions.cpp:893
+#: useractions.cpp:904
 #, kde-format
 msgid "Quick Tile Window to the Bottom Right"
 msgstr "Ablak áthelyezése jobb alulra"
 
-#: useractions.cpp:895
+#: useractions.cpp:906
 #, kde-format
 msgid "Switch to Window Above"
 msgstr "Váltás a lefelé levő ablakra"
 
-#: useractions.cpp:897
+#: useractions.cpp:908
 #, kde-format
 msgid "Switch to Window Below"
 msgstr "Váltás a felfelé levő ablakra"
 
-#: useractions.cpp:899
+#: useractions.cpp:912
 #, kde-format
 msgid "Switch to Window to the Right"
 msgstr "Váltás a jobbra eső ablakra"
 
-#: useractions.cpp:901
+#: useractions.cpp:914
 #, kde-format
 msgid "Switch to Window to the Left"
 msgstr "Váltás a balra eső ablakra"
 
-#: useractions.cpp:903
+#: useractions.cpp:918
 #, kde-format
 msgid "Increase Opacity of Active Window by 5%"
 msgstr "Az aktív ablak átlátszóságának növelése 5%-kal"
 
-#: useractions.cpp:905
+#: useractions.cpp:920
 #, kde-format
 msgid "Decrease Opacity of Active Window by 5%"
 msgstr "Az aktív ablak átlátszóságának csökkentése 5%-kal"
 
-#: useractions.cpp:908
+#: useractions.cpp:924
 #, kde-format
 msgid "Keep Window on All Desktops"
 msgstr "Ablak megjelenítése az összes munkaasztalon"
 
-#: useractions.cpp:911
+#: useractions.cpp:927
 #, kde-format
 msgid "Custom Quick Tile Window to the Left"
 msgstr "Egyéni ablakcsempe áthelyezése balra"
 
-#: useractions.cpp:913
+#: useractions.cpp:929
 #, kde-format
 msgid "Custom Quick Tile Window to the Right"
 msgstr "Egyéni ablakcsempe áthelyezése jobbra"
 
-#: useractions.cpp:915
+#: useractions.cpp:931
 #, kde-format
 msgid "Custom Quick Tile Window to the Top"
 msgstr "Egyéni ablakcsempe áthelyezése fentre"
 
-#: useractions.cpp:917
+#: useractions.cpp:933
 #, kde-format
 msgid "Custom Quick Tile Window to the Bottom"
 msgstr "Egyéni ablakcsempe áthelyezése lentre"
 
-#: useractions.cpp:928
+#: useractions.cpp:944
 #, kde-format
 msgid "Window to Desktop %1"
 msgstr "Az ablak a(z) %1. munkaasztalra"
 
-#: useractions.cpp:930
+#: useractions.cpp:946
 #, kde-format
 msgid "Window to Next Desktop"
 msgstr "Az ablak a következő munkaasztalra"
 
-#: useractions.cpp:931
+#: useractions.cpp:947
 #, kde-format
 msgid "Window to Previous Desktop"
 msgstr "Az ablak az előző munkaasztalra"
 
-#: useractions.cpp:932
+#: useractions.cpp:950
 #, kde-format
 msgid "Window One Desktop to the Right"
 msgstr "Váltás a jobbra levő asztalra"
 
-#: useractions.cpp:934
+#: useractions.cpp:952
 #, kde-format
 msgid "Window One Desktop to the Left"
 msgstr "Váltás a balra levő asztalra"
 
-#: useractions.cpp:936
+#: useractions.cpp:956
 #, kde-format
 msgid "Window One Desktop Up"
 msgstr "Váltás a felfelé levő asztalra"
 
-#: useractions.cpp:938
+#: useractions.cpp:958
 #, kde-format
 msgid "Window One Desktop Down"
 msgstr "Váltás a lefelé levő asztalra"
 
-#: useractions.cpp:942
+#: useractions.cpp:963
 #, kde-format
 msgid "Move Window to Screen %1"
 msgstr "Ablak áthelyezése a(z) %1. képernyőre"
 
-#: useractions.cpp:949
+#: useractions.cpp:970
 #, kde-format
 msgid "Move Window to Next Screen"
 msgstr "Ablak áthelyezése a következő képernyőre"
 
-#: useractions.cpp:951
+#: useractions.cpp:972
 #, kde-format
 msgid "Move Window to Previous Screen"
 msgstr "Ablak áthelyezése az előző képernyőre"
 
-#: useractions.cpp:953
+#: useractions.cpp:976
 #, kde-format
 msgid "Move Window One Screen to the Right"
 msgstr "Ablak áthelyezése egy képernyővel jobbra"
 
-#: useractions.cpp:955
+#: useractions.cpp:978
 #, kde-format
 msgid "Move Window One Screen to the Left"
 msgstr "Ablak áthelyezése egy képernyővel balra"
 
-#: useractions.cpp:957
+#: useractions.cpp:982
 #, kde-format
 msgid "Move Window One Screen Up"
 msgstr "Ablak áthelyezése egy képernyővel felfelé"
 
-#: useractions.cpp:959
+#: useractions.cpp:984
 #, kde-format
 msgid "Move Window One Screen Down"
 msgstr "Ablak áthelyezése egy képernyővel lefelé"
 
-#: useractions.cpp:963
+#: useractions.cpp:989
 #, kde-format
 msgid "Switch to Screen %1"
 msgstr "Váltás a(z) %1. képernyőre"
 
-#: useractions.cpp:970
+#: useractions.cpp:996
 #, kde-format
 msgid "Switch to Next Screen"
 msgstr "Váltás a következő képernyőre"
 
-#: useractions.cpp:971
+#: useractions.cpp:997
 #, kde-format
 msgid "Switch to Previous Screen"
 msgstr "Váltás az előző képernyőre"
 
-#: useractions.cpp:972
+#: useractions.cpp:1000
 #, kde-format
 msgid "Switch to Screen to the Right"
 msgstr "Váltás a jobbra lévő képernyőre"
 
-#: useractions.cpp:974
+#: useractions.cpp:1002
 #, kde-format
 msgid "Switch to Screen to the Left"
 msgstr "Váltás a balra lévő képernyőre"
 
-#: useractions.cpp:976
+#: useractions.cpp:1006
 #, kde-format
 msgid "Switch to Screen Above"
 msgstr "Váltás a felfelé lévő képernyőre"
 
-#: useractions.cpp:978
+#: useractions.cpp:1008
 #, kde-format
 msgid "Switch to Screen Below"
 msgstr "Váltás a lefelé lévő képernyőre"
 
-#: useractions.cpp:981
+#: useractions.cpp:1012
 #, kde-format
 msgid "Peek at Desktop"
 msgstr "Pillantás az asztalra"
 
-#: useractions.cpp:984
+#: useractions.cpp:1015
 #, kde-format
 msgid "Kill Window"
 msgstr "Ablak kilövése"
 
-#: useractions.cpp:1049
+#: useractions.cpp:1080
 #, kde-format
 msgid "Activate Window (%1)"
 msgstr "Ablak aktiválása (%1)"
@@ -4357,27 +4290,27 @@ msgstr "Váltás a következő asztalra"
 msgid "Switch to Previous Desktop"
 msgstr "Váltás az előző asztalra"
 
-#: virtualdesktops.cpp:773
+#: virtualdesktops.cpp:775
 #, kde-format
 msgid "Switch One Desktop to the Right"
 msgstr "Váltás a jobbra eső asztalra"
 
-#: virtualdesktops.cpp:774
+#: virtualdesktops.cpp:776
 #, kde-format
 msgid "Switch One Desktop to the Left"
 msgstr "Váltás a balra eső asztalra"
 
-#: virtualdesktops.cpp:775
+#: virtualdesktops.cpp:777
 #, kde-format
 msgid "Switch One Desktop Up"
 msgstr "Váltás a felfelé eső asztalra"
 
-#: virtualdesktops.cpp:776
+#: virtualdesktops.cpp:778
 #, kde-format
 msgid "Switch One Desktop Down"
 msgstr "Váltás a lefelé eső asztalra"
 
-#: virtualdesktops.cpp:877
+#: virtualdesktops.cpp:882
 #, kde-format
 msgid "Switch to Desktop %1"
 msgstr "Váltás a(z) %1. asztalra"
@@ -4385,7 +4318,7 @@ msgstr "Váltás a(z) %1. asztalra"
 #: wayland/outputmanagement_v2.cpp:569
 #, kde-format
 msgid "abm level is larger than the maximum (4): %1"
-msgstr ""
+msgstr "Az abm szint magasabb a maximumnál (4): %1"
 
 #: wayland/outputmanagement_v2.cpp:647
 #, kde-format
@@ -4400,32 +4333,34 @@ msgstr "Az összes kimenet letiltása beállításmódosítással nem engedélye
 #: wayland/outputmanagement_v2.cpp:675
 #, kde-format
 msgid "%1 cannot mirror itself"
-msgstr ""
+msgstr "A(z) %1 nem tudja magát tükrözni"
 
 #: wayland/outputmanagement_v2.cpp:682
 #, kde-format
 msgid "Cannot add a custom mode with an empty size"
-msgstr ""
+msgstr "Üres méretű egyéni módot nem lehet hozzáadni"
 
 #: wayland/outputmanagement_v2.cpp:686
 #, kde-format
 msgid "Cannot add a custom mode with a refresh rate of zero Hz"
 msgstr ""
+"Nem lehet hozzáadni olyan egyéni módot, amelynek frissítési gyakorisága "
+"nulla Hz"
 
 #: wayland/outputmanagement_v2.cpp:697
 #, kde-format
 msgid "Position of output %1 is way too negative (%2, %3)"
-msgstr ""
+msgstr "A(z) %1 kimenet értéke túlságosan negatív (%2, %3)"
 
 #: wayland/outputmanagement_v2.cpp:700
 #, kde-format
 msgid "Position of enabled output %1 is negative (%2, %3)"
-msgstr ""
+msgstr "A(z) %1. engedélyezett kimenet pozíciója negatív (%2, %3)"
 
 #: wayland/outputmanagement_v2.cpp:704
 #, kde-format
 msgid "Position of output %1 is way too large (%2, %3)"
-msgstr ""
+msgstr "A(z) %1 kimenet pozíciója túl nagy (%2, %3)"
 
 #: wayland/outputmanagement_v2.cpp:721
 #, kde-format
@@ -4433,12 +4368,11 @@ msgid "The driver rejected the output configuration"
 msgstr "Az illesztőprogram elutasította a kimenetbeállítást"
 
 #: wayland/outputmanagement_v2.cpp:724
-#, fuzzy, kde-format
-#| msgid "The Alt key is now active."
+#, kde-format
 msgid "The session is not active"
-msgstr "Az Alt most aktív."
+msgstr "A munkamenet nem aktív"
 
-#: window.cpp:3108
+#: window.cpp:3107
 #, kde-format
 msgctxt "Application is not responding, appended to window title"
 msgid "(Not Responding)"
@@ -4447,25 +4381,25 @@ msgstr "(Nem válaszol)"
 #: workspace.cpp:1310
 #, kde-format
 msgid "Built-in Screen"
-msgstr ""
+msgstr "Beépített képernyő"
 
 #: workspace.cpp:1323
 #, kde-format
 msgctxt "Display label: manufacturer + model name + connector name"
 msgid "%1 %2 %3"
-msgstr ""
+msgstr "%1 %2 %3"
 
 #: workspace.cpp:1333
 #, kde-format
 msgctxt "Display label: manufacturer + model name + serial number"
 msgid "%1 %2 %3"
-msgstr ""
+msgstr "%1 %2 %3"
 
 #: workspace.cpp:1336
 #, kde-format
 msgctxt "Display label: manufacturer + model name"
 msgid "%1 %2"
-msgstr ""
+msgstr "%1 %2"
 
 #: workspace.cpp:1805
 #, kde-format

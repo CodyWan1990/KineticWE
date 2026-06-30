@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2024 David Redondo <kde@david-redondo>
+    SPDX-FileCopyrightText: 2024 David Redondo <kde@david-redondo.de>
 
     SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
@@ -302,6 +302,9 @@ void TestInputCapture::testInputCapture()
     while (auto event = ei_get_event(ei)) {
         ei_event_unref(event);
     }
+
+    // We receive a warp from the release
+    QVERIFY(motionSpy.wait());
 
     Test::pointerMotion({2, 2}, ++timestamp);
     Test::pointerButtonPressed(BTN_LEFT, ++timestamp);
