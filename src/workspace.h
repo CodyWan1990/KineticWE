@@ -508,6 +508,8 @@ public Q_SLOTS:
     void slotWindowNoBorder();
     void slotWindowExcludeFromCapture();
 
+    void slotExecuteCommand(const QString &command);
+
     void slotWindowToNextDesktop();
     void slotWindowToPreviousDesktop();
     void slotWindowToDesktopRight();
