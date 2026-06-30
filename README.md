@@ -104,7 +104,7 @@ A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of k
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     kineticwe = {
-      url = "codeberg:theblackdon/kineticwe";
+      url = "gitlab:theblackdon/kineticwe";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
