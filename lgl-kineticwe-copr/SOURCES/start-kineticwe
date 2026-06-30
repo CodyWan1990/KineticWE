@@ -44,7 +44,13 @@ sleep 1
 mkdir -p "\$HOME/.local/share"
 
 if [[ -x "$PORTAL_KDE" ]]; then
-    nohup "$PORTAL_KDE" >"\$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
+    # xdg-desktop-portal-kde only registers the Wayland-integration portals
+    # (ScreenCast, Screenshot, RemoteDesktop, Clipboard, GlobalShortcuts,
+    # InputCapture, Background, Wallpaper) when XDG_CURRENT_DESKTOP is
+    # exactly "KDE" (desktopportal.cpp does a plain string compare, not a
+    # colon-list check). Override it for this one process only so the rest
+    # of the session can keep showing as "KineticWE:KDE".
+    XDG_CURRENT_DESKTOP=KDE nohup "$PORTAL_KDE" >"\$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
 else
     echo "Warning: xdg-desktop-portal-kde not found" >&2
 fi
