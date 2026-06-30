@@ -27,7 +27,6 @@ If you want to support this project, you can donate here: [Ko-fi — theblackdon
 > Portions of this project — including (but not limited to) installer scripts, build glue, configuration files, documentation, and some C++/QML/JS source files — were **authored with the assistance of LLM tools** (large language models coding assistants).
 =======
 > Portions of this project — including (but not limited to) installer scripts, build glue, configuration files, documentation, and some C++/QML/JS source files — were **authored with the assistance of AI tools** (large language models coding assistants).
->>>>>>> master
 >
 > All LLM-generated content has been reviewed by the maintainers, but it has **not** been audited to the same standard as hand-written code. You may encounter:
 > - Subtle bugs or edge cases that a human author would have caught.
