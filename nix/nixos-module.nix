@@ -33,8 +33,13 @@ in
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ cfg.package ];
 
-    # Register the session with the display manager so SDDM / greetd
-    # picks up share/wayland-sessions/kineticwe.desktop from the package.
-    services.xserver.displayManager.sessionPackages = [ cfg.package ];
+    # Register the session with the display manager so SDDM shows it
+    # in the session chooser. Using the session list directly (rather than
+    # sessionPackages) avoids type-check issues with unbuilt derivations.
+    services.xserver.displayManager.session = [{
+      name = "kineticwe";
+      manage = "desktop";
+      start = ''exec ${cfg.package}/bin/start-kineticwe'';
+    }];
   };
 }
