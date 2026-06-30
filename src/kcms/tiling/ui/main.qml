@@ -104,6 +104,35 @@ KCM.SimpleKCM {
                     kcm.settings.enabledLayouts = layouts;
                 }
             }
+            QQC2.CheckBox {
+                id: enableMonocle
+                text: i18n("Monocle")
+                checked: kcm.settings.enabledLayouts.indexOf("Monocle") !== -1
+                onToggled: {
+                    let layouts = kcm.settings.enabledLayouts.slice();
+                    if (checked && layouts.indexOf("Monocle") === -1) {
+                        layouts.push("Monocle");
+                    } else if (!checked) {
+                        layouts = layouts.filter(l => l !== "Monocle");
+                    }
+                    kcm.settings.enabledLayouts = layouts;
+                }
+            }
+
+            QQC2.CheckBox {
+                id: enableMonocle
+                text: i18n("Monocle")
+                checked: kcm.settings.enabledLayouts.indexOf("Monocle") !== -1
+                onToggled: {
+                    let layouts = kcm.settings.enabledLayouts.slice();
+                    if (checked && layouts.indexOf("Monocle") === -1) {
+                        layouts.push("Monocle");
+                    } else if (!checked) {
+                        layouts = layouts.filter(l => l !== "Monocle");
+                    }
+                    kcm.settings.enabledLayouts = layouts;
+                }
+            }
 
             QQC2.Label {
                 visible: kcm.settings.enabledLayouts.length < 2
@@ -120,7 +149,8 @@ KCM.SimpleKCM {
                 model: [
                     { text: i18n("MasterStack"), value: "MasterStack" },
                     { text: i18n("Stacked"), value: "Stacked" },
-                    { text: i18n("CenterTile"), value: "CenterTile" }
+                    { text: i18n("CenterTile"), value: "CenterTile" },
+                    { text: i18n("Monocle"), value: "Monocle" }
                 ]
                 textRole: "text"
                 valueRole: "value"

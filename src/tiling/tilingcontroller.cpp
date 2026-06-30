@@ -14,6 +14,7 @@
 #include "tiles/layoutengine.h"
 #include "tiles/masterstacklayoutengine.h"
 #include "tiles/stackedlayoutengine.h"
+#include "tiles/monoclelayoutengine.h"
 #include "tiles/tilemanager.h"
 #include "utils/gravity.h"
 #include "virtualdesktops.h"
@@ -303,6 +304,8 @@ QList<LayoutEngine::LayoutKind> TilingController::enabledLayoutKinds() const
             result.append(LayoutEngine::LayoutKind::Stacked);
         } else if (name.compare(QLatin1String("CenterTile"), Qt::CaseInsensitive) == 0) {
             result.append(LayoutEngine::LayoutKind::CenterTile);
+        } else if (name.compare(QLatin1String("Monocle"), Qt::CaseInsensitive) == 0) {
+            result.append(LayoutEngine::LayoutKind::Monocle);
         }
     }
     if (result.isEmpty()) {
