@@ -38,7 +38,7 @@ If you want to support this project, you can donate here: [Ko-fi — theblackdon
 
 ## Installing KineticWE
 
-### COPR (Fedora) — Recommended
+### COPR (Fedora) — Recommended - Use Fedora Linux for the best and tested experience 
 
 The recommended way to install KineticWE on Fedora is via [COPR](https://copr.fedorainfracloud.org/).
 COPR provides pre-built RPMs so you don't need to compile from source.
