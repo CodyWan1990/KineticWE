@@ -20,6 +20,7 @@ cmake -B "$BUILD_DIR" -S . \
     -DCMAKE_PREFIX_PATH="$INSTALL_PREFIX" \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_TESTING=OFF \
+    -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
     "$@"
 
 echo "Building kwin-we..."
