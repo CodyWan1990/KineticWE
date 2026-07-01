@@ -91,7 +91,11 @@ fi
 PAYLOAD
 
 chmod +x "$STARTUP_PAYLOAD"
-exec "$KWIN_WE_BIN" "$STARTUP_PAYLOAD" --xwayland
+
+# Launch kwin-we with the startup payload as the client application.
+# --xwayland enables XWayland support; the payload runs noctalia as
+# the Wayland shell.
+exec "$KWIN_WE_BIN" --xwayland "$STARTUP_PAYLOAD"
 SCRIPTEOF
     chmod +x "$out/bin/start-kineticwe"
 
