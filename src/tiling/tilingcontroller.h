@@ -177,6 +177,12 @@ private:
     void setLayoutOn(LogicalOutput *output, VirtualDesktop *desktop, LayoutEngine::LayoutKind kind);
     void reconcileLayoutKinds();
 
+    /** Show an on-screen notification for the given layout kind via
+     *  org.kde.osdService (the Plasma OSD). No-op when the DBus service
+     *  is unavailable or in test mode.
+     */
+    void showLayoutNotification(LayoutEngine::LayoutKind kind);
+
     QPointer<Workspace> m_workspace;
     std::unique_ptr<TilingRules> m_rules;
     bool m_enabled = true;

@@ -23,6 +23,9 @@
 #include <KColorScheme>
 #include <KConfigGroup>
 #include <KSharedConfig>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCall>
 #include <QGuiApplication>
 #include <QPalette>
 #include <QStandardPaths>
@@ -1209,6 +1212,7 @@ void TilingController::setLayout(LayoutEngine::LayoutKind kind)
     }
 
     setLayoutOn(output, desktop, kind);
+    showLayoutNotification(kind);
 }
 
 void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *desktop, LayoutEngine::LayoutKind kind)
@@ -1325,6 +1329,29 @@ void TilingController::cycleLayout()
     }
     const int nextIndex = (currentIndex + 1) % enabled.size();
     setLayout(enabled.at(nextIndex));
+}
+
+void TilingController::showLayoutNotification(LayoutEngine::LayoutKind kind)
+{
+    // Skip notifications in test mode to avoid DBus warnings in unit tests.
+    if (QStandardPaths::isTestModeEnabled()) {
+        return;
+    }
+
+    const QString text = LayoutEngine::layoutDisplayName(kind);
+    // The icon name must be a valid themed icon. "preferences-desktop-tiling"
+    // is not part of the standard Breeze set, so we fall back to a generic
+    // window-management icon that ships with Plasma.
+    const QString iconName = QStringLiteral("kwin");
+
+    QDBusMessage message = QDBusMessage::createMethodCall(
+        QStringLiteral("org.kde.plasmashell"),
+        QStringLiteral("/org/kde/osdService"),
+        QStringLiteral("org.kde.osdService"),
+        QStringLiteral("showText"));
+    message.setArguments({iconName, text});
+
+    QDBusConnection::sessionBus().asyncCall(message);
 }
 
 void TilingController::moveWindowToOutput(TilingDirection direction)

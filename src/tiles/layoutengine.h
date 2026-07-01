@@ -44,6 +44,12 @@ public:
     static QString layoutKindToString(LayoutKind kind);
     static LayoutKind layoutKindFromString(const QString &name, LayoutKind fallback = LayoutKind::MasterStack);
 
+    /**
+     * Returns a human-readable display name for the given layout kind,
+     * suitable for on-screen notifications and user-facing UI.
+     */
+    static QString layoutDisplayName(LayoutKind kind);
+
     explicit LayoutEngine(QObject *parent = nullptr);
     ~LayoutEngine() override;
 
