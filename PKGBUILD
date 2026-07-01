@@ -122,9 +122,8 @@ makedepends=(
 
 optdepends=()
 
-# Conflicts with Arch's kglobalacceld since we build our own from git
-conflicts=('kglobalacceld')
-provides=('kglobalacceld')
+provides=('kglobalacceld' 'kwin')
+conflicts=('kwin' 'kglobalacceld')
 
 # Source: kwin-we from GitLab + kglobalacceld from KDE invent
 _sourcebase="$pkgname-$pkgver"
@@ -206,6 +205,14 @@ package() {
     # Remove static libs and cmake files from main package
     rm -f "$pkgdir/usr/lib/cmake/KGlobalAccelD/"*.cmake 2>/dev/null || true
     rm -f "$pkgdir/usr/lib/"*.a 2>/dev/null || true
+
+    # Strip kglobalacceld development files (matching COPR — keep only runtime lib)
+    rm -rf "$pkgdir/usr/include/KGlobalAccelD" 2>/dev/null || true
+    rm -f "$pkgdir/usr/lib/libKGlobalAccelD.so" 2>/dev/null || true
+
+    # Compatibility symlinks so Plasma can find the compositor (like COPR does)
+    ln -s kinetic-we "$pkgdir/usr/bin/kwin_wayland"
+    ln -s kwin-we_wayland_wrapper "$pkgdir/usr/bin/kwin_wayland_wrapper"
 
     # Install license
     install -Dm644 "$srcdir/$_sourcebase/LICENSES/"* \
