@@ -38,11 +38,34 @@ If you want to support this project, you can donate here: [Ko-fi — theblackdon
 
 ## Installing KineticWE
 
-Convenience scripts are provided that install all dependencies, build kglobalacceld (the global shortcuts daemon), build kwin-we, install the [noctalia-shell](https://github.com/noctalia-dev/noctalia), and set up session files so you can launch KineticWE from a TTY.
+### COPR (Fedora) — Recommended
+
+The recommended way to install KineticWE on Fedora is via [COPR](https://copr.fedorainfracloud.org/).
+COPR provides pre-built RPMs so you don't need to compile from source.
+
+Enable the required COPR repositories, then install:
+
+```bash
+sudo dnf copr enable lionheartp/Hyprland
+sudo dnf copr enable theblackdon/kineticwe
+sudo dnf install kineticwe noctalia-git
+```
+
+After installation, select **KineticWE** from your display manager's session menu
+or run `start-kineticwe` from a TTY.
+
+The `kineticwe` package provides and obsoletes Fedora's stock `kwin`, `kwin-common`,
+and `kwin-libs` packages — it replaces the stock compositor rather than installing
+alongside it.
+
+### Install via Scripts (Alternative / Other Distros)
 
 > **Why kglobalacceld is built from source:** kwin-we calls `keyEvent()`, `pointerPressed()`, `axisTriggered()` and `resetModifierOnlyState()` directly on the `KGlobalAccelD` object — an API introduced in kglobalacceld git master (post-6.7.0). The system package on most distros is still 6.7.0 or older and routes those calls through a separate `KGlobalAccelInterface` class, so kwin-we cannot compile against it. The install scripts clone kglobalacceld from `invent.kde.org/plasma/kglobalacceld.git` and build it into `$INSTALL_PREFIX` so kwin-we's CMake finds the newer version first. This requires **Qt ≥ 6.10** and **KF6 ≥ 6.26** (satisfied on Fedora 44+, Arch rolling, and Debian Trixie/Ubuntu 24.04+ with backports).
 
-### Install via Scripts
+Convenience scripts are provided that install all dependencies, build kglobalacceld
+(the global shortcuts daemon), build kwin-we, install the
+[noctalia-shell](https://github.com/noctalia-dev/noctalia), and set up session
+files so you can launch KineticWE from a TTY.
 
 **Quick start (copy & paste):**
 
@@ -135,7 +158,7 @@ A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of k
 }
 ```
 
-> **Note:** On the first build, Nix will error with a hash mismatch for `kglobalacceld-git`. Copy the expected hash from the error into `nix/kglobalacceld-git.nix` and rebuild. (This should be resolved)
+> **Note:** On the first build, Nix may error with a hash mismatch for `kglobalacceld-git`. Copy the expected hash from the error into `nix/kglobalacceld-git.nix` and rebuild. (This should be resolved)
 
 ---
 
