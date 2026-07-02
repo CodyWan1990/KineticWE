@@ -75,6 +75,8 @@ private Q_SLOTS:
     void testEngineMasterWidthDefaultsTo75();
     void testEngineSetMasterRatioReflows();
     void testConfigMasterWidthPropagatesToEngine();
+    void testRemoveMasterThenAddNewWindowSurvives();
+    void testRemoveLeftWindowThenAddNewWindowSurvives();
 
 private:
     void createTiledWindow(std::unique_ptr<KWayland::Client::Surface> *surface,
@@ -577,6 +579,94 @@ void TilingCenterTileTest::testConfigMasterWidthPropagatesToEngine()
     tilingGroup.sync();
     workspace()->slotReconfigure();
     QCOMPARE(freshEngine->masterRatio(), qreal(0.20));
+}
+
+void TilingCenterTileTest::testRemoveMasterThenAddNewWindowSurvives()
+{
+    // Regression test: when the master window is removed leaving only a window
+    // in the left (or right) stack, the singleton reflow path must preserve the
+    // surviving column's weights.  Prior to the fix, the singleton path
+    // unconditionally cleared m_leftWeights / m_rightWeights, so the next
+    // addWindow → reflow would crash with an out-of-bounds access on the empty
+    // weight list.
+    //
+    // Scenario: two windows tiled (master + left), then close master, then add
+    // a third window — this must not crash.
+    TilingController *controller = workspace()->tilingController();
+    controller->setLayout(LayoutEngine::LayoutKind::CenterTile);
+
+    createTiledWindow(&m_surface, &m_shellSurface, &m_window);
+    createTiledWindow(&m_surface2, &m_shellSurface2, &m_window2);
+    QVERIFY(m_window && m_window2);
+
+    // m_window is the first → master column.
+    // m_window2 is the second → because masterSize = 1, it goes to left stack.
+    auto *engine = qobject_cast<CenterTileLayoutEngine *>(
+        m_tileManager->layoutEngine(m_desktop));
+    QVERIFY(engine);
+
+    // Close the master window (m_window).  This triggers removeWindow → reflow
+    // with totalCount == 1, where the surviving window (m_window2) lives in the
+    // left stack.
+    QSignalSpy closedSpy(m_window, &Window::closed);
+    m_shellSurface.reset();
+    m_surface.reset();
+    QVERIFY(closedSpy.wait());
+    m_window = nullptr;
+
+    // The surviving window should now fill the entire output.
+    QTRY_VERIFY(qFuzzyCompare(m_window2->moveResizeGeometry().width(), qreal(1280))
+                && qFuzzyCompare(m_window2->moveResizeGeometry().height(), qreal(1024)));
+
+    // Critical: add a third window.  Before the fix this would crash because
+    // the singleton path cleared m_leftWeights while the leaf remained in
+    // m_leftLeaves.
+    createTiledWindow(&m_surface3, &m_shellSurface3, &m_window3);
+    QVERIFY(m_window3);
+
+    // Verify the layout still has valid geometry (no crash, windows are placed).
+    QTRY_VERIFY(m_window3->tilingState().mode == TilingState::Mode::Tiled);
+    QVERIFY(m_window3->moveResizeGeometry().width() > 0);
+    QVERIFY(m_window3->moveResizeGeometry().height() > 0);
+}
+
+void TilingCenterTileTest::testRemoveLeftWindowThenAddNewWindowSurvives()
+{
+    // Mirror of the above: when only the right-stack window survives, weights
+    // must not be cleared either.
+    // Scenario: three windows (master + left + right), close the master and
+    // left, then add a new window.
+    TilingController *controller = workspace()->tilingController();
+    controller->setLayout(LayoutEngine::LayoutKind::CenterTile);
+
+    createTiledWindow(&m_surface, &m_shellSurface, &m_window);
+    createTiledWindow(&m_surface2, &m_shellSurface2, &m_window2);
+    createTiledWindow(&m_surface3, &m_shellSurface3, &m_window3);
+    QVERIFY(m_window && m_window2 && m_window3);
+
+    // Close m_window (master) and m_window2 (left stack).
+    QSignalSpy closedSpy(m_window, &Window::closed);
+    m_shellSurface.reset();
+    m_surface.reset();
+    QVERIFY(closedSpy.wait());
+    m_window = nullptr;
+
+    QSignalSpy closedSpy2(m_window2, &Window::closed);
+    m_shellSurface2.reset();
+    m_surface2.reset();
+    QVERIFY(closedSpy2.wait());
+    m_window2 = nullptr;
+
+    // m_window3 (right stack) should now fill the output.
+    QTRY_VERIFY(qFuzzyCompare(m_window3->moveResizeGeometry().width(), qreal(1280))
+                && qFuzzyCompare(m_window3->moveResizeGeometry().height(), qreal(1024)));
+
+    // Add a fourth window — must not crash.
+    createTiledWindow(&m_surface4, &m_shellSurface4, &m_window4);
+    QVERIFY(m_window4);
+    QTRY_VERIFY(m_window4->tilingState().mode == TilingState::Mode::Tiled);
+    QVERIFY(m_window4->moveResizeGeometry().width() > 0);
+    QVERIFY(m_window4->moveResizeGeometry().height() > 0);
 }
 
 } // namespace KWin

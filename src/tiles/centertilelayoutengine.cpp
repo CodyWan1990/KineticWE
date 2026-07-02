@@ -78,15 +78,19 @@ void CenterTileLayoutEngine::addWindow(Window *window)
     if (!leaf->manage(window)) {
         qWarning() << "CenterTileLayoutEngine: failed to manage window" << window->caption()
                     << "in leaf, desktop mismatch?";
+        // Remember which column the leaf was appended to *before* destroyChild
+        // zeroes out the QPointer (destroyChild does a synchronous delete tile).
+        const bool wasMaster = (!m_masterLeaves.isEmpty() && m_masterLeaves.last() == leaf);
+        const bool wasLeft   = (!m_leftLeaves.isEmpty()   && m_leftLeaves.last()   == leaf);
+        const bool wasRight  = (!m_rightLeaves.isEmpty()  && m_rightLeaves.last()  == leaf);
         m_root->destroyChild(leaf);
-        // Undo the list append.
-        if (!m_masterLeaves.isEmpty() && m_masterLeaves.last() == leaf) {
+        if (wasMaster) {
             m_masterLeaves.removeLast();
             m_masterWeights.removeLast();
-        } else if (!m_leftLeaves.isEmpty() && m_leftLeaves.last() == leaf) {
+        } else if (wasLeft) {
             m_leftLeaves.removeLast();
             m_leftWeights.removeLast();
-        } else if (!m_rightLeaves.isEmpty() && m_rightLeaves.last() == leaf) {
+        } else if (wasRight) {
             m_rightLeaves.removeLast();
             m_rightWeights.removeLast();
         }
@@ -307,17 +311,25 @@ void CenterTileLayoutEngine::reflow()
     }
 
     if (totalCount == 1) {
-        // Single window takes the full screen.
+        // Single window takes the full screen.  Reset weights only for the
+        // column that actually holds the window; the other two columns are
+        // cleared so they are empty when the next window arrives.
         if (!m_masterLeaves.isEmpty() && m_masterLeaves.first()) {
             m_masterLeaves.first()->setRelativeGeometry(RectF(0, 0, 1, 1));
+            m_masterWeights = {DefaultWeight};
+            m_leftWeights.clear();
+            m_rightWeights.clear();
         } else if (!m_leftLeaves.isEmpty() && m_leftLeaves.first()) {
             m_leftLeaves.first()->setRelativeGeometry(RectF(0, 0, 1, 1));
+            m_leftWeights = {DefaultWeight};
+            m_masterWeights.clear();
+            m_rightWeights.clear();
         } else if (!m_rightLeaves.isEmpty() && m_rightLeaves.first()) {
             m_rightLeaves.first()->setRelativeGeometry(RectF(0, 0, 1, 1));
+            m_rightWeights = {DefaultWeight};
+            m_masterWeights.clear();
+            m_leftWeights.clear();
         }
-        m_masterWeights = {DefaultWeight};
-        m_leftWeights.clear();
-        m_rightWeights.clear();
         Q_EMIT layoutChanged();
         return;
     }
@@ -376,6 +388,21 @@ void CenterTileLayoutEngine::reflow()
     const int leftCount = m_leftLeaves.count();
     const int masterCount = m_masterLeaves.count();
     const int rightCount = m_rightLeaves.count();
+
+    // Defensive: keep every weight list in lock-step with its leaf list so a
+    // reflow never accesses heights[i] out-of-bounds.  This guards against
+    // weight/leaf mismatches from any future change that forgets to sync them.
+    auto healColumn = [](QList<QPointer<CustomTile>> &leaves, QList<qreal> &weights) {
+        while (weights.size() < leaves.size()) {
+            weights.append(DefaultWeight);
+        }
+        while (weights.size() > leaves.size()) {
+            weights.removeLast();
+        }
+    };
+    healColumn(m_leftLeaves, m_leftWeights);
+    healColumn(m_masterLeaves, m_masterWeights);
+    healColumn(m_rightLeaves, m_rightWeights);
 
     if (leftCount > 0 || rightCount > 0) {
         constexpr qreal minColumnWidth = 0.15;
