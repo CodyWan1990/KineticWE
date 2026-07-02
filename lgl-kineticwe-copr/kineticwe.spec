@@ -3,7 +3,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -245,6 +245,13 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Fri Jul 03 2026 LGL <lgl@localhost> - 6.7.80-4
+- Rebuild to pick up the Meta+Scroll / Meta+Alt+Scroll swap option
+  (InvertScrollDesktopSwitch), which was already merged before build 3 but
+  missing from it because lgl-kineticwe-copr/results/kineticwe-6.7.80.tar.gz
+  was stale: the Makefile only regenerates that tarball when the file is
+  absent, so builds 2 and 3 silently reused the June 28 source snapshot
+
 * Thu Jul 02 2026 LGL <lgl@localhost> - 6.7.80-3
 - Fix crash in CenterTileLayoutEngine::cancelMoveWindow: removing a leaf from
   its column list without removing the matching entry from the parallel
