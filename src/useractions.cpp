@@ -48,6 +48,7 @@
 
 #include <QCheckBox>
 #include <QFileInfo>
+#include <QProcess>
 #include <QPushButton>
 #include <QWindow>
 
@@ -781,6 +782,11 @@ void Workspace::slotLowerWindowOpacity()
     m_activeWindow->setOpacity(std::max(m_activeWindow->opacity() - 0.05, 0.05));
 }
 
+void Workspace::slotExecuteCommand(const QString &command)
+{
+    QProcess::startDetached(QStringLiteral("/bin/sh"), {QStringLiteral("-c"), command});
+}
+
 void Workspace::closeActivePopup()
 {
     if (active_popup) {
@@ -1014,6 +1020,11 @@ void Workspace::initShortcuts()
                  Qt::META | Qt::Key_D, &Workspace::slotToggleShowDesktop, false);
 
     initShortcut("Kill Window", i18n("Kill Window"), Qt::META | Qt::CTRL | Qt::Key_Escape, &Workspace::slotKillWindow, true);
+
+    // Noctalia shell commands
+    initShortcut("Noctalia Launcher", i18n("Toggle Noctalia Launcher"),
+                 Qt::META | Qt::Key_Space,
+                 std::bind(&Workspace::slotExecuteCommand, this, QStringLiteral("noctalia msg panel-toggle launcher")), false);
 
     // Native tiling shortcuts
     initShortcut("Tiling Focus Left", i18n("Tiling Focus Left"), Qt::META | Qt::Key_Left, [this]() {

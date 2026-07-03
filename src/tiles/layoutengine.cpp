@@ -27,6 +27,8 @@ QString LayoutEngine::layoutKindToString(LayoutKind kind)
         return QStringLiteral("Stacked");
     case LayoutKind::CenterTile:
         return QStringLiteral("CenterTile");
+    case LayoutKind::Monocle:
+        return QStringLiteral("Monocle");
     }
     return QStringLiteral("MasterStack");
 }
@@ -54,6 +56,9 @@ LayoutEngine::LayoutKind LayoutEngine::layoutKindFromString(const QString &name,
     }
     if (name.compare(QLatin1String("CenterTile"), Qt::CaseInsensitive) == 0) {
         return LayoutKind::CenterTile;
+    }
+    if (name.compare(QLatin1String("Monocle"), Qt::CaseInsensitive) == 0) {
+        return LayoutKind::Monocle;
     }
     return fallback;
 }

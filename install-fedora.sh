@@ -16,6 +16,12 @@ set -euo pipefail
 #   INSTALL_PREFIX  - Where to install binaries (default: $HOME/.local)
 #   NOCTALIA_URL    - Git URL for noctalia-shell (default: GitHub)
 # =============================================================================
+#
+# Quick start (copy & paste):
+#   git clone https://gitlab.com/theblackdon/kineticwe.git
+#   cd kineticwe
+#   ./install-fedora.sh
+# =============================================================================
 
 INSTALL_PREFIX="${INSTALL_PREFIX:-$HOME/.local}"
 NOCTALIA_URL="${NOCTALIA_URL:-https://github.com/noctalia-dev/noctalia.git}"

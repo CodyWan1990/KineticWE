@@ -84,7 +84,14 @@ export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
 
 # ---------------------------------------------------------------------------
-# 1. Start XDG Desktop Portals
+# 1. Rebuild KDE service cache so System Settings finds installed KCMs
+# ---------------------------------------------------------------------------
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Start XDG Desktop Portals
 # ---------------------------------------------------------------------------
 # The KDE portal backend MUST start before the generic portal frontend so that
 # the frontend can discover the backend's capabilities (Screenshot, ScreenCast).

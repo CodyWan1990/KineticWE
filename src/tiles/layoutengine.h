@@ -39,6 +39,7 @@ public:
         MasterStack = 0,
         Stacked = 1,
         CenterTile = 2,
+        Monocle = 3,
     };
 
     static QString layoutKindToString(LayoutKind kind);

@@ -3,7 +3,7 @@
 
 pkgname=kineticwe
 pkgver=6.7.80
-pkgrel=1
+pkgrel=2
 pkgdesc="KineticWE - A tiling KWin Wayland compositor with native window tiling"
 arch=('x86_64')
 url="https://gitlab.com/theblackdon/kineticwe"
@@ -122,9 +122,8 @@ makedepends=(
 
 optdepends=()
 
-# Conflicts with Arch's kglobalacceld since we build our own from git
-conflicts=('kglobalacceld')
-provides=('kglobalacceld')
+provides=('kglobalacceld' 'kwin')
+conflicts=('kwin' 'kglobalacceld')
 
 # Source: kwin-we from GitLab + kglobalacceld from KDE invent
 _sourcebase="$pkgname-$pkgver"
@@ -207,6 +206,14 @@ package() {
     rm -f "$pkgdir/usr/lib/cmake/KGlobalAccelD/"*.cmake 2>/dev/null || true
     rm -f "$pkgdir/usr/lib/"*.a 2>/dev/null || true
 
+    # Strip kglobalacceld development files (matching COPR — keep only runtime lib)
+    rm -rf "$pkgdir/usr/include/KGlobalAccelD" 2>/dev/null || true
+    rm -f "$pkgdir/usr/lib/libKGlobalAccelD.so" 2>/dev/null || true
+
+    # Compatibility symlinks so Plasma can find the compositor (like COPR does)
+    ln -s kinetic-we "$pkgdir/usr/bin/kwin_wayland"
+    ln -s kwin-we_wayland_wrapper "$pkgdir/usr/bin/kwin_wayland_wrapper"
+
     # Install license
     install -Dm644 "$srcdir/$_sourcebase/LICENSES/"* \
         -t "$pkgdir/usr/share/licenses/$pkgname/"
@@ -216,4 +223,20 @@ package() {
         install -Dm644 "$srcdir/kglobalacceld/LICENSES/"* \
             -t "$pkgdir/usr/share/licenses/$pkgname-kglobalacceld/" 2>/dev/null || true
     fi
+
+    # Install Wayland session launcher (start-kineticwe)
+    echo "==> Installing start-kineticwe session launcher..."
+    sed -e "s|@INSTALL_PREFIX@|/usr|g" \
+        -e 's|if \[\[ "\$_INSTALL_PREFIX_" == "/usr" \]\]; then|if false; then # system-wide install, use /usr as prefix|' \
+        "$srcdir/$_sourcebase/scripts/start-kineticwe.sh" \
+        > "$pkgdir/usr/bin/start-kineticwe"
+    chmod 0755 "$pkgdir/usr/bin/start-kineticwe"
+
+    # Install Wayland session desktop entry (for SDDM, greetd, etc.)
+    echo "==> Installing wayland-sessions desktop entry..."
+    mkdir -p "$pkgdir/usr/share/wayland-sessions"
+    sed -e "s|@INSTALL_PREFIX@|/usr|g" \
+        "$srcdir/$_sourcebase/scripts/kineticwe.desktop.in" \
+        > "$pkgdir/usr/share/wayland-sessions/kineticwe.desktop"
+    chmod 0644 "$pkgdir/usr/share/wayland-sessions/kineticwe.desktop"
 }

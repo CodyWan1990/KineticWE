@@ -33,18 +33,13 @@ in
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ cfg.package ];
 
-    # system-wide wayland-sessions entry.
-    environment.etc."wayland-sessions/kineticwe.desktop".source =
-      pkgs.runCommand "kineticwe.desktop" { } ''
-        mkdir -p "$out"
-        cat > "$out/kineticwe.desktop" <<EOF
-        [Desktop Entry]
-        Name=KineticWE
-        Comment=A Kwin Window Environment
-        Type=Application
-        Exec=${cfg.package}/bin/start-kineticwe
-        DesktopNames=KDE
-        EOF
-      '';
+    # Register the session with the display manager so SDDM shows it
+    # in the session chooser. Using the session list directly (rather than
+    # sessionPackages) avoids type-check issues with unbuilt derivations.
+    services.xserver.displayManager.session = [{
+      name = "kineticwe";
+      manage = "desktop";
+      start = ''exec ${cfg.package}/bin/start-kineticwe'';
+    }];
   };
 }

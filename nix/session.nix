@@ -26,7 +26,18 @@ stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p "$out/bin"
+    mkdir -p "$out/bin" "$out/share/wayland-sessions"
+
+    # Desktop entry so SDDM / greetd can list KineticWE.
+    cat > "$out/share/wayland-sessions/kineticwe.desktop" << DESKTOPEOF
+[Desktop Entry]
+Name=KineticWE
+Comment=A Kwin Window Environment
+Type=Application
+Exec=$out/bin/start-kineticwe
+DesktopNames=KDE
+DESKTOPEOF
+
     cat > "$out/bin/start-kineticwe" << 'SCRIPTEOF'
 #!/bin/bash
 # KineticWE — session startup script (Nix-built).
@@ -80,6 +91,10 @@ fi
 PAYLOAD
 
 chmod +x "$STARTUP_PAYLOAD"
+
+# Launch kwin-we with the startup payload as the client application.
+# --xwayland enables XWayland support; the payload runs noctalia as
+# the Wayland shell.
 exec "$KWIN_WE_BIN" --xwayland "$STARTUP_PAYLOAD"
 SCRIPTEOF
     chmod +x "$out/bin/start-kineticwe"
