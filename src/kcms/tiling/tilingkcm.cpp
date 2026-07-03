@@ -52,6 +52,7 @@ void OutputGapOverride::setGapLeft(int value)
         return;
     }
     m_gapLeft = value;
+    markFieldDirty("gapLeft");
     Q_EMIT gapLeftChanged();
     Q_EMIT modified();
 }
@@ -62,6 +63,7 @@ void OutputGapOverride::setGapRight(int value)
         return;
     }
     m_gapRight = value;
+    markFieldDirty("gapRight");
     Q_EMIT gapRightChanged();
     Q_EMIT modified();
 }
@@ -72,6 +74,7 @@ void OutputGapOverride::setGapTop(int value)
         return;
     }
     m_gapTop = value;
+    markFieldDirty("gapTop");
     Q_EMIT gapTopChanged();
     Q_EMIT modified();
 }
@@ -82,6 +85,7 @@ void OutputGapOverride::setGapBottom(int value)
         return;
     }
     m_gapBottom = value;
+    markFieldDirty("gapBottom");
     Q_EMIT gapBottomChanged();
     Q_EMIT modified();
 }
@@ -92,6 +96,7 @@ void OutputGapOverride::setGapBetween(int value)
         return;
     }
     m_gapBetween = value;
+    markFieldDirty("gapBetween");
     Q_EMIT gapBetweenChanged();
     Q_EMIT modified();
 }
@@ -102,8 +107,24 @@ void OutputGapOverride::setDefaultLayout(const QString &value)
     // when the user touches the control, even if the value happens to
     // resolve to the same string (e.g. they re-selected it).
     m_defaultLayout = value;
+    markFieldDirty("defaultLayout");
     Q_EMIT defaultLayoutChanged();
     Q_EMIT modified();
+}
+
+void OutputGapOverride::markFieldDirty(const QByteArray &fieldName)
+{
+    m_dirtyFields.insert(fieldName);
+}
+
+bool OutputGapOverride::isFieldDirty(const QByteArray &fieldName) const
+{
+    return m_dirtyFields.contains(fieldName);
+}
+
+void OutputGapOverride::clearDirtyFlags()
+{
+    m_dirtyFields.clear();
 }
 
 OutputGapOverridesModel::OutputGapOverridesModel(QObject *parent)
@@ -341,14 +362,28 @@ void OutputGapOverridesModel::refreshFromDefaults(const TilingSettings *settings
 
     beginResetModel();
     for (OutputGapOverride *entry : std::as_const(m_entries)) {
-        // Reset every value to the new global default. setDefaultLayout
-        // already emits modified() so the model's modified flag is set.
-        entry->setGapLeft(defaultLeft);
-        entry->setGapRight(defaultRight);
-        entry->setGapTop(defaultTop);
-        entry->setGapBottom(defaultBottom);
-        entry->setGapBetween(defaultBetween);
-        entry->setDefaultLayout(defaultLayout);
+        // Only reset values the user hasn't explicitly overridden.
+        // This preserves per-monitor customizations when the global
+        // defaults change (e.g. changing the default layout no longer
+        // wipes all per-monitor gap overrides).
+        if (!entry->isFieldDirty("gapLeft")) {
+            entry->setGapLeft(defaultLeft);
+        }
+        if (!entry->isFieldDirty("gapRight")) {
+            entry->setGapRight(defaultRight);
+        }
+        if (!entry->isFieldDirty("gapTop")) {
+            entry->setGapTop(defaultTop);
+        }
+        if (!entry->isFieldDirty("gapBottom")) {
+            entry->setGapBottom(defaultBottom);
+        }
+        if (!entry->isFieldDirty("gapBetween")) {
+            entry->setGapBetween(defaultBetween);
+        }
+        if (!entry->isFieldDirty("defaultLayout")) {
+            entry->setDefaultLayout(defaultLayout);
+        }
     }
     endResetModel();
 }
@@ -396,6 +431,13 @@ void OutputGapOverridesModel::load(KConfigGroup &tilingGroup, const TilingSettin
     }
 
     endResetModel();
+
+    // Mark all entries as clean so the dirty-tracking in refreshFromDefaults
+    // knows these values were loaded from disk, not set by the user.
+    for (OutputGapOverride *entry : std::as_const(m_entries)) {
+        entry->clearDirtyFlags();
+    }
+
     Q_EMIT countChanged();
     setModified(false);
 }
@@ -461,6 +503,7 @@ void OutputGapOverridesModel::defaults(const TilingSettings *settings)
         entry->setGapBottom(defaultBottom);
         entry->setGapBetween(defaultBetween);
         entry->setDefaultLayout(defaultLayout);
+        entry->clearDirtyFlags();
     }
     endResetModel();
     setModified(false);

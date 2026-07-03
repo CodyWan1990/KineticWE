@@ -61,6 +61,20 @@ public:
     void setGapBetween(int value);
     void setDefaultLayout(const QString &value);
 
+    /**
+     * Returns true if the given field has been explicitly changed by the user
+     * since the entry was loaded (i.e., it is a deliberate override, not just
+     * tracking the global default). Used by refreshFromDefaults() to preserve
+     * user-set values when a global default changes.
+     */
+    bool isFieldDirty(const QByteArray &fieldName) const;
+
+    /**
+     * Reset the dirty-tracking state for all fields. Called after load() so
+     * freshly loaded values are not mistaken for user edits.
+     */
+    void clearDirtyFlags();
+
 Q_SIGNALS:
     void gapLeftChanged();
     void gapRightChanged();
@@ -76,6 +90,8 @@ Q_SIGNALS:
     void modified();
 
 private:
+    void markFieldDirty(const QByteArray &fieldName);
+
     QString m_name;
     QString m_description;
     int m_gapLeft;
@@ -84,6 +100,7 @@ private:
     int m_gapBottom;
     int m_gapBetween;
     QString m_defaultLayout;
+    QSet<QByteArray> m_dirtyFields;
 };
 
 /**

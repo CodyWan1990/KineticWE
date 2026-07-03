@@ -322,7 +322,8 @@ KCM.SimpleKCM {
                                     for (let i = 0; i < seen.length; ++i) {
                                         if (seen[i] === "MasterStack"
                                             || seen[i] === "Stacked"
-                                            || seen[i] === "CenterTile") {
+                                            || seen[i] === "CenterTile"
+                                            || seen[i] === "Monocle") {
                                             opts.push({ text: seen[i], value: seen[i] });
                                         }
                                     }
