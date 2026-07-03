@@ -21,7 +21,7 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = pkgs.kineticwe or cfg.package;
+      default = pkgs.kineticwe or (throw "programs.kineticwe.package is not set and pkgs.kineticwe is not available. Did you forget to apply the kineticwe overlay? Add `kineticwe.overlays.default` to `nixpkgs.overlays`.");
       defaultText = lib.literalExpression "pkgs.kineticwe";
       description = ''
         The KineticWE session package providing `bin/start-kineticwe`.

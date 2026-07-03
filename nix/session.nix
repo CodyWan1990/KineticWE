@@ -29,7 +29,7 @@ stdenv.mkDerivation {
     mkdir -p "$out/bin" "$out/share/wayland-sessions"
 
     # Desktop entry so SDDM / greetd can list KineticWE.
-    cat > "$out/share/wayland-sessions/kineticwe.desktop" << DESKTOPEOF
+    cat > "$out/share/wayland-sessions/KineticWE.desktop" << DESKTOPEOF
 [Desktop Entry]
 Name=KineticWE
 Comment=A Kwin Window Environment
@@ -49,9 +49,9 @@ XDP_BIN="${xdg-desktop-portal}/libexec/xdg-desktop-portal"
 XDP_KDE_BIN="${kdePackages.xdg-desktop-portal-kde}/libexec/xdg-desktop-portal-kde"
 
 export PATH="${lib.makeBinPath [ coreutils findutils gnused gnugrep systemd ]}:$PATH"
-export QT_PLUGIN_PATH="''${QT_PLUGIN_PATH:-}:${kwinWe}/lib/qt6/plugins"
-export QML2_IMPORT_PATH="''${QML2_IMPORT_PATH:-}:${kwinWe}/lib/qt6/qml"
-export QML_IMPORT_PATH="''${QML_IMPORT_PATH:-}:${kwinWe}/lib/qt6/qml"
+export QT_PLUGIN_PATH="''${QT_PLUGIN_PATH:-}:${kwinWe}/lib/qt-6/plugins"
+export QML2_IMPORT_PATH="''${QML2_IMPORT_PATH:-}:${kwinWe}/lib/qt-6/qml"
+export QML_IMPORT_PATH="''${QML_IMPORT_PATH:-}:${kwinWe}/lib/qt-6/qml"
 export XDG_CURRENT_DESKTOP="''${XDG_CURRENT_DESKTOP:-KDE}"
 export XDG_SESSION_TYPE="''${XDG_SESSION_TYPE:-wayland}"
 export XDG_SESSION_DESKTOP="''${XDG_SESSION_DESKTOP:-KDE}"
@@ -103,9 +103,9 @@ SCRIPTEOF
     # noctalia + portal binaries without callers having to set anything.
     wrapProgram "$out/bin/start-kineticwe" \
       --prefix PATH : "${lib.makeBinPath [ noctalia xdg-desktop-portal kdePackages.xdg-desktop-portal-kde ]}" \
-      --prefix QT_PLUGIN_PATH : "${kwinWe}/lib/qt6/plugins" \
-      --prefix QML2_IMPORT_PATH : "${kwinWe}/lib/qt6/qml" \
-      --prefix QML_IMPORT_PATH  : "${kwinWe}/lib/qt6/qml" \
+      --prefix QT_PLUGIN_PATH : "${kwinWe}/lib/qt-6/plugins" \
+      --prefix QML2_IMPORT_PATH : "${kwinWe}/lib/qt-6/qml" \
+      --prefix QML_IMPORT_PATH  : "${kwinWe}/lib/qt-6/qml" \
       --suffix LD_LIBRARY_PATH : "${kwinWe}/lib"
 
     runHook postInstall
