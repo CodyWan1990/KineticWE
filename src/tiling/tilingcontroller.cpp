@@ -1268,7 +1268,20 @@ void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *deskto
 
     // Take ownership of the current windows so we can re-add them in the same
     // order once the new engine is in place.
-    const QList<Window *> carriedWindows = existing->windows();
+    QList<Window *> carriedWindows = existing->windows();
+
+    // Preserve the primary/master window position across layout switches.
+    // Different layouts have different window ordering semantics: CenterTile
+    // orders left stack → master column → right stack, while MasterStack
+    // expects the master at index 0.  Reorder the carried windows so the old
+    // engine's primary window comes first, keeping its master status in the
+    // new layout.
+    if (Window *primary = existing->primaryWindow()) {
+        if (carriedWindows.size() > 1 && carriedWindows.first() != primary) {
+            carriedWindows.removeOne(primary);
+            carriedWindows.prepend(primary);
+        }
+    }
 
     auto engine = createLayoutEngine(kind, manager);
     if (kind == LayoutEngine::LayoutKind::CenterTile) {

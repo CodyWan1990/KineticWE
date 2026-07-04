@@ -123,6 +123,24 @@ void CenterTileLayoutEngine::removeWindow(Window *window)
             CustomTile *leaf = m_masterLeaves.takeAt(i);
             leaf->unmanage(window);
             m_root->destroyChild(leaf);
+
+            // Promote a side-stack window to fill the empty master slot so the
+            // centre column doesn't end up with fewer windows than expected.
+            if (!m_leftLeaves.isEmpty() || !m_rightLeaves.isEmpty()) {
+                CustomTile *promotedLeaf = nullptr;
+                qreal promotedWeight = DefaultWeight;
+                // Pick from the stack that has more windows to keep the balance.
+                if (m_leftLeaves.count() >= m_rightLeaves.count()) {
+                    promotedLeaf = m_leftLeaves.takeLast();
+                    promotedWeight = m_leftWeights.takeLast();
+                } else {
+                    promotedLeaf = m_rightLeaves.takeLast();
+                    promotedWeight = m_rightWeights.takeLast();
+                }
+                m_masterLeaves.insert(i, promotedLeaf);
+                m_masterWeights.insert(i, promotedWeight);
+            }
+
             reflow();
             return;
         }
