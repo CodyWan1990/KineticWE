@@ -223,6 +223,7 @@ target_sources(kwin PRIVATE
     tiles/quicktile.cpp
     tiles/stackedlayoutengine.cpp
     tiles/monoclelayoutengine.cpp
+    tiles/scrollinglayoutengine.cpp
     tiles/tile.cpp
     tiles/tilemanager.cpp
     tiling/tilingcontroller.cpp

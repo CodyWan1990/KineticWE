@@ -29,6 +29,8 @@ QString LayoutEngine::layoutKindToString(LayoutKind kind)
         return QStringLiteral("CenterTile");
     case LayoutKind::Monocle:
         return QStringLiteral("Monocle");
+    case LayoutKind::Scrolling:
+        return QStringLiteral("Scrolling");
     }
     return QStringLiteral("MasterStack");
 }
@@ -42,6 +44,10 @@ QString LayoutEngine::layoutDisplayName(LayoutKind kind)
         return QStringLiteral("Stacked");
     case LayoutKind::CenterTile:
         return QStringLiteral("Center Tile");
+    case LayoutKind::Monocle:
+        return QStringLiteral("Monocle");
+    case LayoutKind::Scrolling:
+        return QStringLiteral("Scrolling");
     }
     return QStringLiteral("Master & Stack");
 }
@@ -59,6 +65,9 @@ LayoutEngine::LayoutKind LayoutEngine::layoutKindFromString(const QString &name,
     }
     if (name.compare(QLatin1String("Monocle"), Qt::CaseInsensitive) == 0) {
         return LayoutKind::Monocle;
+    }
+    if (name.compare(QLatin1String("Scrolling"), Qt::CaseInsensitive) == 0) {
+        return LayoutKind::Scrolling;
     }
     return fallback;
 }

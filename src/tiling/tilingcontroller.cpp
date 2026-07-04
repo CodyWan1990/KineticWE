@@ -15,6 +15,7 @@
 #include "tiles/masterstacklayoutengine.h"
 #include "tiles/stackedlayoutengine.h"
 #include "tiles/monoclelayoutengine.h"
+#include "tiles/scrollinglayoutengine.h"
 #include "tiles/tilemanager.h"
 #include "utils/gravity.h"
 #include "virtualdesktops.h"
@@ -47,6 +48,8 @@ std::unique_ptr<LayoutEngine> createLayoutEngine(LayoutEngine::LayoutKind kind, 
         return std::make_unique<CenterTileLayoutEngine>(parent);
     case LayoutEngine::LayoutKind::Monocle:
         return std::make_unique<MonocleLayoutEngine>(parent);
+    case LayoutEngine::LayoutKind::Scrolling:
+        return std::make_unique<ScrollingLayoutEngine>(parent);
     case LayoutEngine::LayoutKind::MasterStack:
     default:
         return std::make_unique<MasterStackLayoutEngine>(parent);
@@ -152,7 +155,7 @@ void TilingController::reconfigure()
     // Whitelist of layouts the user wants available. Order in the list also
     // defines the cycle order used by cycleLayout().
     m_enabledLayouts = tilingGroup.readEntry("EnabledLayouts",
-        QStringList{QLatin1String("MasterStack"), QLatin1String("Stacked"), QLatin1String("CenterTile"), QLatin1String("Monocle")});
+        QStringList{QLatin1String("MasterStack"), QLatin1String("Stacked"), QLatin1String("CenterTile"), QLatin1String("Monocle"), QLatin1String("Scrolling")});
     m_rules->load(rulesGroup);
 
     // Per-tile resize step. Weight units; see tilingcontroller.h. Clamped to
@@ -324,6 +327,8 @@ QList<LayoutEngine::LayoutKind> TilingController::enabledLayoutKinds() const
             result.append(LayoutEngine::LayoutKind::CenterTile);
         } else if (name.compare(QLatin1String("Monocle"), Qt::CaseInsensitive) == 0) {
             result.append(LayoutEngine::LayoutKind::Monocle);
+        } else if (name.compare(QLatin1String("Scrolling"), Qt::CaseInsensitive) == 0) {
+            result.append(LayoutEngine::LayoutKind::Scrolling);
         }
     }
     if (result.isEmpty()) {
