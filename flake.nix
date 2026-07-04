@@ -30,6 +30,8 @@
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
         kwin-we = self.packages.${prev.stdenv.hostPlatform.system}.kwin-we
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
+        noctalia = self.packages.${prev.stdenv.hostPlatform.system}.noctalia
+          or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
       };
     }
     //     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
@@ -51,6 +53,7 @@
         session = pkgs.callPackage ./nix/session.nix {
           inherit kwinWe;
           noctalia = noctalia.packages.${system}.default;
+          xwayland = pkgs.xwayland;
         };
       in
       {
@@ -59,6 +62,7 @@
           default = session;
           kwin-we = kwinWe;
           session = session;
+          noctalia = noctalia.packages.${system}.default;
         };
 
         # ---- apps ------------------------------------------------------------
