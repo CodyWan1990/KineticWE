@@ -746,20 +746,60 @@ KCM.SimpleKCM {
         Kirigami.FormLayout {
             id: floatingPage
 
-            QQC2.TextField {
-                id: floatingClasses
+            RowLayout {
                 Kirigami.FormData.label: i18n("Floating classes:")
-                text: kcm.settings.floatingClasses.join(", ")
-                onEditingFinished: kcm.settings.floatingClasses = text.split(",").map(s => s.trim()).filter(s => s.length > 0)
-                KCM.SettingStateBinding {
-                    configObject: kcm.settings
-                    settingName: "floatingClasses"
+
+                QQC2.TextField {
+                    id: floatingClassInput
+                    Layout.fillWidth: true
+                    placeholderText: i18n("Add a window class...")
+                    onAccepted: addFloatingClass()
                 }
+
+                QQC2.Button {
+                    icon.name: "list-add"
+                    enabled: floatingClassInput.text.trim().length > 0
+                    onClicked: addFloatingClass()
+                }
+            }
+
+            Repeater {
+                model: kcm.settings.floatingClasses
+                delegate: RowLayout {
+                    width: parent ? parent.width : undefined
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Label {
+                        text: modelData
+                        Layout.fillWidth: true
+                        leftPadding: Kirigami.Units.smallSpacing
+                    }
+
+                    QQC2.ToolButton {
+                        icon.name: "edit-delete"
+                        QQC2.ToolTip {
+                            text: i18nc("@info:tooltip", "Remove this floating class")
+                        }
+                        onClicked: {
+                            let list = kcm.settings.floatingClasses.slice();
+                            const idx = list.indexOf(modelData);
+                            if (idx !== -1) {
+                                list.splice(idx, 1);
+                                kcm.settings.floatingClasses = list;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Window types:")
+                visible: false
             }
 
             QQC2.CheckBox {
                 id: floatUtility
-                Kirigami.FormData.label: i18n("Window types:")
                 text: i18n("Float utility windows")
                 checked: kcm.settings.floatUtility
                 onToggled: kcm.settings.floatUtility = checked
@@ -788,6 +828,19 @@ KCM.SimpleKCM {
                 KCM.SettingStateBinding {
                     configObject: kcm.settings
                     settingName: "floatTransient"
+                }
+            }
+
+            function addFloatingClass() {
+                const text = floatingClassInput.text.trim();
+                if (text.length > 0) {
+                    let list = kcm.settings.floatingClasses.slice();
+                    if (list.indexOf(text) === -1) {
+                        list.push(text);
+                        kcm.settings.floatingClasses = list;
+                    }
+                    floatingClassInput.text = "";
+                    floatingClassInput.forceActiveFocus();
                 }
             }
         }
