@@ -165,7 +165,7 @@ private:
     Window *activeTiledWindow() const;
 
     void setupLayoutEngine(TileManager *manager, VirtualDesktop *desktop, LayoutEngine::LayoutKind kind);
-    LayoutEngine::LayoutKind resolveLayoutKind(LogicalOutput *output) const;
+    LayoutEngine::LayoutKind resolveLayoutKind(LogicalOutput *output, VirtualDesktop *desktop = nullptr) const;
     LayoutEngine::LayoutKind globalDefaultLayoutKind() const;
     QList<LayoutEngine::LayoutKind> enabledLayoutKinds() const;
     bool isLayoutEnabled(LayoutEngine::LayoutKind kind) const;

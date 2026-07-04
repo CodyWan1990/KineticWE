@@ -237,8 +237,8 @@ void TilingController::onOutputAdded(LogicalOutput *output)
     if (!manager) {
         return;
     }
-    const LayoutEngine::LayoutKind kind = resolveLayoutKind(output);
     for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+        const LayoutEngine::LayoutKind kind = resolveLayoutKind(output, desktop);
         setupLayoutEngine(manager, desktop, kind);
     }
     applyGapSettingsToOutput(output);
@@ -276,17 +276,30 @@ LayoutEngine::LayoutKind TilingController::globalDefaultLayoutKind() const
     return m_defaultLayout;
 }
 
-LayoutEngine::LayoutKind TilingController::resolveLayoutKind(LogicalOutput *output) const
+LayoutEngine::LayoutKind TilingController::resolveLayoutKind(LogicalOutput *output, VirtualDesktop *desktop) const
 {
     KSharedConfigPtr config = KSharedConfig::openConfig(KWIN_CONFIG);
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
     LayoutEngine::LayoutKind kind = globalDefaultLayoutKind();
-    if (output) {
+
+    // Check per-(desktop, output) override first (most specific).
+    // This allows different layouts for the same desktop number on
+    // different monitors when per-output virtual desktops is enabled.
+    if (desktop && output) {
+        const KConfigGroup combinedGroup(&tilingGroup, QStringLiteral("DesktopOutput %1:%2").arg(desktop->x11DesktopNumber()).arg(output->name()));
+        if (combinedGroup.hasKey("DefaultLayout")) {
+            kind = LayoutEngine::layoutKindFromString(combinedGroup.readEntry("DefaultLayout", QString()));
+        }
+    }
+
+    // Fall back to per-output override
+    if (desktop && output && kind == globalDefaultLayoutKind()) {
         const KConfigGroup outputGroup(&tilingGroup, QStringLiteral("Output %1").arg(output->name()));
         if (outputGroup.hasKey("DefaultLayout")) {
             kind = LayoutEngine::layoutKindFromString(outputGroup.readEntry("DefaultLayout", QString()));
         }
     }
+
     // If the configured default is not currently enabled, fall back to the
     // first enabled layout so the monitor is always in a usable state.
     if (!isLayoutEnabled(kind)) {
@@ -717,7 +730,7 @@ void TilingController::addWindowToLayout(Window *window, LogicalOutput *output, 
         return;
     }
 
-    setupLayoutEngine(manager, desktop, resolveLayoutKind(output));
+    setupLayoutEngine(manager, desktop, resolveLayoutKind(output, desktop));
 
     LayoutEngine *engine = manager->layoutEngine(desktop);
     if (!engine) {
@@ -1290,8 +1303,8 @@ void TilingController::reconcileLayoutKinds()
         if (!output) {
             continue;
         }
-        const LayoutEngine::LayoutKind kind = resolveLayoutKind(output);
         for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+            const LayoutEngine::LayoutKind kind = resolveLayoutKind(output, desktop);
             setLayoutOn(output, desktop, kind);
         }
     }

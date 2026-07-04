@@ -9,6 +9,7 @@
 #include "tilingsettings.h"
 
 #include <KConfigGroup>
+#include <KLocalizedString>
 #include <KPluginFactory>
 #include <KSharedConfig>
 #include <QDBusConnection>
@@ -531,15 +532,283 @@ bool OutputGapOverridesModel::isDefaults(const TilingSettings *settings) const
     return true;
 }
 
+// ===================================================================
+// DesktopOutputLayoutOverride
+// ===================================================================
+
+DesktopOutputLayoutOverride::DesktopOutputLayoutOverride(uint desktopNumber, QString desktopName,
+                                                         int outputIndex, QString outputName, QString outputDescription,
+                                                         QString defaultLayout,
+                                                         QObject *parent)
+    : QObject(parent)
+    , m_desktopNumber(desktopNumber)
+    , m_desktopName(std::move(desktopName))
+    , m_outputIndex(outputIndex)
+    , m_outputName(std::move(outputName))
+    , m_outputDescription(std::move(outputDescription))
+    , m_defaultLayout(std::move(defaultLayout))
+{
+}
+
+void DesktopOutputLayoutOverride::setDefaultLayout(const QString &value)
+{
+    m_defaultLayout = value;
+    Q_EMIT defaultLayoutChanged();
+    Q_EMIT modified();
+}
+
+// ===================================================================
+// DesktopOutputLayoutOverridesModel
+// ===================================================================
+
+DesktopOutputLayoutOverridesModel::DesktopOutputLayoutOverridesModel(QObject *parent)
+    : QAbstractListModel(parent)
+{
+    if (qApp) {
+        connect(qApp, &QGuiApplication::screenAdded, this, [this]() {
+            rebuildModel(nullptr, nullptr);
+        });
+        connect(qApp, &QGuiApplication::screenRemoved, this, [this]() {
+            rebuildModel(nullptr, nullptr);
+        });
+    }
+}
+
+DesktopOutputLayoutOverridesModel::~DesktopOutputLayoutOverridesModel()
+{
+    qDeleteAll(m_entries);
+}
+
+QHash<int, QByteArray> DesktopOutputLayoutOverridesModel::roleNames() const
+{
+    return {
+        {DesktopNumberRole, "desktopNumber"},
+        {DesktopNameRole, "desktopName"},
+        {OutputIndexRole, "outputIndex"},
+        {OutputNameRole, "outputName"},
+        {OutputDescriptionRole, "outputDescription"},
+        {DefaultLayoutRole, "defaultLayout"},
+        {EntryRole, "entry"},
+    };
+}
+
+QVariant DesktopOutputLayoutOverridesModel::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() < 0 || index.row() >= m_entries.size()) {
+        return {};
+    }
+    DesktopOutputLayoutOverride *entry = m_entries.at(index.row());
+    switch (role) {
+    case DesktopNumberRole:
+        return entry->desktopNumber();
+    case DesktopNameRole:
+        return entry->desktopName();
+    case OutputIndexRole:
+        return entry->outputIndex();
+    case OutputNameRole:
+        return entry->outputName();
+    case OutputDescriptionRole:
+        return entry->outputDescription();
+    case DefaultLayoutRole:
+        return entry->defaultLayout();
+    case EntryRole:
+        return QVariant::fromValue(entry);
+    }
+    return {};
+}
+
+int DesktopOutputLayoutOverridesModel::rowCount(const QModelIndex &parent) const
+{
+    if (parent.isValid()) {
+        return 0;
+    }
+    return m_entries.size();
+}
+
+DesktopOutputLayoutOverride *DesktopOutputLayoutOverridesModel::entryAt(int row) const
+{
+    if (row < 0 || row >= m_entries.size()) {
+        return nullptr;
+    }
+    return m_entries.at(row);
+}
+
+DesktopOutputLayoutOverride *DesktopOutputLayoutOverridesModel::entryAt(uint desktopNum, const QString &outputName) const
+{
+    for (DesktopOutputLayoutOverride *entry : m_entries) {
+        if (entry->desktopNumber() == desktopNum && entry->outputName() == outputName) {
+            return entry;
+        }
+    }
+    return nullptr;
+}
+
+void DesktopOutputLayoutOverridesModel::setModified(bool modified)
+{
+    if (m_modified == modified) {
+        return;
+    }
+    m_modified = modified;
+    Q_EMIT modifiedChanged();
+}
+
+void DesktopOutputLayoutOverridesModel::syncOutputList()
+{
+    QStringList names;
+    QStringList descriptions;
+    if (qApp) {
+        for (const QScreen *screen : qApp->screens()) {
+            if (!screen) continue;
+            names << screen->name();
+            QString desc = screen->model();
+            if (desc.isEmpty()) {
+                desc = QStringLiteral("%1 %2").arg(screen->manufacturer(), screen->name());
+            }
+            if (desc.trimmed().isEmpty()) {
+                desc = screen->name();
+            }
+            descriptions << desc;
+        }
+    }
+    if (names != m_outputNames) {
+        m_outputNames = names;
+        m_outputDescriptions = descriptions;
+        Q_EMIT outputNamesChanged();
+    }
+}
+
+void DesktopOutputLayoutOverridesModel::rebuildModel(const TilingSettings *settings, KConfigGroup *tilingGroup)
+{
+    const QString defaultLayout = settings ? settings->defaultLayout() : QStringLiteral("MasterStack");
+
+    // Read desktop list from kwinrc
+    KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+    KConfigGroup dtopGroup(config, QStringLiteral("Desktops"));
+    const int n = dtopGroup.readEntry("Number", 1);
+
+    // Update output list
+    syncOutputList();
+
+    // Check if anything changed
+    QList<uint> newDesktopNums;
+    for (int i = 1; i <= n; ++i) {
+        newDesktopNums << static_cast<uint>(i);
+    }
+    if (newDesktopNums == m_desktopNumbers && tilingGroup == nullptr) {
+        // No structural change; refreshFromDefaults handles value-only updates
+        return;
+    }
+
+    beginResetModel();
+    qDeleteAll(m_entries);
+    m_entries.clear();
+    m_desktopNumbers = newDesktopNums;
+
+    for (uint num : std::as_const(m_desktopNumbers)) {
+        const QString dName = dtopGroup.readEntry(QStringLiteral("Name_%1").arg(num), i18n("Desktop %1", num));
+        for (int oi = 0; oi < m_outputNames.size(); ++oi) {
+            const QString &oName = m_outputNames[oi];
+            const QString &oDesc = m_outputDescriptions[oi];
+            QString entryLayout = QString();  // empty = use default
+            if (tilingGroup) {
+                KConfigGroup perPairGroup(tilingGroup, QStringLiteral("DesktopOutput %1:%2").arg(num).arg(oName));
+                if (perPairGroup.hasKey("DefaultLayout")) {
+                    entryLayout = perPairGroup.readEntry("DefaultLayout", QString());
+                }
+            }
+            auto *entry = new DesktopOutputLayoutOverride(num, dName, oi, oName, oDesc, entryLayout, this);
+            connect(entry, &DesktopOutputLayoutOverride::modified, this, [this]() {
+                if (!m_modified) {
+                    setModified(true);
+                }
+            });
+            m_entries.append(entry);
+        }
+    }
+
+    endResetModel();
+    Q_EMIT countChanged();
+}
+
+void DesktopOutputLayoutOverridesModel::load(KConfigGroup &tilingGroup, const TilingSettings *settings)
+{
+    rebuildModel(settings, &tilingGroup);
+    setModified(false);
+}
+
+void DesktopOutputLayoutOverridesModel::refreshFromDefaults(const TilingSettings *settings)
+{
+    Q_UNUSED(settings)
+    // Resetting to empty string means "no override, use default".
+    // This is the safest because changing global defaults should not silently
+    // turn every (desktop, output) pair into an explicit override.
+    beginResetModel();
+    for (DesktopOutputLayoutOverride *entry : std::as_const(m_entries)) {
+        entry->setDefaultLayout(QString());
+    }
+    endResetModel();
+}
+
+void DesktopOutputLayoutOverridesModel::save(KConfigGroup &tilingGroup, const TilingSettings *settings)
+{
+    const QString defaultLayout = settings ? settings->defaultLayout() : QStringLiteral("MasterStack");
+
+    // Remove all existing DesktopOutput sub-groups
+    const QStringList existing = tilingGroup.groupList();
+    for (const QString &sub : existing) {
+        if (sub.startsWith(QLatin1String("DesktopOutput "))) {
+            tilingGroup.deleteGroup(sub);
+        }
+    }
+
+    for (DesktopOutputLayoutOverride *entry : std::as_const(m_entries)) {
+        // Skip entries with empty layout (they represent "use default, no override")
+        const QString layout = entry->defaultLayout();
+        if (layout.isEmpty() || layout == defaultLayout) {
+            continue;
+        }
+        KConfigGroup perPairGroup(&tilingGroup,
+            QStringLiteral("DesktopOutput %1:%2").arg(entry->desktopNumber()).arg(entry->outputName()));
+        perPairGroup.writeEntry("DefaultLayout", entry->defaultLayout());
+    }
+
+    setModified(false);
+}
+
+void DesktopOutputLayoutOverridesModel::defaults(const TilingSettings *settings)
+{
+    Q_UNUSED(settings)
+    beginResetModel();
+    for (DesktopOutputLayoutOverride *entry : std::as_const(m_entries)) {
+        entry->setDefaultLayout(QString());
+    }
+    endResetModel();
+    setModified(false);
+}
+
+bool DesktopOutputLayoutOverridesModel::isDefaults(const TilingSettings *settings) const
+{
+    Q_UNUSED(settings)
+    for (DesktopOutputLayoutOverride *entry : m_entries) {
+        if (!entry->defaultLayout().isEmpty()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 TilingKCM::TilingKCM(QObject *parent, const KPluginMetaData &metaData)
     : KQuickManagedConfigModule(parent, metaData)
     , m_settings(new TilingSettings(this))
     , m_gapOverridesModel(new OutputGapOverridesModel(this))
+    , m_desktopLayoutOverridesModel(new DesktopOutputLayoutOverridesModel(this))
 {
     registerSettings(m_settings);
     qmlRegisterAnonymousType<TilingSettings>("org.kde.kwin.kcm.tiling", 1);
     qmlRegisterAnonymousType<OutputGapOverride>("org.kde.kwin.kcm.tiling", 1);
     qmlRegisterAnonymousType<OutputGapOverridesModel>("org.kde.kwin.kcm.tiling", 1);
+    qmlRegisterAnonymousType<DesktopOutputLayoutOverride>("org.kde.kwin.kcm.tiling", 1);
+    qmlRegisterAnonymousType<DesktopOutputLayoutOverridesModel>("org.kde.kwin.kcm.tiling", 1);
 
     // The base class's settingsChanged() only re-checks the registered
     // KCoreConfigSkeleton objects; it does not consult the virtual
@@ -548,7 +817,16 @@ TilingKCM::TilingKCM(QObject *parent, const KPluginMetaData &metaData)
     // the Apply button in the KCM shell lights up.
     connect(m_gapOverridesModel, &OutputGapOverridesModel::modifiedChanged,
             this, [this]() {
-                const bool modelSaveNeeded = m_gapOverridesModel->isModified();
+                const bool modelSaveNeeded = m_gapOverridesModel->isModified() || m_desktopLayoutOverridesModel->isModified();
+                const bool settingsSaveNeeded = m_settings->isSaveNeeded();
+                setNeedsSave(settingsSaveNeeded || modelSaveNeeded);
+                if (modelSaveNeeded) {
+                    setRepresentsDefaults(false);
+                }
+            });
+    connect(m_desktopLayoutOverridesModel, &DesktopOutputLayoutOverridesModel::modifiedChanged,
+            this, [this]() {
+                const bool modelSaveNeeded = m_gapOverridesModel->isModified() || m_desktopLayoutOverridesModel->isModified();
                 const bool settingsSaveNeeded = m_settings->isSaveNeeded();
                 setNeedsSave(settingsSaveNeeded || modelSaveNeeded);
                 if (modelSaveNeeded) {
@@ -568,6 +846,7 @@ TilingKCM::TilingKCM(QObject *parent, const KPluginMetaData &metaData)
     connect(m_settings, &TilingSettings::defaultLayoutChanged,
             this, [this]() {
                 m_gapOverridesModel->refreshFromDefaults(m_settings);
+                m_desktopLayoutOverridesModel->refreshFromDefaults(m_settings);
             });
     connect(m_settings, &TilingSettings::gapLeftChanged,
             this, [this]() {
@@ -599,6 +878,7 @@ TilingKCM::TilingKCM(QObject *parent, const KPluginMetaData &metaData)
     connect(m_settings, &TilingSettings::enabledLayoutsChanged,
             this, [this]() {
                 m_gapOverridesModel->refreshFromDefaults(m_settings);
+                m_desktopLayoutOverridesModel->refreshFromDefaults(m_settings);
             });
 }
 
@@ -614,6 +894,11 @@ OutputGapOverridesModel *TilingKCM::gapOverridesModel() const
     return m_gapOverridesModel;
 }
 
+DesktopOutputLayoutOverridesModel *TilingKCM::desktopLayoutOverridesModel() const
+{
+    return m_desktopLayoutOverridesModel;
+}
+
 void TilingKCM::load()
 {
     KQuickManagedConfigModule::load();
@@ -621,6 +906,7 @@ void TilingKCM::load()
     KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
     m_gapOverridesModel->load(tilingGroup, m_settings);
+    m_desktopLayoutOverridesModel->load(tilingGroup, m_settings);
 }
 
 void TilingKCM::save()
@@ -630,6 +916,7 @@ void TilingKCM::save()
     KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
     m_gapOverridesModel->save(tilingGroup, m_settings);
+    m_desktopLayoutOverridesModel->save(tilingGroup, m_settings);
     tilingGroup.sync();
 
     QDBusMessage message = QDBusMessage::createSignal(QStringLiteral("/KWin"),
@@ -642,6 +929,7 @@ void TilingKCM::defaults()
 {
     KQuickManagedConfigModule::defaults();
     m_gapOverridesModel->defaults(m_settings);
+    m_desktopLayoutOverridesModel->defaults(m_settings);
 }
 
 bool TilingKCM::isSaveNeeded() const
@@ -649,7 +937,7 @@ bool TilingKCM::isSaveNeeded() const
     if (m_settings->isSaveNeeded()) {
         return true;
     }
-    return m_gapOverridesModel->isModified();
+    return m_gapOverridesModel->isModified() || m_desktopLayoutOverridesModel->isModified();
 }
 
 bool TilingKCM::isDefaults() const
@@ -657,7 +945,7 @@ bool TilingKCM::isDefaults() const
     if (!m_settings->isDefaults()) {
         return false;
     }
-    return m_gapOverridesModel->isDefaults(m_settings);
+    return m_gapOverridesModel->isDefaults(m_settings) && m_desktopLayoutOverridesModel->isDefaults(m_settings);
 }
 
 } // namespace KWin

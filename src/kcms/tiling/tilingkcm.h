@@ -193,6 +193,144 @@ private:
 };
 
 /**
+ * Per-(desktop, output) layout override entry, exposed to QML.
+ *
+ * One entry is created for every (virtual desktop, monitor) pair.
+ * Editing the layout value writes it into a composite kwinrc sub-group
+ * so the tiling controller can read it back at runtime. Per-(desktop, output)
+ * overrides take precedence over per-output overrides and the global default.
+ */
+class DesktopOutputLayoutOverride : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(uint desktopNumber READ desktopNumber CONSTANT)
+    Q_PROPERTY(QString desktopName READ desktopName CONSTANT)
+    Q_PROPERTY(QString outputName READ outputName CONSTANT)
+    Q_PROPERTY(QString outputDescription READ outputDescription CONSTANT)
+    Q_PROPERTY(int outputIndex READ outputIndex CONSTANT)
+    Q_PROPERTY(QString defaultLayout READ defaultLayout WRITE setDefaultLayout NOTIFY defaultLayoutChanged)
+
+public:
+    explicit DesktopOutputLayoutOverride(uint desktopNumber, QString desktopName,
+                                         int outputIndex, QString outputName, QString outputDescription,
+                                         QString defaultLayout,
+                                         QObject *parent = nullptr);
+
+    uint desktopNumber() const { return m_desktopNumber; }
+    QString desktopName() const { return m_desktopName; }
+    int outputIndex() const { return m_outputIndex; }
+    QString outputName() const { return m_outputName; }
+    QString outputDescription() const { return m_outputDescription; }
+    QString defaultLayout() const { return m_defaultLayout; }
+
+    void setDefaultLayout(const QString &value);
+
+Q_SIGNALS:
+    void defaultLayoutChanged();
+
+    /**
+     * Emitted when the layout value changes. The owning model
+     * uses this to mark itself as modified.
+     */
+    void modified();
+
+private:
+    uint m_desktopNumber;
+    QString m_desktopName;
+    int m_outputIndex;
+    QString m_outputName;
+    QString m_outputDescription;
+    QString m_defaultLayout;
+};
+
+/**
+ * Model of per-(desktop, output) layout overrides.
+ *
+ * Exposes DesktopOutputLayoutOverride entries to QML. Creates one entry for
+ * every (virtual desktop, connected monitor) pair. Reads/writes the
+ * composite sub-group [Tiling][DesktopOutput "<num>:<output>"] in kwinrc.
+ */
+class DesktopOutputLayoutOverridesModel : public QAbstractListModel
+{
+    Q_OBJECT
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
+    Q_PROPERTY(QStringList outputNames READ outputNames NOTIFY outputNamesChanged)
+    Q_PROPERTY(QStringList outputDescriptions READ outputDescriptions NOTIFY outputNamesChanged)
+
+public:
+    enum Roles
+    {
+        DesktopNumberRole = Qt::UserRole + 1,
+        DesktopNameRole,
+        OutputIndexRole,
+        OutputNameRole,
+        OutputDescriptionRole,
+        DefaultLayoutRole,
+        EntryRole,
+    };
+    Q_ENUM(Roles)
+
+    explicit DesktopOutputLayoutOverridesModel(QObject *parent = nullptr);
+    ~DesktopOutputLayoutOverridesModel() override;
+
+    QHash<int, QByteArray> roleNames() const override;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+    int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+
+    /**
+     * Returns the DesktopOutputLayoutOverride entry at the given flat row index,
+     * or nullptr if out of range. Exposed as Q_INVOKABLE so QML can look up
+     * entries without needing access to the C++ enum role values.
+     */
+    Q_INVOKABLE DesktopOutputLayoutOverride *entryAt(int row) const;
+
+    QStringList outputNames() const { return m_outputNames; }
+    QStringList outputDescriptions() const { return m_outputDescriptions; }
+
+    /**
+     * Re-populate the model from the current virtual desktops and
+     * connected monitors.
+     */
+    void load(KConfigGroup &tilingGroup, const TilingSettings *settings);
+
+    /**
+     * Re-sync every entry's value to the current global defaults.
+     */
+    void refreshFromDefaults(const TilingSettings *settings);
+
+    /**
+     * Write the current override values into the per-(desktop, output)
+     * sub-groups of the supplied Tiling group.
+     */
+    void save(KConfigGroup &tilingGroup, const TilingSettings *settings);
+
+    /**
+     * Reset every override entry to match the global default layout.
+     */
+    void defaults(const TilingSettings *settings);
+
+    bool isModified() const { return m_modified; }
+    bool isDefaults(const TilingSettings *settings) const;
+
+Q_SIGNALS:
+    void countChanged();
+    void modifiedChanged();
+    void outputNamesChanged();
+
+private:
+    void rebuildModel(const TilingSettings *settings, KConfigGroup *tilingGroup);
+    DesktopOutputLayoutOverride *entryAt(uint desktopNum, const QString &outputName) const;
+    void setModified(bool modified);
+    void syncOutputList();
+
+    QVector<DesktopOutputLayoutOverride *> m_entries;
+    QStringList m_outputNames;
+    QStringList m_outputDescriptions;
+    QList<uint> m_desktopNumbers;
+    bool m_modified = false;
+};
+
+/**
  * Tiling settings KCM module.
  *
  * Hosts the default settings (via TilingSettings) and a model of
@@ -205,6 +343,7 @@ class TilingKCM : public KQuickManagedConfigModule
     Q_OBJECT
     Q_PROPERTY(TilingSettings *settings READ settings CONSTANT)
     Q_PROPERTY(KWin::OutputGapOverridesModel *gapOverridesModel READ gapOverridesModel CONSTANT)
+    Q_PROPERTY(KWin::DesktopOutputLayoutOverridesModel *desktopLayoutOverridesModel READ desktopLayoutOverridesModel CONSTANT)
 
 public:
     explicit TilingKCM(QObject *parent, const KPluginMetaData &metaData);
@@ -212,6 +351,7 @@ public:
 
     TilingSettings *settings() const;
     OutputGapOverridesModel *gapOverridesModel() const;
+    DesktopOutputLayoutOverridesModel *desktopLayoutOverridesModel() const;
 
     bool isSaveNeeded() const override;
     bool isDefaults() const override;
@@ -224,6 +364,7 @@ public Q_SLOTS:
 private:
     TilingSettings *m_settings;
     OutputGapOverridesModel *m_gapOverridesModel;
+    DesktopOutputLayoutOverridesModel *m_desktopLayoutOverridesModel;
 };
 
 } // namespace KWin

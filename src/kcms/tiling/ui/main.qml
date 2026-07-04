@@ -27,6 +27,9 @@ KCM.SimpleKCM {
             text: i18nc("@title:tab", "Gaps & Per-Monitor")
         }
         QQC2.TabButton {
+            text: i18nc("@title:tab", "Per-Desktop")
+        }
+        QQC2.TabButton {
             text: i18nc("@title:tab", "Window Borders")
         }
         QQC2.TabButton {
@@ -427,6 +430,161 @@ KCM.SimpleKCM {
                 visible: kcm.gapOverridesModel.count === 0
                 Kirigami.FormData.label: i18nc("@info", "Status:")
                 text: i18nc("@info", "No connected monitors detected. Per-monitor overrides will appear here once a monitor is connected.")
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 30
+            }
+        }
+
+        Kirigami.FormLayout {
+            id: perDesktopPage
+
+            Item {
+                Kirigami.FormData.isSection: true
+                Kirigami.FormData.label: i18n("Per-Desktop Layout Overrides")
+            }
+
+            QQC2.Label {
+                id: perDesktopHelp
+                Kirigami.FormData.label: i18nc("@info:placeholder", "Overrides:")
+                text: xi18nc("@info", "Each row is a virtual desktop. Each column is a connected monitor. Select a layout to override the global default for that (desktop, monitor) pair. Leave as <interface>Use default</interface> to fall back to the per-monitor or global setting.")
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 40
+            }
+
+            // Table header row showing output names
+            Item {
+                Kirigami.FormData.isSection: true
+                Layout.fillWidth: true
+                Layout.maximumWidth: Kirigami.Units.gridUnit * 40
+                implicitHeight: outputHeaderRow.implicitHeight
+
+                RowLayout {
+                    id: outputHeaderRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    spacing: Kirigami.Units.smallSpacing
+
+                    // Empty spacer matching the desktop label column width
+                    Item {
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 8
+                    }
+
+                    Repeater {
+                        model: kcm.desktopLayoutOverridesModel.outputNames
+
+                        QQC2.Label {
+                            text: kcm.desktopLayoutOverridesModel.outputDescriptions[index]
+                            font.bold: true
+                            horizontalAlignment: Text.AlignHCenter
+                            leftPadding: Kirigami.Units.smallSpacing * 2
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            wrapMode: Text.WordWrap
+                            maximumLineCount: 2
+                        }
+                    }
+                }
+            }
+
+            Repeater {
+                id: desktopRepeater
+                model: {
+                    // Build a flat list of desktop numbers, one per desktop row
+                    const nums = [];
+                    const count = kcm.desktopLayoutOverridesModel.count;
+                    const outputCount = kcm.desktopLayoutOverridesModel.outputNames.length;
+                    if (outputCount === 0) return [];
+                    for (let i = 0; i < count; i += outputCount) {
+                        nums.push(i / outputCount + 1);
+                    }
+                    return nums;
+                }
+
+                delegate: Item {
+                    id: desktopRow
+                    property int desktopNumber: modelData
+
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: Kirigami.Units.gridUnit * 40
+                    implicitHeight: desktopRowLayout.implicitHeight
+                    Layout.topMargin: Kirigami.Units.smallSpacing
+                    Layout.bottomMargin: Kirigami.Units.smallSpacing
+
+                    RowLayout {
+                        id: desktopRowLayout
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        spacing: Kirigami.Units.smallSpacing
+
+                        // Desktop label
+                        QQC2.Label {
+                            text: i18n("Desktop %1:", desktopRow.desktopNumber)
+                            font.bold: true
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 8
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        // One combo per output
+                        Repeater {
+                            id: outputRepeater
+                            model: kcm.desktopLayoutOverridesModel.outputNames
+
+                            QQC2.ComboBox {
+                                id: perDesktopLayoutCombo
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                                Layout.fillWidth: true
+
+                                property var layoutOptions: {
+                                    const seen = kcm.settings.enabledLayouts.slice();
+                                    const opts = [];
+                                    opts.push({ text: i18n("Use default"), value: "" });
+                                    for (let i = 0; i < seen.length; ++i) {
+                                        if (seen[i] === "MasterStack"
+                                            || seen[i] === "Stacked"
+                                            || seen[i] === "CenterTile"
+                                            || seen[i] === "Monocle") {
+                                            opts.push({ text: seen[i], value: seen[i] });
+                                        }
+                                    }
+                                    if (opts.length === 1) {
+                                        opts.push({ text: i18n("MasterStack"), value: "MasterStack" });
+                                    }
+                                    return opts;
+                                }
+                                model: layoutOptions
+                                textRole: "text"
+                                valueRole: "value"
+
+                                // Find the entry for this (desktop, output) pair.
+                                // desktopRow.desktopNumber captures the outer Repeater's
+                                // model data so we are not affected by the inner Repeater
+                                // shadowing the outer modelData.
+                                property var entry: kcm.desktopLayoutOverridesModel.entryAt((desktopRow.desktopNumber - 1) * kcm.desktopLayoutOverridesModel.outputNames.length + index)
+
+                                currentIndex: {
+                                    const cur = entry ? entry.defaultLayout : "";
+                                    const idx_val = layoutOptions.findIndex(item => item.value === cur);
+                                    return idx_val >= 0 ? idx_val : 0;
+                                }
+                                onActivated: {
+                                    if (entry) {
+                                        entry.defaultLayout = layoutOptions[currentIndex].value;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            QQC2.Label {
+                id: noDesktopsLabel
+                visible: kcm.desktopLayoutOverridesModel.count === 0
+                Kirigami.FormData.label: i18nc("@info", "Status:")
+                text: i18nc("@info", "No virtual desktops detected.")
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
                 Layout.maximumWidth: Kirigami.Units.gridUnit * 30
