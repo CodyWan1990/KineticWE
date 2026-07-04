@@ -57,6 +57,12 @@ stdenv.mkDerivation {
 
   src = lib.cleanSource ../.;
 
+  patches = [
+    # Allow the KWin QPA plugin to recognise the binary when wrapped
+    # by Nix's wrapQtAppsHook (which renames it to .kinetic-we-wrapped).
+    ./patches/kwin-we-qpa-nixos-wrapper.patch
+  ];
+
   # Scripts in the KWin source use #!/usr/bin/env python3; patchShebangs
   # in stdenv can miss them if coreutils (env) is missing from the sandbox.
   postPatch = ''
@@ -155,9 +161,15 @@ stdenv.mkDerivation {
     "-DBUILD_TESTING=OFF"
   ];
 
-  # The compositor and many KF6/Plasma libs ship their QML modules
-  # under <lib>/qt6/qml. Keep that discoverable by wrapQtAppsHook.
-  qtQmlPrefix = "lib/qt6";
+  # TZDIR may be unset when running through the wrapper, but we need
+  # it for the lockscreen clock to render.
+  qtWrapperArgs = [
+    "--set-default TZDIR /etc/zoneinfo"
+  ];
+
+  # KDE cmake installs QML modules under <lib>/qt-6/qml and plugins
+  # under <lib>/qt-6/plugins. Tell wrapQtAppsHook where to find them.
+  qtQmlPrefix = "lib/qt-6";
 
   meta = with lib; {
     description = "KineticWE — KWin window environment with native tiling";

@@ -2,11 +2,7 @@
   description = "KineticWE — a KWin window environment (KWin fork) bundled with the noctalia shell";
 
   inputs = {
-    # kwin-we requires Plasma 6.7 / KF6 6.27 development versions that
-    # are only present on nixpkgs `master` today. nixos-unstable
-    # (and release-26.05) currently track Plasma 6.6.5, which the
-    # build refuses. Switch to `nixos-unstable` once nixpkgs catches up.
-    nixpkgs.url = "github:NixOS/nixpkgs/master";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     flake-utils.url = "github:numtide/flake-utils";
 
