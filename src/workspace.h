@@ -97,6 +97,7 @@ class OrientationSensor;
 class BrightnessDevice;
 class BackendOutput;
 class LightSensor;
+class NoctaliaSettings;
 
 class KWIN_EXPORT Workspace : public QObject
 {
@@ -747,6 +748,7 @@ private:
     std::unique_ptr<OrientationSensor> m_orientationSensor;
     std::unique_ptr<LightSensor> m_lightSensor;
     std::unique_ptr<QTimer> m_delayedLightTimer;
+    std::unique_ptr<NoctaliaSettings> m_noctaliaSettings;
     std::optional<double> m_luxAtLastBrightnessAdjust;
     std::unique_ptr<DpmsInputEventFilter> m_dpmsFilter;
     KConfigWatcher::Ptr m_kdeglobalsWatcher;

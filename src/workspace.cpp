@@ -56,6 +56,7 @@
 #include "tiles/tilemanager.h"
 #include "tiling/tilingcontroller.h"
 #include "useractions.h"
+#include "noctaliasettings.h"
 #include "utils/envvar.h"
 #include "utils/kernel.h"
 #include "utils/lightsensor.h"
@@ -182,6 +183,7 @@ Workspace::Workspace()
     });
 
     initShortcuts();
+    m_noctaliaSettings = std::make_unique<NoctaliaSettings>(this);
 
     init();
 }
