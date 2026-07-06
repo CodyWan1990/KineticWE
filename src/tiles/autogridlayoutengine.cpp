@@ -177,32 +177,61 @@ void AutoGridLayoutEngine::beginMoveWindow(Window *window)
 
 bool AutoGridLayoutEngine::endMoveWindow(Window *window, Window *target)
 {
-    if (!window || !m_moveSourceLeaf || m_moveSourceIndex < 0) {
+    QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;
+    m_moveSourceLeaf.clear();
+    m_moveSourceIndex = -1;
+
+    if (!sourceLeaf) {
         return false;
     }
 
-    if (target) {
-        // Swap the two windows' grid slots; everything else stays in place.
+    if (target && target != window) {
         const int targetIdx = indexOfWindow(target);
-        if (targetIdx >= 0 && targetIdx != m_moveSourceIndex) {
-            m_leaves.swapItemsAt(m_moveSourceIndex, targetIdx);
+        if (targetIdx >= 0 && m_leaves[targetIdx]) {
+            CustomTile *targetLeaf = m_leaves[targetIdx];
+            // Swap the two windows: the dragged window takes the target's leaf,
+            // and the target takes the dragged window's original leaf.
+            // Using manage/unmanage instead of swapping leaf pointers ensures
+            // the swap works even if the dragged window was unmanaged from its
+            // source leaf during the drag (e.g. by quick-tile-mode reset in
+            // updateInteractiveMoveResize).
+            targetLeaf->unmanage(target);
+            targetLeaf->manage(window);
+            sourceLeaf->manage(target);
             reflow();
+            return true;
         }
     }
-    // If no target, the window snaps back to its slot (reflow is a no-op on
-    // order, but restores the dragged geometry).
-    reflow();
 
-    m_moveSourceLeaf = nullptr;
-    m_moveSourceIndex = -1;
+    // No valid target: restore the window to its original leaf.
+    if (!sourceLeaf->windows().contains(window)) {
+        sourceLeaf->manage(window);
+    }
+    reflow();
     return true;
 }
 
 void AutoGridLayoutEngine::cancelMoveWindow(Window *window)
 {
-    Q_UNUSED(window)
-    m_moveSourceLeaf = nullptr;
+    QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;
+    m_moveSourceLeaf.clear();
     m_moveSourceIndex = -1;
+
+    if (!sourceLeaf || !m_leaves.contains(sourceLeaf)) {
+        return;
+    }
+
+    // The window moved to another output (or was unmanaged during the drag).
+    // Remove the now-empty source leaf so the remaining layout reflows and
+    // doesn't leave a gap behind.
+    if (sourceLeaf->windows().isEmpty() || sourceLeaf->windows().contains(window)) {
+        if (sourceLeaf->windows().contains(window)) {
+            sourceLeaf->unmanage(window);
+        }
+        m_leaves.removeOne(sourceLeaf);
+        m_root->destroyChild(sourceLeaf);
+        reflow();
+    }
 }
 
 void AutoGridLayoutEngine::reflow()
