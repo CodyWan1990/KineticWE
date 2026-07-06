@@ -68,4 +68,8 @@ $(OUTDIR)/kglobalacceld-mask.conf: $(SELF_DIR)SOURCES/kglobalacceld-mask.conf
 clean:
 	rm -rf $(OUTDIR)
 
-.PHONY: srpm clean
+# The kineticwe source archive is keyed on the repo's current HEAD, not on
+# whether the tarball file already exists on disk — without this, once the
+# tarball has been generated once, `make srpm` would keep reusing that stale
+# snapshot forever, even after new commits land on master.
+.PHONY: srpm clean $(OUTDIR)/$(KINETICWE_SRC)
