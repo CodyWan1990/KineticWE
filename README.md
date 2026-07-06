@@ -25,8 +25,6 @@ If you want to support this project, you can donate here: [Ko-fi — theblackdon
 > ## 🤖 LLM-Generated Code Disclaimer
 >
 > Portions of this project — including (but not limited to) installer scripts, build glue, configuration files, documentation, and some C++/QML/JS source files — were **authored with the assistance of LLM tools** (large language models coding assistants).
-=======
-> Portions of this project — including (but not limited to) installer scripts, build glue, configuration files, documentation, and some C++/QML/JS source files — were **authored with the assistance of AI tools** (large language models coding assistants).
 >
 > All LLM-generated content has been reviewed by the maintainers, but it has **not** been audited to the same standard as hand-written code. You may encounter:
 > - Subtle bugs or edge cases that a human author would have caught.
@@ -60,6 +58,14 @@ alongside it.
 
 ### Install via Scripts (Alternative / Other Distros)
 
+Convenience scripts are provided that install all dependencies, build kglobalacceld
+(the global shortcuts daemon), build kwin-we, install the
+[noctalia-shell](https://github.com/noctalia-dev/noctalia), and set up session
+files so you can launch KineticWE from a TTY.
+
+> **For Fedora users:** Pre-built packages are available via COPR — see [Fedora / RHEL](#copr-fedora--recommended---use-fedora-linux-for-the-best-and-tested-experience) above.
+> **For Arch users:** The kineticwe package is available on the [AUR](https://aur.archlinux.org/packages/kineticwe) (`yay -S kineticwe`).
+
 > **Why kglobalacceld is built from source:** kwin-we calls `keyEvent()`, `pointerPressed()`, `axisTriggered()` and `resetModifierOnlyState()` directly on the `KGlobalAccelD` object — an API introduced in kglobalacceld git master (post-6.7.0). The system package on most distros is still 6.7.0 or older and routes those calls through a separate `KGlobalAccelInterface` class, so kwin-we cannot compile against it. The install scripts clone kglobalacceld from `invent.kde.org/plasma/kglobalacceld.git` and build it into `$INSTALL_PREFIX` so kwin-we's CMake finds the newer version first. This requires **Qt ≥ 6.10** and **KF6 ≥ 6.26** (satisfied on Fedora 44+, Arch rolling, and Debian Trixie/Ubuntu 24.04+ with backports).
 
 Convenience scripts are provided that install all dependencies, build kglobalacceld
@@ -79,10 +85,12 @@ cd kineticwe
 
 Pick the script that matches your distribution:
 
-| Distro | Script |
+| Distro | Method |
 |--------|--------|
-| Fedora / RHEL | `./install-fedora.sh` |
-| Arch Linux / Arch-derivatives | `./install-arch.sh` |
+| Fedora / RHEL | COPR (recommended) — see below |
+| Fedora / RHEL | `./install-fedora.sh` (manual build) |
+| Arch Linux / Arch-derivatives | [AUR](https://aur.archlinux.org/packages/kineticwe) — `yay -S kineticwe` |
+| Arch Linux / Arch-derivatives | `./install-arch.sh` (manual build) |
 | Debian / Ubuntu | `./install-debian.sh` |
 | NixOS / Nix (flake) | — see below |
 
@@ -108,15 +116,29 @@ After installation:
   # export LD_LIBRARY_PATH="$HOME/.local/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
   ```
 
-### Fedora / RHEL
+### Fedora / RHEL (COPR — Recommended)
+
+KineticWE is available via COPR for Fedora. Enable both the Noctalia and KineticWE repositories, then install:
 
 ```bash
-./install-fedora.sh
+sudo dnf copr enable lionheartp/Hyprland
+sudo dnf copr enable theblackdon/kineticwe
+sudo dnf install kineticwe noctalia-git
 ```
 
-> **Note:** The script uses `sudo` to install system packages via `dnf`. Make sure you have sudo privileges before running it.
+> **Note:** The first time you install, reboot before logging in to a KineticWE session. On subsequent logins Noctalia will load automatically.
+>
+> **Tip:** Press **Meta+Space** to open the app drawer.
 
 ### Arch Linux
+
+The recommended way to install on Arch is via the [AUR](https://aur.archlinux.org/packages/kineticwe):
+
+```bash
+yay -S kineticwe
+```
+
+Or build manually:
 
 ```bash
 ./install-arch.sh
