@@ -3,7 +3,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        5%{?dist}
+Release:        7%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -245,6 +245,10 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Mon Jul 06 2026 LGL <lgl@localhost> - 6.7.80-7
+- Rebuild from latest master after README/COPR/AUR docs and Arch packaging
+  metadata updates
+
 * Sat Jul 04 2026 LGL <lgl@localhost> - 6.7.80-5
 - Rebuild to pick up the latest KineticWE changes from master
 
