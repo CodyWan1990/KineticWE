@@ -3,11 +3,11 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
-URL:            https://codeberg.org/theblackdon/kineticwe
+URL:            https://gitlab.com/theblackdon/kineticwe
 Source0:        %{name}-%{version}.tar.gz
 Source1:        kglobalacceld-%{kglobalacceld_ref}.tar.gz
 Source2:        start-kineticwe
@@ -245,6 +245,13 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Mon Jul 06 2026 LGL <lgl@localhost> - 6.7.80-7
+- Start upowerd and org_kde_powerdevil from the RPM session launcher so power
+  management controls are available in KineticWE sessions
+- Rebuild with the latest Noctalia/KDE settings integration, including
+  Noctalia shortcut registration and Noctalia color source options in the
+  Tiling System Settings module
+
 * Mon Jul 06 2026 LGL <lgl@localhost> - 6.7.80-6
 - Rebuild from latest master after README/COPR/AUR docs and Arch packaging
   metadata updates

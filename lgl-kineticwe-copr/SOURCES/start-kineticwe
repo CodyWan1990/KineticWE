@@ -3,17 +3,22 @@
 
 set -e
 
-export XDG_CURRENT_DESKTOP=KineticWE:KDE
+INSTALL_PREFIX="${INSTALL_PREFIX:-/usr}"
+
+export PATH="$INSTALL_PREFIX/bin:$PATH"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
+export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
-export XDG_SESSION_DESKTOP=kineticwe
+export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
-export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:$PATH"
 
 find_portal() {
     local name="$1"
     for path in \
         "/usr/libexec/$name" \
-        "/usr/lib/$name"
+        "/usr/lib/$name" \
+        "$INSTALL_PREFIX/libexec/$name"
     do
         if [[ -x "$path" ]]; then
             printf '%s\n' "$path"
@@ -32,11 +37,17 @@ STARTUP_PAYLOAD="$STARTUP_PAYLOAD_DIR/startup.sh"
 
 cat > "$STARTUP_PAYLOAD" << EOF
 #!/bin/bash
-export XDG_CURRENT_DESKTOP=KineticWE:KDE
+export PATH="$INSTALL_PREFIX/bin:\$PATH"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
+export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
-export XDG_SESSION_DESKTOP=kineticwe
+export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
-export PATH="\$HOME/.local/bin:/usr/local/bin:/usr/bin:\$PATH"
+
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+fi
 
 killall -q xdg-desktop-portal-kde xdg-desktop-portal xdg-desktop-portal-gtk xdg-document-portal 2>/dev/null || true
 sleep 1
@@ -44,13 +55,7 @@ sleep 1
 mkdir -p "\$HOME/.local/share"
 
 if [[ -x "$PORTAL_KDE" ]]; then
-    # xdg-desktop-portal-kde only registers the Wayland-integration portals
-    # (ScreenCast, Screenshot, RemoteDesktop, Clipboard, GlobalShortcuts,
-    # InputCapture, Background, Wallpaper) when XDG_CURRENT_DESKTOP is
-    # exactly "KDE" (desktopportal.cpp does a plain string compare, not a
-    # colon-list check). Override it for this one process only so the rest
-    # of the session can keep showing as "KineticWE:KDE".
-    XDG_CURRENT_DESKTOP=KDE nohup "$PORTAL_KDE" >"\$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
+    nohup "$PORTAL_KDE" >"\$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
 else
     echo "Warning: xdg-desktop-portal-kde not found" >&2
 fi
@@ -72,11 +77,7 @@ if [[ -x /usr/libexec/org_kde_powerdevil ]]; then
     /usr/libexec/org_kde_powerdevil &>/dev/null &
 fi
 
-if command -v noctalia >/dev/null 2>&1; then
-    nohup noctalia >"\$HOME/.local/share/noctalia.log" 2>&1 &
-else
-    echo "Warning: noctalia not found" >"\$HOME/.local/share/noctalia.log"
-fi
+noctalia &
 EOF
 
 chmod +x "$STARTUP_PAYLOAD"
@@ -86,9 +87,4 @@ chmod +x "$STARTUP_PAYLOAD"
 systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
 pkill -x kglobalacceld 2>/dev/null || true
 
-# Prefer dev build, fall back to system install
-if [[ -x "$HOME/.local/bin/kinetic-we" ]]; then
-    exec "$HOME/.local/bin/kinetic-we" --xwayland "$STARTUP_PAYLOAD"
-else
-    exec /usr/bin/kinetic-we --xwayland "$STARTUP_PAYLOAD"
-fi
+exec kinetic-we --xwayland "$STARTUP_PAYLOAD"
