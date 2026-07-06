@@ -63,6 +63,15 @@ else
     echo "Warning: xdg-desktop-portal not found" >&2
 fi
 
+# Power management
+if [[ -x /usr/libexec/upowerd ]]; then
+    /usr/libexec/upowerd &>/dev/null &
+fi
+
+if [[ -x /usr/libexec/org_kde_powerdevil ]]; then
+    /usr/libexec/org_kde_powerdevil &>/dev/null &
+fi
+
 if command -v noctalia >/dev/null 2>&1; then
     nohup noctalia >"\$HOME/.local/share/noctalia.log" 2>&1 &
 else
@@ -77,4 +86,9 @@ chmod +x "$STARTUP_PAYLOAD"
 systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
 pkill -x kglobalacceld 2>/dev/null || true
 
-exec /usr/bin/kinetic-we --xwayland "$STARTUP_PAYLOAD"
+# Prefer dev build, fall back to system install
+if [[ -x "$HOME/.local/bin/kinetic-we" ]]; then
+    exec "$HOME/.local/bin/kinetic-we" --xwayland "$STARTUP_PAYLOAD"
+else
+    exec /usr/bin/kinetic-we --xwayland "$STARTUP_PAYLOAD"
+fi

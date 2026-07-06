@@ -96,23 +96,6 @@ NoctaliaSettings::NoctaliaSettings(QObject *parent)
                      i18n("Reload Dock"),
                      {QStringLiteral("msg"), QStringLiteral("dock-reload")});
 
-    // Screenshots
-    registerShortcut(QStringLiteral("NoctaliaScreenshotRegion"),
-                     i18n("Region Screenshot"),
-                     {QStringLiteral("msg"), QStringLiteral("screenshot-region")});
-
-    registerShortcut(QStringLiteral("NoctaliaScreenshotFullscreen"),
-                     i18n("Fullscreen Screenshot"),
-                     {QStringLiteral("msg"), QStringLiteral("screenshot-fullscreen")});
-
-    registerShortcut(QStringLiteral("NoctaliaScreenshotPicker"),
-                     i18n("Screenshot (Pick Monitor)"),
-                     {QStringLiteral("msg"), QStringLiteral("screenshot-fullscreen"), QStringLiteral("pick")});
-
-    registerShortcut(QStringLiteral("NoctaliaScreenshotAll"),
-                     i18n("Screenshot All Monitors"),
-                     {QStringLiteral("msg"), QStringLiteral("screenshot-fullscreen"), QStringLiteral("all")});
-
     // Wallpaper & Theme
     registerShortcut(QStringLiteral("NoctaliaWallpaperRandom"),
                      i18n("Random Wallpaper"),

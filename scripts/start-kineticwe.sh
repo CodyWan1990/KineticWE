@@ -116,7 +116,21 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Start user applications
+# 3. Start power management
+# ---------------------------------------------------------------------------
+# upowerd provides battery and power device monitoring via D-Bus
+if [[ -x /usr/libexec/upowerd ]]; then
+    /usr/libexec/upowerd &>/dev/null &
+fi
+
+# org_kde_powerdevil provides idle timeouts, DPMS, suspend, brightness,
+# and power profile management
+if [[ -x /usr/libexec/org_kde_powerdevil ]]; then
+    /usr/libexec/org_kde_powerdevil &>/dev/null &
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Start user applications
 # ---------------------------------------------------------------------------
 noctalia &
 EOF
