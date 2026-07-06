@@ -63,6 +63,7 @@ Convenience scripts are provided that install all dependencies, build kglobalacc
 [noctalia-shell](https://github.com/noctalia-dev/noctalia), and set up session
 files so you can launch KineticWE from a TTY.
 
+
 > **For Fedora users:** Pre-built packages are available via COPR — see [Fedora / RHEL](#copr-fedora--recommended---use-fedora-linux-for-the-best-and-tested-experience) above.
 > **For Arch users:** The kineticwe package is available on the [AUR](https://aur.archlinux.org/packages/kineticwe) (`yay -S kineticwe`).
 
