@@ -56,6 +56,44 @@ The `kineticwe` package provides and obsoletes Fedora's stock `kwin`, `kwin-comm
 and `kwin-libs` packages — it replaces the stock compositor rather than installing
 alongside it.
 
+### Bazzite / Universal Blue (rpm-ostree)
+
+> **Prerequisite:** The kineticwe COPR package requires **Qt ≥ 6.11**.
+> Your base image must include Qt 6.11 or newer — update your system first:
+> `sudo bootc upgrade && systemctl reboot`
+
+On rpm-ostree based systems (Bazzite, Bluefin, Aurora, Silverblue, Kinoite),
+`kineticwe` replaces the system's stock `kwin`, `kwin-common`, `kwin-libs`,
+and `kglobalacceld`. These base packages must be removed from the immutable
+image first via `override remove`:
+
+```bash
+sudo dnf copr enable lionheartp/Hyprland
+sudo dnf copr enable theblackdon/kineticwe
+sudo rpm-ostree override remove kwin kwin-common kwin-libs kglobalacceld \
+    --install kineticwe --install noctalia-git
+systemctl reboot
+```
+
+A convenience script is also provided that handles this automatically,
+including checking the Qt version:
+
+```bash
+git clone https://gitlab.com/theblackdon/kineticwe.git
+cd kineticwe
+./install-bazzite.sh
+systemctl reboot
+```
+
+Bazzite users can also use the `ujust` recipe from `bazzite/kineticwe-ublue.just`
+(import it into your custom justfile or run directly):
+
+```bash
+just --justfile bazzite/kineticwe-ublue.just install-kineticwe
+```
+
+For building a custom bootc derivative image, see [`bazzite/Containerfile`](bazzite/Containerfile).
+
 ### Install via Scripts (Alternative / Other Distros)
 
 Convenience scripts are provided that install all dependencies, build kglobalacceld
@@ -90,6 +128,7 @@ Pick the script that matches your distribution:
 |--------|--------|
 | Fedora / RHEL | COPR (recommended) — see below |
 | Fedora / RHEL | `./install-fedora.sh` (manual build) |
+| **Bazzite / uBlue (rpm-ostree)** | `./install-bazzite.sh` — see below |
 | Arch Linux / Arch-derivatives | [AUR](https://aur.archlinux.org/packages/kineticwe) — `yay -S kineticwe` |
 | Arch Linux / Arch-derivatives | `./install-arch.sh` (manual build) |
 | Debian / Ubuntu | `./install-debian.sh` |

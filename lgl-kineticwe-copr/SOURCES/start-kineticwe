@@ -77,7 +77,7 @@ if [[ -x /usr/libexec/org_kde_powerdevil ]]; then
     /usr/libexec/org_kde_powerdevil &>/dev/null &
 fi
 
-noctalia &
+noctalia
 EOF
 
 chmod +x "$STARTUP_PAYLOAD"
@@ -87,4 +87,4 @@ chmod +x "$STARTUP_PAYLOAD"
 systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
 pkill -x kglobalacceld 2>/dev/null || true
 
-exec kinetic-we --xwayland "$STARTUP_PAYLOAD"
+exec kinetic-we --xwayland --exit-with-session "$STARTUP_PAYLOAD"
