@@ -9,21 +9,21 @@ set -euo pipefail
 #
 # Usage:
 #   ./build-rpm-dev.sh                          # Default: RPM build + extract for TTY testing
-#   ./build-rpm-dev.sh --quick                  # Quick cmake build (incremental, no RPM)
+#   ./build-rpm-dev.sh --quick                  # Quick cmake build (incremental, no RPM) — recommended
 #   ./build-rpm-dev.sh --install                # Same as default (alias)
 #   ./build-rpm-dev.sh --ostree                 # Build RPM + layer via rpm-ostree (needs reboot)
 #   ./build-rpm-dev.sh --ostree --reboot        # Build + ostree + reboot
 #   ./build-rpm-dev.sh --reset                  # Revert rpm-ostree override
+#   ./build-rpm-dev.sh --reset-local            # Remove dev files from TEST_PREFIX
 #
-# All build modes (default/--install/--quick) install the binary to the same
-# TEST_PREFIX so you always test with a single startup script.
+# All build modes install into TEST_PREFIX so you can test with a single command.
 #
 # Environment variables:
-#   TEST_PREFIX     - Where to install for TTY testing (default: $HOME/.local/kineticwe-dev)
+#   TEST_PREFIX     - Where to install for TTY testing (default: $HOME/.local)
 #   DISTROBOX_NAME  - Name of the distrobox container (default: kineticwe-build)
 # =============================================================================
 
-TEST_PREFIX="${TEST_PREFIX:-$HOME/.local/kineticwe-dev}"
+TEST_PREFIX="${TEST_PREFIX:-$HOME/.local}"
 DISTROBOX_NAME="${DISTROBOX_NAME:-kineticwe-build}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_DIR="${SCRIPT_DIR}/lgl-kineticwe-copr"
@@ -204,6 +204,19 @@ quick_build() {
 
     distrobox enter "$DISTROBOX_NAME" -- bash -c "
         set -euo pipefail
+
+        # Strip Nix from the environment so cmake doesn't link against
+        # Nix-store libraries (openssl, curl, etc.) that won't exist on
+        # the host at runtime.
+        unset NIX_REMOTE
+        unset NIX_PATH
+        unset NIX_SSL_CERT_FILE
+        unset NIX_PROFILE
+        unset LD_LIBRARY_PATH
+        unset XDG_DATA_DIRS
+        unset PKG_CONFIG_PATH
+        export PATH='/usr/local/bin:/usr/bin:/bin'
+
         cd '$SCRIPT_DIR'
 
         # Build kglobalacceld if not already installed
@@ -223,6 +236,7 @@ quick_build() {
         fi
 
         echo '[STEP] Configuring KineticWE...'
+        rm -rf '$build_dir'
         cmake -B '$build_dir' -S . \\
             -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
             -DCMAKE_PREFIX_PATH='${TEST_PREFIX}' \\
@@ -262,15 +276,21 @@ extract_for_testing() {
         exit 1
     fi
 
-    rm -rf "$TEST_PREFIX"
-    mkdir -p "$TEST_PREFIX"
-    rpm2cpio "$rpm_file" | cpio -idm -D "$TEST_PREFIX" 2>/dev/null
+    # Extract to temp dir, then rsync to TEST_PREFIX stripping the usr/ prefix
+    local tmpdir
+    tmpdir=$(mktemp -d /tmp/kineticwe-rpm-extract.XXXXXX)
+    rpm2cpio "$rpm_file" | cpio -idm -D "$tmpdir" 2>/dev/null
 
-    if [[ ! -x "$TEST_PREFIX/usr/bin/kinetic-we" ]]; then
+    if [[ ! -x "$tmpdir/usr/bin/kinetic-we" ]]; then
         warn "Extraction produced no kinetic-we binary at expected path."
     fi
+
+    # rsync strips usr/ so files land directly in TEST_PREFIX
+    rsync -a "$tmpdir/usr/" "$TEST_PREFIX/"
+    rm -rf "$tmpdir"
+
     info "Extracted to $TEST_PREFIX"
-    info "  Binary: $TEST_PREFIX/usr/bin/kinetic-we"
+    info "  Binary: $TEST_PREFIX/bin/kinetic-we"
 }
 
 # ---------------------------------------------------------------------------
@@ -280,8 +300,7 @@ extract_for_testing() {
 #   $1  - Layout type: "rpm" (default, binary at $TEST_PREFIX/usr/bin/) or
 #         "quick" (binary at $TEST_PREFIX/bin/)
 install_startup_script() {
-    local layout="${1:-rpm}"
-    step "Installing dev startup script (layout: ${layout})..."
+    step "Installing dev startup script..."
 
     mkdir -p "$TEST_PREFIX/bin"
 
@@ -290,16 +309,10 @@ install_startup_script() {
         exit 1
     fi
 
-    if [[ "$layout" == "quick" ]]; then
-        local prefix_override="$TEST_PREFIX"
-    else
-        local prefix_override="$TEST_PREFIX/usr"
-    fi
-
-    # Generate the single startup script from the template.
-    # This provides the full session experience (portals, noctalia, services)
-    # just like the COPR /usr/bin/start-kineticwe, but points at the dev build.
-    sed -e "s|@INSTALL_PREFIX@|$prefix_override|g" \
+    # Generate the startup script from the template.
+    # INSTALL_PREFIX points directly at TEST_PREFIX (no usr/ subdirectory).
+    # Both quick and RPM modes produce the same flat layout now.
+    sed -e "s|@INSTALL_PREFIX@|$TEST_PREFIX|g" \
         "$SCRIPT_DIR/scripts/start-kineticwe.sh" \
         > "$TEST_PREFIX/bin/start-kineticwe"
     chmod +x "$TEST_PREFIX/bin/start-kineticwe"
@@ -361,6 +374,68 @@ reset_override() {
 }
 
 # ---------------------------------------------------------------------------
+# Reset local dev install (remove kineticwe files from TEST_PREFIX)
+# ---------------------------------------------------------------------------
+reset_local() {
+    step "Removing kineticwe dev files from ${TEST_PREFIX}..."
+
+    local removed_any=false
+
+    # Remove files known to be installed by the kineticwe package.
+    # This follows the %files section of the spec — only targets paths
+    # within TEST_PREFIX that kineticwe owns.
+    local -a known_paths=(
+        "$TEST_PREFIX/bin/kinetic-we"
+        "$TEST_PREFIX/bin/kwin_wayland"
+        "$TEST_PREFIX/bin/kwin_wayland_wrapper"
+        "$TEST_PREFIX/bin/kwin-we_wayland"
+        "$TEST_PREFIX/bin/kwin-we_wayland_wrapper"
+        "$TEST_PREFIX/bin/kwindowprop"
+        "$TEST_PREFIX/bin/start-kineticwe"
+        "$TEST_PREFIX/lib64/libKGlobalAccelD.so"*
+        "$TEST_PREFIX/lib64/libkwin.so"*
+        "$TEST_PREFIX/lib64/libkcmkwincommon.so"*
+        "$TEST_PREFIX/lib64/libexec/kwin"*
+        "$TEST_PREFIX/lib64/kconf_update_bin/kwin"*
+        "$TEST_PREFIX/lib64/qt6/plugins/kwin"
+        "$TEST_PREFIX/lib64/qt6/plugins/plasma/kcms"
+        "$TEST_PREFIX/lib64/qt6/plugins/kf6/packagestructure"
+        "$TEST_PREFIX/lib64/qt6/qml/org/kde/kwin"
+        "$TEST_PREFIX/share/kwin-wayland"
+        "$TEST_PREFIX/share/config.kcfg"
+        "$TEST_PREFIX/share/kconf_update"
+        "$TEST_PREFIX/share/knsrcfiles"
+        "$TEST_PREFIX/share/qlogging-categories6"
+        "$TEST_PREFIX/share/krunner"
+        "$TEST_PREFIX/share/wayland-sessions/kineticwe.desktop"
+    )
+
+    for pattern in "${known_paths[@]}"; do
+        # shellcheck disable=SC2086
+        for f in $pattern; do
+            if [[ -e "$f" || -L "$f" ]]; then
+                rm -rf "$f"
+                info "  Removed: $f"
+                removed_any=true
+            fi
+        done
+    done
+
+    # Also remove .build-id entries that belong to kineticwe
+    find "$TEST_PREFIX/lib/.build-id" -type f -name '*.debug' 2>/dev/null \
+        -exec sh -c 'readelf -n "$1" 2>/dev/null | grep -q "kineticwe\|kwin"' _ {} \; \
+        -delete 2>/dev/null || true
+
+    if $removed_any; then
+        echo
+        info "Dev files removed from $TEST_PREFIX."
+        info "The COPR stable install in /usr/ is untouched."
+    else
+        info "No kineticwe dev files found in $TEST_PREFIX."
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Reboot prompt
 # ---------------------------------------------------------------------------
 prompt_reboot() {
@@ -389,29 +464,18 @@ print_usage() {
     echo "=========================================="
     echo
 
-    # Detect which layout was built
-    local bin_path=""
-    local bin_label=""
-    if [[ -x "$TEST_PREFIX/usr/bin/kinetic-we" ]]; then
-        bin_path="$TEST_PREFIX/usr/bin"
-        bin_label="RPM-extracted"
-    elif [[ -x "$TEST_PREFIX/bin/kinetic-we" ]]; then
-        bin_path="$TEST_PREFIX/bin"
-        bin_label="Quick-build"
-    fi
-
-    echo "  ┌─────────────────────────────────────────────────────┐"
-    if [[ -n "$bin_path" ]]; then
-        echo "  │  DEV BUILD  (${bin_label})                        │"
-        echo "  │    $TEST_PREFIX/bin/start-kineticwe         │"
+    if [[ -x "$TEST_PREFIX/bin/kinetic-we" ]]; then
+        echo "  ┌─────────────────────────────────────────────────────┐"
+        echo "  │  DEV BUILD  (local install)                        │"
+        echo "  │    start-kineticwe                                  │"
+        echo "  ├─────────────────────────────────────────────────────┤"
+        echo "  │  STABLE  (COPR system install)                      │"
+        echo "  │    /usr/bin/start-kineticwe                         │"
+        echo "  └─────────────────────────────────────────────────────┘"
     else
-        echo "  │  DEV BUILD  (none)                                 │"
-        echo "  │    (run ./build-rpm-dev.sh first)                  │"
+        echo "  No dev build found at $TEST_PREFIX"
+        echo "  (run ./build-rpm-dev.sh --quick first)"
     fi
-    echo "  ├─────────────────────────────────────────────────────┤"
-    echo "  │  STABLE  (COPR system install)                      │"
-    echo "  │    /usr/bin/start-kineticwe                         │"
-    echo "  └─────────────────────────────────────────────────────┘"
     echo
 
     if rpm -q "${PACKAGE}" &>/dev/null; then
@@ -423,22 +487,29 @@ print_usage() {
     info "  Dev build release tag : ${DEV_RELEASE}"
     echo
 
+    info "  Since TEST_PREFIX=$TEST_PREFIX is in your PATH, just type:"
+    info "    start-kineticwe"
+    info "  (from any TTY — no full path needed)"
+    echo
+
     info "Rebuild after making changes:"
-    info "  ./build-rpm-dev.sh"
+    info "  ./build-rpm-dev.sh --quick"
     echo
 
     if find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" ! -name '*.src.rpm' -print0 2>/dev/null | grep -qz .; then
         info "RPM packages:"
         find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" ! -name '*.src.rpm' -exec ls -lh {} \; 2>/dev/null | sed 's/^/  /'
+        echo
+        info "To layer via rpm-ostree (requires reboot):"
+        info "  ./build-rpm-dev.sh --ostree"
+        echo
+        info "To revert the ostree override:"
+        info "  ./build-rpm-dev.sh --reset"
+        echo
     fi
-    echo
 
-    info "To layer via rpm-ostree (requires reboot):"
-    info "  ./build-rpm-dev.sh --ostree"
-    echo
-
-    info "To revert to the COPR version:"
-    info "  ./build-rpm-dev.sh --reset"
+    info "To remove local dev files and restore pure COPR:"
+    info "  ./build-rpm-dev.sh --reset-local"
     echo
 
     info "RPMs are cached in:"
@@ -454,6 +525,7 @@ main() {
     local do_ostree=false
     local do_reboot=false
     local do_reset=false
+    local do_reset_local=false
     local do_quick=false
 
     for arg in "$@"; do
@@ -462,11 +534,21 @@ main() {
             --ostree)  do_ostree=true ;;
             --reboot)  do_reboot=true ;;
             --reset)   do_reset=true ;;
+            --reset-local) do_reset_local=true ;;
             --quick)   do_quick=true ;;
-            --help|-h) echo "Usage: $0 [--install] [--ostree] [--reboot] [--quick] [--reset]"; exit 0 ;;
+            --help|-h) echo "Usage: $0 [--install] [--ostree] [--reboot] [--quick] [--reset] [--reset-local]"; exit 0 ;;
             *)         warn "Unknown option: $arg";;
         esac
     done
+
+    if $do_reset_local; then
+        echo "=========================================="
+        echo "  KineticWE - Reset Local Dev Install"
+        echo "=========================================="
+        echo
+        reset_local
+        exit 0
+    fi
 
     if $do_reset; then
         echo "=========================================="
@@ -487,7 +569,7 @@ main() {
         check_prereqs
         setup_distrobox
         quick_build
-        install_startup_script "quick"
+        install_startup_script
         print_usage
         exit 0
     fi

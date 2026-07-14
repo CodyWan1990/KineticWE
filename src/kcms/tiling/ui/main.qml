@@ -771,13 +771,35 @@ KCM.SimpleKCM {
                     id: floatingClassInput
                     Layout.fillWidth: true
                     placeholderText: i18n("Add a window class...")
-                    onAccepted: addFloatingClass()
+                    onAccepted: {
+                        const text = floatingClassInput.text.trim();
+                        if (text.length > 0) {
+                            let list = kcm.settings.floatingClasses.slice();
+                            if (list.indexOf(text) === -1) {
+                                list.push(text);
+                                kcm.settings.floatingClasses = list;
+                            }
+                            floatingClassInput.text = "";
+                            floatingClassInput.forceActiveFocus();
+                        }
+                    }
                 }
 
                 QQC2.Button {
                     icon.name: "list-add"
                     enabled: floatingClassInput.text.trim().length > 0
-                    onClicked: addFloatingClass()
+                    onClicked: {
+                        const text = floatingClassInput.text.trim();
+                        if (text.length > 0) {
+                            let list = kcm.settings.floatingClasses.slice();
+                            if (list.indexOf(text) === -1) {
+                                list.push(text);
+                                kcm.settings.floatingClasses = list;
+                            }
+                            floatingClassInput.text = "";
+                            floatingClassInput.forceActiveFocus();
+                        }
+                    }
                 }
             }
 
@@ -849,18 +871,6 @@ KCM.SimpleKCM {
                 }
             }
 
-            function addFloatingClass() {
-                const text = floatingClassInput.text.trim();
-                if (text.length > 0) {
-                    let list = kcm.settings.floatingClasses.slice();
-                    if (list.indexOf(text) === -1) {
-                        list.push(text);
-                        kcm.settings.floatingClasses = list;
-                    }
-                    floatingClassInput.text = "";
-                    floatingClassInput.forceActiveFocus();
-                }
-            }
         }
     }
 }
