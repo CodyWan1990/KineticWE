@@ -16,9 +16,13 @@ set -e
 # When installed via install-fedora.sh this is set automatically.
 # When run manually it defaults to $HOME/.local.
 _INSTALL_PREFIX_="@INSTALL_PREFIX@"
-if [[ "$_INSTALL_PREFIX_" == "@INSTALL_PREFIX@" ]]; then
+if [[ "${_INSTALL_PREFIX_%%@*}" == "" ]]; then
+    # @INSTALL_PREFIX@ was NOT replaced by sed (raw template) —
+    # use default: $HOME/.local.
     INSTALL_PREFIX="${INSTALL_PREFIX:-$HOME/.local}"
 else
+    # @INSTALL_PREFIX@ was replaced with a real path by sed —
+    # use that path as the install prefix.
     INSTALL_PREFIX="${INSTALL_PREFIX:-$_INSTALL_PREFIX_}"
 fi
 
@@ -26,10 +30,19 @@ fi
 # 1. Core paths for the custom KWin build
 # ---------------------------------------------------------------------------
 export PATH="$INSTALL_PREFIX/bin:$PATH"
-export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
 
-# KWin needs this to find its own plugins (screencast.so, screenshot.so, etc.)
-export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+# KWin needs this to find its own plugins (screencast.so, screenshot.so, etc.).
+# On RPM-based distros plugins live under lib64/qt6/plugins/.
+export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins:$INSTALL_PREFIX/lib64/plugins"
+
+# QML import path: ensures KWin QML modules (tiling UI, etc.) load from the
+# dev build instead of falling through to the COPR system install.
+export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
+
+# XDG data dirs: ensures KWin scripts, effects, and config data (kwin-wayland/
+# scripts/, tabbox/, etc.) are found from the dev build first.
+export XDG_DATA_DIRS="$INSTALL_PREFIX/share:$XDG_DATA_DIRS"
 
 # ---------------------------------------------------------------------------
 # 2. Session / Desktop identity
@@ -76,8 +89,10 @@ cat > "$STARTUP_PAYLOAD" << EOF
 # KineticWE startup payload — run by KWin as a detached child process.
 
 export PATH="$INSTALL_PREFIX/bin:\$PATH"
-export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
-export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
+export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins:$INSTALL_PREFIX/lib64/plugins"
+export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
+export XDG_DATA_DIRS="$INSTALL_PREFIX/share:\$XDG_DATA_DIRS"
 export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
@@ -158,4 +173,4 @@ pkill -x kglobalacceld 2>/dev/null || true
 # ---------------------------------------------------------------------------
 # KWin will run the startup payload as a child process. The child inherits
 # the environment captured here (including QT_PLUGIN_PATH).
-exec kinetic-we --xwayland --exit-with-session "$STARTUP_PAYLOAD"
+exec "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --exit-with-session "$STARTUP_PAYLOAD"

@@ -6,8 +6,10 @@ set -e
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr}"
 
 export PATH="$INSTALL_PREFIX/bin:$PATH"
-export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
 export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
+export XDG_DATA_DIRS="$INSTALL_PREFIX/share:$XDG_DATA_DIRS"
 export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
@@ -38,8 +40,10 @@ STARTUP_PAYLOAD="$STARTUP_PAYLOAD_DIR/startup.sh"
 cat > "$STARTUP_PAYLOAD" << EOF
 #!/bin/bash
 export PATH="$INSTALL_PREFIX/bin:\$PATH"
-export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
 export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
+export XDG_DATA_DIRS="$INSTALL_PREFIX/share:\$XDG_DATA_DIRS"
 export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
@@ -87,4 +91,4 @@ chmod +x "$STARTUP_PAYLOAD"
 systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
 pkill -x kglobalacceld 2>/dev/null || true
 
-exec kinetic-we --xwayland --exit-with-session "$STARTUP_PAYLOAD"
+exec "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --exit-with-session "$STARTUP_PAYLOAD"
