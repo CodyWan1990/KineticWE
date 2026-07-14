@@ -214,6 +214,18 @@ void MasterStackLayoutEngine::cancelMoveWindow(Window *window)
         if (sourceLeaf->windows().contains(window)) {
             sourceLeaf->unmanage(window);
         }
+
+        // Remove the weight that matched this leaf so the parallel lists stay
+        // in sync.  Without this, reflow() would compute a stale stackCount
+        // and access m_leaves out of bounds, causing a crash.
+        const int idx = m_leaves.indexOf(sourceLeaf);
+        const int masterCount = m_masterWeights.count();
+        if (idx < masterCount) {
+            m_masterWeights.removeAt(idx);
+        } else {
+            m_stackWeights.removeAt(idx - masterCount);
+        }
+
         m_leaves.removeOne(sourceLeaf);
         m_root->destroyChild(sourceLeaf);
         reflow();
