@@ -915,6 +915,52 @@ void TilingController::focusInDirection(LayoutEngine::FocusDirection direction)
     }
 }
 
+void TilingController::swapUp()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Up);
+}
+
+void TilingController::swapDown()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Down);
+}
+
+void TilingController::swapLeft()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Left);
+}
+
+void TilingController::swapRight()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Right);
+}
+
+void TilingController::swapInDirection(LayoutEngine::FocusDirection direction)
+{
+    Window *window = activeTiledWindow();
+    if (!window) {
+        return;
+    }
+    LayoutEngine *engine = layoutEngineForWindow(window);
+    if (!engine) {
+        return;
+    }
+
+    Window *target = engine->windowInDirection(window, direction);
+    if (!target || target == window) {
+        return;
+    }
+
+    const QList<Window *> ws = engine->windows();
+    const int fromIdx = ws.indexOf(window);
+    const int targetIdx = ws.indexOf(target);
+    if (fromIdx < 0 || targetIdx < 0) {
+        return;
+    }
+
+    engine->moveWindow(window, targetIdx - fromIdx);
+}
+
 void TilingController::toggleFloating()
 {
     Window *window = activeTiledWindow();

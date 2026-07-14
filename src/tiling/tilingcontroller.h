@@ -82,6 +82,10 @@ public:
     void focusRight();
     void focusUp();
     void focusDown();
+    void swapUp();
+    void swapDown();
+    void swapLeft();
+    void swapRight();
     void toggleFloating();
     void promoteToMaster();
     void moveWindowToOutput(TilingDirection direction);
@@ -156,6 +160,7 @@ private:
     bool shouldTile(const Window *window) const;
     void onWindowMoveFinished(Window *window);
     void focusInDirection(LayoutEngine::FocusDirection direction);
+    void swapInDirection(LayoutEngine::FocusDirection direction);
     Window *windowUnderCursorInEngine(LayoutEngine *engine) const;
     void addWindowToLayout(Window *window, LogicalOutput *output, VirtualDesktop *desktop);
     void removeWindowFromLayouts(Window *window);
