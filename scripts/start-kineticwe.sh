@@ -54,6 +54,10 @@ export XDG_SESSION_DESKTOP=KDE
 # Plasma 6 session, so it calls kde-open instead of the long-removed kfmclient.
 # Without this, URL and folder clicks in Electron apps silently do nothing.
 export KDE_SESSION_VERSION=6
+# Without this, kbuildsycoca6 fails and KDE tools can't find the application
+# menu database, breaking kglobalacceld shortcut registration and the
+# Application Picker (blank on Arch, Nix, etc.).
+export XDG_MENU_PREFIX=plasma-
 
 # ---------------------------------------------------------------------------
 # 3. Helper: locate xdg-desktop-portal executables
@@ -97,6 +101,7 @@ export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
+export XDG_MENU_PREFIX=plasma-
 
 # ---------------------------------------------------------------------------
 # 1. Rebuild KDE service cache so System Settings finds installed KCMs
