@@ -16,9 +16,13 @@ set -e
 # When installed via install-fedora.sh this is set automatically.
 # When run manually it defaults to $HOME/.local.
 _INSTALL_PREFIX_="@INSTALL_PREFIX@"
-if [[ "$_INSTALL_PREFIX_" == "@INSTALL_PREFIX@" ]]; then
+if [[ "${_INSTALL_PREFIX_%%@*}" == "" ]]; then
+    # @INSTALL_PREFIX@ was NOT replaced by sed (raw template) —
+    # use default: $HOME/.local.
     INSTALL_PREFIX="${INSTALL_PREFIX:-$HOME/.local}"
 else
+    # @INSTALL_PREFIX@ was replaced with a real path by sed —
+    # use that path as the install prefix.
     INSTALL_PREFIX="${INSTALL_PREFIX:-$_INSTALL_PREFIX_}"
 fi
 
@@ -28,8 +32,9 @@ fi
 export PATH="$INSTALL_PREFIX/bin:$PATH"
 export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 
-# KWin needs this to find its own plugins (screencast.so, screenshot.so, etc.)
-export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+# KWin needs this to find its own plugins (screencast.so, screenshot.so, etc.).
+# On RPM-based distros plugins live under lib64/qt6/plugins/.
+export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins"
 
 # ---------------------------------------------------------------------------
 # 2. Session / Desktop identity
@@ -77,7 +82,7 @@ cat > "$STARTUP_PAYLOAD" << EOF
 
 export PATH="$INSTALL_PREFIX/bin:\$PATH"
 export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH"
-export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/plugins"
+export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins"
 export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
