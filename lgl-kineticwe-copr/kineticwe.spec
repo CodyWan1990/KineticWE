@@ -3,7 +3,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -245,6 +245,22 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Wed Jul 15 2026 LGL <lgl@localhost> - 6.7.80-8
+- Rebuild from latest master: adds the Columns tiling layout, the AutoGrid
+  layout engine, and KCM shortcuts for swapping the focused window
+  up/down/left/right
+- Fix ghost window left behind on masterstack when a window is moved to a
+  different monitor
+- Fix autogrid layout windows floating when moved with the mouse
+- Sync start-kineticwe session launcher with upstream start-kineticwe.sh
+  fixes: correct QT_PLUGIN_PATH to include the qt6/plugins subdirectory
+  (was missing it, so KWin's own plugins could fail to load on Fedora's
+  Qt6 layout), export XDG_MENU_PREFIX=plasma- (fixes kbuildsycoca6/
+  Application Picker breakage), stop clobbering LD_LIBRARY_PATH with a
+  stale inherited value, and pass --exit-with-session to kinetic-we with
+  noctalia running in the foreground so the session ends cleanly when
+  noctalia exits instead of leaving kinetic-we running detached
+
 * Mon Jul 06 2026 LGL <lgl@localhost> - 6.7.80-7
 - Start upowerd and org_kde_powerdevil from the RPM session launcher so power
   management controls are available in KineticWE sessions
