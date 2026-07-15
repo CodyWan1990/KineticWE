@@ -109,6 +109,21 @@ KCM.SimpleKCM {
             }
 
             QQC2.CheckBox {
+                id: enableColumns
+                text: i18n("Columns")
+                checked: kcm.settings.enabledLayouts.indexOf("Columns") !== -1
+                onToggled: {
+                    let layouts = kcm.settings.enabledLayouts.slice();
+                    if (checked && layouts.indexOf("Columns") === -1) {
+                        layouts.push("Columns");
+                    } else if (!checked) {
+                        layouts = layouts.filter(l => l !== "Columns");
+                    }
+                    kcm.settings.enabledLayouts = layouts;
+                }
+            }
+
+            QQC2.CheckBox {
                 id: enableMonocle
                 text: i18n("Monocle")
                 checked: kcm.settings.enabledLayouts.indexOf("Monocle") !== -1
@@ -154,6 +169,7 @@ KCM.SimpleKCM {
                     { text: i18n("MasterStack"), value: "MasterStack" },
                     { text: i18n("Stacked"), value: "Stacked" },
                     { text: i18n("CenterTile"), value: "CenterTile" },
+                    { text: i18n("Columns"), value: "Columns" },
                     { text: i18n("Monocle"), value: "Monocle" },
                     { text: i18n("AutoGrid"), value: "AutoGrid" }
                 ]

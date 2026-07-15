@@ -41,6 +41,7 @@ public:
         CenterTile = 2,
         Monocle = 3,
         AutoGrid = 4,
+        Columns = 5,
     };
 
     static QString layoutKindToString(LayoutKind kind);
