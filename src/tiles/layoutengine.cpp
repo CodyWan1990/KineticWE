@@ -31,6 +31,8 @@ QString LayoutEngine::layoutKindToString(LayoutKind kind)
         return QStringLiteral("Monocle");
     case LayoutKind::AutoGrid:
         return QStringLiteral("AutoGrid");
+    case LayoutKind::Columns:
+        return QStringLiteral("Columns");
     }
     return QStringLiteral("MasterStack");
 }
@@ -48,6 +50,8 @@ QString LayoutEngine::layoutDisplayName(LayoutKind kind)
         return QStringLiteral("Monocle");
     case LayoutKind::AutoGrid:
         return QStringLiteral("Auto Grid");
+    case LayoutKind::Columns:
+        return QStringLiteral("Columns");
     }
     return QStringLiteral("Master & Stack");
 }
@@ -68,6 +72,9 @@ LayoutEngine::LayoutKind LayoutEngine::layoutKindFromString(const QString &name,
     }
     if (name.compare(QLatin1String("AutoGrid"), Qt::CaseInsensitive) == 0) {
         return LayoutKind::AutoGrid;
+    }
+    if (name.compare(QLatin1String("Columns"), Qt::CaseInsensitive) == 0) {
+        return LayoutKind::Columns;
     }
     return fallback;
 }

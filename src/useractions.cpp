@@ -1047,6 +1047,26 @@ void Workspace::initShortcuts()
             m_tilingController->focusDown();
         }
     }, true);
+    initShortcut("Swap Tiled Window Up", i18n("Swap Tiled Window Up"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->swapUp();
+        }
+    }, true);
+    initShortcut("Swap Tiled Window Down", i18n("Swap Tiled Window Down"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->swapDown();
+        }
+    }, true);
+    initShortcut("Swap Tiled Window Left", i18n("Swap Tiled Window Left"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->swapLeft();
+        }
+    }, true);
+    initShortcut("Swap Tiled Window Right", i18n("Swap Tiled Window Right"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->swapRight();
+        }
+    }, true);
     initShortcut("Tiling Toggle Floating", i18n("Tiling Toggle Floating"), Qt::META | Qt::Key_W, [this]() {
         if (m_tilingController) {
             m_tilingController->toggleFloating();

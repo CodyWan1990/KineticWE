@@ -12,6 +12,7 @@
 #include "scene/borderradius.h"
 #include "tiles/autogridlayoutengine.h"
 #include "tiles/centertilelayoutengine.h"
+#include "tiles/columnslayoutengine.h"
 #include "tiles/layoutengine.h"
 #include "tiles/masterstacklayoutengine.h"
 #include "tiles/stackedlayoutengine.h"
@@ -50,6 +51,8 @@ std::unique_ptr<LayoutEngine> createLayoutEngine(LayoutEngine::LayoutKind kind, 
         return std::make_unique<MonocleLayoutEngine>(parent);
     case LayoutEngine::LayoutKind::AutoGrid:
         return std::make_unique<AutoGridLayoutEngine>(parent);
+    case LayoutEngine::LayoutKind::Columns:
+        return std::make_unique<ColumnsLayoutEngine>(parent);
     case LayoutEngine::LayoutKind::MasterStack:
     default:
         return std::make_unique<MasterStackLayoutEngine>(parent);
@@ -155,7 +158,7 @@ void TilingController::reconfigure()
     // Whitelist of layouts the user wants available. Order in the list also
     // defines the cycle order used by cycleLayout().
     m_enabledLayouts = tilingGroup.readEntry("EnabledLayouts",
-        QStringList{QLatin1String("MasterStack"), QLatin1String("Stacked"), QLatin1String("CenterTile"), QLatin1String("Monocle"), QLatin1String("AutoGrid")});
+        QStringList{QLatin1String("MasterStack"), QLatin1String("Stacked"), QLatin1String("CenterTile"), QLatin1String("Columns"), QLatin1String("Monocle"), QLatin1String("AutoGrid")});
     m_rules->load(rulesGroup);
 
     // Per-tile resize step. Weight units; see tilingcontroller.h. Clamped to
@@ -329,6 +332,8 @@ QList<LayoutEngine::LayoutKind> TilingController::enabledLayoutKinds() const
             result.append(LayoutEngine::LayoutKind::Monocle);
         } else if (name.compare(QLatin1String("AutoGrid"), Qt::CaseInsensitive) == 0) {
             result.append(LayoutEngine::LayoutKind::AutoGrid);
+        } else if (name.compare(QLatin1String("Columns"), Qt::CaseInsensitive) == 0) {
+            result.append(LayoutEngine::LayoutKind::Columns);
         }
     }
     if (result.isEmpty()) {
@@ -913,6 +918,52 @@ void TilingController::focusInDirection(LayoutEngine::FocusDirection direction)
     if (target && m_workspace) {
         m_workspace->activateWindow(target);
     }
+}
+
+void TilingController::swapUp()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Up);
+}
+
+void TilingController::swapDown()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Down);
+}
+
+void TilingController::swapLeft()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Left);
+}
+
+void TilingController::swapRight()
+{
+    swapInDirection(LayoutEngine::FocusDirection::Right);
+}
+
+void TilingController::swapInDirection(LayoutEngine::FocusDirection direction)
+{
+    Window *window = activeTiledWindow();
+    if (!window) {
+        return;
+    }
+    LayoutEngine *engine = layoutEngineForWindow(window);
+    if (!engine) {
+        return;
+    }
+
+    Window *target = engine->windowInDirection(window, direction);
+    if (!target || target == window) {
+        return;
+    }
+
+    const QList<Window *> ws = engine->windows();
+    const int fromIdx = ws.indexOf(window);
+    const int targetIdx = ws.indexOf(target);
+    if (fromIdx < 0 || targetIdx < 0) {
+        return;
+    }
+
+    engine->moveWindow(window, targetIdx - fromIdx);
 }
 
 void TilingController::toggleFloating()
