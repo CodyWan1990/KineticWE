@@ -37,6 +37,21 @@ class Window;
  * Navigation: Up/Down within a column, Left/Right between columns at the
  * same row (clamped to the last row of the target column).
  */
+
+/*!
+ * A single column in the Columns layout.
+ *
+ * Each column owns its leaf tiles (top-to-bottom), the vertical resize weight
+ * for each leaf, and its share of the total available width.  The column's
+ * width is expressed as a fraction between 0 and 1; all columns' widths sum
+ * to exactly 1.0 (see ColumnsLayoutEngine::normalizeColumnWidths).
+ */
+struct KWIN_EXPORT Column {
+    QList<QPointer<CustomTile>> leaves;  // top-to-bottom order
+    QList<qreal> weights;                // parallel vertical weights
+    qreal width = 0.0;                   // fraction of total width [0, 1]
+};
+
 class KWIN_EXPORT ColumnsLayoutEngine : public LayoutEngine
 {
     Q_OBJECT
@@ -82,18 +97,20 @@ private:
     void removeColumn(int col);
     /** Redistribute total width equally among all current columns. */
     void rebalanceColumnWidths();
+    /**
+     * Normalise column widths so they sum to exactly 1.0.
+     * Called after any interactive adjustment to prevent floating-point drift
+     * that would break the screen-edge detection in Tile::windowGeometry().
+     */
+    void normalizeColumnWidths();
 
     QPointer<RootTile> m_root;
 
-    // Dynamic list of columns. Each inner list holds the column's leaf tiles
-    // in top-to-bottom order. m_columnLeaves.size() is the current column
-    // count (1, 2, or 3).
-    QList<QList<QPointer<CustomTile>>> m_columnLeaves;
-    // Parallel weight lists, one per column, same structure.
-    QList<QList<qreal>> m_columnWeights;
-    // Parallel per-column width fractions. Sums to 1.0. Rebalanced to equal
-    // when the column count changes; user can adjust via mouse resize.
-    QList<qreal> m_columnWidths;
+    // Dynamic list of columns (each a self-contained Column struct).
+    // m_columns.size() is the current column count (1, 2, or 3).
+    // All column widths sum to exactly 1.0 (rebalanced on column-count changes,
+    // normalised after interactive adjustments).
+    QList<Column> m_columns;
 
     // Source leaf remembered during an interactive drag-move so the window can
     // be swapped with another tiled window or restored to its original place.
