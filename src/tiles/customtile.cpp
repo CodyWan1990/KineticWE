@@ -184,6 +184,29 @@ void CustomTile::setRelativeGeometry(const RectF &geom)
 bool CustomTile::supportsResizeGravity(KWin::Gravity gravity)
 {
     if (layoutDirection() == LayoutDirection::Floating) {
+        // For Floating tiles, allow all edges by default but still respect
+        // screen boundaries for Left/Right edges. This prevents the window
+        // from detaching / "floating" when the user grabs a resize handle
+        // that would push past the screen edge (e.g. right edge of the
+        // rightmost column in the Columns layout).
+        switch (gravity) {
+        case Gravity::Left:
+        case Gravity::TopLeft:
+        case Gravity::BottomLeft:
+            if (m_relativeGeometry.left() <= 0.0) {
+                return false;
+            }
+            break;
+        case Gravity::Right:
+        case Gravity::TopRight:
+        case Gravity::BottomRight:
+            if (m_relativeGeometry.right() >= 1.0) {
+                return false;
+            }
+            break;
+        default:
+            break;
+        }
         return gravity != Gravity::None;
     }
 

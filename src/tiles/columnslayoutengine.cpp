@@ -55,39 +55,35 @@ void ColumnsLayoutEngine::addWindow(Window *window)
     CustomTile *leaf = m_root->createChildAt(RectF(0, 0, 1, 1), Tile::LayoutDirection::Floating,
                                               totalLeafCount());
 
-    const int numCols = m_columnLeaves.size();
+    const int numCols = m_columns.size();
 
     if (numCols < m_maxColumns) {
-        QList<QPointer<CustomTile>> newCol;
-        newCol.append(leaf);
-        m_columnLeaves.append(newCol);
-
-        QList<qreal> newWeights;
-        newWeights.append(m_defaultWeight);
-        m_columnWeights.append(newWeights);
-
-        m_columnWidths.append(0); // placeholder; rebalanced below
+        Column col;
+        col.leaves.append(leaf);
+        col.weights.append(m_defaultWeight);
+        col.width = 0.0; // placeholder; rebalanced below
+        m_columns.append(col);
         rebalanceColumnWidths();
     } else {
         int col = columnOfWindow(workspace() ? workspace()->activeWindow() : nullptr);
         if (col < 0) {
             col = columnWithFewestWindows();
         }
-        if (col < 0 || col >= m_columnLeaves.size()) {
+        if (col < 0 || col >= m_columns.size()) {
             col = 0;
         }
-        m_columnLeaves[col].append(leaf);
-        m_columnWeights[col].append(m_defaultWeight);
+        m_columns[col].leaves.append(leaf);
+        m_columns[col].weights.append(m_defaultWeight);
     }
 
     if (!leaf->manage(window)) {
         qWarning() << "ColumnsLayoutEngine: failed to manage window" << window->caption();
-        for (int c = 0; c < m_columnLeaves.size(); ++c) {
-            if (!m_columnLeaves[c].isEmpty() && m_columnLeaves[c].last() == leaf) {
+        for (int c = 0; c < m_columns.size(); ++c) {
+            if (!m_columns[c].leaves.isEmpty() && m_columns[c].leaves.last() == leaf) {
                 m_root->destroyChild(leaf);
-                m_columnLeaves[c].removeLast();
-                m_columnWeights[c].removeLast();
-                if (m_columnLeaves[c].isEmpty()) {
+                m_columns[c].leaves.removeLast();
+                m_columns[c].weights.removeLast();
+                if (m_columns[c].leaves.isEmpty()) {
                     removeColumn(c);
                 }
                 return;
@@ -102,16 +98,16 @@ void ColumnsLayoutEngine::addWindow(Window *window)
 
 void ColumnsLayoutEngine::removeWindow(Window *window)
 {
-    for (int c = 0; c < m_columnLeaves.size(); ++c) {
-        for (int r = 0; r < m_columnLeaves[c].size(); ++r) {
-            if (m_columnLeaves[c][r] && m_columnLeaves[c][r]->windows().contains(window)) {
-                CustomTile *leaf = m_columnLeaves[c][r];
+    for (int c = 0; c < m_columns.size(); ++c) {
+        for (int r = 0; r < m_columns[c].leaves.size(); ++r) {
+            if (m_columns[c].leaves[r] && m_columns[c].leaves[r]->windows().contains(window)) {
+                CustomTile *leaf = m_columns[c].leaves[r];
                 leaf->unmanage(window);
                 m_root->destroyChild(leaf);
-                m_columnLeaves[c].removeAt(r);
-                m_columnWeights[c].removeAt(r);
+                m_columns[c].leaves.removeAt(r);
+                m_columns[c].weights.removeAt(r);
 
-                if (m_columnLeaves[c].isEmpty()) {
+                if (m_columns[c].leaves.isEmpty()) {
                     removeColumn(c);
                     rebalanceColumnWidths();
                 }
@@ -146,18 +142,18 @@ void ColumnsLayoutEngine::moveWindow(Window *window, int delta)
     }
 
     if (srcCol == dstCol) {
-        m_columnLeaves[srcCol].swapItemsAt(srcRow, dstRow);
-        m_columnWeights[srcCol].swapItemsAt(srcRow, dstRow);
+        m_columns[srcCol].leaves.swapItemsAt(srcRow, dstRow);
+        m_columns[srcCol].weights.swapItemsAt(srcRow, dstRow);
     } else {
         // Swap the two leaves across columns.
-        CustomTile *srcLeaf = m_columnLeaves[srcCol][srcRow];
-        qreal srcWeight = m_columnWeights[srcCol][srcRow];
+        CustomTile *srcLeaf = m_columns[srcCol].leaves[srcRow];
+        qreal srcWeight = m_columns[srcCol].weights[srcRow];
 
-        m_columnLeaves[srcCol][srcRow] = m_columnLeaves[dstCol][dstRow];
-        m_columnWeights[srcCol][srcRow] = m_columnWeights[dstCol][dstRow];
+        m_columns[srcCol].leaves[srcRow] = m_columns[dstCol].leaves[dstRow];
+        m_columns[srcCol].weights[srcRow] = m_columns[dstCol].weights[dstRow];
 
-        m_columnLeaves[dstCol][dstRow] = srcLeaf;
-        m_columnWeights[dstCol][dstRow] = srcWeight;
+        m_columns[dstCol].leaves[dstRow] = srcLeaf;
+        m_columns[dstCol].weights[dstRow] = srcWeight;
     }
 
     reflow();
@@ -169,50 +165,52 @@ void ColumnsLayoutEngine::reflow()
         return;
     }
 
-    const int numCols = m_columnLeaves.size();
+    const int numCols = m_columns.size();
     if (numCols == 0) {
         return;
     }
 
-    // Ensure column widths list is in sync.
-    while (m_columnWidths.size() < numCols) {
-        m_columnWidths.append(0);
+    // Ensure column sizes are in sync.
+    while (m_columns.size() > numCols) {
+        m_columns.removeLast();
     }
-    while (m_columnWidths.size() > numCols) {
-        m_columnWidths.removeLast();
-    }
-    if (m_columnWidths.size() == numCols) {
+    if (m_columns.size() == numCols) {
         qreal total = 0;
-        for (qreal w : m_columnWidths) {
-            total += w;
+        for (const Column &col : m_columns) {
+            total += col.width;
         }
         if (qFuzzyIsNull(total) || !qFuzzyCompare(total, 1.0)) {
             rebalanceColumnWidths();
+        } else {
+            // Ensure the total is *exactly* 1.0 to prevent floating-point drift
+            // from breaking the screen-edge detection in Tile::windowGeometry().
+            normalizeColumnWidths();
         }
     }
 
     qreal x = 0;
     for (int c = 0; c < numCols; ++c) {
-        const int rows = m_columnLeaves[c].size();
+        Column &col = m_columns[c];
+        const int rows = col.leaves.size();
         if (rows == 0) {
-            x += m_columnWidths[c];
+            x += col.width;
             continue;
         }
 
         qreal totalWeight = 0;
         for (int r = 0; r < rows; ++r) {
-            totalWeight += m_columnWeights[c][r];
+            totalWeight += col.weights[r];
         }
         if (qFuzzyIsNull(totalWeight)) {
             totalWeight = rows;
         }
 
-        const qreal colWidth = m_columnWidths[c];
+        const qreal colWidth = col.width;
         qreal y = 0;
 
         for (int r = 0; r < rows; ++r) {
-            const qreal height = m_columnWeights[c][r] / totalWeight;
-            m_columnLeaves[c][r]->setRelativeGeometry(RectF(x, y, colWidth, height));
+            const qreal height = col.weights[r] / totalWeight;
+            col.leaves[r]->setRelativeGeometry(RectF(x, y, colWidth, height));
             y += height;
         }
 
@@ -224,21 +222,21 @@ void ColumnsLayoutEngine::pruneEmptyLeaves()
 {
     bool changed = false;
 
-    for (int c = m_columnLeaves.size() - 1; c >= 0; --c) {
-        for (int r = m_columnLeaves[c].size() - 1; r >= 0; --r) {
-            const auto &leaf = m_columnLeaves[c][r];
+    for (int c = m_columns.size() - 1; c >= 0; --c) {
+        for (int r = m_columns[c].leaves.size() - 1; r >= 0; --r) {
+            const auto &leaf = m_columns[c].leaves[r];
             if (leaf && !leaf->windows().isEmpty()) {
                 continue;
             }
             if (leaf) {
                 m_root->destroyChild(leaf);
             }
-            m_columnLeaves[c].removeAt(r);
-            m_columnWeights[c].removeAt(r);
+            m_columns[c].leaves.removeAt(r);
+            m_columns[c].weights.removeAt(r);
             changed = true;
         }
 
-        if (m_columnLeaves[c].isEmpty()) {
+        if (m_columns[c].leaves.isEmpty()) {
             removeColumn(c);
             rebalanceColumnWidths();
             changed = true;
@@ -253,8 +251,8 @@ void ColumnsLayoutEngine::pruneEmptyLeaves()
 QList<Window *> ColumnsLayoutEngine::windows() const
 {
     QList<Window *> result;
-    for (const auto &col : m_columnLeaves) {
-        for (const auto &leaf : col) {
+    for (const auto &col : m_columns) {
+        for (const auto &leaf : col.leaves) {
             if (leaf) {
                 result.append(leaf->windows());
             }
@@ -265,10 +263,10 @@ QList<Window *> ColumnsLayoutEngine::windows() const
 
 Window *ColumnsLayoutEngine::primaryWindow() const
 {
-    if (m_columnLeaves.isEmpty() || m_columnLeaves[0].isEmpty() || !m_columnLeaves[0][0]) {
+    if (m_columns.isEmpty() || m_columns[0].leaves.isEmpty() || !m_columns[0].leaves[0]) {
         return nullptr;
     }
-    const QList<Window *> ws = m_columnLeaves[0][0]->windows();
+    const QList<Window *> ws = m_columns[0].leaves[0]->windows();
     return ws.isEmpty() ? nullptr : ws.first();
 }
 
@@ -296,7 +294,7 @@ Window *ColumnsLayoutEngine::windowInDirection(Window *from, FocusDirection dire
         }
         return nullptr;
     case FocusDirection::Down:
-        if (row < m_columnLeaves[col].size() - 1) {
+        if (row < m_columns[col].leaves.size() - 1) {
             return ws[flatIdx + 1];
         }
         return nullptr;
@@ -305,29 +303,29 @@ Window *ColumnsLayoutEngine::windowInDirection(Window *from, FocusDirection dire
             return nullptr;
         }
         const int targetCol = col - 1;
-        const int targetRow = qMin(row, m_columnLeaves[targetCol].size() - 1);
+        const int targetRow = qMin(row, m_columns[targetCol].leaves.size() - 1);
         if (targetRow < 0) {
             return nullptr;
         }
         int idx = 0;
         for (int c = 0; c < targetCol; ++c) {
-            idx += m_columnLeaves[c].size();
+            idx += m_columns[c].leaves.size();
         }
         idx += targetRow;
         return ws.value(idx);
     }
     case FocusDirection::Right: {
-        if (col >= m_columnLeaves.size() - 1) {
+        if (col >= m_columns.size() - 1) {
             return nullptr;
         }
         const int targetCol = col + 1;
-        const int targetRow = qMin(row, m_columnLeaves[targetCol].size() - 1);
+        const int targetRow = qMin(row, m_columns[targetCol].leaves.size() - 1);
         if (targetRow < 0) {
             return nullptr;
         }
         int idx = 0;
         for (int c = 0; c < targetCol; ++c) {
-            idx += m_columnLeaves[c].size();
+            idx += m_columns[c].leaves.size();
         }
         idx += targetRow;
         return ws.value(idx);
@@ -344,13 +342,13 @@ void ColumnsLayoutEngine::adjustTileSize(Window *window, qreal weightDelta, Qt::
     }
 
     const int col = columnOfWindow(window);
-    if (col < 0 || col >= m_columnLeaves.size()) {
+    if (col < 0 || col >= m_columns.size()) {
         return;
     }
 
     int row = -1;
-    for (int r = 0; r < m_columnLeaves[col].size(); ++r) {
-        if (m_columnLeaves[col][r] && m_columnLeaves[col][r]->windows().contains(window)) {
+    for (int r = 0; r < m_columns[col].leaves.size(); ++r) {
+        if (m_columns[col].leaves[r] && m_columns[col].leaves[r]->windows().contains(window)) {
             row = r;
             break;
         }
@@ -359,7 +357,7 @@ void ColumnsLayoutEngine::adjustTileSize(Window *window, qreal weightDelta, Qt::
         return;
     }
 
-    QList<qreal> &weights = m_columnWeights[col];
+    QList<qreal> &weights = m_columns[col].weights;
     if (weights.isEmpty()) {
         return;
     }
@@ -385,8 +383,8 @@ void ColumnsLayoutEngine::adjustTileSize(Window *window, qreal weightDelta, Qt::
 int ColumnsLayoutEngine::indexOfWindow(Window *window) const
 {
     int idx = 0;
-    for (const auto &col : m_columnLeaves) {
-        for (const auto &leaf : col) {
+    for (const auto &col : m_columns) {
+        for (const auto &leaf : col.leaves) {
             if (leaf && leaf->windows().contains(window)) {
                 return idx;
             }
@@ -399,8 +397,8 @@ int ColumnsLayoutEngine::indexOfWindow(Window *window) const
 QPair<int, int> ColumnsLayoutEngine::columnRowFromFlatIndex(int flatIdx) const
 {
     int running = 0;
-    for (int c = 0; c < m_columnLeaves.size(); ++c) {
-        const int colSize = m_columnLeaves[c].size();
+    for (int c = 0; c < m_columns.size(); ++c) {
+        const int colSize = m_columns[c].leaves.size();
         if (flatIdx < running + colSize) {
             return {c, flatIdx - running};
         }
@@ -411,8 +409,8 @@ QPair<int, int> ColumnsLayoutEngine::columnRowFromFlatIndex(int flatIdx) const
 
 int ColumnsLayoutEngine::columnOfWindow(Window *window) const
 {
-    for (int c = 0; c < m_columnLeaves.size(); ++c) {
-        for (const auto &leaf : m_columnLeaves[c]) {
+    for (int c = 0; c < m_columns.size(); ++c) {
+        for (const auto &leaf : m_columns[c].leaves) {
             if (leaf && leaf->windows().contains(window)) {
                 return c;
             }
@@ -424,10 +422,10 @@ int ColumnsLayoutEngine::columnOfWindow(Window *window) const
 int ColumnsLayoutEngine::columnWithFewestWindows() const
 {
     int bestCol = 0;
-    int fewest = m_columnLeaves.isEmpty() ? 0 : m_columnLeaves[0].size();
-    for (int c = 1; c < m_columnLeaves.size(); ++c) {
-        if (m_columnLeaves[c].size() < fewest) {
-            fewest = m_columnLeaves[c].size();
+    int fewest = m_columns.isEmpty() ? 0 : m_columns[0].leaves.size();
+    for (int c = 1; c < m_columns.size(); ++c) {
+        if (m_columns[c].leaves.size() < fewest) {
+            fewest = m_columns[c].leaves.size();
             bestCol = c;
         }
     }
@@ -437,50 +435,77 @@ int ColumnsLayoutEngine::columnWithFewestWindows() const
 int ColumnsLayoutEngine::totalLeafCount() const
 {
     int count = 0;
-    for (const auto &col : m_columnLeaves) {
-        count += col.size();
+    for (const auto &col : m_columns) {
+        count += col.leaves.size();
     }
     return count;
 }
 
 void ColumnsLayoutEngine::removeColumn(int col)
 {
-    if (col < 0 || col >= m_columnLeaves.size()) {
+    if (col < 0 || col >= m_columns.size()) {
         return;
     }
-    for (const auto &leaf : m_columnLeaves[col]) {
+    for (const auto &leaf : m_columns[col].leaves) {
         if (leaf) {
             m_root->destroyChild(leaf);
         }
     }
-    m_columnLeaves.removeAt(col);
-    m_columnWeights.removeAt(col);
-    m_columnWidths.removeAt(col);
+    m_columns.removeAt(col);
 }
 
 void ColumnsLayoutEngine::rebalanceColumnWidths()
 {
-    const int n = m_columnLeaves.size();
+    const int n = m_columns.size();
     if (n == 0) {
-        m_columnWidths.clear();
         return;
     }
     const qreal w = 1.0 / n;
-    m_columnWidths.resize(n);
     for (int i = 0; i < n; ++i) {
-        m_columnWidths[i] = w;
+        m_columns[i].width = w;
+    }
+}
+
+void ColumnsLayoutEngine::normalizeColumnWidths()
+{
+    const int n = m_columns.size();
+    if (n == 0) {
+        return;
+    }
+    qreal total = 0;
+    for (const auto &col : m_columns) {
+        total += col.width;
+    }
+    if (qFuzzyIsNull(total)) {
+        rebalanceColumnWidths();
+        return;
+    }
+    // Scale all columns proportionally so that the last column is set to
+    // 1.0 - sum_of_others, making the total bit-exact 1.0.  This prevents
+    // floating-point drift from breaking the screen-edge detection in
+    // Tile::windowGeometry().
+    qreal sum = 0;
+    for (int i = 0; i < n - 1; ++i) {
+        const qreal clamped = std::clamp(m_columns[i].width / total, qreal(0.08), qreal(0.85));
+        m_columns[i].width = clamped;
+        sum += clamped;
+    }
+    m_columns[n - 1].width = qreal(1.0) - sum;
+    // If the last column is out of range, rebalance entirely.
+    if (m_columns[n - 1].width < qreal(0.08) || m_columns[n - 1].width > qreal(0.85)) {
+        rebalanceColumnWidths();
     }
 }
 
 void ColumnsLayoutEngine::beginMoveWindow(Window *window)
 {
     const int col = columnOfWindow(window);
-    if (col < 0 || col >= m_columnLeaves.size()) {
+    if (col < 0 || col >= m_columns.size()) {
         return;
     }
-    for (int r = 0; r < m_columnLeaves[col].size(); ++r) {
-        if (m_columnLeaves[col][r] && m_columnLeaves[col][r]->windows().contains(window)) {
-            m_moveSourceLeaf = m_columnLeaves[col][r];
+    for (int r = 0; r < m_columns[col].leaves.size(); ++r) {
+        if (m_columns[col].leaves[r] && m_columns[col].leaves[r]->windows().contains(window)) {
+            m_moveSourceLeaf = m_columns[col].leaves[r];
             m_moveSourceColumn = col;
             m_moveSourceRow = r;
             return;
@@ -500,10 +525,10 @@ bool ColumnsLayoutEngine::endMoveWindow(Window *window, Window *target)
     }
 
     if (target && target != window) {
-        for (int c = 0; c < m_columnLeaves.size(); ++c) {
-            for (int r = 0; r < m_columnLeaves[c].size(); ++r) {
-                if (m_columnLeaves[c][r] && m_columnLeaves[c][r]->windows().contains(target)) {
-                    CustomTile *targetLeaf = m_columnLeaves[c][r];
+        for (int c = 0; c < m_columns.size(); ++c) {
+            for (int r = 0; r < m_columns[c].leaves.size(); ++r) {
+                if (m_columns[c].leaves[r] && m_columns[c].leaves[r]->windows().contains(target)) {
+                    CustomTile *targetLeaf = m_columns[c].leaves[r];
                     targetLeaf->unmanage(target);
                     targetLeaf->manage(window);
                     sourceLeaf->manage(target);
@@ -534,8 +559,8 @@ void ColumnsLayoutEngine::cancelMoveWindow(Window *window)
     }
 
     bool found = false;
-    for (const auto &col : m_columnLeaves) {
-        if (col.contains(sourceLeaf)) {
+    for (const auto &col : m_columns) {
+        if (col.leaves.contains(sourceLeaf)) {
             found = true;
             break;
         }
@@ -549,13 +574,13 @@ void ColumnsLayoutEngine::cancelMoveWindow(Window *window)
             sourceLeaf->unmanage(window);
         }
 
-        for (int c = 0; c < m_columnLeaves.size(); ++c) {
-            for (int r = 0; r < m_columnLeaves[c].size(); ++r) {
-                if (m_columnLeaves[c][r] == sourceLeaf) {
-                    m_columnLeaves[c].removeAt(r);
-                    m_columnWeights[c].removeAt(r);
+        for (int c = 0; c < m_columns.size(); ++c) {
+            for (int r = 0; r < m_columns[c].leaves.size(); ++r) {
+                if (m_columns[c].leaves[r] == sourceLeaf) {
+                    m_columns[c].leaves.removeAt(r);
+                    m_columns[c].weights.removeAt(r);
 
-                    if (m_columnLeaves[c].isEmpty()) {
+                    if (m_columns[c].leaves.isEmpty()) {
                         removeColumn(c);
                     } else {
                         rebalanceColumnWidths();
@@ -572,23 +597,36 @@ void ColumnsLayoutEngine::cancelMoveWindow(Window *window)
 
 void ColumnsLayoutEngine::adjustColumnRatio(qreal delta)
 {
-    const int numCols = m_columnLeaves.size();
+    const int numCols = m_columns.size();
     if (numCols < 2) {
         return;
     }
-    const int gaps = numCols - 1;
-    const qreal perGap = delta / gaps;
 
-    for (int c = 0; c < gaps; ++c) {
-        qreal newLeft = m_columnWidths[c] + perGap;
-        qreal newRight = m_columnWidths[c + 1] - perGap;
-        constexpr qreal minColWidth = 0.08;
-        if (newLeft < minColWidth || newRight < minColWidth) {
-            return;
-        }
-        m_columnWidths[c] = newLeft;
-        m_columnWidths[c + 1] = newRight;
+    // Find the column of the focused window to choose which boundary to adjust.
+    Window *active = workspace() ? workspace()->activeWindow() : nullptr;
+    int focusCol = columnOfWindow(active);
+    if (focusCol < 0 || focusCol >= numCols) {
+        focusCol = 0;
     }
+
+    // Adjust the boundary between focusCol and focusCol + 1.
+    // If this is the rightmost column, adjust the left boundary instead.
+    int boundary = focusCol;
+    if (boundary >= numCols - 1) {
+        boundary = numCols - 2;
+    }
+
+    constexpr qreal minColWidth = 0.08;
+    qreal newLeft = m_columns[boundary].width + delta;
+    qreal newRight = m_columns[boundary + 1].width - delta;
+
+    if (newLeft < minColWidth || newRight < minColWidth) {
+        return;
+    }
+
+    m_columns[boundary].width = newLeft;
+    m_columns[boundary + 1].width = newRight;
+    normalizeColumnWidths();
     reflow();
 }
 
@@ -602,7 +640,7 @@ void ColumnsLayoutEngine::interactiveResizeEnded(Window *window, const RectF &be
 
     if (edge == Qt::LeftEdge || edge == Qt::RightEdge) {
         const int col = columnOfWindow(window);
-        if (col < 0 || m_columnWidths.size() <= 1) {
+        if (col < 0 || m_columns.size() <= 1) {
             return;
         }
 
@@ -618,7 +656,11 @@ void ColumnsLayoutEngine::interactiveResizeEnded(Window *window, const RectF &be
             sign = -1.0;
         }
 
-        if (leftCol < 0 || rightCol >= m_columnWidths.size()) {
+        // If the resize would push past the screen edge (left edge of leftmost
+        // column or right edge of rightmost column), there is no neighbour to
+        // transfer width to — this is a no-op (no resize handle should appear
+        // for these edges anyway).
+        if (leftCol < 0 || rightCol >= m_columns.size()) {
             return;
         }
 
@@ -631,8 +673,8 @@ void ColumnsLayoutEngine::interactiveResizeEnded(Window *window, const RectF &be
             return;
         }
 
-        qreal newLeft = m_columnWidths[leftCol] + widthDelta;
-        qreal newRight = m_columnWidths[rightCol] - widthDelta;
+        qreal newLeft = m_columns[leftCol].width + widthDelta;
+        qreal newRight = m_columns[rightCol].width - widthDelta;
 
         constexpr qreal minColWidth = 0.08;
         constexpr qreal maxColWidth = 0.85;
@@ -641,8 +683,11 @@ void ColumnsLayoutEngine::interactiveResizeEnded(Window *window, const RectF &be
             return;
         }
 
-        m_columnWidths[leftCol] = newLeft;
-        m_columnWidths[rightCol] = newRight;
+        m_columns[leftCol].width = newLeft;
+        m_columns[rightCol].width = newRight;
+        // Normalise after adjustment to prevent floating-point drift from
+        // breaking the screen-edge gap detection in Tile::windowGeometry().
+        normalizeColumnWidths();
         reflow();
         return;
     }
