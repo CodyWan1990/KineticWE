@@ -7,6 +7,8 @@
 
 #include "columnslayoutengine.h"
 #include "customtile.h"
+#include "core/output.h"
+#include "tilemanager.h"
 #include "window.h"
 #include "workspace.h"
 
@@ -460,9 +462,94 @@ void ColumnsLayoutEngine::rebalanceColumnWidths()
     if (n == 0) {
         return;
     }
-    const qreal w = 1.0 / n;
+
+    // Without a root tile, fall back to equal widths.
+    if (!m_root) {
+        const qreal w = 1.0 / n;
+        for (int i = 0; i < n; ++i) {
+            m_columns[i].width = w;
+        }
+        return;
+    }
+
+    // Retrieve gap values from the tile tree and the output size so we can
+    // convert pixel-based gaps into relative (0–1) units.  The column widths
+    // are then computed so that every column's *usable content* (i.e. the
+    // portion left after subtracting its share of the gaps) is identical.
+    const qreal gapBetween = m_root->gapBetween();
+    const QMarginsF gapMargins = m_root->gapMargins();
+    const qreal outputWidth = m_root->manager()->output()->geometryF().width();
+
+    if (outputWidth <= 0) {
+        const qreal w = 1.0 / n;
+        for (int i = 0; i < n; ++i) {
+            m_columns[i].width = w;
+        }
+        return;
+    }
+
+    // Convert pixel gaps to relative fractions of the output width.
+    const qreal gl = gapMargins.left() / outputWidth;
+    const qreal gr = gapMargins.right() / outputWidth;
+    const qreal gb = gapBetween / outputWidth;
+
+    // Total relative width consumed by gaps between the leftmost and rightmost
+    // content edges: left margin + (n-1) between-gaps + right margin.
+    const qreal totalGapRel = gl + (n > 1 ? (n - 1) * gb : 0) + gr;
+
+    // Single column: full width; gaps are handled by the margin system.
+    if (n == 1) {
+        m_columns[0].width = 1.0;
+        return;
+    }
+
+    // If the configured gaps leave no room for window content, fall back to
+    // equal widths and let the user adjust.
+    if (totalGapRel >= 1.0) {
+        const qreal w = 1.0 / n;
+        for (int i = 0; i < n; ++i) {
+            m_columns[i].width = w;
+        }
+        return;
+    }
+
+    // Available relative width for content, split evenly among all columns.
+    const qreal contentPerCol = (1.0 - totalGapRel) / n;
+    constexpr qreal minColWidth = 0.05;
+    constexpr qreal maxColWidth = 0.95;
+
+    // --- Gap-aware column widths ---
+    //
+    // Each column's relative tile width = its content share + the gaps it
+    // borders.  The centre column (or columns) pays the between-gap on both
+    // sides, so it gets an extra gb relative to the side columns.
+    //
+    //   col 0   :  contentPerCol + gapLeft      + gapBetween/2
+    //   col 1..n-2: contentPerCol + gapBetween
+    //   col n-1  : contentPerCol + gapBetween/2 + gapRight
+
+    m_columns[0].width = std::clamp(contentPerCol + gl + gb / 2.0, minColWidth, maxColWidth);
+
+    for (int i = 1; i < n - 1; ++i) {
+        m_columns[i].width = std::clamp(contentPerCol + gb, minColWidth, maxColWidth);
+    }
+
+    m_columns[n - 1].width = std::clamp(contentPerCol + gb / 2.0 + gr, minColWidth, maxColWidth);
+
+    // Normalise so the total is *exactly* 1.0, preventing floating-point drift
+    // from breaking screen-edge detection in Tile::windowGeometry().
+    qreal total = 0;
     for (int i = 0; i < n; ++i) {
-        m_columns[i].width = w;
+        total += m_columns[i].width;
+    }
+    if (!qFuzzyIsNull(total)) {
+        qreal sum = 0;
+        for (int i = 0; i < n - 1; ++i) {
+            const qreal clamped = std::clamp(m_columns[i].width / total, qreal(0.05), qreal(0.95));
+            m_columns[i].width = clamped;
+            sum += clamped;
+        }
+        m_columns[n - 1].width = qreal(1.0) - sum;
     }
 }
 
