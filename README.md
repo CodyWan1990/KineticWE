@@ -85,15 +85,6 @@ cd kineticwe
 systemctl reboot
 ```
 
-Bazzite users can also use the `ujust` recipe from `bazzite/kineticwe-ublue.just`
-(import it into your custom justfile or run directly):
-
-```bash
-just --justfile bazzite/kineticwe-ublue.just install-kineticwe
-```
-
-For building a custom bootc derivative image, see [`bazzite/Containerfile`](bazzite/Containerfile).
-
 ### Install via Scripts (Alternative / Other Distros)
 
 Convenience scripts are provided that install all dependencies, build kglobalacceld
