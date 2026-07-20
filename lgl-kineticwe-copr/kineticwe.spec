@@ -3,7 +3,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -245,6 +245,15 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Mon Jul 20 2026 LGL <lgl@localhost> - 6.7.80-9
+- Fix New Columns layout window spawning and resizing issues
+- Add gap-aware column width rebalancing to ColumnsLayoutEngine
+- Sync start-kineticwe session launcher with upstream power management fix:
+  look up upowerd/org_kde_powerdevil across Fedora/Arch/Debian libexec
+  paths instead of a hardcoded Fedora-only path, export a WAYLAND_DISPLAY
+  fallback so powerdevil doesn't abort at startup, and log their output to
+  files instead of discarding it
+
 * Wed Jul 15 2026 LGL <lgl@localhost> - 6.7.80-8
 - Rebuild from latest master: adds the Columns tiling layout, the AutoGrid
   layout engine, and KCM shortcuts for swapping the focused window
