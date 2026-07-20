@@ -94,7 +94,7 @@ files so you can launch KineticWE from a TTY.
 
 
 > **For Fedora users:** Pre-built packages are available via COPR — see [Fedora / RHEL](#copr-fedora--recommended---use-fedora-linux-for-the-best-and-tested-experience) above.
-> **For Arch users:** The kineticwe package is available on the [AUR](https://aur.archlinux.org/packages/kineticwe) (`yay -S kineticwe`).
+> **For Arch users:** The preferred way to install on Arch-based distros is the [AUR](https://aur.archlinux.org/packages/kineticwe) package (`yay -S kineticwe`) — see [Arch Linux](#arch-linux) below.
 
 > **Why kglobalacceld is built from source:** kwin-we calls `keyEvent()`, `pointerPressed()`, `axisTriggered()` and `resetModifierOnlyState()` directly on the `KGlobalAccelD` object — an API introduced in kglobalacceld git master (post-6.7.0). The system package on most distros is still 6.7.0 or older and routes those calls through a separate `KGlobalAccelInterface` class, so kwin-we cannot compile against it. The install scripts clone kglobalacceld from `invent.kde.org/plasma/kglobalacceld.git` and build it into `$INSTALL_PREFIX` so kwin-we's CMake finds the newer version first. This requires **Qt ≥ 6.10** and **KF6 ≥ 6.26** (satisfied on Fedora 44+, Arch rolling, and Debian Trixie/Ubuntu 24.04+ with backports).
 
@@ -120,7 +120,7 @@ Pick the script that matches your distribution:
 | Fedora / RHEL | COPR (recommended) — see below |
 | Fedora / RHEL | `./install-fedora.sh` (manual build) |
 | **Bazzite / uBlue (rpm-ostree)** | `./install-bazzite.sh` — see below |
-| Arch Linux / Arch-derivatives | [AUR](https://aur.archlinux.org/packages/kineticwe) — `yay -S kineticwe` |
+| Arch Linux / Arch-derivatives | [AUR](https://aur.archlinux.org/packages/kineticwe) (preferred) — `yay -S kineticwe` |
 | Arch Linux / Arch-derivatives | `./install-arch.sh` (manual build) |
 | Debian / Ubuntu | `./install-debian.sh` |
 | NixOS / Nix (flake) | — see below |
@@ -164,13 +164,13 @@ sudo dnf install kineticwe noctalia-git
 
 ### Arch Linux
 
-The recommended way to install on Arch is via the [AUR](https://aur.archlinux.org/packages/kineticwe):
+The preferred way to install KineticWE on Arch-based distros (Arch, CachyOS, EndeavourOS, Manjaro, etc.) is via the [AUR](https://aur.archlinux.org/packages/kineticwe):
 
 ```bash
 yay -S kineticwe
 ```
 
-Or build manually:
+Alternatively, build manually with the install script:
 
 ```bash
 ./install-arch.sh
@@ -262,6 +262,27 @@ sudo emerge --ask kde-plasma/kineticwe
 >
 > Once KineticWE has stable tagged releases, the overlay will provide versioned ebuilds alongside the live `9999` ebuild.
 
+---
+
+## Troubleshooting
+
+### Power management not working (brightness, idle/DPMS, suspend, power profiles)
+
+The `start-kineticwe` session launcher starts `upowerd` and `org_kde_powerdevil` automatically. It resolves distro-specific paths (`/usr/libexec` on Fedora/RHEL, `/usr/lib` on Arch) and guarantees `WAYLAND_DISPLAY` is set — PowerDevil aborts at startup if that variable is missing.
+
+Verify PowerDevil is running and registered on D-Bus:
+
+```bash
+pgrep -f org_kde_powerdevil
+busctl --user list | grep org.kde.Solid.PowerManagement
+cat ~/.local/share/powerdevil.log
+```
+
+> **Note:** If you previously created a manual `powerdevil-user.service` systemd unit as a workaround, disable it to avoid launching PowerDevil twice:
+>
+> ```bash
+> systemctl --user disable --now powerdevil-user.service
+> ```
 
 ---
 

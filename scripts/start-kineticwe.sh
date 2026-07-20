@@ -60,7 +60,7 @@ export KDE_SESSION_VERSION=6
 export XDG_MENU_PREFIX=plasma-
 
 # ---------------------------------------------------------------------------
-# 3. Helper: locate xdg-desktop-portal executables
+# 3. Helpers: locate portal and system executables (paths differ by distro)
 # ---------------------------------------------------------------------------
 find_portal() {
     local name="$1"
@@ -77,8 +77,31 @@ find_portal() {
     command -v "$name" 2>/dev/null || true
 }
 
+# Fedora/RHEL ship helper daemons under /usr/libexec, Arch under /usr/lib,
+# and Debian/Ubuntu under the multiarch libexec dir. Search all known
+# locations (Fedora first, so resolution there is unchanged).
+find_bin() {
+    local name="$1"
+    local path
+    for path in \
+        "/usr/libexec/$name" \
+        "/usr/lib/$name" \
+        "/usr/bin/$name" \
+        "$INSTALL_PREFIX/libexec/$name" \
+        /usr/lib/*/libexec/"$name"
+    do
+        if [[ -x "$path" ]]; then
+            printf '%s\n' "$path"
+            return 0
+        fi
+    done
+    command -v "$name" 2>/dev/null || true
+}
+
 PORTAL_KDE="$(find_portal xdg-desktop-portal-kde)"
 PORTAL="$(find_portal xdg-desktop-portal)"
+POWERDEVIL="$(find_bin org_kde_powerdevil)"
+UPOWERD="$(find_bin upowerd)"
 
 # ---------------------------------------------------------------------------
 # 4. Build the KWin startup payload (runs as KWin's child)
@@ -138,15 +161,23 @@ fi
 # ---------------------------------------------------------------------------
 # 3. Start power management
 # ---------------------------------------------------------------------------
+# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset (which
+# happens when it is spawned via D-Bus activation instead of this payload).
+# KWin exports WAYLAND_DISPLAY before launching this payload; the fallback
+# keeps PowerDevil alive if the payload is started any other way.
+export WAYLAND_DISPLAY="\${WAYLAND_DISPLAY:-wayland-0}"
+
 # upowerd provides battery and power device monitoring via D-Bus
-if [[ -x /usr/libexec/upowerd ]]; then
-    /usr/libexec/upowerd &>/dev/null &
+if [[ -n "$UPOWERD" ]]; then
+    nohup "$UPOWERD" >"\$HOME/.local/share/upowerd.log" 2>&1 &
 fi
 
 # org_kde_powerdevil provides idle timeouts, DPMS, suspend, brightness,
 # and power profile management
-if [[ -x /usr/libexec/org_kde_powerdevil ]]; then
-    /usr/libexec/org_kde_powerdevil &>/dev/null &
+if [[ -n "$POWERDEVIL" ]]; then
+    nohup "$POWERDEVIL" >"\$HOME/.local/share/powerdevil.log" 2>&1 &
+else
+    echo "Warning: org_kde_powerdevil not found; power management unavailable" >&2
 fi
 
 # ---------------------------------------------------------------------------

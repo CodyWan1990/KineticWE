@@ -102,6 +102,9 @@ sleep 2
 nohup @xdg_desktop_portal@ >"$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
 
 # Power management (best-effort; paths are Nix store binaries).
+# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset; KWin
+# exports it for payload children, and this is a fallback guard.
+export WAYLAND_DISPLAY="${dl}{WAYLAND_DISPLAY:-wayland-0}"
 nohup @upowerd@ >/dev/null 2>&1 &
 nohup @powerdevil@ >/dev/null 2>&1 &
 
