@@ -124,9 +124,17 @@ nohup @xdg_desktop_portal@ >"$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
 nohup @upowerd@ >/dev/null 2>&1 &
 nohup @powerdevil@ >/dev/null 2>&1 &
 
-# Shell must stay in the foreground: --exit-with-session ends the compositor
-# when this payload exits. Do not background noctalia or sleep-and-exit.
-exec @noctalia@
+# Run noctalia under a supervisor loop: if it crashes or is killed it is
+# restarted automatically instead of taking the whole session down. The
+# session ends only when the login session itself is terminated (logout),
+# which tears down this payload and KWin together. Keep the loop in the
+# foreground: --exit-with-session ends the compositor when this payload
+# exits.
+while true; do
+    @noctalia@
+    echo "noctalia exited (code ${dl}?), restarting in 2s..."
+    sleep 2
+done
 PAYLOADEOF
 
 chmod +x "${dl}STARTUP_PAYLOAD"

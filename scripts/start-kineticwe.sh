@@ -194,9 +194,18 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Start user applications
+# 4. Start the shell (supervised)
 # ---------------------------------------------------------------------------
-noctalia
+# Run noctalia under a supervisor loop: if it crashes or is killed (e.g.
+# pkill noctalia to recover a broken shell), it restarts automatically
+# instead of taking the whole session down. The session ends only when the
+# login session itself is terminated (logout -> loginctl terminate-session,
+# or the display manager), which tears down this payload and KWin together.
+while true; do
+    noctalia
+    echo "noctalia exited (code \$?), restarting in 2s..."
+    sleep 2
+done
 EOF
 
 chmod +x "$STARTUP_PAYLOAD"
