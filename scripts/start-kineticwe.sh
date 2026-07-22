@@ -54,13 +54,18 @@ export XDG_SESSION_DESKTOP=KDE
 # Plasma 6 session, so it calls kde-open instead of the long-removed kfmclient.
 # Without this, URL and folder clicks in Electron apps silently do nothing.
 export KDE_SESSION_VERSION=6
+# Marks this as a full KDE session (startplasma sets this too). KDE apps use
+# it to pick their desktop file identity — e.g. System Settings uses
+# systemsettings.desktop instead of kdesystemsettings.desktop, which is what
+# docks/launchers need to resolve its icon correctly.
+export KDE_FULL_SESSION=true
 # Without this, kbuildsycoca6 fails and KDE tools can't find the application
 # menu database, breaking kglobalacceld shortcut registration and the
 # Application Picker (blank on Arch, Nix, etc.).
 export XDG_MENU_PREFIX=plasma-
 
 # ---------------------------------------------------------------------------
-# 3. Helper: locate xdg-desktop-portal executables
+# 3. Helpers: locate portal and system executables (paths differ by distro)
 # ---------------------------------------------------------------------------
 find_portal() {
     local name="$1"
@@ -77,8 +82,31 @@ find_portal() {
     command -v "$name" 2>/dev/null || true
 }
 
+# Fedora/RHEL ship helper daemons under /usr/libexec, Arch under /usr/lib,
+# and Debian/Ubuntu under the multiarch libexec dir. Search all known
+# locations (Fedora first, so resolution there is unchanged).
+find_bin() {
+    local name="$1"
+    local path
+    for path in \
+        "/usr/libexec/$name" \
+        "/usr/lib/$name" \
+        "/usr/bin/$name" \
+        "$INSTALL_PREFIX/libexec/$name" \
+        /usr/lib/*/libexec/"$name"
+    do
+        if [[ -x "$path" ]]; then
+            printf '%s\n' "$path"
+            return 0
+        fi
+    done
+    command -v "$name" 2>/dev/null || true
+}
+
 PORTAL_KDE="$(find_portal xdg-desktop-portal-kde)"
 PORTAL="$(find_portal xdg-desktop-portal)"
+POWERDEVIL="$(find_bin org_kde_powerdevil)"
+UPOWERD="$(find_bin upowerd)"
 
 # ---------------------------------------------------------------------------
 # 4. Build the KWin startup payload (runs as KWin's child)
@@ -101,7 +129,18 @@ export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
+export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
+
+# KWin exports WAYLAND_DISPLAY and DISPLAY (XWayland) before launching this
+# payload; the fallback guards against the payload being started other ways.
+export WAYLAND_DISPLAY="\${WAYLAND_DISPLAY:-wayland-0}"
+
+# Publish the session environment to D-Bus/systemd-activated services.
+# Without this, on-demand services (e.g. Spectacle via its global shortcut)
+# start without WAYLAND_DISPLAY/DISPLAY and crash at launch:
+# "could not activate remote peer org.kde.spectacle: startup job failed".
+dbus-update-activation-environment --systemd --all 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 1. Rebuild KDE service cache so System Settings finds installed KCMs
@@ -138,21 +177,35 @@ fi
 # ---------------------------------------------------------------------------
 # 3. Start power management
 # ---------------------------------------------------------------------------
+# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset; it is
+# exported at the top of this payload.
+
 # upowerd provides battery and power device monitoring via D-Bus
-if [[ -x /usr/libexec/upowerd ]]; then
-    /usr/libexec/upowerd &>/dev/null &
+if [[ -n "$UPOWERD" ]]; then
+    nohup "$UPOWERD" >"\$HOME/.local/share/upowerd.log" 2>&1 &
 fi
 
 # org_kde_powerdevil provides idle timeouts, DPMS, suspend, brightness,
 # and power profile management
-if [[ -x /usr/libexec/org_kde_powerdevil ]]; then
-    /usr/libexec/org_kde_powerdevil &>/dev/null &
+if [[ -n "$POWERDEVIL" ]]; then
+    nohup "$POWERDEVIL" >"\$HOME/.local/share/powerdevil.log" 2>&1 &
+else
+    echo "Warning: org_kde_powerdevil not found; power management unavailable" >&2
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Start user applications
+# 4. Start the shell (supervised)
 # ---------------------------------------------------------------------------
-noctalia
+# Run noctalia under a supervisor loop: if it crashes or is killed (e.g.
+# pkill noctalia to recover a broken shell), it restarts automatically
+# instead of taking the whole session down. The session ends only when the
+# login session itself is terminated (logout -> loginctl terminate-session,
+# or the display manager), which tears down this payload and KWin together.
+while true; do
+    noctalia
+    echo "noctalia exited (code \$?), restarting in 2s..."
+    sleep 2
+done
 EOF
 
 chmod +x "$STARTUP_PAYLOAD"

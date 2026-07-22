@@ -2,8 +2,8 @@
 # Contributor: KineticWE project
 
 pkgname=kineticwe
-pkgver=6.7.80
-pkgrel=3
+pkgver=6.7.81
+pkgrel=2
 pkgdesc="KineticWE - A tiling KWin Wayland compositor with native window tiling"
 arch=('x86_64')
 url="https://gitlab.com/theblackdon/kineticwe"
@@ -27,7 +27,18 @@ depends=(
     'aurorae'
     'breeze'
     'kscreen'
+    'systemsettings'
+    'plasma-desktop'
+    'xdg-desktop-portal'
     'xdg-desktop-portal-kde'
+    'libqaccessibilityclient-qt6'
+    'pipewire'
+    'libevdev'
+    'libcanberra'
+    'procps-ng'
+    'psmisc'
+    'upower'
+    'powerdevil'
 )
 
 makedepends=(
@@ -120,7 +131,13 @@ makedepends=(
     'jemalloc'
 )
 
-optdepends=()
+optdepends=(
+    'bluedevil: Bluetooth device integration'
+    'plasma-nm: Network management applet'
+    'plasma-pa: Audio volume management'
+    'kinfocenter: System information center'
+    'kde-gtk-config: GTK application styling'
+)
 # COPR-compatible package replacement metadata
 # Mimics the COPR spec's Provides + Obsoletes for kwin, kwin-common, kwin-libs,
 # kwin-wayland, kglobalacceld, and kglobalacceld-devel.
@@ -230,15 +247,169 @@ package() {
             -t "$pkgdir/usr/share/licenses/$pkgname-kglobalacceld/" 2>/dev/null || true
     fi
 
-    # Install Wayland session launcher (start-kineticwe)
+    # Install Wayland session launcher (start-kineticwe) - written directly to avoid sed issues
     echo "==> Installing start-kineticwe session launcher..."
-    sed -e "s|@INSTALL_PREFIX@|/usr|g" \
-        -e 's|if \[\[ "$_INSTALL_PREFIX_" == "/usr" \]\]; then|if false; then # system-wide install, use /usr as prefix|' \
-        -e 's|export XDG_CURRENT_DESKTOP=KDE|export XDG_CURRENT_DESKTOP=KineticWE:KDE|g' \
-        -e 's|nohup "$PORTAL_KDE" >"\\\$HOME|XDG_CURRENT_DESKTOP=KDE nohup "$PORTAL_KDE" >"\\\$HOME|' \
-        "$srcdir/$_sourcebase/scripts/start-kineticwe.sh" \
-        > "$pkgdir/usr/bin/start-kineticwe"
+    cat > "$pkgdir/usr/bin/start-kineticwe" << 'STARTEOF'
+#!/bin/bash
+# KineticWE session launcher (system-wide install)
+
+_INSTALL_PREFIX_=/usr
+
+export XDG_MENU_PREFIX=plasma-
+
+find_portal() {
+    local name="$1"
+    for path in "/usr/libexec/$name" "/usr/lib/$name" "$_INSTALL_PREFIX_/libexec/$name"
+    do
+        if [[ -x "$path" ]]; then
+            printf '%s\n' "$path"
+            return 0
+        fi
+    done
+    command -v "$name" 2>/dev/null || true
+}
+
+find_bin() {
+    local name="$1"
+    for path in "/usr/libexec/$name" "/usr/lib/$name" "/usr/bin/$name"
+    do
+        if [[ -x "$path" ]]; then
+            printf '%s\n' "$path"
+            return 0
+        fi
+    done
+    command -v "$name" 2>/dev/null || true
+}
+
+PORTAL_KDE="$(find_portal xdg-desktop-portal-kde)"
+PORTAL="$(find_portal xdg-desktop-portal)"
+POWERDEVIL="$(find_bin org_kde_powerdevil)"
+UPOWERD="$(find_bin upowerd)"
+
+# The payload below is written with a quoted heredoc ('PAYLOADEOF'), so these
+# variables are expanded when the payload runs, not when it is written. They
+# must be exported, otherwise the payload sees them as empty and the portals
+# and power management daemons are never launched.
+export PORTAL_KDE PORTAL POWERDEVIL UPOWERD
+
+STARTUP_PAYLOAD_DIR="${XDG_RUNTIME_DIR:-/tmp}/kineticwe-$USER"
+mkdir -p "$STARTUP_PAYLOAD_DIR"
+STARTUP_PAYLOAD="$STARTUP_PAYLOAD_DIR/startup.sh"
+
+cat > "$STARTUP_PAYLOAD" << 'PAYLOADEOF'
+#!/bin/bash
+# KineticWE startup payload — run by KWin as a detached child process.
+
+export PATH=/usr/bin:/usr/lib
+export XDG_CURRENT_DESKTOP=KDE
+export XDG_SESSION_TYPE=wayland
+export XDG_SESSION_DESKTOP=KDE
+export KDE_SESSION_VERSION=6
+export XDG_MENU_PREFIX=plasma-
+
+# 1. Rebuild KDE service cache so System Settings finds installed KCMs
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+fi
+
+# 2. Start XDG Desktop Portals
+killall -q xdg-desktop-portal-kde xdg-desktop-portal xdg-desktop-portal-gtk xdg-document-portal 2>/dev/null || true
+sleep 1
+
+mkdir -p "$HOME/.local/share"
+
+if [[ -x "$PORTAL_KDE" ]]; then
+    XDG_CURRENT_DESKTOP=KDE nohup "$PORTAL_KDE" >"$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
+else
+    echo "Warning: xdg-desktop-portal-kde not found" >&2
+fi
+
+sleep 2
+
+if [[ -x "$PORTAL" ]]; then
+    nohup "$PORTAL" >"$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
+else
+    echo "Warning: xdg-desktop-portal not found" >&2
+fi
+
+# 2.5. Start kded6 for shortcut component discovery
+if command -v kded6 >/dev/null 2>&1; then
+    kded6 &>/dev/null &
+    sleep 2
+fi
+
+# 3. Start power management
+# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset (which
+# happens when it is spawned via D-Bus activation instead of this payload).
+# KWin exports WAYLAND_DISPLAY before launching this payload; the fallback
+# keeps PowerDevil alive if the payload is started any other way.
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+
+# upowerd provides battery and power device monitoring via D-Bus
+if [[ -n "$UPOWERD" ]]; then
+    nohup "$UPOWERD" >"$HOME/.local/share/upowerd.log" 2>&1 &
+    # Give upowerd time to register on D-Bus before starting powerdevil
+    sleep 2
+fi
+
+# org_kde_powerdevil provides idle timeouts, DPMS, suspend, brightness, and power profile management
+if [[ -n "$POWERDEVIL" ]]; then
+    nohup "$POWERDEVIL" >"$HOME/.local/share/powerdevil.log" 2>&1 &
+else
+    echo "Warning: org_kde_powerdevil not found; power management unavailable" >&2
+fi
+
+# 4. Start user applications
+nohup noctalia >"$HOME/.local/share/noctalia.log" 2>&1 &
+PAYLOADEOF
+
+chmod +x "$STARTUP_PAYLOAD"
+
+# ---------------------------------------------------------------------------
+# 5. Stop any competing global-shortcuts daemon and verify D-Bus name is free
+# ---------------------------------------------------------------------------
+# kwin-we embeds kglobalacceld and registers the org.kde.kglobalaccel D-Bus
+# service at startup (KGlobalAccelD::init).  If a Plasma session was
+# previously active, the standalone plasma-kglobalaccel.service (which runs
+# /usr/libexec/kglobalacceld) may still own that D-Bus name.  When that
+# happens kwin-we's init() fails to register the service, m_kglobalAccel is
+# reset, and ALL keyboard shortcuts stop working with the error
+# "error communicating with global shortcuts service".
+#
+# Stop any competing daemon so kwin-we can claim the name cleanly, then
+# verify the D-Bus name is actually free before proceeding.
+
+_kglobalaccel_cleared=false
+for _attempt in 1 2 3 4 5; do
+    # Try stopping via systemd and pkill
+    systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
+    pkill -x kglobalacceld 2>/dev/null || true
+    sleep 1
+
+    # Check if the D-Bus service name is free.
+    if command -v busctl >/dev/null 2>&1; then
+        if ! busctl get-proxy org.kde.kglobalaccel /kglobalaccel >/dev/null 2>&1; then
+            _kglobalaccel_cleared=true
+            break
+        fi
+        # Service still owns the name — try harder
+        pkill -9 -x kglobalacceld 2>/dev/null || true
+    else
+        # No busctl available, assume stop was enough
+        _kglobalaccel_cleared=true
+        break
+    fi
+done
+
+if [[ "$_kglobalaccel_cleared" != "true" ]]; then
+    echo "Warning: Could not clear kglobalacceld D-Bus name. Shortcuts may not work." >&2
+fi
+
+export XDG_CURRENT_DESKTOP=KineticWE:KDE
+exec kinetic-we --xwayland "$STARTUP_PAYLOAD"
+STARTEOF
     chmod 0755 "$pkgdir/usr/bin/start-kineticwe"
+
 
     # Install Wayland session desktop entry (for SDDM, greetd, etc.)
     echo "==> Installing wayland-sessions desktop entry..."
@@ -262,7 +433,41 @@ ConditionPathExists=/nonexistent
 ExecStart=
 MASKEOF
     chmod 0644 "$pkgdir/etc/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf"
+
+    # Install D-Bus service activation file for org.kde.kglobalaccel
+    # The original kglobalacceld package provides this file, but since kineticwe
+    # replaces/conflicts with kglobalacceld, the file is missing. Without it,
+    # D-Bus activation fails and shortcuts KCM shows
+    # "Error while communicating with the global shortcuts service".
+    echo "==> Installing D-Bus activation for org.kde.kglobalaccel..."
+    mkdir -p "$pkgdir/usr/share/dbus-1/services"
+    cat > "$pkgdir/usr/share/dbus-1/services/org.kde.kglobalaccel.service" << DBUSEOF
+[D-BUS Service]
+Name=org.kde.kglobalaccel
+Exec=/usr/libexec/kineticwe-kglobalacceld-bridge
+DBUSEOF
+    chmod 0644 "$pkgdir/usr/share/dbus-1/services/org.kde.kglobalaccel.service"
+
+    # Install the bridge script for D-Bus activation
+    echo "==> Installing kineticwe-kglobalacceld-bridge..."
+    mkdir -p "$pkgdir/usr/libexec"
+    cat > "$pkgdir/usr/libexec/kineticwe-kglobalacceld-bridge" << 'BRIDGEEOF'
+#!/bin/bash
+# KineticWE kglobalacceld bridge for D-Bus activation.
+# The real kglobalacceld is embedded in-process in kinetic-we.
+# This script handles D-Bus activation requests gracefully.
+for i in 1 2 3 4 5; do
+    if busctl get-property org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel 2>/dev/null >/dev/null; then
+        exit 0
+    fi
+    sleep 1
+done
+echo "kineticwe-kglobalacceld-bridge: kinetic-we not running or kglobalaccel service not registered." >&2
+exit 1
+BRIDGEEOF
+    chmod 0755 "$pkgdir/usr/libexec/kineticwe-kglobalacceld-bridge"
 }
+
 # ---------------------------------------------------------------------------
 # Post-install hooks (like COPR %%post / %%postun)
 # Reload user daemon so the kglobalacceld mask takes effect immediately.
@@ -270,6 +475,8 @@ MASKEOF
 post_install() {
     # Reload user daemon so the kglobalacceld mask takes effect
     systemctl --user daemon-reload 2>/dev/null || true
+    # Explicitly mask the standalone kglobalacceld service to prevent D-Bus activation
+    systemctl --user mask plasma-kglobalaccel.service 2>/dev/null || true
 }
 
 post_upgrade() {
@@ -277,6 +484,7 @@ post_upgrade() {
 }
 
 post_remove() {
-    # Clean up: reload daemon after removing the mask
+    # Clean up: unmask and reload daemon after removing the mask
+    systemctl --user unmask plasma-kglobalaccel.service 2>/dev/null || true
     systemctl --user daemon-reload 2>/dev/null || true
 }

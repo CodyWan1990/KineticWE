@@ -403,6 +403,7 @@ KCM.SimpleKCM {
                                         if (seen[i] === "MasterStack"
                                             || seen[i] === "Stacked"
                                             || seen[i] === "CenterTile"
+                                            || seen[i] === "Columns"
                                             || seen[i] === "Monocle"
                                             || seen[i] === "AutoGrid") {
                                             opts.push({ text: seen[i], value: seen[i] });
@@ -607,6 +608,7 @@ KCM.SimpleKCM {
                                         if (seen[i] === "MasterStack"
                                             || seen[i] === "Stacked"
                                             || seen[i] === "CenterTile"
+                                            || seen[i] === "Columns"
                                             || seen[i] === "Monocle"
                                             || seen[i] === "AutoGrid") {
                                             opts.push({ text: seen[i], value: seen[i] });
