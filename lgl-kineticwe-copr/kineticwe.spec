@@ -3,7 +3,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        9%{?dist}
+Release:        10%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -245,6 +245,18 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Wed Jul 22 2026 LGL <lgl@localhost> - 6.7.80-10
+- Supervise noctalia in the session launcher: the shell is restarted after
+  a crash or manual kill instead of tearing down the whole session, which
+  now ends only when the login session itself is terminated
+- Fix D-Bus/systemd-activated apps (e.g. Spectacle's shortcut) crashing on
+  startup by exporting WAYLAND_DISPLAY and running
+  dbus-update-activation-environment --systemd --all in the payload
+- Export KDE_FULL_SESSION=true so System Settings resolves its dock icon
+  instead of falling back to a generic one
+- Add the "Columns" layout to the per-monitor/per-desktop override
+  dropdowns, where it was missing since the layout was introduced
+
 * Mon Jul 20 2026 LGL <lgl@localhost> - 6.7.80-9
 - Fix New Columns layout window spawning and resizing issues
 - Add gap-aware column width rebalancing to ColumnsLayoutEngine
