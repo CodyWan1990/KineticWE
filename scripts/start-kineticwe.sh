@@ -132,6 +132,16 @@ export KDE_SESSION_VERSION=6
 export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
 
+# KWin exports WAYLAND_DISPLAY and DISPLAY (XWayland) before launching this
+# payload; the fallback guards against the payload being started other ways.
+export WAYLAND_DISPLAY="\${WAYLAND_DISPLAY:-wayland-0}"
+
+# Publish the session environment to D-Bus/systemd-activated services.
+# Without this, on-demand services (e.g. Spectacle via its global shortcut)
+# start without WAYLAND_DISPLAY/DISPLAY and crash at launch:
+# "could not activate remote peer org.kde.spectacle: startup job failed".
+dbus-update-activation-environment --systemd --all 2>/dev/null || true
+
 # ---------------------------------------------------------------------------
 # 1. Rebuild KDE service cache so System Settings finds installed KCMs
 # ---------------------------------------------------------------------------
@@ -167,11 +177,8 @@ fi
 # ---------------------------------------------------------------------------
 # 3. Start power management
 # ---------------------------------------------------------------------------
-# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset (which
-# happens when it is spawned via D-Bus activation instead of this payload).
-# KWin exports WAYLAND_DISPLAY before launching this payload; the fallback
-# keeps PowerDevil alive if the payload is started any other way.
-export WAYLAND_DISPLAY="\${WAYLAND_DISPLAY:-wayland-0}"
+# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset; it is
+# exported at the top of this payload.
 
 # upowerd provides battery and power device monitoring via D-Bus
 if [[ -n "$UPOWERD" ]]; then

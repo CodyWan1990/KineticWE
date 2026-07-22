@@ -91,6 +91,17 @@ export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
 export XDG_DATA_DIRS="@kwin_share@:${dl}{XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
+# KWin exports WAYLAND_DISPLAY and DISPLAY (XWayland) before launching this
+# payload; the fallback guards against the payload being started other ways.
+export WAYLAND_DISPLAY="${dl}{WAYLAND_DISPLAY:-wayland-0}"
+
+# Publish the session environment to D-Bus/systemd-activated services
+# (e.g. Spectacle via its global shortcut). Without this, activated services
+# get no WAYLAND_DISPLAY/DISPLAY and crash: "startup job failed".
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd --all 2>/dev/null || true
+fi
+
 # Rebuild KDE service cache so shortcuts / System Settings find components.
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 --noincremental 2>/dev/null || true
@@ -108,9 +119,8 @@ sleep 2
 nohup @xdg_desktop_portal@ >"$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
 
 # Power management (best-effort; paths are Nix store binaries).
-# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset; KWin
-# exports it for payload children, and this is a fallback guard.
-export WAYLAND_DISPLAY="${dl}{WAYLAND_DISPLAY:-wayland-0}"
+# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset; it is
+# exported at the top of this payload.
 nohup @upowerd@ >/dev/null 2>&1 &
 nohup @powerdevil@ >/dev/null 2>&1 &
 
