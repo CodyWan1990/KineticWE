@@ -14,9 +14,16 @@ set -euo pipefail
 #   ./build-rpm-dev.sh --ostree                 # Build RPM + layer via rpm-ostree (needs reboot)
 #   ./build-rpm-dev.sh --ostree --reboot        # Build + ostree + reboot
 #   ./build-rpm-dev.sh --reset                  # Revert rpm-ostree override
-#   ./build-rpm-dev.sh --reset-local            # Remove dev files from TEST_PREFIX
+#   ./build-rpm-dev.sh --reset-local            # Remove dev files from TEST_PREFIX + login entry
+#   ./build-rpm-dev.sh --quick --no-session     # Skip installing the login-screen session entry
 #
 # All build modes install into TEST_PREFIX so you can test with a single command.
+#
+# All build modes also install a "KineticWE-Dev" session entry for the login
+# screen (SDDM / plasma-login-manager) into /usr/local/share/wayland-sessions,
+# which is writable on rpm-ostree systems and searched by display managers,
+# while leaving the COPR stable install in /usr untouched. The entry just
+# points at $TEST_PREFIX/bin/start-kineticwe, so TTY testing is unchanged.
 #
 # Environment variables:
 #   TEST_PREFIX     - Where to install for TTY testing (default: $HOME/.local)
@@ -29,6 +36,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_DIR="${SCRIPT_DIR}/lgl-kineticwe-copr"
 RESULTS_DIR="${SPEC_DIR}/results"
 DISTROBOX_IMAGE="fedora:44"
+
+# Login-screen session entry for the dev build. /usr/local/share is in the
+# default session search path of SDDM / plasma-login-manager and is writable
+# on rpm-ostree systems (symlink to /var/usrlocal), so the entry survives
+# deployments without touching the COPR-managed /usr.
+SESSION_DIR="/usr/local/share/wayland-sessions"
+SESSION_DESKTOP="kineticwe-dev.desktop"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -320,6 +334,74 @@ install_startup_script() {
 }
 
 # ---------------------------------------------------------------------------
+# Install the "KineticWE-Dev" login-screen session entry
+# ---------------------------------------------------------------------------
+# Display managers (SDDM / plasma-login-manager) only scan system session
+# dirs — never ~/.local/share/wayland-sessions — so the entry must live in
+# SESSION_DIR (see above). The entry's Exec points at the same launcher used
+# for TTY testing, so both login paths run identical code.
+#
+# One-time sudo: skipped on later runs while the installed file is identical.
+install_dev_session_entry() {
+    step "Installing 'KineticWE-Dev' login-screen session entry..."
+
+    local template="$SCRIPT_DIR/scripts/kineticwe-dev.desktop.in"
+    if [[ ! -f "$template" ]]; then
+        error "Missing template: $template"
+        exit 1
+    fi
+
+    local tmp_file
+    # .desktop suffix: desktop-file-validate rejects files without it.
+    tmp_file=$(mktemp --suffix=.desktop /tmp/kineticwe-dev.XXXXXX)
+    sed -e "s|@INSTALL_PREFIX@|$TEST_PREFIX|g" \
+        "$template" \
+        > "$tmp_file"
+
+    # Sanity-check the generated file. DesktopNames is a valid key for
+    # session files (desktop entry spec 1.5) but desktop-file-validate still
+    # flags it — even Fedora's shipped plasma.desktop "fails" on it — so
+    # ignore that specific false positive and only warn about real issues.
+    if command -v desktop-file-validate &>/dev/null; then
+        local validate_out
+        validate_out=$(desktop-file-validate "$tmp_file" 2>&1 | grep -v 'DesktopNames' || true)
+        if [[ -n "$validate_out" ]]; then
+            warn "desktop-file-validate reported issues (continuing anyway):"
+            warn "$validate_out"
+        fi
+    fi
+
+    local target="$SESSION_DIR/$SESSION_DESKTOP"
+
+    # Skip sudo entirely when the installed entry is already up to date.
+    if [[ -f "$target" ]] && cmp -s "$tmp_file" "$target"; then
+        info "  $target (already up to date)"
+        rm -f "$tmp_file"
+    elif sudo mkdir -p "$SESSION_DIR" \
+        && sudo install -m 0644 "$tmp_file" "$target"; then
+        rm -f "$tmp_file"
+        info "  $target"
+        info "  Select 'KineticWE-Dev' at the login screen (appears after logout)."
+    else
+        rm -f "$tmp_file"
+        warn "Could not install the session entry (sudo declined/failed)."
+        warn "The dev build still works from a TTY: start-kineticwe"
+        warn "To install the login entry manually:"
+        warn "  sudo install -m 0644 $template $target   # after sed substitution"
+    fi
+
+    # Remove the stale user-local session entry: it has the same Name= as the
+    # COPR stable entry but Exec points at the dev build, and no display
+    # manager ever scans ~/.local/share/wayland-sessions — pure clutter.
+    # RPM mode re-extracts it on every build, so this runs every time.
+    local stale="$TEST_PREFIX/share/wayland-sessions/kineticwe.desktop"
+    if [[ -f "$stale" ]]; then
+        rm -f "$stale"
+        info "  Removed stale user-local entry: $stale"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Install via rpm-ostree (override replace)
 # ---------------------------------------------------------------------------
 install_via_ostree() {
@@ -426,6 +508,18 @@ reset_local() {
         -exec sh -c 'readelf -n "$1" 2>/dev/null | grep -q "kineticwe\|kwin"' _ {} \; \
         -delete 2>/dev/null || true
 
+    # Remove the login-screen session entry (lives outside TEST_PREFIX).
+    local session_entry="$SESSION_DIR/$SESSION_DESKTOP"
+    if [[ -f "$session_entry" ]]; then
+        if sudo rm -f "$session_entry"; then
+            info "  Removed: $session_entry"
+            removed_any=true
+        else
+            warn "Could not remove $session_entry (sudo declined/failed)."
+            warn "Remove it manually: sudo rm -f $session_entry"
+        fi
+    fi
+
     if $removed_any; then
         echo
         info "Dev files removed from $TEST_PREFIX."
@@ -466,15 +560,27 @@ print_usage() {
 
     if [[ -x "$TEST_PREFIX/bin/kinetic-we" ]]; then
         echo "  ┌─────────────────────────────────────────────────────┐"
-        echo "  │  DEV BUILD  (local install)                        │"
-        echo "  │    start-kineticwe                                  │"
+        echo "  │  DEV BUILD  (local install)                         │"
+        echo "  │    TTY:          start-kineticwe                    │"
+        echo "  │    Login screen: KineticWE-Dev                      │"
         echo "  ├─────────────────────────────────────────────────────┤"
         echo "  │  STABLE  (COPR system install)                      │"
-        echo "  │    /usr/bin/start-kineticwe                         │"
+        echo "  │    TTY:          /usr/bin/start-kineticwe           │"
+        echo "  │    Login screen: KineticWE                          │"
         echo "  └─────────────────────────────────────────────────────┘"
     else
         echo "  No dev build found at $TEST_PREFIX"
         echo "  (run ./build-rpm-dev.sh --quick first)"
+    fi
+    echo
+
+    if [[ -f "$SESSION_DIR/$SESSION_DESKTOP" ]]; then
+        info "  Login-screen entry: $SESSION_DIR/$SESSION_DESKTOP"
+        info "  (log out and pick 'KineticWE-Dev'; the stable 'KineticWE'"
+        info "   entry still launches the untouched COPR install)"
+    else
+        info "  No login-screen entry installed (skipped or sudo declined)."
+        info "  Re-run without --no-session to add 'KineticWE-Dev' to the greeter."
     fi
     echo
 
@@ -527,6 +633,7 @@ main() {
     local do_reset=false
     local do_reset_local=false
     local do_quick=false
+    local do_session=true
 
     for arg in "$@"; do
         case "$arg" in
@@ -536,7 +643,8 @@ main() {
             --reset)   do_reset=true ;;
             --reset-local) do_reset_local=true ;;
             --quick)   do_quick=true ;;
-            --help|-h) echo "Usage: $0 [--install] [--ostree] [--reboot] [--quick] [--reset] [--reset-local]"; exit 0 ;;
+            --no-session) do_session=false ;;
+            --help|-h) echo "Usage: $0 [--install] [--ostree] [--reboot] [--quick] [--no-session] [--reset] [--reset-local]"; exit 0 ;;
             *)         warn "Unknown option: $arg";;
         esac
     done
@@ -570,6 +678,9 @@ main() {
         setup_distrobox
         quick_build
         install_startup_script
+        if $do_session; then
+            install_dev_session_entry
+        fi
         print_usage
         exit 0
     fi
@@ -587,6 +698,9 @@ main() {
         build_rpms
         extract_for_testing
         install_startup_script
+        if $do_session; then
+            install_dev_session_entry
+        fi
         print_usage
 
         if $do_ostree; then
@@ -622,6 +736,9 @@ main() {
     build_rpms
     extract_for_testing
     install_startup_script
+    if $do_session; then
+        install_dev_session_entry
+    fi
     print_usage
 
     if $do_ostree; then
