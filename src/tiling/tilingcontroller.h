@@ -93,6 +93,21 @@ public:
     void moveWindowPrevious();
 
     /**
+     * Column-consume action (Columns layout). The active tiled window leaves
+     * its column and joins the column to its right; if there is no column to
+     * the right it joins the column to its left. No-op otherwise.
+     */
+    void consume();
+    /**
+     * Column-expel action (Columns layout). The active tiled window leaves
+     * its column and gets its own new column, inserted to the right of its
+     * old column (or to the left if its old column is the rightmost).
+     * No-op if the window is already alone in its column or the layout is
+     * at its column cap.
+     */
+    void expel();
+
+    /**
      * Per-tile resize actions. Routes to the active window's layout engine
      * and asks it to grow (@p grow == true) or shrink the active leaf along
      * the given @p axis. The delta is m_resizeStep (configurable via kwinrc).
@@ -162,6 +177,14 @@ private:
     void focusInDirection(LayoutEngine::FocusDirection direction);
     void swapInDirection(LayoutEngine::FocusDirection direction);
     Window *windowUnderCursorInEngine(LayoutEngine *engine) const;
+    /**
+     * Which drop zone of @p target the cursor is currently over: the top
+     * quarter is InsertAbove, the bottom quarter is InsertBelow, and the
+     * middle half is Swap.
+     */
+    LayoutEngine::DropZone dropZoneForTarget(Window *target) const;
+    /** Push m_columnsMaxColumns to every live layout engine. */
+    void applyMaxColumnsToEngines();
     void addWindowToLayout(Window *window, LogicalOutput *output, VirtualDesktop *desktop);
     void removeWindowFromLayouts(Window *window);
     void migrateWindow(Window *window, LogicalOutput *newOutput, VirtualDesktop *newDesktop);
@@ -202,6 +225,10 @@ private:
     // the ratio via mouse resize or keyboard shortcut. Clamped to
     // [0.2, 0.95] in reconfigure() and when reading from config.
     qreal m_lastCenterTileRatio = 0.75;
+    // Maximum number of columns the Columns layout may grow to.
+    // Configurable via kwinrc ("ColumnsMaxColumns", clamped to [3, 5] in
+    // reconfigure()); pushed to every Columns engine via setMaxColumns().
+    int m_columnsMaxColumns = 3;
     QStringList m_enabledLayouts;
     BorderMode m_borderMode = BorderMode::None;
     qreal m_borderThickness = 2.0;

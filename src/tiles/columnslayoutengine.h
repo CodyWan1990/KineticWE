@@ -67,9 +67,15 @@ public:
     void moveWindow(Window *window, int delta) override;
     void beginMoveWindow(Window *window) override;
     bool endMoveWindow(Window *window, Window *target) override;
+    bool endMoveWindowOnZone(Window *window, Window *target, DropZone zone) override;
     void cancelMoveWindow(Window *window) override;
+    void consumeWindow(Window *window) override;
+    void expelWindow(Window *window) override;
     void reflow() override;
     void pruneEmptyLeaves() override;
+
+    void setMaxColumns(int maxColumns) override;
+    int maxColumns() const { return m_maxColumns; }
 
     QList<Window *> windows() const override;
     Window *primaryWindow() const override;
@@ -93,6 +99,8 @@ private:
     /** Total number of windows across all columns. */
     int totalLeafCount() const;
 
+    /** Returns (column, row) for @p window, or (-1, -1) if not found. */
+    QPair<int, int> columnAndRowOfWindow(Window *window) const;
     /** Remove the column at @p col, destroying all its leaves. */
     void removeColumn(int col);
     /** Redistribute total width equally among all current columns. */
@@ -118,7 +126,14 @@ private:
     int m_moveSourceColumn = -1;
     int m_moveSourceRow = -1;
 
-    static constexpr int m_maxColumns = 3;
+    // Maximum number of columns the layout will grow to. Configurable via
+    // kwinrc ("ColumnsMaxColumns", 3-5); the TilingController pushes the
+    // configured value down through setMaxColumns(). The cap only limits
+    // growth — lowering it below the current column count does not merge
+    // existing columns.
+    int m_maxColumns = 3;
+    static constexpr int m_minMaxColumns = 3;
+    static constexpr int m_maxMaxColumns = 5;
     static constexpr qreal m_minWeight = 0.1;
     static constexpr qreal m_maxWeight = 10.0;
     static constexpr qreal m_defaultWeight = 1.0;

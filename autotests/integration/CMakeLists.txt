@@ -149,6 +149,7 @@ integrationTest(NAME testTilingController SRCS tiling_controller_test.cpp OPTION
 integrationTest(NAME testTilingResize SRCS tiling_resize_test.cpp OPTIONAL_LIBS XCB::ICCCM)
 integrationTest(NAME testTilingCenterTile SRCS tiling_center_tile_test.cpp OPTIONAL_LIBS XCB::ICCCM)
 integrationTest(NAME testTilingAutoGrid SRCS tiling_autogrid_test.cpp OPTIONAL_LIBS XCB::ICCCM)
+integrationTest(NAME testTilingColumns SRCS tiling_columns_test.cpp OPTIONAL_LIBS XCB::ICCCM)
 integrationTest(NAME testFractionalScaling SRCS fractional_scaling_test.cpp)
 integrationTest(NAME testMoveResize SRCS move_resize_window_test.cpp)
 integrationTest(NAME testPlasmaWindow SRCS plasmawindow_test.cpp OPTIONAL_LIBS XCB::ICCCM PROPERTIES RUN_SERIAL TRUE)

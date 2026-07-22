@@ -1067,6 +1067,16 @@ void Workspace::initShortcuts()
             m_tilingController->swapRight();
         }
     }, true);
+    initShortcut("Tiling Consume Window", i18n("Tiling Consume Window Into Column"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->consume();
+        }
+    }, true);
+    initShortcut("Tiling Expel Window", i18n("Tiling Expel Window To Own Column"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->expel();
+        }
+    }, true);
     initShortcut("Tiling Toggle Floating", i18n("Tiling Toggle Floating"), Qt::META | Qt::Key_W, [this]() {
         if (m_tilingController) {
             m_tilingController->toggleFloating();
