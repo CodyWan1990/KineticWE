@@ -54,6 +54,11 @@ export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
+# Marks this as a full KDE session (startplasma sets this too). KDE apps use
+# it to pick their desktop file identity — e.g. System Settings uses
+# systemsettings.desktop instead of kdesystemsettings.desktop, which is what
+# docks/launchers need to resolve its icon correctly.
+export KDE_FULL_SESSION=true
 # Without this, kbuildsycoca6 fails on minimal installs (Arch, Nix, etc.).
 export XDG_MENU_PREFIX=plasma-
 
@@ -82,6 +87,7 @@ export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
+export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
 export XDG_DATA_DIRS="@kwin_share@:${dl}{XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 

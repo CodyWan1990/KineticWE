@@ -54,6 +54,11 @@ export XDG_SESSION_DESKTOP=KDE
 # Plasma 6 session, so it calls kde-open instead of the long-removed kfmclient.
 # Without this, URL and folder clicks in Electron apps silently do nothing.
 export KDE_SESSION_VERSION=6
+# Marks this as a full KDE session (startplasma sets this too). KDE apps use
+# it to pick their desktop file identity — e.g. System Settings uses
+# systemsettings.desktop instead of kdesystemsettings.desktop, which is what
+# docks/launchers need to resolve its icon correctly.
+export KDE_FULL_SESSION=true
 # Without this, kbuildsycoca6 fails and KDE tools can't find the application
 # menu database, breaking kglobalacceld shortcut registration and the
 # Application Picker (blank on Arch, Nix, etc.).
@@ -124,6 +129,7 @@ export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
 export KDE_SESSION_VERSION=6
+export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
 
 # ---------------------------------------------------------------------------
