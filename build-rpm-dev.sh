@@ -104,7 +104,9 @@ check_prereqs() {
 # ---------------------------------------------------------------------------
 setup_distrobox() {
     step "Setting up distrobox container '${DISTROBOX_NAME}'..."
-    if distrobox list 2>/dev/null | grep -q "^${DISTROBOX_NAME}[[:space:]]"; then
+    # distrobox list prints "ID | NAME | STATUS | IMAGE", so the name is
+    # never at line start — match it as a word anywhere in the line.
+    if distrobox list 2>/dev/null | grep -qw "$DISTROBOX_NAME"; then
         info "Container '${DISTROBOX_NAME}' already exists."
     else
         info "Creating distrobox from ${DISTROBOX_IMAGE}..."
