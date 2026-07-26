@@ -8,6 +8,7 @@
 */
 #include "x11_windowed_egl_backend.h"
 #include "core/gbmgraphicsbufferallocator.h"
+#include "core/renderdevice.h"
 #include "opengl/eglnativefence.h"
 #include "opengl/eglswapchain.h"
 #include "opengl/glrendertimequery.h"
@@ -44,7 +45,14 @@ std::optional<OutputLayerBeginFrameInfo> X11WindowedEglPrimaryLayer::doBeginFram
         if (!formatTable.contains(format)) {
             return std::nullopt;
         }
-        m_swapchain = EglSwapchain::create(m_backend->drmDevice()->allocator(), m_backend->openglContext(), bufferSize, format, formatTable[format], false);
+        GraphicsBufferOptions options{
+            .size = bufferSize,
+            .format = format,
+            .modifiers = formatTable[format],
+            .software = false,
+            .scanout = false,
+        };
+        m_swapchain = EglSwapchain::create(m_backend->renderDevice()->allocator(), m_backend->openglContext(), options);
         if (!m_swapchain) {
             return std::nullopt;
         }
@@ -69,16 +77,13 @@ std::optional<OutputLayerBeginFrameInfo> X11WindowedEglPrimaryLayer::doBeginFram
 bool X11WindowedEglPrimaryLayer::doEndFrame(const Region &renderedDeviceRegion, const Region &damagedDeviceRegion, OutputFrame *frame)
 {
     m_query->end();
-    frame->addRenderTimeQuery(std::move(m_query));
+    if (frame) {
+        frame->addRenderTimeQuery(std::move(m_query));
+    }
     EGLNativeFence releaseFence{m_backend->eglDisplayObject()};
     m_swapchain->release(m_buffer, releaseFence.fileDescriptor().duplicate());
     m_output->setPrimaryBuffer(m_buffer->buffer());
     return true;
-}
-
-DrmDevice *X11WindowedEglPrimaryLayer::scanoutDevice() const
-{
-    return m_backend->drmDevice();
 }
 
 FormatModifierMap X11WindowedEglPrimaryLayer::supportedDrmFormats() const
@@ -147,11 +152,6 @@ bool X11WindowedEglCursorLayer::doEndFrame(const Region &renderedDeviceRegion, c
     return true;
 }
 
-DrmDevice *X11WindowedEglCursorLayer::scanoutDevice() const
-{
-    return m_backend->drmDevice();
-}
-
 FormatModifierMap X11WindowedEglCursorLayer::supportedDrmFormats() const
 {
     return m_backend->supportedFormats();
@@ -161,8 +161,9 @@ void X11WindowedEglCursorLayer::releaseBuffers()
 {
 }
 
-X11WindowedEglBackend::X11WindowedEglBackend(X11WindowedBackend *backend)
-    : m_backend(backend)
+X11WindowedEglBackend::X11WindowedEglBackend(X11WindowedBackend *backend, RenderDevice *device)
+    : EglBackend(device)
+    , m_backend(backend)
 {
 }
 
@@ -180,26 +181,11 @@ X11WindowedBackend *X11WindowedEglBackend::backend() const
     return m_backend;
 }
 
-DrmDevice *X11WindowedEglBackend::drmDevice() const
-{
-    return m_backend->drmDevice();
-}
-
-bool X11WindowedEglBackend::initializeEgl()
-{
-    if (!initClientExtensions()) {
-        return false;
-    }
-    Q_ASSERT(m_backend->renderDevice());
-    setRenderDevice(m_backend->renderDevice());
-    return true;
-}
-
 bool X11WindowedEglBackend::init()
 {
     qputenv("EGL_PLATFORM", "x11");
 
-    if (!initializeEgl()) {
+    if (!initClientExtensions()) {
         qCWarning(KWIN_X11WINDOWED, "Could not initialize egl");
         return false;
     }

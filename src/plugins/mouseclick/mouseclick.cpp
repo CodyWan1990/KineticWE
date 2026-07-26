@@ -25,8 +25,6 @@
 #include <KConfigGroup>
 #include <KGlobalAccel>
 
-#include <QPainter>
-
 #include <cmath>
 
 namespace KWin
@@ -96,13 +94,13 @@ void MouseClickEffect::prePaintScreen(ScreenPrePaintData &data)
     effects->prePaintScreen(data);
 }
 
-void MouseClickEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
+bool MouseClickEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
 {
-    effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
-
-    if (effects->isOpenGLCompositing()) {
-        paintScreenSetupGl(renderTarget, viewport.projectionMatrix());
+    if (!effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen)) {
+        return false;
     }
+
+    paintScreenSetupGl(renderTarget, viewport.projectionMatrix());
     for (const auto &click : m_clicks) {
         for (int i = 0; i < m_ringCount; ++i) {
             float alpha = computeAlpha(click.get(), i);
@@ -126,9 +124,8 @@ void MouseClickEffect::paintScreen(const RenderTarget &renderTarget, const Rende
             drawCircle(viewport, tool.m_color, tool.m_globalPosition.x(), tool.m_globalPosition.y(), size);
         }
     }
-    if (effects->isOpenGLCompositing()) {
-        paintScreenFinishGl();
-    }
+    paintScreenFinishGl();
+    return true;
 }
 
 void MouseClickEffect::postPaintScreen()
@@ -252,11 +249,7 @@ bool MouseClickEffect::isActive() const
 
 void MouseClickEffect::drawCircle(const RenderViewport &viewport, const QColor &color, float cx, float cy, float r)
 {
-    if (effects->isOpenGLCompositing()) {
-        drawCircleGl(viewport, color, cx, cy, r);
-    } else if (effects->compositingType() == QPainterCompositing) {
-        drawCircleQPainter(color, cx, cy, r);
-    }
+    drawCircleGl(viewport, color, cx, cy, r);
 }
 
 void MouseClickEffect::drawCircleGl(const RenderViewport &viewport, const QColor &color, float cx, float cy, float r)
@@ -288,15 +281,6 @@ void MouseClickEffect::drawCircleGl(const RenderViewport &viewport, const QColor
     vbo->render(GL_LINE_LOOP);
 }
 
-void MouseClickEffect::drawCircleQPainter(const QColor &color, float cx, float cy, float r)
-{
-    QPainter *painter = effects->scenePainter();
-    painter->save();
-    painter->setPen(color);
-    painter->drawArc(cx - r, cy - r, r * 2, r * 2, 0, 5760);
-    painter->restore();
-}
-
 void MouseClickEffect::paintScreenSetupGl(const RenderTarget &renderTarget, const QMatrix4x4 &projectionMatrix)
 {
     GLShader *shader = ShaderManager::instance()->pushShader(ShaderTrait::UniformColor | ShaderTrait::TransformColorspace);
@@ -305,7 +289,7 @@ void MouseClickEffect::paintScreenSetupGl(const RenderTarget &renderTarget, cons
 
     glLineWidth(m_lineWidth);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void MouseClickEffect::paintScreenFinishGl()

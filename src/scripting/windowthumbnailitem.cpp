@@ -115,7 +115,7 @@ void WindowThumbnailSource::update()
     }
     Q_ASSERT(m_view);
 
-    const QRectF geometry = m_handle->visibleGeometry();
+    const RectF geometry = m_handle->visibleGeometry();
     const qreal devicePixelRatio = m_view->devicePixelRatio();
     const QSize textureSize = geometry.toAlignedRect().size() * devicePixelRatio;
 
@@ -222,10 +222,14 @@ WindowThumbnailItem::WindowThumbnailItem(QQuickItem *parent)
 {
     setFlag(ItemHasContents);
 
-    connect(Compositor::self(), &Compositor::aboutToToggleCompositing,
-            this, &WindowThumbnailItem::resetSource);
-    connect(Compositor::self(), &Compositor::compositingToggled,
-            this, &WindowThumbnailItem::updateSource);
+    // NOTE this can't use the normal GPU reset handling of Qt,
+    // since the source uses KWin's OpenGL context.
+    connect(Compositor::self(), &Compositor::aboutToStop, this, &WindowThumbnailItem::releaseOpenGlResources);
+    connect(Compositor::self(), &Compositor::compositingToggled, this, [this](bool active) {
+        if (active) {
+            updateSource();
+        }
+    });
 }
 
 WindowThumbnailItem::~WindowThumbnailItem()
@@ -253,6 +257,7 @@ void WindowThumbnailItem::invalidateSceneGraph()
 {
     delete m_provider;
     m_provider = nullptr;
+    m_source.reset();
 }
 
 void WindowThumbnailItem::itemChange(QQuickItem::ItemChange change, const QQuickItem::ItemChangeData &value)
@@ -279,9 +284,12 @@ QSGTextureProvider *WindowThumbnailItem::textureProvider() const
     return m_provider;
 }
 
-void WindowThumbnailItem::resetSource()
+void WindowThumbnailItem::releaseOpenGlResources()
 {
     m_source.reset();
+    if (m_provider) {
+        m_provider->setTexture(nullptr);
+    }
 }
 
 void WindowThumbnailItem::updateSource()
@@ -386,24 +394,23 @@ void WindowThumbnailItem::updateImplicitSize()
     }
     setImplicitSize(frameSize.width(), frameSize.height());
 }
-
-QRectF WindowThumbnailItem::paintedRect() const
+RectF WindowThumbnailItem::paintedRect() const
 {
     if (!m_client) {
-        return QRectF();
+        return RectF();
     }
 
-    const QRectF visibleGeometry = m_client->visibleGeometry();
-    const QRectF frameGeometry = m_client->frameGeometry();
+    const RectF visibleGeometry = m_client->visibleGeometry();
+    const RectF frameGeometry = m_client->frameGeometry();
     const QSizeF scaled = QSizeF(frameGeometry.size()).scaled(boundingRect().size(), Qt::KeepAspectRatio);
 
     const qreal xScale = scaled.width() / frameGeometry.width();
     const qreal yScale = scaled.height() / frameGeometry.height();
 
-    QRectF paintedRect(boundingRect().x() + (boundingRect().width() - scaled.width()) / 2,
-                       boundingRect().y() + (boundingRect().height() - scaled.height()) / 2,
-                       visibleGeometry.width() * xScale,
-                       visibleGeometry.height() * yScale);
+    RectF paintedRect(boundingRect().x() + (boundingRect().width() - scaled.width()) / 2,
+                      boundingRect().y() + (boundingRect().height() - scaled.height()) / 2,
+                      visibleGeometry.width() * xScale,
+                      visibleGeometry.height() * yScale);
 
     paintedRect.moveLeft(paintedRect.x() + (visibleGeometry.x() - frameGeometry.x()) * xScale);
     paintedRect.moveTop(paintedRect.y() + (visibleGeometry.y() - frameGeometry.y()) * yScale);

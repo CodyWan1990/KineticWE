@@ -9,6 +9,7 @@
 */
 
 #include "eglplatformcontext.h"
+#include "compositor.h"
 #include "core/outputbackend.h"
 #include "eglhelpers.h"
 #include "internalwindow.h"
@@ -60,7 +61,7 @@ EGLPlatformContext::~EGLPlatformContext()
 
 bool EGLPlatformContext::makeCurrent(QPlatformSurface *surface)
 {
-    if (!m_eglContext) {
+    if (!isValid()) {
         return false;
     }
     const bool ok = m_eglContext->makeCurrent();
@@ -183,11 +184,6 @@ GLuint EGLPlatformContext::defaultFramebufferObject(QPlatformSurface *surface) c
 
 void EGLPlatformContext::create(const QSurfaceFormat &format, EglContext *shareContext)
 {
-    if (!eglBindAPI(isOpenGLES() ? EGL_OPENGL_ES_API : EGL_OPENGL_API)) {
-        qCWarning(KWIN_QPA) << "eglBindAPI failed:" << getEglErrorString();
-        return;
-    }
-
     m_config = configFromFormat(m_eglDisplay, format);
     if (m_config == EGL_NO_CONFIG_KHR) {
         qCWarning(KWIN_QPA) << "Could not find suitable EGLConfig for" << format;
@@ -201,6 +197,7 @@ void EGLPlatformContext::create(const QSurfaceFormat &format, EglContext *shareC
         return;
     }
     updateFormatFromContext();
+    connect(Compositor::self(), &Compositor::aboutToStop, this, &EGLPlatformContext::invalidateContext);
 }
 
 void EGLPlatformContext::updateFormatFromContext()
@@ -262,6 +259,12 @@ EGLDisplay EGLPlatformContext::display() const
 void EGLPlatformContext::invalidateContext()
 {
     m_markedInvalid = true;
+    if (m_eglContext) {
+        m_eglContext->makeCurrent();
+        m_renderTargets.clear();
+        m_zombieRenderTargets.clear();
+        m_eglContext.reset();
+    }
 }
 
 } // namespace QPA

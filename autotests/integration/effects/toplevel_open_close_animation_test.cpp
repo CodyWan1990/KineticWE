@@ -36,10 +36,6 @@ private Q_SLOTS:
 
 void ToplevelOpenCloseAnimationTest::initTestCase()
 {
-    if (!Test::renderNodeAvailable()) {
-        QSKIP("no render node available");
-        return;
-    }
     qputenv("XDG_DATA_DIRS", QCoreApplication::applicationDirPath().toUtf8());
 
     qRegisterMetaType<KWin::Window *>();
@@ -54,7 +50,6 @@ void ToplevelOpenCloseAnimationTest::initTestCase()
     config->sync();
     kwinApp()->setConfig(config);
 
-    qputenv("KWIN_COMPOSE", QByteArrayLiteral("O2"));
     qputenv("KWIN_EFFECTS_FORCE_ANIMATIONS", QByteArrayLiteral("1"));
 
     kwinApp()->start();

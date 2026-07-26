@@ -34,6 +34,8 @@ class KWIN_EXPORT EglBackend : public RenderBackend
     Q_OBJECT
 
 public:
+    explicit EglBackend(RenderDevice *device);
+
     virtual bool init() = 0;
     CompositingType compositingType() const override final;
     bool checkGraphicsReset() override final;
@@ -54,14 +56,10 @@ public:
     EGLImageKHR importBufferAsImage(GraphicsBuffer *buffer, int plane, int format, const QSize &size);
 
 protected:
-    EglBackend();
-
     void cleanup();
-    void setRenderDevice(RenderDevice *device);
     bool initClientExtensions();
     void initWayland();
     bool hasClientExtension(const QByteArray &ext) const;
-    bool isOpenGLES() const;
     bool createContext();
 
     bool ensureGlobalShareContext();
@@ -69,6 +67,7 @@ protected:
 
     RenderDevice *m_renderDevice = nullptr;
     std::shared_ptr<EglContext> m_context;
+    std::shared_ptr<EglContext> m_globalShareContext;
     QList<QByteArray> m_clientExtensions;
     QList<LinuxDmaBufV1Feedback::Tranche> m_tranches;
     QHash<std::pair<GraphicsBuffer *, int>, EGLImageKHR> m_importedBuffers;

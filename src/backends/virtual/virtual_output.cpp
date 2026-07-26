@@ -22,7 +22,6 @@ namespace KWin
 VirtualOutput::VirtualOutput(VirtualBackend *parent, bool internal, const QSize &physicalSizeInMM, OutputTransform panelOrientation, const QByteArray &edid, std::optional<QByteArray> edidIdentifierOverride, const std::optional<QString> &connectorName, const std::optional<QByteArray> &mstPath)
     : BackendOutput()
     , m_backend(parent)
-    , m_renderLoop(std::make_unique<RenderLoop>(this))
     , m_vsyncMonitor(SoftwareVsyncMonitor::create())
 {
     connect(m_vsyncMonitor.get(), &VsyncMonitor::vblankOccurred, this, &VirtualOutput::vblank);
@@ -42,11 +41,6 @@ VirtualOutput::VirtualOutput(VirtualBackend *parent, bool internal, const QSize 
 
 VirtualOutput::~VirtualOutput()
 {
-}
-
-RenderLoop *VirtualOutput::renderLoop() const
-{
-    return m_renderLoop.get();
 }
 
 bool VirtualOutput::testPresentation(const std::shared_ptr<OutputFrame> &frame)
@@ -100,7 +94,9 @@ void VirtualOutput::applyChanges(const OutputConfiguration &config)
     next.priority = props->priority.value_or(m_state.priority);
     next.deviceOffset = props->deviceOffset.value_or(m_state.deviceOffset);
     if (props->customModes.has_value()) {
-        next.customModes = *props->customModes;
+        next.customModes = *props->customModes | std::views::transform([](const OutputModeline &modeline) {
+            return modeline.withFlags(OutputModeline::Flag::Generated | OutputModeline::Flag::Custom);
+        }) | std::ranges::to<QList>();
 
         QList<std::shared_ptr<OutputMode>> newModes;
         for (const auto &mode : next.modes) {
@@ -109,8 +105,7 @@ void VirtualOutput::applyChanges(const OutputConfiguration &config)
             }
             newModes.push_back(mode);
         }
-        for (const auto &custom : next.customModes) {
-            const OutputModeline modeline = OutputModeline::custom(custom);
+        for (const auto &modeline : next.customModes) {
             if (auto mode = modeline.match(next.modes)) {
                 newModes.append(mode);
             } else {

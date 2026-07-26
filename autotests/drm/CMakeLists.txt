@@ -1,6 +1,5 @@
 set(mockDRM_SRCS
     mock_drm.cpp
-    ../../src/backends/drm/drm_abstract_output.cpp
     ../../src/backends/drm/drm_backend.cpp
     ../../src/backends/drm/drm_blob.cpp
     ../../src/backends/drm/drm_buffer.cpp
@@ -21,8 +20,6 @@ set(mockDRM_SRCS
     ../../src/backends/drm/drm_pipeline_legacy.cpp
     ../../src/backends/drm/drm_plane.cpp
     ../../src/backends/drm/drm_property.cpp
-    ../../src/backends/drm/drm_qpainter_backend.cpp
-    ../../src/backends/drm/drm_qpainter_layer.cpp
     ../../src/backends/drm/drm_virtual_egl_layer.cpp
     ../../src/backends/drm/drm_virtual_output.cpp
     ../../src/wayland/drmlease_v1.cpp

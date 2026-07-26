@@ -16,8 +16,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kwin\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-06-25 00:45+0000\n"
-"PO-Revision-Date: 2026-06-18 19:03+0300\n"
+"POT-Creation-Date: 2026-07-24 00:46+0000\n"
+"PO-Revision-Date: 2026-07-22 08:44+0300\n"
 "Last-Translator: Emir SARI <emir_sari@icloud.com>\n"
 "Language-Team: Turkish <kde-l10n-tr@kde.org>\n"
 "Language: tr\n"
@@ -37,49 +37,49 @@ msgctxt "EMAIL OF TRANSLATORS"
 msgid "Your emails"
 msgstr "tulliana@gmail.com, volkangezer@gmail.com, emir_sari@icloud.com"
 
-#: backends/wayland/wayland_output.cpp:480
+#: backends/wayland/wayland_output.cpp:474
 #, kde-format
 msgid "Press right control to ungrab pointer"
 msgstr "İşaretçiyi bırakmak için sağ kontrol düğmesine bas"
 
-#: backends/wayland/wayland_output.cpp:482
+#: backends/wayland/wayland_output.cpp:476
 #, kde-format
 msgid "Press right control key to grab pointer"
 msgstr "İşaretçiyi yakalamak için sağ kontrol düğmesine bas"
 
-#: backends/wayland/wayland_output.cpp:486
+#: backends/wayland/wayland_output.cpp:480
 #, kde-format
 msgctxt ""
 "Title of nested KWin Wayland with Wayland socket identifier as argument"
 msgid "KDE Wayland Compositor %1"
 msgstr "KDE Wayland Bileşikleştiricisi %1"
 
-#: backends/wayland/wayland_output.cpp:489
+#: backends/wayland/wayland_output.cpp:483
 #, kde-format
 msgid "- Output disabled"
 msgstr "- Çıkış devre dışı"
 
-#: backends/wayland/wayland_output.cpp:491
+#: backends/wayland/wayland_output.cpp:485
 #, kde-format
 msgid "- Output dimmed"
 msgstr "- Çıkış karartıldı"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control to ungrab input"
 msgstr "Girdiyi bırakmak için sağ kontrol düğmesine bas"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control key to grab input"
 msgstr "Girdiyi yakalamak için sağ kontrol düğmesine bas"
 
-#: backends/x11/x11_windowed_backend.cpp:500
+#: backends/x11/x11_windowed_backend.cpp:501
 #, kde-format
 msgid "KDE Wayland Compositor"
 msgstr "KDE Wayland Bileşikleştiricisi"
 
-#: compositor.cpp:650
+#: compositor.cpp:750
 #, kde-format
 msgid "Desktop effects were restarted due to a graphics reset"
 msgstr "Grafik sıfırlaması nedeniyle masaüstü efektleri yeniden başlatıldı"
@@ -1573,60 +1573,60 @@ msgstr "Xaver Hugl"
 msgid "Disable configuration options"
 msgstr "Yapılandırma seçeneklerini iptal et"
 
-#: main_wayland.cpp:322
+#: main_wayland.cpp:328
 #, kde-format
 msgid "Start a rootless Xwayland server."
 msgstr "Köksüz bir Xwayland sunucusu başlat."
 
-#: main_wayland.cpp:325
+#: main_wayland.cpp:331
 #, kde-format
 msgid ""
 "Name of the Wayland socket to listen on. If not set \"wayland-0\" is used."
 msgstr "Dinlenecek Wayland yuvasının adı. Ayarlanmazsa “wayland-0” kullanılır."
 
-#: main_wayland.cpp:329
+#: main_wayland.cpp:335
 #, kde-format
 msgid "The X11 Display to use in windowed mode on platform X11."
 msgstr "X11 platformunda pencereli kipte kullanılacak X11 Ekranı."
 
-#: main_wayland.cpp:333
+#: main_wayland.cpp:339
 #, kde-format
 msgid "The Wayland Display to use in windowed mode on platform Wayland."
 msgstr "Wayland platformunda pencereli kipte kullanılacak Wayland Ekranı."
 
-#: main_wayland.cpp:335
+#: main_wayland.cpp:341
 #, kde-format
 msgid "Render to a virtual framebuffer."
 msgstr "Sanal bir çerçeve arabelleğine sun."
 
-#: main_wayland.cpp:337
+#: main_wayland.cpp:343
 #, kde-format
 msgid "The width for windowed mode. Default width is 1024."
 msgstr "Pencereli kipin genişliği. Öntanımlı genişlik 1024’tür."
 
-#: main_wayland.cpp:341
+#: main_wayland.cpp:347
 #, kde-format
 msgid "The height for windowed mode. Default height is 768."
 msgstr "Pencereli kipin yüksekliği. Öntanımlı yükseklik 768’tir."
 
-#: main_wayland.cpp:346
+#: main_wayland.cpp:352
 #, kde-format
 msgid "Whether or not to make windowed mode fullscreen"
 msgstr "Pencereli kipin tam ekran yapılıp yapılmayacağı"
 
-#: main_wayland.cpp:350
+#: main_wayland.cpp:356
 #, kde-format
 msgid "The scale for windowed mode. Default value is 1."
 msgstr "Pencerelenmiş kipin ölçeği. Öntanımlı değer 1’dir."
 
-#: main_wayland.cpp:355
+#: main_wayland.cpp:361
 #, kde-format
 msgid ""
 "The number of windows to open as outputs in windowed mode. Default value is 1"
 msgstr ""
 "Pencere kipinde çıkış olarak açılacak pencere sayısı. Öntanımlı değer 1’dir"
 
-#: main_wayland.cpp:360
+#: main_wayland.cpp:366
 #, kde-format
 msgid ""
 "Wayland socket to use for incoming connections. This can be combined with --"
@@ -1635,7 +1635,7 @@ msgstr ""
 "Gelen bağlantılar için kullanılacak Wayland yuvası; yuvayı adlandırmak için "
 "--socket ile birlikte kullanılabilir"
 
-#: main_wayland.cpp:364
+#: main_wayland.cpp:370
 #, kde-format
 msgid ""
 "XWayland socket to use for Xwayland's incoming connections. This can be set "
@@ -1644,76 +1644,76 @@ msgstr ""
 "XWayland’in gelen bağlantıları için kullanılacak XWayland yuvası; bu, birden "
 "çok kez ayarlanabilir"
 
-#: main_wayland.cpp:368
+#: main_wayland.cpp:374
 #, kde-format
 msgid "Name of the xwayland display that has been pre-set up"
 msgstr "Önceden ayarlanan XWayland görüntüsü"
 
-#: main_wayland.cpp:372
+#: main_wayland.cpp:378
 #, kde-format
 msgid "XWayland socket to use for Xwayland's init connections"
 msgstr "XWayland’in başlatma bağlantıları için kullanılacak XWayland yuvası"
 
-#: main_wayland.cpp:376
+#: main_wayland.cpp:382
 #, kde-format
 msgid "Name of the xwayland init display that has been pre-set up"
 msgstr "Önceden ayarlanmış XWayland başlatma görüntüsünün adı"
 
-#: main_wayland.cpp:380
+#: main_wayland.cpp:386
 #, kde-format
 msgid "Name of the xauthority file "
 msgstr "xauthority dosyasının adı "
 
-#: main_wayland.cpp:384
+#: main_wayland.cpp:390
 #, kde-format
 msgid "Exits this instance so it can be restarted by kwin_wayland_wrapper."
 msgstr ""
 "Bu örnekten çıkar; böylece kwin_wayland_wrapper tarafından yeniden "
 "başlatılabilir."
 
-#: main_wayland.cpp:386
+#: main_wayland.cpp:392
 #, kde-format
 msgid "Render through drm node."
 msgstr "Drm düğümü ile sunun."
 
-#: main_wayland.cpp:387
+#: main_wayland.cpp:393
 #, kde-format
 msgid ""
 "Extract locale information from locale1 rather than the user's configuration"
 msgstr "Yerel ayar bilgisini kullanıcı yapılandırması yerine locale1’den çıkar"
 
-#: main_wayland.cpp:416
+#: main_wayland.cpp:422
 #, kde-format
 msgid "Input method that KWin starts."
 msgstr "KWin’in başlattığı giriş yöntemi."
 
-#: main_wayland.cpp:422
+#: main_wayland.cpp:428
 #, kde-format
 msgid "Starts the session in locked mode."
 msgstr "Oturumu kilitli kipte başlatır."
 
-#: main_wayland.cpp:426
+#: main_wayland.cpp:432
 #, kde-format
 msgid "Starts the session without lock screen support."
 msgstr "Oturumu, kilit ekranı desteği olmadan başlatır."
 
-#: main_wayland.cpp:431
+#: main_wayland.cpp:437
 #, kde-format
 msgid "Starts the session without global shortcuts support."
 msgstr "Oturumu, global kısayollar desteği olmadan başlatır."
 
-#: main_wayland.cpp:436
+#: main_wayland.cpp:442
 #, kde-format
 msgid "Disable KActivities integration."
 msgstr "KActivities tümleşimini devre dışı bırakın."
 
-#: main_wayland.cpp:441
+#: main_wayland.cpp:447
 #, kde-format
 msgid "Exit after the session application, which is started by KWin, closed."
 msgstr ""
 "KWin tarafından başlatılan oturum uygulaması kapatıldıktan sonra çıkın."
 
-#: main_wayland.cpp:446
+#: main_wayland.cpp:452
 #, kde-format
 msgid "Applications to start once Wayland and Xwayland server are started"
 msgstr ""
@@ -2211,25 +2211,25 @@ msgctxt "Duration of rotation"
 msgid "Default"
 msgstr "Öntanımlı"
 
-#: plugins/mouseclick/mouseclick.cpp:42
+#: plugins/mouseclick/mouseclick.cpp:40
 #: plugins/mouseclick/mouseclick_config.cpp:43
 #, kde-format
 msgid "Toggle Mouse Click Animation"
 msgstr "Fare Tıklama Canlandırmasını Aç/Kapat"
 
-#: plugins/mouseclick/mouseclick.cpp:48
+#: plugins/mouseclick/mouseclick.cpp:46
 #, kde-format
 msgctxt "Left mouse button"
 msgid "Left"
 msgstr "Sol"
 
-#: plugins/mouseclick/mouseclick.cpp:49
+#: plugins/mouseclick/mouseclick.cpp:47
 #, kde-format
 msgctxt "Middle mouse button"
 msgid "Middle"
 msgstr "Orta"
 
-#: plugins/mouseclick/mouseclick.cpp:50
+#: plugins/mouseclick/mouseclick.cpp:48
 #, kde-format
 msgctxt "Right mouse button"
 msgid "Right"
@@ -2327,12 +2327,12 @@ msgstr "Yazıtipi:"
 msgid "Show Text:"
 msgstr "Metni göster:"
 
-#: plugins/mousemark/mousemark.cpp:43
+#: plugins/mousemark/mousemark.cpp:36
 #, kde-format
 msgid "Clear All Mouse Marks"
 msgstr "Tüm Fare İmlerini Temizle"
 
-#: plugins/mousemark/mousemark.cpp:48 plugins/mousemark/mousemark_config.cpp:51
+#: plugins/mousemark/mousemark.cpp:41 plugins/mousemark/mousemark_config.cpp:51
 #, kde-format
 msgid "Clear Last Mouse Mark"
 msgstr "Son Fare İmini Temizle"
@@ -2612,12 +2612,12 @@ msgstr "Çıktı bulunamadı"
 msgid "Invalid region"
 msgstr "Geçersiz bölge"
 
-#: plugins/screencast/screencaststream.cpp:378
+#: plugins/screencast/screencaststream.cpp:380
 #, kde-format
 msgid "OpenGL compositing is required for screencasting"
 msgstr "Ekran yayını için OpenGL bileşikleştirmesi gerekir"
 
-#: plugins/screencast/screencaststream.cpp:386
+#: plugins/screencast/screencaststream.cpp:388
 #, kde-format
 msgid "Failed to create PipeWire stream"
 msgstr "PipeWire akışı oluşturulamadı"
@@ -3086,16 +3086,6 @@ msgstr "Yakınlaştırılan Alanı Yukarı Taşı"
 msgid "Move Zoomed Area Downwards"
 msgstr "Yakınlaştırılan Alanı Aşağı Taşı"
 
-#: plugins/zoom/zoom.cpp:122
-#, kde-format
-msgid "Move Mouse to Focus"
-msgstr "Odaklamak için Fareyi Taşı"
-
-#: plugins/zoom/zoom.cpp:128
-#, kde-format
-msgid "Move Mouse to Center"
-msgstr "Fareyi Merkeze Taşı"
-
 #. i18n: ectx: label, entry (count), group (General)
 #: rulebooksettingsbase.kcfg:9
 #, kde-format
@@ -3457,220 +3447,177 @@ msgid "Fullscreen rule type"
 msgstr "Tam Ekran kuralı türü"
 
 #. i18n: ectx: label, entry (noborder), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:307
+#: rulesettings.kcfg:311
 #, kde-format
 msgid "No titlebar and frame"
 msgstr "Başlık çubuğu ve çerçeve yok"
 
 #. i18n: ectx: label, entry (noborderrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:311
+#: rulesettings.kcfg:315
 #, kde-format
 msgid "No titlebar rule type"
 msgstr "Başlık çubuğu yok kuralı türü"
 
+#. i18n: ectx: label, entry (decorationpolicy), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:322
+#, kde-format
+msgid "Decoration policy"
+msgstr "Dekorasyon politikası"
+
+#. i18n: ectx: label, entry (decorationpolicyrule), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:332
+#, kde-format
+msgid "Decoration policy rule type"
+msgstr "Dekorasyon politikası kuralı türü"
+
 #. i18n: ectx: label, entry (decocolor), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:318
+#: rulesettings.kcfg:339
 #, kde-format
 msgid "Titlebar color and scheme"
 msgstr "Başlık çubuğu rengi ve şeması"
 
 #. i18n: ectx: label, entry (decocolorrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:321
+#: rulesettings.kcfg:342
 #, kde-format
 msgid "Titlebar color rule type"
 msgstr "Başlık çubuğu rengi kuralı türü"
 
-#. i18n: ectx: label, entry (blockcompositing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:326
-#, kde-format
-msgid "Block Compositing"
-msgstr "Bileşikliği Engelle"
-
-#. i18n: ectx: label, entry (blockcompositingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:330
-#, kde-format
-msgid "Block Compositing rule type"
-msgstr "Bileşikleştirme kural türünü engelle"
-
 #. i18n: ectx: label, entry (fsplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:335
+#: rulesettings.kcfg:347
 #, kde-format
 msgid "Focus stealing prevention"
 msgstr "Odak çalmayı önleme"
 
 #. i18n: ectx: label, entry (fsplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:341
+#: rulesettings.kcfg:353
 #, kde-format
 msgid "Focus stealing prevention rule type"
 msgstr "Odak çalmayı önleme kuralı türü"
 
 #. i18n: ectx: label, entry (fpplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:346
+#: rulesettings.kcfg:358
 #, kde-format
 msgid "Focus protection"
 msgstr "Odak koruma"
 
 #. i18n: ectx: label, entry (fpplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:352
+#: rulesettings.kcfg:364
 #, kde-format
 msgid "Focus protection rule type"
 msgstr "Odak koruma kuralı türü"
 
 #. i18n: ectx: label, entry (acceptfocus), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:357
+#: rulesettings.kcfg:369
 #, kde-format
 msgid "Accept Focus"
 msgstr "Odağı Kabul Et"
 
 #. i18n: ectx: label, entry (acceptfocusrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:361
+#: rulesettings.kcfg:373
 #, kde-format
 msgid "Accept Focus rule type"
 msgstr "Odağı Kabul Et kuralı türü"
 
 #. i18n: ectx: label, entry (closeable), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:366
+#: rulesettings.kcfg:378
 #, kde-format
 msgid "Closeable"
 msgstr "Kapatılabilir"
 
 #. i18n: ectx: label, entry (closeablerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:370
+#: rulesettings.kcfg:382
 #, kde-format
 msgid "Closeable rule type"
 msgstr "Kapatılabilir kuralı türü"
 
-#. i18n: ectx: label, entry (autogroup), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:375
-#, kde-format
-msgid "Autogroup with identical"
-msgstr "Eşdeğeriyle otomatik grupla"
-
-#. i18n: ectx: label, entry (autogrouprule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:379
-#, kde-format
-msgid "Autogroup with identical rule type"
-msgstr "Eşdeğeriyle otomatik grupla kuralı türü"
-
-#. i18n: ectx: label, entry (autogroupfg), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:384
-#, kde-format
-msgid "Autogroup in foreground"
-msgstr "Ön planda otomatik grupla"
-
-#. i18n: ectx: label, entry (autogroupfgrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:388
-#, kde-format
-msgid "Autogroup in foreground rule type"
-msgstr "Ön planda otomatik grupla kuralı türü"
-
-#. i18n: ectx: label, entry (autogroupid), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:393
-#, kde-format
-msgid "Autogroup by ID"
-msgstr "Kimliğe göre otomatik grupla"
-
-#. i18n: ectx: label, entry (autogroupidrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:396
-#, kde-format
-msgid "Autogroup by ID rule type"
-msgstr "Kimliğe göre otomatik grupla kuralı türü"
-
-#. i18n: ectx: label, entry (strictgeometry), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:401
-#, kde-format
-msgid "Obey geometry restrictions"
-msgstr "Geometri sınırlamalarına uy"
-
-#. i18n: ectx: label, entry (strictgeometryrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:405
-#, kde-format
-msgid "Obey geometry restrictions rule type"
-msgstr "Geometri sınırlamalarına uy kuralı türü"
-
 #. i18n: ectx: label, entry (shortcut), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:410
+#: rulesettings.kcfg:387
 #, kde-format
 msgid "Shortcut"
 msgstr "Kısayol"
 
 #. i18n: ectx: label, entry (shortcutrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:413
+#: rulesettings.kcfg:390
 #, kde-format
 msgid "Shortcut rule type"
 msgstr "Kısayol kuralı türü"
 
 #. i18n: ectx: label, entry (disableglobalshortcuts), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:420
+#: rulesettings.kcfg:397
 #, kde-format
 msgid "Ignore global shortcuts"
 msgstr "Global kısayolları yok say"
 
 #. i18n: ectx: label, entry (disableglobalshortcutsrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:424
+#: rulesettings.kcfg:401
 #, kde-format
 msgid "Ignore global shortcuts rule type"
 msgstr "Global kısayolları yok say kuralı türü"
 
 #. i18n: ectx: label, entry (desktopfile), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:429
+#: rulesettings.kcfg:406
 #, kde-format
 msgid "Desktop file name"
 msgstr "Masaüstü dosya adı"
 
 #. i18n: ectx: label, entry (desktopfilerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:432
+#: rulesettings.kcfg:409
 #, kde-format
 msgid "Desktop file name rule type"
 msgstr "Masaüstü dosya adı kuralı türü"
 
 #. i18n: ectx: label, entry (layer), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:439
+#: rulesettings.kcfg:416
 #, kde-format
 msgid "Layer"
 msgstr "Katman"
 
 #. i18n: ectx: label, entry (layerrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:455
+#: rulesettings.kcfg:432
 #, kde-format
 msgid "Layer rule type"
 msgstr "Katman kuralı türü"
 
 #. i18n: ectx: label, entry (adaptivesync), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:460
+#: rulesettings.kcfg:437
 #, kde-format
 msgid "AdaptiveSync"
 msgstr "Uyarlanır Eşzamanlama"
 
 #. i18n: ectx: label, entry (adaptivesyncrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:464
+#: rulesettings.kcfg:441
 #, kde-format
 msgid "AdaptiveSync rule type"
 msgstr "Uyarlanır Eşzamanlama kuralı türü"
 
 #. i18n: ectx: label, entry (tearing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:469
+#: rulesettings.kcfg:446
 #, kde-format
 msgid "Allow Tearing"
 msgstr "Yırtılmaya izin ver"
 
 #. i18n: ectx: label, entry (tearingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:473
+#: rulesettings.kcfg:450
 #, kde-format
 msgid "Tearing rule type"
 msgstr "Yırtılma kuralı türü"
 
 #. i18n: ectx: label, entry (excludefromcapture), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:478
+#: rulesettings.kcfg:455
 #, kde-format
 msgid "Hide from screenshots and screen recordings"
 msgstr "Ekran görüntülerinden ve kayıtlarından gizle"
 
 #. i18n: ectx: label, entry (excludefromcapturerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:482
+#: rulesettings.kcfg:459
 #, kde-format
 msgid "Hide from screenshots and screen recordings rule type"
 msgstr "Ekran görüntülerinden ve kayıtlarından gizle kuralı türü"
+
+#: scene/workspacescene.cpp:115
+#, kde-format
+msgid "Toggle “Show Compositing” effect"
+msgstr "“Bileşikleştirmeyi Göster” efektini aç/kapat"
 
 #. i18n: ectx: property (windowTitle), widget (QDialog, ShortcutDialog)
 #: shortcutdialog.ui:14
@@ -4256,7 +4203,19 @@ msgstr "Masaüstüne Bak"
 msgid "Kill Window"
 msgstr "Pencereyi Öldür"
 
-#: useractions.cpp:1080
+#: useractions.cpp:1017
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Focused Window"
+msgstr "İşaretçiyi Odaklı Pencerede Ortala"
+
+#: useractions.cpp:1018
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Screen"
+msgstr "İşaretçiyi Ekranda Ortala"
+
+#: useractions.cpp:1083
 #, kde-format
 msgid "Activate Window (%1)"
 msgstr "Pencereyi Etkinleştir (%1)"
@@ -4306,95 +4265,104 @@ msgstr "Bir Alt Masaüstüne Geç"
 msgid "Switch to Desktop %1"
 msgstr "%1. Masaüstüne Geç"
 
-#: wayland/outputmanagement_v2.cpp:569
+#: wayland/outputmanagement_v2.cpp:521
+#, kde-format
+msgid ""
+"Setting custom modes with too old kde-output-management-v2 protocol versions "
+"is unsupported"
+msgstr ""
+"Artık eskimiş kde-output-management-v2 protokolü sürümleriyle özel kipler "
+"ayarlamak desteklenmiyor."
+
+#: wayland/outputmanagement_v2.cpp:575
 #, kde-format
 msgid "abm level is larger than the maximum (4): %1"
 msgstr ""
 "Uyarlanır arka ışık modülasyonu düzeyi, olabilecek en yüksek değerden daha "
 "fazla (4): %1"
 
-#: wayland/outputmanagement_v2.cpp:647
+#: wayland/outputmanagement_v2.cpp:673
 #, kde-format
 msgid "One of the relevant outputs is no longer available"
 msgstr "İlgili çıktılardan biri artık kullanılabilir değil"
 
-#: wayland/outputmanagement_v2.cpp:665
+#: wayland/outputmanagement_v2.cpp:691
 #, kde-format
 msgid "Disabling all outputs through configuration changes is not allowed"
 msgstr ""
 "Tüm çıktıları yapılandırma değişiklikleriyle devre dışı bırakmaya izin "
 "verilmiyor"
 
-#: wayland/outputmanagement_v2.cpp:675
+#: wayland/outputmanagement_v2.cpp:701
 #, kde-format
 msgid "%1 cannot mirror itself"
 msgstr "%1 kendi kendini yansıtamıyor"
 
-#: wayland/outputmanagement_v2.cpp:682
+#: wayland/outputmanagement_v2.cpp:708
 #, kde-format
 msgid "Cannot add a custom mode with an empty size"
 msgstr "Boş bir boyut ile özel bir kip eklenemiyor"
 
-#: wayland/outputmanagement_v2.cpp:686
+#: wayland/outputmanagement_v2.cpp:712
 #, kde-format
 msgid "Cannot add a custom mode with a refresh rate of zero Hz"
 msgstr "Sıfır Hz’lik bir yenileme hızıyla özel bir kip eklenemiyor"
 
-#: wayland/outputmanagement_v2.cpp:697
+#: wayland/outputmanagement_v2.cpp:723
 #, kde-format
 msgid "Position of output %1 is way too negative (%2, %3)"
 msgstr "%1 çıkışının konumu pek negatif (%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:700
+#: wayland/outputmanagement_v2.cpp:726
 #, kde-format
 msgid "Position of enabled output %1 is negative (%2, %3)"
 msgstr "%1 etkinleştirilmiş çıkışının konumu negatif (%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:704
+#: wayland/outputmanagement_v2.cpp:730
 #, kde-format
 msgid "Position of output %1 is way too large (%2, %3)"
 msgstr "%1 çıkışının konumu pek büyük (%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:721
+#: wayland/outputmanagement_v2.cpp:747
 #, kde-format
 msgid "The driver rejected the output configuration"
 msgstr "Sürücü çıktı yapılandırmasını reddetti"
 
-#: wayland/outputmanagement_v2.cpp:724
+#: wayland/outputmanagement_v2.cpp:750
 #, kde-format
 msgid "The session is not active"
 msgstr "Bu oturum etkin değil"
 
-#: window.cpp:3107
+#: window.cpp:3162
 #, kde-format
 msgctxt "Application is not responding, appended to window title"
 msgid "(Not Responding)"
 msgstr "(Yanıt Vermiyor)"
 
-#: workspace.cpp:1310
+#: workspace.cpp:1311
 #, kde-format
 msgid "Built-in Screen"
 msgstr "Yerleşik Ekran"
 
-#: workspace.cpp:1323
+#: workspace.cpp:1324
 #, kde-format
 msgctxt "Display label: manufacturer + model name + connector name"
 msgid "%1 %2 %3"
 msgstr "%1 %2, %3"
 
-#: workspace.cpp:1333
+#: workspace.cpp:1334
 #, kde-format
 msgctxt "Display label: manufacturer + model name + serial number"
 msgid "%1 %2 %3"
 msgstr "%1 %2, %3"
 
-#: workspace.cpp:1336
+#: workspace.cpp:1337
 #, kde-format
 msgctxt "Display label: manufacturer + model name"
 msgid "%1 %2"
 msgstr "%1 %2"
 
-#: workspace.cpp:1805
+#: workspace.cpp:1806
 #, kde-format
 msgctxt "Introductory text shown in the support information."
 msgid ""
@@ -4420,6 +4388,42 @@ msgstr ""
 #, kde-format
 msgid "Xwayland has crashed"
 msgstr "Xwayland çöktü"
+
+#~ msgid "Block Compositing"
+#~ msgstr "Bileşikliği Engelle"
+
+#~ msgid "Block Compositing rule type"
+#~ msgstr "Bileşikleştirme kural türünü engelle"
+
+#~ msgid "Autogroup with identical"
+#~ msgstr "Eşdeğeriyle otomatik grupla"
+
+#~ msgid "Autogroup with identical rule type"
+#~ msgstr "Eşdeğeriyle otomatik grupla kuralı türü"
+
+#~ msgid "Autogroup in foreground"
+#~ msgstr "Ön planda otomatik grupla"
+
+#~ msgid "Autogroup in foreground rule type"
+#~ msgstr "Ön planda otomatik grupla kuralı türü"
+
+#~ msgid "Autogroup by ID"
+#~ msgstr "Kimliğe göre otomatik grupla"
+
+#~ msgid "Autogroup by ID rule type"
+#~ msgstr "Kimliğe göre otomatik grupla kuralı türü"
+
+#~ msgid "Obey geometry restrictions"
+#~ msgstr "Geometri sınırlamalarına uy"
+
+#~ msgid "Obey geometry restrictions rule type"
+#~ msgstr "Geometri sınırlamalarına uy kuralı türü"
+
+#~ msgid "Move Mouse to Focus"
+#~ msgstr "Odaklamak için Fareyi Taşı"
+
+#~ msgid "Move Mouse to Center"
+#~ msgstr "Fareyi Merkeze Taşı"
 
 #~ msgid "Indicate that KWin has recently crashed n times"
 #~ msgstr "KWin uygulamasının kaç kez çöktüğünü göster"

@@ -325,6 +325,7 @@ bool X11Window::track(xcb_window_t w)
     if (Xcb::Extensions::self()->isShapeAvailable()) {
         xcb_shape_select_input(kwinApp()->x11Connection(), w, true);
     }
+    detectShape();
     updateShapeRegion();
     getWmOpaqueRegion();
     getSkipCloseAnimation();
@@ -397,6 +398,7 @@ bool X11Window::manage(xcb_window_t w, bool isMapped)
     if (Xcb::Extensions::self()->isShapeAvailable()) {
         xcb_shape_select_input(kwinApp()->x11Connection(), window(), true);
     }
+    detectShape();
     updateShapeRegion();
     detectNoBorder();
     fetchIconicName();
@@ -902,7 +904,7 @@ void X11Window::setDecorationPolicy(DecorationPolicy policy)
     }
     m_decorationPolicy = effectivePolicy;
     updateDecoration(true, false);
-    updateWindowRules(Rules::NoBorder);
+    updateWindowRules(Rules::DecorationPolicy);
     Q_EMIT decorationPolicyChanged();
 }
 
@@ -919,11 +921,17 @@ DecorationMode X11Window::preferredDecorationMode() const
         return DecorationMode::None;
     case DecorationPolicy::Server:
         return DecorationMode::Server;
-    case DecorationPolicy::PreferredByClient:
+    case DecorationPolicy::Shadow:
+        if (Decoration::DecorationBridge::supportedStyles().contains(KDecoration3::Style::Shadow)) {
+            return DecorationMode::Shadow;
+        } else {
+            return DecorationMode::Client;
+        }
+    case DecorationPolicy::ClientPreference:
         if (!m_clientFrameExtents.isNull()) {
             return DecorationMode::Client;
         } else if (m_wantsNoDecoration) {
-            return DecorationMode::None;
+            return wantsServerDropShadow() ? DecorationMode::Shadow : DecorationMode::None;
         } else {
             return DecorationMode::Server;
         }
@@ -932,29 +940,109 @@ DecorationMode X11Window::preferredDecorationMode() const
     Q_UNREACHABLE();
 }
 
+bool X11Window::wantsServerDropShadow() const
+{
+    if (!Decoration::DecorationBridge::supportedStyles().contains(KDecoration3::Style::Shadow)) {
+        return false;
+    } else {
+        static const bool wants = environmentVariableBoolValue("KWIN_X11_USE_SSD_DROP_SHADOW").value_or(true);
+        return wants && !is_shape;
+    }
+}
+
+static QPointF gravityReferencePoint(const QMarginsF &margins, xcb_gravity_t gravity)
+{
+    qreal dx = 0;
+    qreal dy = 0;
+
+    // dx, dy specify how the client window moves to make space for the frame.
+    // In general we have to compute the reference point and from that figure
+    // out how much we need to shift the client, however given that we ignore
+    // the border width attribute and the extents of the server-side decoration
+    // are known in advance, we can simplify the math quite a bit and express
+    // the required window gravity adjustment in terms of border sizes.
+    switch (gravity) {
+    case XCB_GRAVITY_NORTH_WEST: // move down right
+    default:
+        dx = Xcb::nativeRound(margins.left());
+        dy = Xcb::nativeRound(margins.top());
+        break;
+    case XCB_GRAVITY_NORTH: // move right
+        dx = 0;
+        dy = Xcb::nativeRound(margins.top());
+        break;
+    case XCB_GRAVITY_NORTH_EAST: // move down left
+        dx = -Xcb::nativeRound(margins.right());
+        dy = Xcb::nativeRound(margins.top());
+        break;
+    case XCB_GRAVITY_WEST: // move right
+        dx = Xcb::nativeRound(margins.left());
+        dy = 0;
+        break;
+    case XCB_GRAVITY_CENTER:
+        dx = Xcb::fromXNative((int(Xcb::toXNative(margins.left())) - int(Xcb::toXNative(margins.right()))) / 2);
+        dy = Xcb::fromXNative((int(Xcb::toXNative(margins.top())) - int(Xcb::toXNative(margins.bottom()))) / 2);
+        break;
+    case XCB_GRAVITY_STATIC: // don't move
+        dx = 0;
+        dy = 0;
+        break;
+    case XCB_GRAVITY_EAST: // move left
+        dx = -Xcb::nativeRound(margins.right());
+        dy = 0;
+        break;
+    case XCB_GRAVITY_SOUTH_WEST: // move up right
+        dx = Xcb::nativeRound(margins.left());
+        dy = -Xcb::nativeRound(margins.bottom());
+        break;
+    case XCB_GRAVITY_SOUTH: // move up
+        dx = 0;
+        dy = -Xcb::nativeRound(margins.bottom());
+        break;
+    case XCB_GRAVITY_SOUTH_EAST: // move up left
+        dx = -Xcb::nativeRound(margins.right());
+        dy = -Xcb::nativeRound(margins.bottom());
+        break;
+    }
+
+    return QPointF(dx, dy);
+}
+
 void X11Window::updateDecoration(bool check_workspace_pos, bool force)
 {
-    const bool wantsDecoration = preferredDecorationMode() == DecorationMode::Server;
+    const RectF oldGeometry = moveResizeGeometry();
 
-    if (!force && (isDecorated() == wantsDecoration)) {
-        return;
+    const QMarginsF previousFrameMargins = frameMargins();
+    const QPointF previousFrameAdjustment = gravityReferencePoint(previousFrameMargins, m_geometryHints.windowGravity())
+        - QPointF(Xcb::nativeRound(previousFrameMargins.left()),
+                  Xcb::nativeRound(previousFrameMargins.top()));
+
+    switch (preferredDecorationMode()) {
+    case DecorationMode::None:
+    case DecorationMode::Client:
+        destroyDecoration();
+        break;
+    case DecorationMode::Shadow:
+        createDecoration(KDecoration3::Style::Shadow, force);
+        break;
+    case DecorationMode::Server:
+        createDecoration(KDecoration3::Style::Titled, force);
+        break;
     }
-    RectF oldgeom = moveResizeGeometry();
+
+    const QMargins currentFrameMargins = frameMargins();
+    const QPointF currentFrameAdjustement = gravityReferencePoint(currentFrameMargins, m_geometryHints.windowGravity())
+        - QPointF(Xcb::nativeRound(currentFrameMargins.left()),
+                  Xcb::nativeRound(currentFrameMargins.top()));
+
+    const RectF geometry(pos() - previousFrameAdjustment + currentFrameAdjustement, clientSizeToFrameSize(clientSize()));
+
     blockGeometryUpdates(true);
-    if (force) {
-        destroyDecoration();
-    }
-    if (wantsDecoration) {
-        createDecoration();
-    } else {
-        destroyDecoration();
-    }
-    updateShadow();
+    moveResize(geometry);
     if (check_workspace_pos) {
-        checkWorkspacePosition(oldgeom);
+        checkWorkspacePosition(oldGeometry);
     }
     blockGeometryUpdates(false);
-    updateFrameExtents();
 }
 
 void X11Window::invalidateDecoration()
@@ -962,10 +1050,16 @@ void X11Window::invalidateDecoration()
     updateDecoration(true, true);
 }
 
-void X11Window::createDecoration()
+void X11Window::createDecoration(KDecoration3::Style style, bool force)
 {
-    std::shared_ptr<KDecoration3::Decoration> decoration(Workspace::self()->decorationBridge()->createDecoration(this));
+    if ((decoration() && decoration()->style() == style) && !force) {
+        return;
+    }
+
+    std::shared_ptr<KDecoration3::Decoration> decoration(Workspace::self()->decorationBridge()->createDecoration(this, style));
     if (decoration) {
+        decoration->apply(decoration->nextState()->clone());
+
         connect(decoration.get(), &KDecoration3::Decoration::bordersChanged, this, [this]() {
             if (isDeleted()) {
                 return;
@@ -975,25 +1069,27 @@ void X11Window::createDecoration()
             updateFrameExtents();
         });
 
-        decoration->apply(decoration->nextState()->clone());
         connect(decoration.get(), &KDecoration3::Decoration::nextStateChanged, this, [this](auto state) {
             if (!isDeleted()) {
                 m_decoration.decoration->apply(state->clone());
             }
         });
     }
-    setDecoration(decoration);
 
-    moveResize(RectF(calculateGravitation(false), clientSizeToFrameSize(clientSize())));
+    setDecoration(decoration);
+    updateShadow();
+    updateFrameExtents();
 }
 
 void X11Window::destroyDecoration()
 {
-    if (isDecorated()) {
-        QPointF grav = calculateGravitation(true);
-        setDecoration(nullptr);
-        moveResize(RectF(grav, clientSizeToFrameSize(clientSize())));
+    if (!decoration()) {
+        return;
     }
+
+    setDecoration(nullptr);
+    updateShadow();
+    updateFrameExtents();
 }
 
 void X11Window::detectNoBorder()
@@ -2798,7 +2894,7 @@ void X11Window::checkActiveModal()
     }
 }
 
-QSizeF X11Window::constrainClientSize(const QSizeF &size, SizeMode mode) const
+QSizeF X11Window::constrainClientSize(const QSizeF &size) const
 {
     qreal w = size.width();
     qreal h = size.height();
@@ -2834,131 +2930,6 @@ QSizeF X11Window::constrainClientSize(const QSizeF &size, SizeMode mode) const
     h = std::min(max_size.height(), h);
     w = std::max(min_size.width(), w);
     h = std::max(min_size.height(), h);
-
-    if (!rules()->checkStrictGeometry(false)) {
-        // Disobey increments and aspect by explicit rule.
-        return QSizeF(w, h);
-    }
-
-    qreal width_inc = Xcb::fromXNative(m_geometryHints.resizeIncrements()).width();
-    qreal height_inc = Xcb::fromXNative(m_geometryHints.resizeIncrements()).height();
-    qreal basew_inc = Xcb::fromXNative(m_geometryHints.baseSize()).width();
-    qreal baseh_inc = Xcb::fromXNative(m_geometryHints.baseSize()).height();
-    if (!m_geometryHints.hasBaseSize()) {
-        basew_inc = Xcb::fromXNative(m_geometryHints.minSize()).width();
-        baseh_inc = Xcb::fromXNative(m_geometryHints.minSize()).height();
-    }
-
-    w = std::floor((w - basew_inc) / width_inc) * width_inc + basew_inc;
-    h = std::floor((h - baseh_inc) / height_inc) * height_inc + baseh_inc;
-
-    // code for aspect ratios based on code from FVWM
-    /*
-     * The math looks like this:
-     *
-     * minAspectX    dwidth     maxAspectX
-     * ---------- <= ------- <= ----------
-     * minAspectY    dheight    maxAspectY
-     *
-     * If that is multiplied out, then the width and height are
-     * invalid in the following situations:
-     *
-     * minAspectX * dheight > minAspectY * dwidth
-     * maxAspectX * dheight < maxAspectY * dwidth
-     *
-     */
-    if (m_geometryHints.hasAspect()) {
-        double min_aspect_w = m_geometryHints.minAspect().width(); // use doubles, because the values can be MAX_INT
-        double min_aspect_h = m_geometryHints.minAspect().height(); // and multiplying would go wrong otherwise
-        double max_aspect_w = m_geometryHints.maxAspect().width();
-        double max_aspect_h = m_geometryHints.maxAspect().height();
-        // According to ICCCM 4.1.2.3 PMinSize should be a fallback for PBaseSize for size increments,
-        // but not for aspect ratio. Since this code comes from FVWM, handles both at the same time,
-        // and I have no idea how it works, let's hope nobody relies on that.
-        const QSizeF baseSize = Xcb::fromXNative(m_geometryHints.baseSize());
-        w -= baseSize.width();
-        h -= baseSize.height();
-        qreal max_width = max_size.width() - baseSize.width();
-        qreal min_width = min_size.width() - baseSize.width();
-        qreal max_height = max_size.height() - baseSize.height();
-        qreal min_height = min_size.height() - baseSize.height();
-#define ASPECT_CHECK_GROW_W                                                           \
-    if (min_aspect_w * h > min_aspect_h * w) {                                        \
-        int delta = int(min_aspect_w * h / min_aspect_h - w) / width_inc * width_inc; \
-        if (w + delta <= max_width)                                                   \
-            w += delta;                                                               \
-    }
-#define ASPECT_CHECK_SHRINK_H_GROW_W                                                      \
-    if (min_aspect_w * h > min_aspect_h * w) {                                            \
-        int delta = int(h - w * min_aspect_h / min_aspect_w) / height_inc * height_inc;   \
-        if (h - delta >= min_height)                                                      \
-            h -= delta;                                                                   \
-        else {                                                                            \
-            int delta = int(min_aspect_w * h / min_aspect_h - w) / width_inc * width_inc; \
-            if (w + delta <= max_width)                                                   \
-                w += delta;                                                               \
-        }                                                                                 \
-    }
-#define ASPECT_CHECK_GROW_H                                                             \
-    if (max_aspect_w * h < max_aspect_h * w) {                                          \
-        int delta = int(w * max_aspect_h / max_aspect_w - h) / height_inc * height_inc; \
-        if (h + delta <= max_height)                                                    \
-            h += delta;                                                                 \
-    }
-#define ASPECT_CHECK_SHRINK_W_GROW_H                                                        \
-    if (max_aspect_w * h < max_aspect_h * w) {                                              \
-        int delta = int(w - max_aspect_w * h / max_aspect_h) / width_inc * width_inc;       \
-        if (w - delta >= min_width)                                                         \
-            w -= delta;                                                                     \
-        else {                                                                              \
-            int delta = int(w * max_aspect_h / max_aspect_w - h) / height_inc * height_inc; \
-            if (h + delta <= max_height)                                                    \
-                h += delta;                                                                 \
-        }                                                                                   \
-    }
-        switch (mode) {
-        case SizeModeAny:
-#if 0 // make SizeModeAny equal to SizeModeFixedW - prefer keeping fixed width,
-      // so that changing aspect ratio to a different value and back keeps the same size (#87298)
-            {
-                ASPECT_CHECK_SHRINK_H_GROW_W
-                ASPECT_CHECK_SHRINK_W_GROW_H
-                ASPECT_CHECK_GROW_H
-                ASPECT_CHECK_GROW_W
-                break;
-            }
-#endif
-        case SizeModeFixedW: {
-            // the checks are order so that attempts to modify height are first
-            ASPECT_CHECK_GROW_H
-            ASPECT_CHECK_SHRINK_H_GROW_W
-            ASPECT_CHECK_SHRINK_W_GROW_H
-            ASPECT_CHECK_GROW_W
-            break;
-        }
-        case SizeModeFixedH: {
-            ASPECT_CHECK_GROW_W
-            ASPECT_CHECK_SHRINK_W_GROW_H
-            ASPECT_CHECK_SHRINK_H_GROW_W
-            ASPECT_CHECK_GROW_H
-            break;
-        }
-        case SizeModeMax: {
-            // first checks that try to shrink
-            ASPECT_CHECK_SHRINK_H_GROW_W
-            ASPECT_CHECK_SHRINK_W_GROW_H
-            ASPECT_CHECK_GROW_W
-            ASPECT_CHECK_GROW_H
-            break;
-        }
-        }
-#undef ASPECT_CHECK_SHRINK_H_GROW_W
-#undef ASPECT_CHECK_SHRINK_W_GROW_H
-#undef ASPECT_CHECK_GROW_W
-#undef ASPECT_CHECK_GROW_H
-        w += baseSize.width();
-        h += baseSize.height();
-    }
 
     return QSizeF(w, h);
 }
@@ -3110,67 +3081,9 @@ void X11Window::setAllowCommits(bool allow)
                         atoms->xwayland_allow_commits, XCB_ATOM_CARDINAL, 32, 1, &value);
 }
 
-QPointF X11Window::gravityAdjustment(xcb_gravity_t gravity) const
-{
-    qreal dx = 0;
-    qreal dy = 0;
-
-    // dx, dy specify how the client window moves to make space for the frame.
-    // In general we have to compute the reference point and from that figure
-    // out how much we need to shift the client, however given that we ignore
-    // the border width attribute and the extents of the server-side decoration
-    // are known in advance, we can simplify the math quite a bit and express
-    // the required window gravity adjustment in terms of border sizes.
-    switch (gravity) {
-    case XCB_GRAVITY_NORTH_WEST: // move down right
-    default:
-        dx = Xcb::nativeRound(borderLeft());
-        dy = Xcb::nativeRound(borderTop());
-        break;
-    case XCB_GRAVITY_NORTH: // move right
-        dx = 0;
-        dy = Xcb::nativeRound(borderTop());
-        break;
-    case XCB_GRAVITY_NORTH_EAST: // move down left
-        dx = -Xcb::nativeRound(borderRight());
-        dy = Xcb::nativeRound(borderTop());
-        break;
-    case XCB_GRAVITY_WEST: // move right
-        dx = Xcb::nativeRound(borderLeft());
-        dy = 0;
-        break;
-    case XCB_GRAVITY_CENTER:
-        dx = Xcb::fromXNative((int(Xcb::toXNative(borderLeft())) - int(Xcb::toXNative(borderRight()))) / 2);
-        dy = Xcb::fromXNative((int(Xcb::toXNative(borderTop())) - int(Xcb::toXNative(borderBottom()))) / 2);
-        break;
-    case XCB_GRAVITY_STATIC: // don't move
-        dx = 0;
-        dy = 0;
-        break;
-    case XCB_GRAVITY_EAST: // move left
-        dx = -Xcb::nativeRound(borderRight());
-        dy = 0;
-        break;
-    case XCB_GRAVITY_SOUTH_WEST: // move up right
-        dx = Xcb::nativeRound(borderLeft());
-        dy = -Xcb::nativeRound(borderBottom());
-        break;
-    case XCB_GRAVITY_SOUTH: // move up
-        dx = 0;
-        dy = -Xcb::nativeRound(borderBottom());
-        break;
-    case XCB_GRAVITY_SOUTH_EAST: // move up left
-        dx = -Xcb::nativeRound(borderRight());
-        dy = -Xcb::nativeRound(borderBottom());
-        break;
-    }
-
-    return QPointF(dx, dy);
-}
-
 const QPointF X11Window::calculateGravitation(bool invert) const
 {
-    const QPointF adjustment = gravityAdjustment(m_geometryHints.windowGravity());
+    const QPointF adjustment = gravityReferencePoint(frameMargins(), m_geometryHints.windowGravity());
 
     // translate from client movement to frame movement
     const qreal dx = adjustment.x() - Xcb::nativeRound(borderLeft());
@@ -3239,14 +3152,14 @@ void X11Window::configureRequest(int value_mask, qreal rx, qreal ry, qreal rw, q
     }
     if (value_mask & configurePositionMask) {
         QPointF new_pos = framePosToClientPos(pos());
-        new_pos -= gravityAdjustment(xcb_gravity_t(gravity));
+        new_pos -= gravityReferencePoint(frameMargins(), xcb_gravity_t(gravity));
         if (value_mask & XCB_CONFIG_WINDOW_X) {
             new_pos.setX(rx);
         }
         if (value_mask & XCB_CONFIG_WINDOW_Y) {
             new_pos.setY(ry);
         }
-        new_pos += gravityAdjustment(xcb_gravity_t(gravity));
+        new_pos += gravityReferencePoint(frameMargins(), xcb_gravity_t(gravity));
         new_pos = clientPosToFramePos(new_pos);
 
         qreal nw = clientSize().width();
@@ -3549,7 +3462,10 @@ void X11Window::moveResizeInternal(const RectF &rect, MoveResizeMode mode)
     if (oldOutput != m_output) {
         Q_EMIT outputChanged(oldOutput);
     }
-    updateShapeRegion();
+
+    if (oldBufferGeometry.size() != bufferGeometry.size()) {
+        updateShapeRegion();
+    }
 }
 
 void X11Window::configure(const Rect &nativeGeometry)
@@ -3678,7 +3594,7 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
         if (old_mode & MaximizeHorizontal) { // actually restoring from MaximizeFull
             if (geometryRestore().width() == 0) {
                 // needs placement
-                const QSizeF constraintedSize = constrainFrameSize(QSizeF(width() * 2 / 3, clientArea.height()), SizeModeFixedH);
+                const QSizeF constraintedSize = constrainFrameSize(QSizeF(width() * 2 / 3, clientArea.height()));
                 resize(QSizeF(constraintedSize.width(), clientArea.height()));
                 if (const auto placement = workspace()->placement()->placeSmart(this, clientArea)) {
                     place(*placement);
@@ -3699,7 +3615,7 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
         if (old_mode & MaximizeVertical) { // actually restoring from MaximizeFull
             if (geometryRestore().height() == 0) {
                 // needs placement
-                const QSizeF constraintedSize = constrainFrameSize(QSizeF(clientArea.width(), height() * 2 / 3), SizeModeFixedW);
+                const QSizeF constraintedSize = constrainFrameSize(QSizeF(clientArea.width(), height() * 2 / 3));
                 resize(QSizeF(clientArea.width(), constraintedSize.height()));
                 if (const auto placement = workspace()->placement()->placeSmart(this, clientArea)) {
                     place(*placement);
@@ -3749,7 +3665,7 @@ void X11Window::maximize(MaximizeMode mode, const RectF &restore)
             setGeometryRestore(restore); // relevant for mouse pos calculation, bug #298646
         }
 
-        restore.setSize(constrainFrameSize(restore.size(), SizeModeAny));
+        restore.setSize(constrainFrameSize(restore.size()));
 
         if (isFullScreen()) {
             if (info->fullscreenMonitors().isSet()) {
@@ -3967,28 +3883,32 @@ RegionF X11Window::shapeRegion() const
 
 void X11Window::updateShapeRegion()
 {
-    const RectF bufferGeometry = this->bufferGeometry();
+    const RectF bufferRect(0, 0, m_bufferGeometry.width(), m_bufferGeometry.height());
     const auto previousRegion = m_shapeRegion;
     if (Xcb::Extensions::self()->hasShape(window())) {
         auto cookie = xcb_shape_get_rectangles_unchecked(kwinApp()->x11Connection(), window(), XCB_SHAPE_SK_BOUNDING);
         UniqueCPtr<xcb_shape_get_rectangles_reply_t> reply(xcb_shape_get_rectangles_reply(kwinApp()->x11Connection(), cookie, nullptr));
         if (reply) {
-            m_shapeRegion = RegionF{};
-            const xcb_rectangle_t *rects = xcb_shape_get_rectangles_rectangles(reply.get());
-            const int rectCount = xcb_shape_get_rectangles_rectangles_length(reply.get());
-            for (int i = 0; i < rectCount; ++i) {
-                RectF region = Xcb::fromXNative(Rect(rects[i].x, rects[i].y, rects[i].width, rects[i].height));
-                // make sure the shape is sane (X is async, maybe even XShape is broken)
-                region = region.intersected(RectF(QPointF(0, 0), bufferGeometry.size()));
+            // The shape rectangles are sorted in the Y-X lexicographical order. It should be okay
+            // to pass them as is to the Region or RegionF without running the union algorithm.
+            const std::span shapeRects(xcb_shape_get_rectangles_rectangles(reply.get()),
+                                       xcb_shape_get_rectangles_rectangles_length(reply.get()));
 
-                m_shapeRegion += region;
+            QList<RectF> rects;
+            rects.reserve(shapeRects.size());
+            for (const auto &rect : shapeRects) {
+                rects.append(Xcb::fromXNative(Rect(rect.x, rect.y, rect.width, rect.height)));
             }
+
+            // The shape region should be clipped because the X shape and the buffer geometry are async.
+            m_shapeRegion = RegionF::fromSortedRects(rects).intersected(bufferRect);
         } else {
-            m_shapeRegion = {RectF(0, 0, bufferGeometry.width(), bufferGeometry.height())};
+            m_shapeRegion = bufferRect;
         }
     } else {
-        m_shapeRegion = {RectF(0, 0, bufferGeometry.width(), bufferGeometry.height())};
+        m_shapeRegion = bufferRect;
     }
+
     if (m_shapeRegion != previousRegion) {
         Q_EMIT shapeChanged();
     }
@@ -4076,6 +3996,11 @@ void X11Window::getSkipCloseAnimation()
 {
     Xcb::Property property = fetchSkipCloseAnimation();
     readSkipCloseAnimation(property);
+}
+
+void X11Window::detectShape()
+{
+    is_shape = Xcb::Extensions::self()->hasShape(window());
 }
 
 //********************************************

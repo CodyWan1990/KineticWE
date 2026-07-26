@@ -1146,6 +1146,9 @@ void Workspace::initShortcuts()
         }
     }, true);
 
+    initShortcut(QStringLiteral("MoveMouseToFocus"), i18nc("@action", "Center Pointer in Focused Window"), QKeySequence(Qt::META | Qt::Key_F5), &Workspace::slotMouseToFocus, false);
+    initShortcut(QStringLiteral("MoveMouseToCenter"), i18nc("@action", "Center Pointer in Screen"), QKeySequence(Qt::META | Qt::Key_F6), &Workspace::slotMouseToCenter, false);
+
 #if KWIN_BUILD_TABBOX
     m_tabbox->initShortcuts();
 #endif
@@ -1835,6 +1838,18 @@ void Workspace::slotWindowResize()
     if (USABLE_ACTIVE_WINDOW) {
         performWindowOperation(m_activeWindow, Options::UnrestrictedResizeOp);
     }
+}
+
+void Workspace::slotMouseToFocus()
+{
+    if (USABLE_ACTIVE_WINDOW) {
+        input()->pointer()->warp(m_activeWindow->frameGeometry().center());
+    }
+}
+
+void Workspace::slotMouseToCenter()
+{
+    input()->pointer()->warp(m_activeOutput->geometryF().center());
 }
 
 #undef USABLE_ACTIVE_WINDOW

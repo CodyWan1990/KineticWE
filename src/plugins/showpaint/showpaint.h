@@ -21,11 +21,10 @@ class ShowPaintEffect : public Effect
 public:
     ShowPaintEffect();
 
-    void paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
+    bool paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
 
 private:
     void paintGL(const RenderTarget &renderTarget, const RenderViewport &viewport, const Region &deviceRegion);
-    void paintQPainter(const RenderViewport &viewport, const Region &deviceRegion);
 
     int m_colorIndex = 0;
 };

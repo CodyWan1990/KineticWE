@@ -204,7 +204,9 @@ std::optional<AutoBrightnessCurve> AutoBrightnessCurve::fromArray(const QJsonArr
     return ret;
 }
 
-BackendOutput::BackendOutput()
+BackendOutput::BackendOutput(DrmDevice *scanoutDevice)
+    : m_renderLoop(std::make_unique<RenderLoop>(this))
+    , m_scanoutDevice(scanoutDevice)
 {
 }
 
@@ -824,7 +826,7 @@ BackendOutput::BrightnessReason BackendOutput::lastBrightnessAdjustmentReason() 
     return m_state.lastBrightnessAdjustmentReason;
 }
 
-QList<CustomModeDefinition> BackendOutput::customModes() const
+QList<OutputModeline> BackendOutput::customModes() const
 {
     return m_state.customModes;
 }
@@ -832,6 +834,16 @@ QList<CustomModeDefinition> BackendOutput::customModes() const
 uint32_t BackendOutput::abmLevel() const
 {
     return m_state.abmLevel;
+}
+
+RenderLoop *BackendOutput::renderLoop() const
+{
+    return m_renderLoop.get();
+}
+
+DrmDevice *BackendOutput::scanoutDevice() const
+{
+    return m_scanoutDevice;
 }
 
 } // namespace KWin

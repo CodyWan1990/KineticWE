@@ -14,6 +14,7 @@
 #include <QObject>
 #include <QSize>
 #include <memory>
+#include <sys/types.h>
 #include <vulkan/vulkan_raii.hpp>
 
 namespace KWin
@@ -24,6 +25,8 @@ class EglDisplay;
 class EglContext;
 class GraphicsBuffer;
 class VulkanDevice;
+class GraphicsBufferAllocator;
+class UDmabufAllocator;
 
 class KWIN_EXPORT RenderDevice : public QObject
 {
@@ -31,13 +34,17 @@ class KWIN_EXPORT RenderDevice : public QObject
 
 public:
     explicit RenderDevice(std::unique_ptr<DrmDevice> &&device, std::unique_ptr<EglDisplay> &&display);
+    explicit RenderDevice(std::unique_ptr<UDmabufAllocator> &&allocator, std::unique_ptr<EglDisplay> &&display, dev_t deviceId);
     ~RenderDevice();
 
     /**
      * the underlying drm device that can be used to allocate buffers for this render device
-     * This doesn't necessarily represent a render node!
+     * This doesn't necessarily represent a render node, and may be nullptr!
      */
     DrmDevice *drmDevice() const;
+    GraphicsBufferAllocator *allocator() const;
+    QString path() const;
+    dev_t deviceId() const;
     EglDisplay *eglDisplay() const;
     /**
      * @returns an EGL context suitable for rendering with this render device,
@@ -69,12 +76,18 @@ public:
     bool isSoftwareDevice() const;
 
     static std::unique_ptr<RenderDevice> open(const QString &path, int authenticatedFd = -1);
+    /**
+     * @returns a RenderDevice without a drm device, using udmabuf for allocations
+     *          and a software renderer for OpenGL and Vulkan
+     */
+    static std::unique_ptr<RenderDevice> createSoftwareDevice(dev_t deviceId);
 
 private:
     void handleVulkanDeviceLoss();
     void createVulkanDevice();
 
     const std::unique_ptr<DrmDevice> m_device;
+    const std::unique_ptr<UDmabufAllocator> m_udmabufAllocator;
     const std::unique_ptr<EglDisplay> m_display;
     const vk::raii::Context m_vulkanContext;
     const vk::raii::Instance m_vulkanInstance;
@@ -82,6 +95,8 @@ private:
     FormatModifierMap m_allImportableFormats;
     std::weak_ptr<EglContext> m_eglContext;
     bool m_inReset = false;
+    const QString m_path;
+    const dev_t m_deviceId;
 };
 
 }

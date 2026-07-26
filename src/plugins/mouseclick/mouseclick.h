@@ -104,7 +104,7 @@ public:
     ~MouseClickEffect() override;
     void reconfigure(ReconfigureFlags) override;
     void prePaintScreen(ScreenPrePaintData &data) override;
-    void paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
+    bool paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
     void postPaintScreen() override;
     bool isActive() const override;
 
@@ -143,7 +143,6 @@ private:
     void repaint();
 
     void drawCircleGl(const RenderViewport &viewport, const QColor &color, float cx, float cy, float r);
-    void drawCircleQPainter(const QColor &color, float cx, float cy, float r);
     void paintScreenSetupGl(const RenderTarget &renderTarget, const QMatrix4x4 &projectionMatrix);
     void paintScreenFinishGl();
 

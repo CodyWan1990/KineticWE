@@ -1123,7 +1123,7 @@ void Window::startDelayedInteractiveMoveResize()
         if (!startInteractiveMoveResize()) {
             setInteractiveMoveResizePointerButtonDown(false);
         }
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
         stopDelayedInteractiveMoveResize();
     });
     m_interactiveMoveResize.delayedTimer->start(QApplication::startDragTime());
@@ -1398,7 +1398,7 @@ static std::optional<QPointF> confineInteractiveMove(const RectF &geometry, int 
  *
  * See doc/moveresizerestriction for more details on algorithm.
  */
-static std::optional<QPointF> confineInteractiveResize(const RectF &geometry, Gravity gravity, int minVisibleWidth, int minVisibleHeight)
+std::optional<QPointF> Window::confineInteractiveResize(const RectF &geometry, Gravity gravity, int minVisibleWidth, int minVisibleHeight) const
 {
     if (gravity == Gravity::Bottom) {
         QPointF candidate = geometry.bottomLeft();
@@ -1431,9 +1431,108 @@ static std::optional<QPointF> confineInteractiveResize(const RectF &geometry, Gr
         Q_UNREACHABLE();
     }
 
-    const auto clampPoint = [](const RectF &rect, const QPointF &point) {
-        return QPointF(std::clamp(point.x(), rect.left(), rect.right()),
-                       std::clamp(point.y(), rect.top(), rect.bottom()));
+    const auto availableArea = workspace()->clientArea(FullArea, workspace()->activeOutput());
+    const QSizeF minFrameSize = nextClientSizeToFrameSize(minSize());
+    const QSizeF maxFrameSize = nextClientSizeToFrameSize(maxSize());
+
+    const auto closestAllowedPoint = [&](const RectF &rect, const QPointF &point) -> std::optional<QPointF> {
+        // The input rect specifies an area where the anchor point can possibly be. Geometry
+        // constraints are implemented by applying additional restrictions to the rect.
+        RectF constrainedRect = rect;
+
+        switch (gravity) {
+        case Gravity::Top:
+            // Resizing from the top is handled like moving the window to avoid zero width
+            // rectangles when window width is equal to minVisibleWidth.
+            constrainedRect.setLeft(rect.left() - geometry.width() + minVisibleWidth);
+            break;
+
+        case Gravity::Left:
+        case Gravity::TopLeft:
+        case Gravity::BottomLeft:
+            // Convert top-left of visible titlebar subrect to top-left of the window.
+            constrainedRect.setLeft(availableArea.left());
+            break;
+
+        case Gravity::Right:
+        case Gravity::TopRight:
+        case Gravity::BottomRight:
+            // Convert top-right of visible titlebar subrect to top-right of the window.
+            constrainedRect.setRight(availableArea.right());
+            break;
+
+        default:
+            Q_UNREACHABLE();
+        }
+
+        // The minimum and the maximum height constraints are applied by moving the bottom and the top
+        // edges of the constrainedRect so there is enough space reserved for the window and that the
+        // window height doesn't exceed the maximum size.
+        //
+        // Note that after applying the height constraint, the top and the bottom edge of the constrainedRect
+        // can swap, i.e. constrainedRect.top() > constrainedRect.bottom(), which means that the anchor
+        // cannot lie in this rect. However, constrainedRect.top() == constrainedRect.bottom() is a valid
+        // case, it can arise if the min and the max sizes are the same.
+        switch (gravity) {
+        case Gravity::TopLeft:
+        case Gravity::Top:
+        case Gravity::TopRight:
+        case Gravity::BottomLeft:
+        case Gravity::Bottom:
+        case Gravity::BottomRight:
+            constrainedRect.setBottom(std::min(constrainedRect.bottom(), geometry.bottom() - minFrameSize.height()));
+            constrainedRect.setTop(std::max(constrainedRect.top(), geometry.bottom() - maxFrameSize.height()));
+            break;
+
+        case Gravity::Left:
+        case Gravity::Right:
+            break;
+
+        case Gravity::None:
+            Q_UNREACHABLE();
+        }
+
+        if (constrainedRect.top() > constrainedRect.bottom()) {
+            return std::nullopt;
+        }
+
+        // The minimum and the maximum width constraints are applied by moving the left and the right
+        // edges of the constrainedRect so there is enough space reserved for the window and that the
+        // window width doesn't exceed the maximum size.
+        //
+        // Note that after applying the width constraint, the left and the right edge of the constrainedRect
+        // can swap, i.e. constrainedRect.left() > constrainedRect.right(), which means that the anchor
+        // cannot lie in this rect. However, constrainedRect.left() == constrainedRect.right() is a valid
+        // case, it can arise if the min and the max sizes are the same.
+        switch (gravity) {
+        case Gravity::TopLeft:
+        case Gravity::Left:
+        case Gravity::BottomLeft:
+            constrainedRect.setRight(std::min(constrainedRect.right(), geometry.right() - minFrameSize.width()));
+            constrainedRect.setLeft(std::max(constrainedRect.left(), geometry.right() - maxFrameSize.width()));
+            break;
+
+        case Gravity::Top:
+        case Gravity::Bottom:
+            break;
+
+        case Gravity::TopRight:
+        case Gravity::Right:
+        case Gravity::BottomRight:
+            constrainedRect.setLeft(std::max(constrainedRect.left(), geometry.left() + minFrameSize.width()));
+            constrainedRect.setRight(std::min(constrainedRect.right(), geometry.left() + maxFrameSize.width()));
+            break;
+
+        case Gravity::None:
+            Q_UNREACHABLE();
+        }
+
+        if (constrainedRect.left() > constrainedRect.right()) {
+            return std::nullopt;
+        }
+
+        return QPointF(std::clamp(point.x(), constrainedRect.left(), constrainedRect.right()),
+                       std::clamp(point.y(), constrainedRect.top(), constrainedRect.bottom()));
     };
 
     // calculate distance, considering movement constraints in the different modes of resizing
@@ -1462,56 +1561,19 @@ static std::optional<QPointF> confineInteractiveResize(const RectF &geometry, Gr
 
     std::optional<QPointF> candidate;
     qreal bestScore;
-    const auto availableArea = workspace()->clientArea(FullArea, workspace()->activeOutput());
-
-    switch (gravity) {
-    case Gravity::Top:
-        // resizing from the top is handled like moving the window to avoid zero width rectangles when window width is equal to minVisibleWidth
-        for (RectF rect : visibleSubrectRegion.rects()) {
-            // convert top-left of visible titlebar subrect to top-left of the window
-            rect.setLeft(rect.left() - geometry.width() + minVisibleWidth);
-
-            const QPointF closest = clampPoint(rect, anchor);
-            const qreal score = calcDistance(anchor, closest);
-            if (!candidate || score < bestScore) {
-                candidate = closest;
-                bestScore = score;
-            }
+    for (const RectF &rect : visibleSubrectRegion.rects()) {
+        const std::optional<QPointF> closest = closestAllowedPoint(rect, anchor);
+        if (!closest) {
+            continue;
         }
-        break;
-    case Gravity::Left:
-    case Gravity::TopLeft:
-    case Gravity::BottomLeft:
-        for (RectF rect : visibleSubrectRegion.rects()) {
-            // convert top-left of visible titlebar subrect to top-left of the window
-            rect.setLeft(availableArea.left());
 
-            const QPointF closest = clampPoint(rect, anchor);
-            const qreal score = calcDistance(anchor, closest);
-            if (!candidate || score < bestScore) {
-                candidate = closest;
-                bestScore = score;
-            }
+        const qreal score = calcDistance(anchor, *closest);
+        if (!candidate || score < bestScore) {
+            candidate = closest;
+            bestScore = score;
         }
-        break;
-    case Gravity::Right:
-    case Gravity::TopRight:
-    case Gravity::BottomRight:
-        for (RectF rect : visibleSubrectRegion.rects()) {
-            // convert top-right of visible titlebar subrect to top-right of the window
-            rect.setRight(availableArea.right());
-
-            const QPointF closest = clampPoint(rect, anchor);
-            const qreal score = calcDistance(anchor, closest);
-            if (!candidate || score < bestScore) {
-                candidate = closest;
-                bestScore = score;
-            }
-        }
-        break;
-    default:
-        Q_UNREACHABLE();
     }
+
     return candidate;
 }
 
@@ -1526,13 +1588,10 @@ RectF Window::nextInteractiveResizeGeometry(const QPointF &global) const
 
     // these two points limit the geometry rectangle, i.e. if bottomleft resizing is done,
     // the bottomleft corner should be at is at (topleft.x(), bottomright().y())
-    RectF orig = initialInteractiveMoveResizeGeometry();
-    QPointF topleft = global - QPointF(interactiveMoveOffset().x() * orig.width(), interactiveMoveOffset().y() * orig.height());
-    QPointF bottomright = global + QPointF((1.0 - interactiveMoveOffset().x()) * orig.width(), (1.0 - interactiveMoveOffset().y()) * orig.height());
+    const RectF orig = initialInteractiveMoveResizeGeometry();
+    const QPointF topleft = global - QPointF(interactiveMoveOffset().x() * orig.width(), interactiveMoveOffset().y() * orig.height());
+    const QPointF bottomright = global + QPointF((1.0 - interactiveMoveOffset().x()) * orig.width(), (1.0 - interactiveMoveOffset().y()) * orig.height());
 
-    // TODO move whole group when moving its leader or when the leader is not mapped?
-
-    SizeMode sizeMode = SizeModeAny;
     switch (gravity) {
     case Gravity::TopLeft:
         nextMoveResizeGeom = RectF(topleft, orig.bottomRight());
@@ -1548,19 +1607,15 @@ RectF Window::nextInteractiveResizeGeometry(const QPointF &global) const
         break;
     case Gravity::Top:
         nextMoveResizeGeom = RectF(QPointF(orig.left(), topleft.y()), orig.bottomRight());
-        sizeMode = SizeModeFixedH; // try not to affect height
         break;
     case Gravity::Bottom:
         nextMoveResizeGeom = RectF(orig.topLeft(), QPointF(orig.right(), bottomright.y()));
-        sizeMode = SizeModeFixedH;
         break;
     case Gravity::Left:
         nextMoveResizeGeom = RectF(QPointF(topleft.x(), orig.top()), orig.bottomRight());
-        sizeMode = SizeModeFixedW;
         break;
     case Gravity::Right:
         nextMoveResizeGeom = RectF(orig.topLeft(), QPointF(bottomright.x(), orig.bottom()));
-        sizeMode = SizeModeFixedW;
         break;
     case Gravity::None:
         Q_UNREACHABLE();
@@ -1569,7 +1624,7 @@ RectF Window::nextInteractiveResizeGeometry(const QPointF &global) const
 
     nextMoveResizeGeom = workspace()->adjustWindowSize(this, nextMoveResizeGeom, gravity);
 
-    const QSizeF constrainedSize = constrainFrameSize(nextMoveResizeGeom.size(), sizeMode);
+    const QSizeF constrainedSize = constrainFrameSize(nextMoveResizeGeom.size());
     switch (gravity) {
     case Gravity::TopLeft:
         nextMoveResizeGeom.setLeft(nextMoveResizeGeom.right() - constrainedSize.width());
@@ -2100,7 +2155,7 @@ bool Window::performMousePressCommand(Options::MouseCommand cmd, const QPointF &
         if (!startInteractiveMoveResize()) {
             setInteractiveMoveResizePointerButtonDown(false);
         }
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
         break;
     }
     case Options::MouseActivateRaiseAndResize:
@@ -2140,7 +2195,7 @@ bool Window::performMousePressCommand(Options::MouseCommand cmd, const QPointF &
         if (!startInteractiveMoveResize()) {
             setInteractiveMoveResizePointerButtonDown(false);
         }
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
         break;
     }
     case Options::MouseNothing:
@@ -2339,7 +2394,7 @@ qreal Window::borderTop() const
     return isDecorated() ? decoration()->borderTop() : 0;
 }
 
-void Window::updateCursor()
+void Window::updateInteractiveMoveResizeCursor()
 {
     if (isDeleted()) {
         return;
@@ -2528,12 +2583,12 @@ void Window::keyPressEvent(QKeyCombination key_combination)
     case Qt::Key_Enter:
         setInteractiveMoveResizePointerButtonDown(false);
         finishInteractiveMoveResize(false);
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
         break;
     case Qt::Key_Escape:
         setInteractiveMoveResizePointerButtonDown(false);
         finishInteractiveMoveResize(true);
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
         break;
     default:
         return;
@@ -2590,7 +2645,7 @@ void Window::endInteractiveMoveResize()
         finishInteractiveMoveResize(false);
         setInteractiveMoveResizeGravity(mouseGravity());
     }
-    updateCursor();
+    updateInteractiveMoveResizeCursor();
 }
 
 void Window::cancelInteractiveMoveResize()
@@ -2601,7 +2656,7 @@ void Window::cancelInteractiveMoveResize()
         finishInteractiveMoveResize(true);
         setInteractiveMoveResizeGravity(mouseGravity());
     }
-    updateCursor();
+    updateInteractiveMoveResizeCursor();
 }
 
 void Window::setDecoration(std::shared_ptr<KDecoration3::Decoration> decoration)
@@ -2711,7 +2766,7 @@ void Window::processDecorationMove(const QPointF &localPos, const QPointF &globa
                 } else {
                     setInteractiveMoveResizePointerButtonDown(false);
                 }
-                updateCursor();
+                updateInteractiveMoveResizeCursor();
             }
         }
         return;
@@ -2721,7 +2776,7 @@ void Window::processDecorationMove(const QPointF &localPos, const QPointF &globa
     Gravity newGravity = mouseGravity();
     if (newGravity != interactiveMoveResizeGravity()) {
         setInteractiveMoveResizeGravity(newGravity);
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
     }
 }
 
@@ -2791,7 +2846,7 @@ bool Window::processDecorationButtonPress(const QPointF &localPos, const QPointF
         setInteractiveMoveOffset(QPointF(qreal(localPos.x()) / width(), qreal(localPos.y()) / height()));
         setUnrestrictedInteractiveMoveResize(false);
         startDelayedInteractiveMoveResize();
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
     }
     // In the new API the decoration may process the menu action to display an inactive tab's menu.
     // If the event is unhandled then the core will create one for the active window in the group.
@@ -2811,7 +2866,7 @@ void Window::processDecorationButtonRelease(Qt::MouseButton button)
             finishInteractiveMoveResize(false);
             setInteractiveMoveResizeGravity(mouseGravity());
         }
-        updateCursor();
+        updateInteractiveMoveResizeCursor();
     }
 }
 
@@ -4172,7 +4227,7 @@ void Window::checkOffscreenPosition(RectF *geom, const RectF &screenArea)
  *
  * Default implementation applies only minimum and maximum size constraints.
  */
-QSizeF Window::constrainClientSize(const QSizeF &size, SizeMode mode) const
+QSizeF Window::constrainClientSize(const QSizeF &size) const
 {
     qreal width = size.width();
     qreal height = size.height();
@@ -4198,10 +4253,10 @@ QSizeF Window::constrainClientSize(const QSizeF &size, SizeMode mode) const
 /**
  * Constrains the frame size @p size according to a set of the window's size hints.
  */
-QSizeF Window::constrainFrameSize(const QSizeF &size, SizeMode mode) const
+QSizeF Window::constrainFrameSize(const QSizeF &size) const
 {
     const QSizeF unconstrainedClientSize = nextFrameSizeToClientSize(size);
-    const QSizeF constrainedClientSize = constrainClientSize(unconstrainedClientSize, mode);
+    const QSizeF constrainedClientSize = constrainClientSize(unconstrainedClientSize);
     return nextClientSizeToFrameSize(constrainedClientSize);
 }
 
@@ -4342,20 +4397,20 @@ void Window::setNoBorder(bool set)
     if (set) {
         setDecorationPolicy(DecorationPolicy::None);
     } else {
-        setDecorationPolicy(DecorationPolicy::PreferredByClient);
+        setDecorationPolicy(DecorationPolicy::ClientPreference);
     }
 }
 
 bool Window::userCanSetNoBorder() const
 {
-    const bool forcingNoDecoration = rules()->checkNoBorder(false);
-    const bool forcingServerDecoration = !rules()->checkNoBorder(true);
-    return !forcingNoDecoration && !forcingServerDecoration;
+    // In other words, check that no specific decoration mode is forced.
+    return rules()->checkDecorationPolicy(DecorationPolicy::None) == DecorationPolicy::None
+        && rules()->checkDecorationPolicy(DecorationPolicy::ClientPreference) == DecorationPolicy::ClientPreference;
 }
 
 DecorationPolicy Window::decorationPolicy() const
 {
-    return DecorationPolicy::PreferredByClient;
+    return DecorationPolicy::ClientPreference;
 }
 
 void Window::setDecorationPolicy(DecorationPolicy policy)

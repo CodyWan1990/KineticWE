@@ -113,7 +113,10 @@ bool DrmAtomicCommit::testAllowModeset()
 
 bool DrmAtomicCommit::commit()
 {
-    uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT;
+    uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
+    if (m_crtc) {
+        flags |= DRM_MODE_PAGE_FLIP_EVENT;
+    }
     if (isTearing()) {
         flags |= DRM_MODE_PAGE_FLIP_ASYNC;
     }
@@ -156,9 +159,17 @@ bool DrmAtomicCommit::doCommit(uint32_t flags)
         .props_ptr = reinterpret_cast<uint64_t>(propertyIds.data()),
         .prop_values_ptr = reinterpret_cast<uint64_t>(values.data()),
         .reserved = 0,
-        .user_data = reinterpret_cast<uint64_t>(this),
+        .user_data = reinterpret_cast<uint64_t>(m_gpu),
     };
-    return drmIoctl(m_gpu->fd(), DRM_IOCTL_MODE_ATOMIC, &commitData) == 0;
+    std::unique_lock<std::mutex> lock;
+    if (flags & DRM_MODE_PAGE_FLIP_EVENT) {
+        lock = m_gpu->lockPendingCommits();
+    }
+    const bool success = drmIoctl(m_gpu->fd(), DRM_IOCTL_MODE_ATOMIC, &commitData) == 0;
+    if (success && (flags & DRM_MODE_PAGE_FLIP_EVENT)) {
+        m_gpu->registerPendingCommit(lock, *m_crtc, this);
+    }
+    return success;
 }
 
 void DrmAtomicCommit::pageFlipped(std::chrono::nanoseconds timestamp)
@@ -182,7 +193,10 @@ void DrmAtomicCommit::pageFlipped(std::chrono::nanoseconds timestamp)
         frame->presented(timestamp, m_mode);
     }
     m_frames.clear();
-    for (const auto pipeline : std::as_const(m_pipelines)) {
+    // Iterate a copy: pageFlipped() can reset DrmCommitThread::m_committed, which
+    // destroys this commit - and with it m_pipelines - mid-loop.
+    const auto pipelines = m_pipelines;
+    for (const auto pipeline : pipelines) {
         pipeline->pageFlipped(timestamp);
     }
 }
@@ -243,6 +257,9 @@ void DrmAtomicCommit::merge(DrmAtomicCommit *onTop)
     } else {
         m_allowedVrrDelay.reset();
     }
+    if (onTop->m_crtc) {
+        m_crtc = onTop->m_crtc;
+    }
 }
 
 void DrmAtomicCommit::setAllowedVrrDelay(std::optional<std::chrono::nanoseconds> allowedDelay)
@@ -269,6 +286,11 @@ bool DrmAtomicCommit::isReadyFor(std::chrono::steady_clock::time_point pageflipT
 bool DrmAtomicCommit::isTearing() const
 {
     return m_mode == PresentationMode::Async || m_mode == PresentationMode::AdaptiveAsync;
+}
+
+void DrmAtomicCommit::requestPageflipEvent(uint32_t crtcId)
+{
+    m_crtc = crtcId;
 }
 
 DrmLegacyCommit::DrmLegacyCommit(DrmPipeline *pipeline, const std::shared_ptr<DrmFramebuffer> &buffer, const std::shared_ptr<OutputFrame> &frame)
@@ -298,7 +320,12 @@ bool DrmLegacyCommit::doPageflip(PresentationMode mode)
     if (mode == PresentationMode::Async || mode == PresentationMode::AdaptiveAsync) {
         flags |= DRM_MODE_PAGE_FLIP_ASYNC;
     }
-    return drmModePageFlip(gpu()->fd(), m_crtc->id(), m_buffer->framebufferId(), flags, this) == 0;
+    auto lock = gpu()->lockPendingCommits();
+    const bool success = drmModePageFlip(gpu()->fd(), m_crtc->id(), m_buffer->framebufferId(), flags, gpu()) == 0;
+    if (success) {
+        gpu()->registerPendingCommit(lock, m_crtc->id(), this);
+    }
+    return success;
 }
 
 void DrmLegacyCommit::pageFlipped(std::chrono::nanoseconds timestamp)

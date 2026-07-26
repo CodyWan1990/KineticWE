@@ -58,9 +58,7 @@
 
 // system
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
-#include <xf86drm.h>
 
 namespace KWin
 {
@@ -593,6 +591,12 @@ std::unique_ptr<Connection> Connection::setup(int socket, AdditionalWaylandInter
         if (flags & AdditionalWaylandInterface::Viewporter && interface == wp_viewporter_interface.name) {
             c->viewporter = std::make_unique<WaylandClient::Viewporter>(*c->registry, name, 1u);
         }
+        if (flags & AdditionalWaylandInterface::AlphaModifierV1 && interface == wp_alpha_modifier_v1_interface.name) {
+            c->alphaModifier = std::make_unique<AlphaModifierV1>(*c->registry, name, version);
+        }
+        if (flags & AdditionalWaylandInterface::TearingControlV1 && interface == wp_tearing_control_manager_v1_interface.name) {
+            c->tearingControl = std::make_unique<TearingControlManagerV1>(*c->registry, name, version);
+        }
         if (flags.testFlag(AdditionalWaylandInterface::Seat) && interface == wl_seat_interface.name) {
             c->kwinSeat = std::make_unique<WlSeat>(*c->registry, name, version);
         }
@@ -743,6 +747,8 @@ Connection::~Connection()
     linuxDmabuf.reset();
     colorRepresentation.reset();
     viewporter.reset();
+    alphaModifier.reset();
+    tearingControl.reset();
     kwinSeat.reset();
 
     delete queue; // Must be destroyed last
@@ -958,9 +964,19 @@ ColorRepresentationV1 *colorRepresentation()
     return s_waylandConnection->colorRepresentation.get();
 }
 
+AlphaModifierV1 *alphaModifier()
+{
+    return s_waylandConnection->alphaModifier.get();
+}
+
 WaylandClient::Viewporter *viewporter()
 {
     return s_waylandConnection->viewporter.get();
+}
+
+TearingControlManagerV1 *tearingControl()
+{
+    return s_waylandConnection->tearingControl.get();
 }
 
 bool waitForWaylandSurface(Window *window)
@@ -1450,36 +1466,6 @@ bool unlockScreen()
     return true;
 }
 #endif // KWIN_BUILD_LOCKSCREEN
-
-static bool haveDrmNode(int type)
-{
-    const int deviceCount = drmGetDevices2(0, nullptr, 0);
-    if (deviceCount <= 0) {
-        return false;
-    }
-
-    QList<drmDevice *> devices(deviceCount);
-    if (drmGetDevices2(0, devices.data(), devices.size()) < 0) {
-        return false;
-    }
-    auto deviceCleanup = qScopeGuard([&devices]() {
-        drmFreeDevices(devices.data(), devices.size());
-    });
-
-    return std::any_of(devices.constBegin(), devices.constEnd(), [type](drmDevice *device) {
-        return device->available_nodes & (1 << type);
-    });
-}
-
-bool renderNodeAvailable()
-{
-    return haveDrmNode(DRM_NODE_RENDER);
-}
-
-bool primaryNodeAvailable()
-{
-    return haveDrmNode(DRM_NODE_PRIMARY);
-}
 
 #if KWIN_BUILD_X11
 void XcbConnectionDeleter::operator()(xcb_connection_t *pointer)
@@ -1993,6 +1979,46 @@ ColorRepresentationSurfaceV1::ColorRepresentationSurfaceV1(::wp_color_representa
 }
 
 ColorRepresentationSurfaceV1::~ColorRepresentationSurfaceV1()
+{
+    destroy();
+}
+
+AlphaModifierV1::AlphaModifierV1(::wl_registry *registry, uint32_t id, int version)
+    : QtWayland::wp_alpha_modifier_v1(registry, id, version)
+{
+}
+
+AlphaModifierV1::~AlphaModifierV1()
+{
+    destroy();
+}
+
+TearingControlManagerV1::TearingControlManagerV1(::wl_registry *registry, uint32_t id, int version)
+    : QtWayland::wp_tearing_control_manager_v1(registry, id, version)
+{
+}
+
+TearingControlManagerV1::~TearingControlManagerV1()
+{
+    destroy();
+}
+
+AlphaModifierSurfaceV1::AlphaModifierSurfaceV1(::wp_alpha_modifier_surface_v1 *object)
+    : QtWayland::wp_alpha_modifier_surface_v1(object)
+{
+}
+
+AlphaModifierSurfaceV1::~AlphaModifierSurfaceV1()
+{
+    destroy();
+}
+
+TearingControlV1::TearingControlV1(::wp_tearing_control_v1 *object)
+    : QtWayland::wp_tearing_control_v1(object)
+{
+}
+
+TearingControlV1::~TearingControlV1()
 {
     destroy();
 }

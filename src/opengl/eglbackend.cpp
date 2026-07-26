@@ -11,6 +11,7 @@
 #include "compositor.h"
 #include "core/drm_formats.h"
 #include "core/drmdevice.h"
+#include "core/gpumanager.h"
 #include "core/graphicsbuffer.h"
 #include "core/outputbackend.h"
 #include "core/renderdevice.h"
@@ -30,9 +31,8 @@
 namespace KWin
 {
 
-static std::shared_ptr<EglContext> s_globalShareContext;
-
-EglBackend::EglBackend()
+EglBackend::EglBackend(RenderDevice *device)
+    : m_renderDevice(device)
 {
 }
 
@@ -87,13 +87,10 @@ bool EglBackend::checkGraphicsReset()
 
 bool EglBackend::ensureGlobalShareContext()
 {
-    if (!s_globalShareContext) {
-        s_globalShareContext = EglContext::create(m_renderDevice->eglDisplay(), EGL_NO_CONFIG_KHR, nullptr);
-        connect(Compositor::self(), &Compositor::aboutToDestroy, qApp, []() {
-            s_globalShareContext.reset();
-        });
+    if (!m_globalShareContext) {
+        m_globalShareContext = EglContext::create(m_renderDevice->eglDisplay(), EGL_NO_CONFIG_KHR, nullptr);
     }
-    return s_globalShareContext != nullptr;
+    return m_globalShareContext != nullptr;
 }
 
 void EglBackend::cleanup()
@@ -101,19 +98,8 @@ void EglBackend::cleanup()
     m_context.reset();
 }
 
-void EglBackend::setRenderDevice(RenderDevice *device)
-{
-    m_renderDevice = device;
-}
-
 void EglBackend::initWayland()
 {
-    if (!WaylandServer::self()) {
-        return;
-    }
-    DrmDevice *scanoutDevice = drmDevice();
-    Q_ASSERT(scanoutDevice);
-
     auto filterFormats = [this](std::optional<uint32_t> bpc, bool withExternalOnlyYUV) {
         FormatModifierMap set;
         const auto &allFormats = m_renderDevice->eglDisplay()->allSupportedDrmFormats();
@@ -165,17 +151,17 @@ void EglBackend::initWayland()
     };
 
     m_tranches.append({
-        .device = m_renderDevice->eglDisplay()->renderDevNode().value_or(scanoutDevice->deviceId()),
+        .device = m_renderDevice->deviceId(),
         .flags = LinuxDmaBufV1Feedback::TrancheFlag::Sampling,
         .formatTable = filterFormats(10, false),
     });
     m_tranches.append({
-        .device = m_renderDevice->eglDisplay()->renderDevNode().value_or(scanoutDevice->deviceId()),
+        .device = m_renderDevice->deviceId(),
         .flags = LinuxDmaBufV1Feedback::TrancheFlag::Sampling,
         .formatTable = filterFormats(8, false),
     });
     m_tranches.append({
-        .device = m_renderDevice->eglDisplay()->renderDevNode().value_or(scanoutDevice->deviceId()),
+        .device = m_renderDevice->deviceId(),
         .flags = LinuxDmaBufV1Feedback::TrancheFlag::Sampling,
         .formatTable = includeShaderConversions(filterFormats(std::nullopt, true)),
     });
@@ -217,17 +203,12 @@ bool EglBackend::hasClientExtension(const QByteArray &ext) const
     return m_clientExtensions.contains(ext);
 }
 
-bool EglBackend::isOpenGLES() const
-{
-    return EglDisplay::shouldUseOpenGLES();
-}
-
 bool EglBackend::createContext()
 {
     if (!ensureGlobalShareContext()) {
         return false;
     }
-    m_context = m_renderDevice->eglContext(s_globalShareContext.get());
+    m_context = m_renderDevice->eglContext(m_globalShareContext.get());
     return m_context != nullptr;
 }
 
@@ -253,6 +234,11 @@ std::shared_ptr<GLTexture> EglBackend::importDmaBufAsTexture(const DmaBufAttribu
 
 bool EglBackend::testImportBuffer(GraphicsBuffer *buffer)
 {
+    RenderDevice *compat = GpuManager::self()->compatibleRenderDevice(buffer->dmabufAttributes()->device);
+    if (compat != m_renderDevice) {
+        // TODO import the buffer into the correct device instead
+        return false;
+    }
     const auto nonExternalOnly = m_renderDevice->eglDisplay()->nonExternalOnlySupportedDrmFormats();
     if (auto it = nonExternalOnly.find(buffer->dmabufAttributes()->format); it != nonExternalOnly.end() && it->contains(buffer->dmabufAttributes()->modifier)) {
         return importBufferAsImage(buffer) != EGL_NO_IMAGE_KHR;
@@ -286,7 +272,7 @@ EglDisplay *EglBackend::eglDisplayObject() const
 
 EglContext *EglBackend::openglShareContext() const
 {
-    return s_globalShareContext.get();
+    return m_globalShareContext.get();
 }
 
 EglContext *EglBackend::openglContext() const

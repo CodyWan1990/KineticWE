@@ -77,24 +77,6 @@ using ElectricBorderMode = std::variant<QuickTileMode, MaximizeMode>;
 using PlacementCommand = std::variant<QPointF, RectF, MaximizeMode>;
 
 /**
- * The DecorationPolicy enum indicates how the decoration mode is determined.
- */
-enum class DecorationPolicy {
-    /**
-     * Force no decoration.
-     */
-    None,
-    /**
-     * Follow the preferred decoration mode of the client.
-     */
-    PreferredByClient,
-    /**
-     * Force the server side decoration mode.
-     */
-    Server,
-};
-
-/**
  * The DecorationMode enum specifies who draws the window decoration, if at all.
  */
 enum class DecorationMode {
@@ -103,11 +85,18 @@ enum class DecorationMode {
      */
     None,
     /**
-     * The window decoration is drawn by the client.
+     * The window decoration is drawn by the client. The client is responsible for drawing both
+     * the titlebar and the drop shadow.
      */
     Client,
     /**
-     * The window decoration is drawn by the compositor.
+     * The window decoration is drawn by the client, but the compositor can draw a drop shadow
+     * around the window and potentially round corners.
+     */
+    Shadow,
+    /**
+     * The window decoration is drawn by the compositor. The compositor is responsible for drawing
+     * both the titlebar and the drop shadow.
      */
     Server,
 };
@@ -746,18 +735,8 @@ public:
     RectF clientRectToFrameRect(const RectF &rect) const;
     RectF nextClientRectToFrameRect(const RectF &rect) const;
 
-    /**
-     * How to resize the window in order to obey constraints (mainly aspect ratios).
-     */
-    enum SizeMode {
-        SizeModeAny,
-        SizeModeFixedW, ///< Try not to affect width
-        SizeModeFixedH, ///< Try not to affect height
-        SizeModeMax, ///< Try not to make it larger in either direction
-    };
-
-    virtual QSizeF constrainClientSize(const QSizeF &size, SizeMode mode = SizeModeAny) const;
-    QSizeF constrainFrameSize(const QSizeF &size, SizeMode mode = SizeModeAny) const;
+    virtual QSizeF constrainClientSize(const QSizeF &size) const;
+    QSizeF constrainFrameSize(const QSizeF &size) const;
 
     /**
      * Moves the window so that the new topLeft corner of the frame is @p topLeft.
@@ -1197,7 +1176,7 @@ public:
     /**
      * Cursor shape for move/resize mode.
      */
-    CursorShape cursor() const
+    CursorShape interactiveMoveResizeCursor() const
     {
         return m_interactiveMoveResize.cursor;
     }
@@ -1730,7 +1709,7 @@ protected:
     /**
      * Sets an appropriate cursor shape for the logical mouse position.
      */
-    void updateCursor();
+    void updateInteractiveMoveResizeCursor();
     void startDelayedInteractiveMoveResize();
     void stopDelayedInteractiveMoveResize();
     bool startInteractiveMoveResize();
@@ -1771,6 +1750,7 @@ protected:
     qreal titlebarThickness() const;
     RectF nextInteractiveMoveGeometry(const RectF &rect) const;
     RectF nextInteractiveResizeGeometry(const QPointF &global) const;
+    std::optional<QPointF> confineInteractiveResize(const RectF &geometry, Gravity gravity, int minVisibleWidth, int minVisibleHeight) const;
     void dontInteractiveMoveResize();
 
     virtual QSizeF resizeIncrements() const;

@@ -18,7 +18,6 @@
 #include "x11_windowed_egl_backend.h"
 #include "x11_windowed_logging.h"
 #include "x11_windowed_output.h"
-#include "x11_windowed_qpainter_backend.h"
 // KDE
 #include <KLocalizedString>
 #include <QAbstractEventDispatcher>
@@ -212,9 +211,11 @@ bool X11WindowedBackend::initialize()
             m_hasDri = true;
             m_driMajorVersion = reply->major_version;
             m_driMinorVersion = reply->minor_version;
-        } else {
-            qCWarning(KWIN_X11WINDOWED) << "Requested DRI3 extension version is unsupported";
         }
+    }
+    if (!m_hasDri) {
+        qCCritical(KWIN_X11WINDOWED, "X11 server is missing support for DRI3 1.2+, which the nested X11 backend requires");
+        return false;
     }
 
     initXInput();
@@ -677,11 +678,6 @@ xcb_window_t X11WindowedBackend::rootWindow() const
     return m_screen->root;
 }
 
-DrmDevice *X11WindowedBackend::drmDevice() const
-{
-    return m_renderDevice ? m_renderDevice->drmDevice() : nullptr;
-}
-
 X11WindowedInputDevice *X11WindowedBackend::pointerDevice() const
 {
     return m_pointerDevice.get();
@@ -697,14 +693,9 @@ X11WindowedInputDevice *X11WindowedBackend::touchDevice() const
     return m_touchDevice.get();
 }
 
-std::unique_ptr<EglBackend> X11WindowedBackend::createOpenGLBackend()
+std::unique_ptr<EglBackend> X11WindowedBackend::createOpenGLBackend(RenderDevice *device)
 {
-    return std::make_unique<X11WindowedEglBackend>(this);
-}
-
-std::unique_ptr<QPainterBackend> X11WindowedBackend::createQPainterBackend()
-{
-    return std::make_unique<X11WindowedQPainterBackend>(this);
+    return std::make_unique<X11WindowedEglBackend>(this, device);
 }
 
 std::unique_ptr<InputBackend> X11WindowedBackend::createInputBackend()
@@ -769,9 +760,6 @@ QList<CompositingType> X11WindowedBackend::supportedCompositors() const
     QList<CompositingType> ret;
     if (m_renderDevice) {
         ret.append(OpenGLCompositing);
-    }
-    if (m_hasShm) {
-        ret.append(QPainterCompositing);
     }
     return ret;
 }

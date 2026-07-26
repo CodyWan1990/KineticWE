@@ -579,6 +579,7 @@ void Workspace::requestDpmsState(DpmsState state)
         applyOutputConfiguration(cfg);
         m_dpmsFilter.reset();
         m_dpmsTimer.stop();
+        m_sleepInhibitor.reset();
     } else {
         applyOutputConfiguration(cfg);
         m_dpmsFilter = std::make_unique<DpmsInputEventFilter>();
@@ -1982,11 +1983,7 @@ QString Workspace::supportInformation() const
         case OpenGLCompositing: {
             const auto context = kwinApp()->scene()->openglContext();
             GLPlatform *platform = context->glPlatform();
-            if (context->isOpenGLES()) {
-                support.append(QStringLiteral("Compositing Type: OpenGL ES 2.0\n"));
-            } else {
-                support.append(QStringLiteral("Compositing Type: OpenGL\n"));
-            }
+            support.append(QStringLiteral("Compositing Type: OpenGL ES\n"));
             support.append(QStringLiteral("OpenGL vendor string: ") + QString::fromUtf8(platform->glVendorString()) + QStringLiteral("\n"));
             support.append(QStringLiteral("OpenGL renderer string: ") + QString::fromUtf8(platform->glRendererString()) + QStringLiteral("\n"));
             support.append(QStringLiteral("OpenGL version string: ") + QString::fromUtf8(platform->glVersionString()) + QStringLiteral("\n"));
@@ -2036,11 +2033,9 @@ QString Workspace::supportInformation() const
             break;
         }
         case QPainterCompositing:
-            support.append("Compositing Type: QPainter\n");
-            break;
         case NoCompositing:
         default:
-            support.append(QStringLiteral("Something is really broken, neither OpenGL nor QPainter is used"));
+            support.append(QStringLiteral("Something is really broken, no supported compositing type is used"));
         }
         support.append(QStringLiteral("\nLoaded Effects:\n"));
         support.append(QStringLiteral("---------------\n"));

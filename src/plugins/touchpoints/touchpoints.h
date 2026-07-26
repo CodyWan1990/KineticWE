@@ -29,7 +29,7 @@ public:
     TouchPointsEffect();
     ~TouchPointsEffect() override;
     void prePaintScreen(ScreenPrePaintData &data) override;
-    void paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
+    bool paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
     void postPaintScreen() override;
     bool isActive() const override;
     bool touchDown(qint32 id, const QPointF &pos, std::chrono::microseconds time) override;
@@ -62,7 +62,6 @@ private:
     float computeAlpha(int time, int ring);
     float computeRadius(int time, bool press, int ring);
     void drawCircleGl(const RenderViewport &viewport, const QColor &color, float cx, float cy, float r);
-    void drawCircleQPainter(const QColor &color, float cx, float cy, float r);
     void paintScreenSetupGl(const RenderTarget &renderTarget, const QMatrix4x4 &projectionMatrix);
     void paintScreenFinishGl();
 

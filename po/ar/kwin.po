@@ -4,8 +4,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kwin\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-06-25 00:45+0000\n"
-"PO-Revision-Date: 2026-06-21 20:18+0400\n"
+"POT-Creation-Date: 2026-07-24 00:46+0000\n"
+"PO-Revision-Date: 2026-07-07 18:07+0400\n"
 "Last-Translator: Zayed Al-Saidi <zayed.alsaidi@gmail.com>\n"
 "Language-Team: ar\n"
 "Language: ar\n"
@@ -26,49 +26,49 @@ msgctxt "EMAIL OF TRANSLATORS"
 msgid "Your emails"
 msgstr "zayed.alsaidi@gmail.com,safa1996alfulaij@gmail.com"
 
-#: backends/wayland/wayland_output.cpp:480
+#: backends/wayland/wayland_output.cpp:474
 #, kde-format
 msgid "Press right control to ungrab pointer"
 msgstr "اضغط على مفتاح التحكم الأيمن لفك المؤشر"
 
-#: backends/wayland/wayland_output.cpp:482
+#: backends/wayland/wayland_output.cpp:476
 #, kde-format
 msgid "Press right control key to grab pointer"
 msgstr "اضغط على مفتاح التحكم الأيمن للحصول على المؤشر"
 
-#: backends/wayland/wayland_output.cpp:486
+#: backends/wayland/wayland_output.cpp:480
 #, kde-format
 msgctxt ""
 "Title of nested KWin Wayland with Wayland socket identifier as argument"
 msgid "KDE Wayland Compositor %1"
 msgstr "مراكب ويلاند كيدي %1"
 
-#: backends/wayland/wayland_output.cpp:489
+#: backends/wayland/wayland_output.cpp:483
 #, kde-format
 msgid "- Output disabled"
 msgstr "- الخرج معطّل"
 
-#: backends/wayland/wayland_output.cpp:491
+#: backends/wayland/wayland_output.cpp:485
 #, kde-format
 msgid "- Output dimmed"
 msgstr "- الخرج معتم"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control to ungrab input"
 msgstr "اضغط على مفتاح التحكم الأيمن لترك الإدخال"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control key to grab input"
 msgstr "اضغط على مفتاح التحكم الأيمن للحصول على الإدخال"
 
-#: backends/x11/x11_windowed_backend.cpp:500
+#: backends/x11/x11_windowed_backend.cpp:501
 #, kde-format
 msgid "KDE Wayland Compositor"
 msgstr "مراكب ويلاند كيدي"
 
-#: compositor.cpp:650
+#: compositor.cpp:750
 #, kde-format
 msgid "Desktop effects were restarted due to a graphics reset"
 msgstr "أُعيد تشغيل تأثيرات سطح المكتب بسبب تصفير الرّسوميّات"
@@ -1557,59 +1557,59 @@ msgstr "كسافير هوغل"
 msgid "Disable configuration options"
 msgstr "عطّل خيارات الضّبط"
 
-#: main_wayland.cpp:322
+#: main_wayland.cpp:328
 #, kde-format
 msgid "Start a rootless Xwayland server."
 msgstr "ابدأ خادم اكس_ويلاند دون صلاحية الجذر."
 
-#: main_wayland.cpp:325
+#: main_wayland.cpp:331
 #, kde-format
 msgid ""
 "Name of the Wayland socket to listen on. If not set \"wayland-0\" is used."
 msgstr "اسم مقبس كوين. إذا لم يعين سيستخدم \"wayland-0\""
 
-#: main_wayland.cpp:329
+#: main_wayland.cpp:335
 #, kde-format
 msgid "The X11 Display to use in windowed mode on platform X11."
 msgstr "شاشة اكس11 التي ستستخدم في وضع المؤطر على منصة اكس11."
 
-#: main_wayland.cpp:333
+#: main_wayland.cpp:339
 #, kde-format
 msgid "The Wayland Display to use in windowed mode on platform Wayland."
 msgstr "شاشة ويلاند التي ستستخدم في وضع المؤطر على منصة ويلاند."
 
-#: main_wayland.cpp:335
+#: main_wayland.cpp:341
 #, kde-format
 msgid "Render to a virtual framebuffer."
 msgstr "التصيير إلى framebuffer افتراضي"
 
-#: main_wayland.cpp:337
+#: main_wayland.cpp:343
 #, kde-format
 msgid "The width for windowed mode. Default width is 1024."
 msgstr "عرض نمط المؤطر. العرض المبدئي 1024."
 
-#: main_wayland.cpp:341
+#: main_wayland.cpp:347
 #, kde-format
 msgid "The height for windowed mode. Default height is 768."
 msgstr "ارتفاع نمط المؤطر. الارتفاع المبدئي 768."
 
-#: main_wayland.cpp:346
+#: main_wayland.cpp:352
 #, kde-format
 msgid "Whether or not to make windowed mode fullscreen"
 msgstr "ما إذا كان سيجعل وضع النافذة ملء الشاشة أم لا"
 
-#: main_wayland.cpp:350
+#: main_wayland.cpp:356
 #, kde-format
 msgid "The scale for windowed mode. Default value is 1."
 msgstr "مقياس التكبير لوضع المؤطر. المبدئي 1."
 
-#: main_wayland.cpp:355
+#: main_wayland.cpp:361
 #, kde-format
 msgid ""
 "The number of windows to open as outputs in windowed mode. Default value is 1"
 msgstr "عدد النوافذ التي ستفتح كمخرجات في الوضع المؤطر. القيمة المبدئي هي 1"
 
-#: main_wayland.cpp:360
+#: main_wayland.cpp:366
 #, kde-format
 msgid ""
 "Wayland socket to use for incoming connections. This can be combined with --"
@@ -1618,7 +1618,7 @@ msgstr ""
 "مقبس ويلاند لاستخدامه في الاتصالات الواردة. يمكن دمج هذا --socket لتسمية "
 "المقبس"
 
-#: main_wayland.cpp:364
+#: main_wayland.cpp:370
 #, kde-format
 msgid ""
 "XWayland socket to use for Xwayland's incoming connections. This can be set "
@@ -1626,73 +1626,73 @@ msgid ""
 msgstr ""
 "مقبس ويلاند_اكس لاستخدامه لاتصالات ويلاند_اكس الواردة. يمكن تعيينها عدة مرات"
 
-#: main_wayland.cpp:368
+#: main_wayland.cpp:374
 #, kde-format
 msgid "Name of the xwayland display that has been pre-set up"
 msgstr "اسم شاشة ويلاند_اكس المعدة مسبقًا"
 
-#: main_wayland.cpp:372
+#: main_wayland.cpp:378
 #, kde-format
 msgid "XWayland socket to use for Xwayland's init connections"
 msgstr "مقبس ويلاند_اكس لاستخدامه لاتصالات تهيئة ويلاند_اكس"
 
-#: main_wayland.cpp:376
+#: main_wayland.cpp:382
 #, kde-format
 msgid "Name of the xwayland init display that has been pre-set up"
 msgstr "اسم شاشة تهيئة ويلاند_اكس المعدة مسبقًا"
 
-#: main_wayland.cpp:380
+#: main_wayland.cpp:386
 #, kde-format
 msgid "Name of the xauthority file "
 msgstr "اسم ملف xauthority "
 
-#: main_wayland.cpp:384
+#: main_wayland.cpp:390
 #, kde-format
 msgid "Exits this instance so it can be restarted by kwin_wayland_wrapper."
 msgstr "اخرج من هذه النسخة حتى يمكن إعادة تشغيله بواسطة kwin_wayland_wrappe"
 
-#: main_wayland.cpp:386
+#: main_wayland.cpp:392
 #, kde-format
 msgid "Render through drm node."
 msgstr "التصيير عن طريق drm."
 
-#: main_wayland.cpp:387
+#: main_wayland.cpp:393
 #, kde-format
 msgid ""
 "Extract locale information from locale1 rather than the user's configuration"
 msgstr "استخرج معلومات المحليات من locale1 عوضاً عن ضبط المستخدم"
 
-#: main_wayland.cpp:416
+#: main_wayland.cpp:422
 #, kde-format
 msgid "Input method that KWin starts."
 msgstr "طريقة الإدخال الذي يبدأه كوين"
 
-#: main_wayland.cpp:422
+#: main_wayland.cpp:428
 #, kde-format
 msgid "Starts the session in locked mode."
 msgstr "تبدأ الجلسة في النمط المقفل."
 
-#: main_wayland.cpp:426
+#: main_wayland.cpp:432
 #, kde-format
 msgid "Starts the session without lock screen support."
 msgstr "تبدأ الجَلسة دون دعم قفل الشاشة"
 
-#: main_wayland.cpp:431
+#: main_wayland.cpp:437
 #, kde-format
 msgid "Starts the session without global shortcuts support."
 msgstr "تبدأ الجلسة دون دعم الاختصارات العامة"
 
-#: main_wayland.cpp:436
+#: main_wayland.cpp:442
 #, kde-format
 msgid "Disable KActivities integration."
 msgstr "عطل تكامل الأنشطة KActivities"
 
-#: main_wayland.cpp:441
+#: main_wayland.cpp:447
 #, kde-format
 msgid "Exit after the session application, which is started by KWin, closed."
 msgstr "اخرج بعد إغلاق تطبيق الجَلسة، الذي بدأه كوين."
 
-#: main_wayland.cpp:446
+#: main_wayland.cpp:452
 #, kde-format
 msgid "Applications to start once Wayland and Xwayland server are started"
 msgstr "التطبيقات التي تبدأ حين بَدْء خادم ويلاند و ويلاند_اكس"
@@ -2192,25 +2192,25 @@ msgctxt "Duration of rotation"
 msgid "Default"
 msgstr "المبدئي"
 
-#: plugins/mouseclick/mouseclick.cpp:42
+#: plugins/mouseclick/mouseclick.cpp:40
 #: plugins/mouseclick/mouseclick_config.cpp:43
 #, kde-format
 msgid "Toggle Mouse Click Animation"
 msgstr "بدّل تحريك نقر الفأرة"
 
-#: plugins/mouseclick/mouseclick.cpp:48
+#: plugins/mouseclick/mouseclick.cpp:46
 #, kde-format
 msgctxt "Left mouse button"
 msgid "Left"
 msgstr "يسار"
 
-#: plugins/mouseclick/mouseclick.cpp:49
+#: plugins/mouseclick/mouseclick.cpp:47
 #, kde-format
 msgctxt "Middle mouse button"
 msgid "Middle"
 msgstr "الأوسط"
 
-#: plugins/mouseclick/mouseclick.cpp:50
+#: plugins/mouseclick/mouseclick.cpp:48
 #, kde-format
 msgctxt "Right mouse button"
 msgid "Right"
@@ -2308,12 +2308,12 @@ msgstr "الخط:"
 msgid "Show Text:"
 msgstr "أظهر النصّ:"
 
-#: plugins/mousemark/mousemark.cpp:43
+#: plugins/mousemark/mousemark.cpp:36
 #, kde-format
 msgid "Clear All Mouse Marks"
 msgstr "امحُ كل علامات الفأرة"
 
-#: plugins/mousemark/mousemark.cpp:48 plugins/mousemark/mousemark_config.cpp:51
+#: plugins/mousemark/mousemark.cpp:41 plugins/mousemark/mousemark_config.cpp:51
 #, kde-format
 msgid "Clear Last Mouse Mark"
 msgstr "امحُ آخر علامة للفأرة"
@@ -2597,12 +2597,12 @@ msgstr "تعذر العثور على الخرج"
 msgid "Invalid region"
 msgstr "منطقة غير صالحة"
 
-#: plugins/screencast/screencaststream.cpp:378
+#: plugins/screencast/screencaststream.cpp:380
 #, kde-format
 msgid "OpenGL compositing is required for screencasting"
 msgstr "يتطلب تسجيل الشاشة تركب أوبن‌جي‌إل"
 
-#: plugins/screencast/screencaststream.cpp:386
+#: plugins/screencast/screencaststream.cpp:388
 #, kde-format
 msgid "Failed to create PipeWire stream"
 msgstr "فشل في إنشاء دفق PipeWire"
@@ -3064,16 +3064,6 @@ msgstr "حرك المنطقة المكبرة للأعلى"
 msgid "Move Zoomed Area Downwards"
 msgstr "حرك المنطقة المكبرة للأسفل"
 
-#: plugins/zoom/zoom.cpp:122
-#, kde-format
-msgid "Move Mouse to Focus"
-msgstr "حرك الفأرة للتركيز"
-
-#: plugins/zoom/zoom.cpp:128
-#, kde-format
-msgid "Move Mouse to Center"
-msgstr "حرك الفأرة للوسط"
-
 #. i18n: ectx: label, entry (count), group (General)
 #: rulebooksettingsbase.kcfg:9
 #, kde-format
@@ -3435,220 +3425,178 @@ msgid "Fullscreen rule type"
 msgstr "نوع القاعدة لملء الشّاشة"
 
 #. i18n: ectx: label, entry (noborder), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:307
+#: rulesettings.kcfg:311
 #, kde-format
 msgid "No titlebar and frame"
 msgstr "بلا شريط العنوان والإطار"
 
 #. i18n: ectx: label, entry (noborderrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:311
+#: rulesettings.kcfg:315
 #, kde-format
 msgid "No titlebar rule type"
 msgstr "نوع القاعدة لبلا شريط العنوان"
 
+#. i18n: ectx: label, entry (decorationpolicy), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:322
+#, kde-format
+msgid "Decoration policy"
+msgstr ""
+
+#. i18n: ectx: label, entry (decorationpolicyrule), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:332
+#, fuzzy, kde-format
+#| msgid "Active opacity rule type"
+msgid "Decoration policy rule type"
+msgstr "نوع القاعدة للتعتيم نشط"
+
 #. i18n: ectx: label, entry (decocolor), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:318
+#: rulesettings.kcfg:339
 #, kde-format
 msgid "Titlebar color and scheme"
 msgstr "لون شريط العنوان والمخطط"
 
 #. i18n: ectx: label, entry (decocolorrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:321
+#: rulesettings.kcfg:342
 #, kde-format
 msgid "Titlebar color rule type"
 msgstr "نوع القاعدة للون شريط العنوان"
 
-#. i18n: ectx: label, entry (blockcompositing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:326
-#, kde-format
-msgid "Block Compositing"
-msgstr "التركيب الكتلي"
-
-#. i18n: ectx: label, entry (blockcompositingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:330
-#, kde-format
-msgid "Block Compositing rule type"
-msgstr "نوع القاعدة للتركيب الكتلي"
-
 #. i18n: ectx: label, entry (fsplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:335
+#: rulesettings.kcfg:347
 #, kde-format
 msgid "Focus stealing prevention"
 msgstr "منع سرقة التركيز"
 
 #. i18n: ectx: label, entry (fsplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:341
+#: rulesettings.kcfg:353
 #, kde-format
 msgid "Focus stealing prevention rule type"
 msgstr "نوع القاعدة لمنع سرقة التركيز"
 
 #. i18n: ectx: label, entry (fpplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:346
+#: rulesettings.kcfg:358
 #, kde-format
 msgid "Focus protection"
 msgstr "حماية التركيز"
 
 #. i18n: ectx: label, entry (fpplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:352
+#: rulesettings.kcfg:364
 #, kde-format
 msgid "Focus protection rule type"
 msgstr "نوع القاعدة لحماية التركيز"
 
 #. i18n: ectx: label, entry (acceptfocus), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:357
+#: rulesettings.kcfg:369
 #, kde-format
 msgid "Accept Focus"
 msgstr "اقبل التركيز"
 
 #. i18n: ectx: label, entry (acceptfocusrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:361
+#: rulesettings.kcfg:373
 #, kde-format
 msgid "Accept Focus rule type"
 msgstr "نوع القاعدة اقبل التركز"
 
 #. i18n: ectx: label, entry (closeable), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:366
+#: rulesettings.kcfg:378
 #, kde-format
 msgid "Closeable"
 msgstr "قابلة للإغلاق"
 
 #. i18n: ectx: label, entry (closeablerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:370
+#: rulesettings.kcfg:382
 #, kde-format
 msgid "Closeable rule type"
 msgstr "نوع القاعدة للقابلة للإغلاق"
 
-#. i18n: ectx: label, entry (autogroup), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:375
-#, kde-format
-msgid "Autogroup with identical"
-msgstr "الجمع الآليّ للمتطابقات"
-
-#. i18n: ectx: label, entry (autogrouprule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:379
-#, kde-format
-msgid "Autogroup with identical rule type"
-msgstr "نوع القاعدة للجمع الآليّ للمتطابقات"
-
-#. i18n: ectx: label, entry (autogroupfg), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:384
-#, kde-format
-msgid "Autogroup in foreground"
-msgstr "الجمع الآليّ في المقدمة"
-
-#. i18n: ectx: label, entry (autogroupfgrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:388
-#, kde-format
-msgid "Autogroup in foreground rule type"
-msgstr "نوع القاعدة للجمع الآليّ في المقدمة"
-
-#. i18n: ectx: label, entry (autogroupid), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:393
-#, kde-format
-msgid "Autogroup by ID"
-msgstr "الجمع الآليّ بالمعرف"
-
-#. i18n: ectx: label, entry (autogroupidrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:396
-#, kde-format
-msgid "Autogroup by ID rule type"
-msgstr "نوع القاعدة للجمع الآليّ بالمعرف"
-
-#. i18n: ectx: label, entry (strictgeometry), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:401
-#, kde-format
-msgid "Obey geometry restrictions"
-msgstr "التزم بقيود الأبعاد"
-
-#. i18n: ectx: label, entry (strictgeometryrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:405
-#, kde-format
-msgid "Obey geometry restrictions rule type"
-msgstr "نوع القاعدة لالتزم بقيود الأبعاد"
-
 #. i18n: ectx: label, entry (shortcut), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:410
+#: rulesettings.kcfg:387
 #, kde-format
 msgid "Shortcut"
 msgstr "الاختصار"
 
 #. i18n: ectx: label, entry (shortcutrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:413
+#: rulesettings.kcfg:390
 #, kde-format
 msgid "Shortcut rule type"
 msgstr "نوع القاعدة للاختصار"
 
 #. i18n: ectx: label, entry (disableglobalshortcuts), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:420
+#: rulesettings.kcfg:397
 #, kde-format
 msgid "Ignore global shortcuts"
 msgstr "تجاهل الاختصارات العامة"
 
 #. i18n: ectx: label, entry (disableglobalshortcutsrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:424
+#: rulesettings.kcfg:401
 #, kde-format
 msgid "Ignore global shortcuts rule type"
 msgstr "نوع القاعدة للتجاهل الاختصارات العامة"
 
 #. i18n: ectx: label, entry (desktopfile), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:429
+#: rulesettings.kcfg:406
 #, kde-format
 msgid "Desktop file name"
 msgstr "اسم ملف سطح المكتب"
 
 #. i18n: ectx: label, entry (desktopfilerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:432
+#: rulesettings.kcfg:409
 #, kde-format
 msgid "Desktop file name rule type"
 msgstr "نوع قاعدة لاسم ملف سطح المكتب"
 
 #. i18n: ectx: label, entry (layer), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:439
+#: rulesettings.kcfg:416
 #, kde-format
 msgid "Layer"
 msgstr "الطبقة"
 
 #. i18n: ectx: label, entry (layerrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:455
+#: rulesettings.kcfg:432
 #, kde-format
 msgid "Layer rule type"
 msgstr "نوع القاعدة الطبقة"
 
 #. i18n: ectx: label, entry (adaptivesync), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:460
+#: rulesettings.kcfg:437
 #, kde-format
 msgid "AdaptiveSync"
 msgstr "التزامن_المتكيف"
 
 #. i18n: ectx: label, entry (adaptivesyncrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:464
+#: rulesettings.kcfg:441
 #, kde-format
 msgid "AdaptiveSync rule type"
 msgstr "نوع القاعدة للتزامن المتكيف"
 
 #. i18n: ectx: label, entry (tearing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:469
+#: rulesettings.kcfg:446
 #, kde-format
 msgid "Allow Tearing"
 msgstr "اسمح بالتمزيق"
 
 #. i18n: ectx: label, entry (tearingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:473
+#: rulesettings.kcfg:450
 #, kde-format
 msgid "Tearing rule type"
 msgstr "نوع القاعدة التمزيق"
 
 #. i18n: ectx: label, entry (excludefromcapture), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:478
+#: rulesettings.kcfg:455
 #, kde-format
 msgid "Hide from screenshots and screen recordings"
 msgstr "أخفِ من لقطات الشاشة وتسجيلات الشاشة"
 
 #. i18n: ectx: label, entry (excludefromcapturerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:482
+#: rulesettings.kcfg:459
 #, kde-format
 msgid "Hide from screenshots and screen recordings rule type"
 msgstr "نوع قاعدة أخفِ من لقطات الشاشة وتسجيلات الشاشة"
+
+#: scene/workspacescene.cpp:115
+#, kde-format
+msgid "Toggle “Show Compositing” effect"
+msgstr ""
 
 #. i18n: ectx: property (windowTitle), widget (QDialog, ShortcutDialog)
 #: shortcutdialog.ui:14
@@ -4235,7 +4183,19 @@ msgstr "نظرة على سطح المكتب"
 msgid "Kill Window"
 msgstr "اقتل النّافذة"
 
-#: useractions.cpp:1080
+#: useractions.cpp:1017
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Focused Window"
+msgstr "وسّط المؤشر على النافذة المُركز عليها"
+
+#: useractions.cpp:1018
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Screen"
+msgstr "وسّط المؤشر في الشاشة"
+
+#: useractions.cpp:1083
 #, kde-format
 msgid "Activate Window (%1)"
 msgstr "فعّل النّافذة (%1)"
@@ -4285,91 +4245,100 @@ msgstr "بدّل إلى سطح المكتب الأسفل"
 msgid "Switch to Desktop %1"
 msgstr "بدّل إلى سطح المكتب %1"
 
-#: wayland/outputmanagement_v2.cpp:569
+#: wayland/outputmanagement_v2.cpp:521
+#, kde-format
+msgid ""
+"Setting custom modes with too old kde-output-management-v2 protocol versions "
+"is unsupported"
+msgstr ""
+"لا يتاح إعداد أوضاع مخصصة باستخدام إصدارات قديمة جدًّا من ميفاق kde-output-"
+"management-v2"
+
+#: wayland/outputmanagement_v2.cpp:575
 #, kde-format
 msgid "abm level is larger than the maximum (4): %1"
 msgstr "مستوى abm أكبر من الحد الأقصى (4): %1"
 
-#: wayland/outputmanagement_v2.cpp:647
+#: wayland/outputmanagement_v2.cpp:673
 #, kde-format
 msgid "One of the relevant outputs is no longer available"
 msgstr "أحد المخرجات ذات الصلة لم يعد متاحًا"
 
-#: wayland/outputmanagement_v2.cpp:665
+#: wayland/outputmanagement_v2.cpp:691
 #, kde-format
 msgid "Disabling all outputs through configuration changes is not allowed"
 msgstr "لا يُسمح بتعطيل جميع المخرجات من خلال تغييرات الضبط"
 
-#: wayland/outputmanagement_v2.cpp:675
+#: wayland/outputmanagement_v2.cpp:701
 #, kde-format
 msgid "%1 cannot mirror itself"
 msgstr "%1 لا يمكنه عكس نفسه"
 
-#: wayland/outputmanagement_v2.cpp:682
+#: wayland/outputmanagement_v2.cpp:708
 #, kde-format
 msgid "Cannot add a custom mode with an empty size"
 msgstr "لا يمكن إضافة وضع مخصص بحجم فارغ"
 
-#: wayland/outputmanagement_v2.cpp:686
+#: wayland/outputmanagement_v2.cpp:712
 #, kde-format
 msgid "Cannot add a custom mode with a refresh rate of zero Hz"
 msgstr "لا يمكن إضافة وضع مخصص بمعدل تحديث يبلغ صفر هرتز"
 
-#: wayland/outputmanagement_v2.cpp:697
+#: wayland/outputmanagement_v2.cpp:723
 #, kde-format
 msgid "Position of output %1 is way too negative (%2, %3)"
 msgstr "موضع الإخراج %1 سلبي للغاية (%2،‏ %3)"
 
-#: wayland/outputmanagement_v2.cpp:700
+#: wayland/outputmanagement_v2.cpp:726
 #, kde-format
 msgid "Position of enabled output %1 is negative (%2, %3)"
 msgstr "موضع الإخراج المُمكن %1 سلبي (%2،‏ %3)"
 
-#: wayland/outputmanagement_v2.cpp:704
+#: wayland/outputmanagement_v2.cpp:730
 #, kde-format
 msgid "Position of output %1 is way too large (%2, %3)"
 msgstr "موضع الإخراج %1 كبير جدًا (%2،‏ %3)"
 
-#: wayland/outputmanagement_v2.cpp:721
+#: wayland/outputmanagement_v2.cpp:747
 #, kde-format
 msgid "The driver rejected the output configuration"
 msgstr "رفض السائق ضبط الإخراج"
 
-#: wayland/outputmanagement_v2.cpp:724
+#: wayland/outputmanagement_v2.cpp:750
 #, kde-format
 msgid "The session is not active"
 msgstr "الجلسة ليست نشطة"
 
-#: window.cpp:3107
+#: window.cpp:3162
 #, kde-format
 msgctxt "Application is not responding, appended to window title"
 msgid "(Not Responding)"
 msgstr "(لا يستجيب)"
 
-#: workspace.cpp:1310
+#: workspace.cpp:1311
 #, kde-format
 msgid "Built-in Screen"
 msgstr "الشاشة المُدْمَجة"
 
-#: workspace.cpp:1323
+#: workspace.cpp:1324
 #, kde-format
 msgctxt "Display label: manufacturer + model name + connector name"
 msgid "%1 %2 %3"
 msgstr "%1 %2 %3"
 
-#: workspace.cpp:1333
+#: workspace.cpp:1334
 #, kde-format
 msgctxt "Display label: manufacturer + model name + serial number"
 msgid "%1 %2 %3"
 msgstr "%1 %2 %3"
 
-#: workspace.cpp:1336
+#: workspace.cpp:1337
 #, kde-format
 msgctxt "Display label: manufacturer + model name"
 msgid "%1 %2"
 msgstr "%1 %2"
 
-#: workspace.cpp:1805
+#: workspace.cpp:1806
 #, kde-format
 msgctxt "Introductory text shown in the support information."
 msgid ""
@@ -4396,6 +4365,42 @@ msgstr ""
 #, kde-format
 msgid "Xwayland has crashed"
 msgstr "إنهار ويلاند_اكس"
+
+#~ msgid "Block Compositing"
+#~ msgstr "التركيب الكتلي"
+
+#~ msgid "Block Compositing rule type"
+#~ msgstr "نوع القاعدة للتركيب الكتلي"
+
+#~ msgid "Autogroup with identical"
+#~ msgstr "الجمع الآليّ للمتطابقات"
+
+#~ msgid "Autogroup with identical rule type"
+#~ msgstr "نوع القاعدة للجمع الآليّ للمتطابقات"
+
+#~ msgid "Autogroup in foreground"
+#~ msgstr "الجمع الآليّ في المقدمة"
+
+#~ msgid "Autogroup in foreground rule type"
+#~ msgstr "نوع القاعدة للجمع الآليّ في المقدمة"
+
+#~ msgid "Autogroup by ID"
+#~ msgstr "الجمع الآليّ بالمعرف"
+
+#~ msgid "Autogroup by ID rule type"
+#~ msgstr "نوع القاعدة للجمع الآليّ بالمعرف"
+
+#~ msgid "Obey geometry restrictions"
+#~ msgstr "التزم بقيود الأبعاد"
+
+#~ msgid "Obey geometry restrictions rule type"
+#~ msgstr "نوع القاعدة لالتزم بقيود الأبعاد"
+
+#~ msgid "Move Mouse to Focus"
+#~ msgstr "حرك الفأرة للتركيز"
+
+#~ msgid "Move Mouse to Center"
+#~ msgstr "حرك الفأرة للوسط"
 
 #~ msgid "Indicate that KWin has recently crashed n times"
 #~ msgstr "يشير إلى عدد انهيارات كوين"

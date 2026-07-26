@@ -9,6 +9,7 @@
 #include "virtual_egl_backend.h"
 #include "core/drmdevice.h"
 #include "core/gbmgraphicsbufferallocator.h"
+#include "core/renderdevice.h"
 #include "opengl/eglswapchain.h"
 #include "opengl/glrendertimequery.h"
 #include "opengl/glutils.h"
@@ -41,7 +42,14 @@ std::optional<OutputLayerBeginFrameInfo> VirtualEglLayer::doBeginFrame()
 
     const QSize nativeSize = m_output->modeSize();
     if (!m_swapchain || m_swapchain->size() != nativeSize) {
-        m_swapchain = EglSwapchain::create(m_backend->drmDevice()->allocator(), m_backend->openglContext(), nativeSize, DRM_FORMAT_XRGB8888, m_backend->supportedFormats()[DRM_FORMAT_XRGB8888], false);
+        GraphicsBufferOptions options{
+            .size = nativeSize,
+            .format = DRM_FORMAT_XRGB8888,
+            .modifiers = m_backend->supportedFormats()[DRM_FORMAT_XRGB8888],
+            .software = false,
+            .scanout = false,
+        };
+        m_swapchain = EglSwapchain::create(m_backend->renderDevice()->allocator(), m_backend->openglContext(), options);
         if (!m_swapchain) {
             return std::nullopt;
         }
@@ -64,16 +72,13 @@ std::optional<OutputLayerBeginFrameInfo> VirtualEglLayer::doBeginFrame()
 bool VirtualEglLayer::doEndFrame(const Region &renderedDeviceRegion, const Region &damagedDeviceRegion, OutputFrame *frame)
 {
     m_query->end();
-    frame->addRenderTimeQuery(std::move(m_query));
+    if (frame) {
+        frame->addRenderTimeQuery(std::move(m_query));
+    }
     glFlush(); // flush pending rendering commands.
     m_swapchain->release(m_current, FileDescriptor{});
     m_damageJournal.add(damagedDeviceRegion);
     return true;
-}
-
-DrmDevice *VirtualEglLayer::scanoutDevice() const
-{
-    return m_backend->drmDevice();
 }
 
 FormatModifierMap VirtualEglLayer::supportedDrmFormats() const
@@ -92,8 +97,9 @@ GLTexture *VirtualEglLayer::texture() const
     return m_current ? m_current->texture().get() : nullptr;
 }
 
-VirtualEglBackend::VirtualEglBackend(VirtualBackend *b)
-    : m_backend(b)
+VirtualEglBackend::VirtualEglBackend(VirtualBackend *b, RenderDevice *renderDevice)
+    : EglBackend(renderDevice)
+    , m_backend(b)
 {
 }
 
@@ -111,24 +117,9 @@ VirtualBackend *VirtualEglBackend::backend() const
     return m_backend;
 }
 
-DrmDevice *VirtualEglBackend::drmDevice() const
-{
-    return m_backend->drmDevice();
-}
-
-bool VirtualEglBackend::initializeEgl()
-{
-    if (!initClientExtensions()) {
-        return false;
-    }
-    Q_ASSERT(m_backend->renderDevice());
-    setRenderDevice(m_backend->renderDevice());
-    return true;
-}
-
 bool VirtualEglBackend::init()
 {
-    if (!initializeEgl()) {
+    if (!initClientExtensions()) {
         qCWarning(KWIN_VIRTUAL, "Could not initialize egl");
         return false;
     }

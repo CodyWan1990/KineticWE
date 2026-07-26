@@ -345,6 +345,18 @@ void LinuxDmaBufV1ClientBufferIntegration::setSupportedFormatsWithModifiers(cons
         d->currentMainDevice = tranches.first().device;
         d->table = std::make_unique<LinuxDmaBufV1FormatTable>(allFormats);
         d->defaultTranches = tranches;
+
+        // If a GPU was hotunplugged, we have no choice but to
+        // switch clients to a different device.
+        for (auto [client, device] : d->mainDevices.asKeyValueRange()) {
+            const bool deviceRemoved = std::ranges::none_of(tranches, [device](const auto &tranche) {
+                return tranche.device == device;
+            });
+            if (deviceRemoved) {
+                device = tranches[0].device;
+            }
+        }
+
         d->defaultFeedback->sendTranches();
     }
 }
@@ -456,7 +468,7 @@ QList<LinuxDmaBufV1Feedback::Tranche> LinuxDmaBufV1Feedback::createScanoutTranch
         if (tranche.device != mainDevice) {
             continue;
         }
-        if (compatibleWithScanout && tranche.device != compatibleWithScanout->drmDevice()->deviceId()) {
+        if (compatibleWithScanout && tranche.device != compatibleWithScanout->deviceId()) {
             // limit scanout tranches to devices we can also sample from
             continue;
         }

@@ -67,7 +67,7 @@ find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS
     Svg
 )
 
-find_package(Qt6GuiPrivate ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
+find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)
 
 find_package(Qt6Test ${QT_MIN_VERSION} CONFIG QUIET)
 set_package_properties(Qt6Test PROPERTIES
@@ -82,7 +82,7 @@ endif()
 if (BUILD_TESTING)
     find_package(KPipeWire)
 
-    find_package(Qt6WaylandClientPrivate ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
+    find_package(Qt6WaylandClientPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)
 endif()
 
 # required frameworks by Core
@@ -207,6 +207,9 @@ set_package_properties(Wayland PROPERTIES
     TYPE REQUIRED
     PURPOSE "Required for building KWin with Wayland support"
 )
+if (Wayland_VERSION VERSION_GREATER_EQUAL "1.25.91")
+    add_compile_definitions(HAVE_ACK_GLOBAL_REMOVE=1)
+endif()
 
 find_package(WaylandProtocols 1.48)
 set_package_properties(WaylandProtocols PROPERTIES

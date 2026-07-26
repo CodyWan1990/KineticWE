@@ -560,18 +560,6 @@ void RulesModel::populateRuleList()
                          i18n("Maximum Size"), i18n("Size & Position"),
                          QIcon::fromTheme("transform-scale")));
 
-    addRule(new RuleItem(QLatin1StringView("strictgeometry"),
-                         RulePolicy::ForceRule, RuleItem::Boolean,
-                         i18n("Obey geometry restrictions"), i18n("Size & Position"),
-                         QIcon::fromTheme("transform-crop-and-resize"),
-                         xi18nc("@info:tooltip", "Some apps like video players or terminals can ask KWin to constrain them to "
-                                                 "certain aspect ratios or only grow by values larger than the dimensions of one "
-                                                 "character. Use this property to ignore such restrictions and allow those windows "
-                                                 "to be resized to arbitrary sizes."
-                                                 "<nl/><nl/>"
-                                                 "This can be helpful for windows that can't quite fit the full screen area when "
-                                                 "maximized.")));
-
     // Arrangement & Access
     addRule(new RuleItem(QLatin1StringView("above"),
                          RulePolicy::SetRule, RuleItem::Boolean,
@@ -607,10 +595,11 @@ void RulesModel::populateRuleList()
                          QIcon::fromTheme("configure-shortcuts")));
 
     // Appearance & Fixes
-    addRule(new RuleItem(QLatin1StringView("noborder"),
-                         RulePolicy::SetRule, RuleItem::Boolean,
-                         i18n("No titlebar and frame"), i18n("Appearance & Fixes"),
-                         QIcon::fromTheme("dialog-cancel")));
+    auto decorationPolicy = addRule(new RuleItem(QLatin1StringView("decorationpolicy"),
+                                                 RulePolicy::SetRule, RuleItem::Option,
+                                                 i18n("Window manager draws titlebar, frame, and shadows"), i18n("Appearance & Fixes"),
+                                                 QIcon::fromTheme("dialog-cancel")));
+    decorationPolicy->setOptionsData(decorationPolicyData());
 
     auto decocolor = addRule(new RuleItem(QLatin1StringView("decocolor"),
                                           RulePolicy::ForceRule, RuleItem::Option,
@@ -712,11 +701,6 @@ void RulesModel::populateRuleList()
                          i18n("Desktop file name"), i18n("Appearance & Fixes"),
                          QIcon::fromTheme("application-x-desktop")));
 
-    addRule(new RuleItem(QLatin1StringView("blockcompositing"),
-                         RulePolicy::ForceRule, RuleItem::Boolean,
-                         i18n("Block compositing"), i18n("Appearance & Fixes"),
-                         QIcon::fromTheme("composite-track-on")));
-
     auto layer = addRule(new RuleItem(QLatin1StringView("layer"),
                                       RulePolicy::ForceRule, RuleItem::Option,
                                       i18n("Layer"), i18n("Appearance & Fixes"),
@@ -751,7 +735,7 @@ const QHash<QString, QString> RulesModel::x11PropertyHash()
         {"fullscreen", "fullscreen"},
         {"keepAbove", "above"},
         {"keepBelow", "below"},
-        {"noBorder", "noborder"},
+        {"decorationPolicy", "decorationpolicy"},
         {"skipTaskbar", "skiptaskbar"},
         {"skipPager", "skippager"},
         {"skipSwitcher", "skipswitcher"},
@@ -942,6 +926,17 @@ QList<OptionsModel::Data> RulesModel::layerModelData() const
         {CriticalNotificationLayer, i18n("Critical notification")},
         {OnScreenDisplayLayer, i18n("On-screen display")},
         {OverlayLayer, i18n("Overlay")},
+    };
+    return modelData;
+}
+
+QList<OptionsModel::Data> RulesModel::decorationPolicyData() const
+{
+    static const auto modelData = QList<OptionsModel::Data>{
+        {int(DecorationPolicy::None), i18nc("Never draw a server side decoration", "Never")},
+        {int(DecorationPolicy::ClientPreference), i18nc("Draw a server side decoration if the application asks for it", "If the application asks")},
+        {int(DecorationPolicy::Server), i18nc("Always draw a server side decoration", "Always")},
+        {int(DecorationPolicy::Shadow), i18nc("Always draw a server side drop shadow", "Only shadow")},
     };
     return modelData;
 }

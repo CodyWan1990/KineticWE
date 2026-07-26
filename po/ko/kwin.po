@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kwin\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-06-25 00:45+0000\n"
+"POT-Creation-Date: 2026-07-24 00:46+0000\n"
 "PO-Revision-Date: 2026-05-26 22:25+0200\n"
 "Last-Translator: Shinjo Park <kde@peremen.name>\n"
 "Language-Team: Korean <kde-kr@kde.org>\n"
@@ -30,49 +30,49 @@ msgctxt "EMAIL OF TRANSLATORS"
 msgid "Your emails"
 msgstr "kde@peremen.name"
 
-#: backends/wayland/wayland_output.cpp:480
+#: backends/wayland/wayland_output.cpp:474
 #, kde-format
 msgid "Press right control to ungrab pointer"
 msgstr "오른쪽 Ctrl 키를 누르면 포인터 잡기를 해제함"
 
-#: backends/wayland/wayland_output.cpp:482
+#: backends/wayland/wayland_output.cpp:476
 #, kde-format
 msgid "Press right control key to grab pointer"
 msgstr "오른쪽 Ctrl 키를 누르면 포인터를 잡음"
 
-#: backends/wayland/wayland_output.cpp:486
+#: backends/wayland/wayland_output.cpp:480
 #, kde-format
 msgctxt ""
 "Title of nested KWin Wayland with Wayland socket identifier as argument"
 msgid "KDE Wayland Compositor %1"
 msgstr "KDE Wayland 컴포지터 %1"
 
-#: backends/wayland/wayland_output.cpp:489
+#: backends/wayland/wayland_output.cpp:483
 #, kde-format
 msgid "- Output disabled"
 msgstr "- 출력 비활성화됨"
 
-#: backends/wayland/wayland_output.cpp:491
+#: backends/wayland/wayland_output.cpp:485
 #, kde-format
 msgid "- Output dimmed"
 msgstr "- 출력 어두워짐"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control to ungrab input"
 msgstr "오른쪽 Ctrl 키를 누르면 입력 잡기를 해제함"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control key to grab input"
 msgstr "오른쪽 Ctrl 키를 누르면 입력을 잡음"
 
-#: backends/x11/x11_windowed_backend.cpp:500
+#: backends/x11/x11_windowed_backend.cpp:501
 #, kde-format
 msgid "KDE Wayland Compositor"
 msgstr "KDE Wayland 컴포지터"
 
-#: compositor.cpp:650
+#: compositor.cpp:750
 #, kde-format
 msgid "Desktop effects were restarted due to a graphics reset"
 msgstr "그래픽 초기화로 인하여 데스크톱 효과가 다시 시작됨"
@@ -1560,60 +1560,60 @@ msgstr "Xaver Hugl"
 msgid "Disable configuration options"
 msgstr "설정 옵션 사용하지 않기"
 
-#: main_wayland.cpp:322
+#: main_wayland.cpp:328
 #, kde-format
 msgid "Start a rootless Xwayland server."
 msgstr "루트 창이 없는 Xwayland 서버를 시작합니다."
 
-#: main_wayland.cpp:325
+#: main_wayland.cpp:331
 #, kde-format
 msgid ""
 "Name of the Wayland socket to listen on. If not set \"wayland-0\" is used."
 msgstr ""
 "들을 Wayland 소켓을 지정합니다. 설정하지 않으면 \"wayland-0\"을 사용합니다."
 
-#: main_wayland.cpp:329
+#: main_wayland.cpp:335
 #, kde-format
 msgid "The X11 Display to use in windowed mode on platform X11."
 msgstr "X11 플랫폼의 창 모드에서 사용할 X11 디스플레이입니다."
 
-#: main_wayland.cpp:333
+#: main_wayland.cpp:339
 #, kde-format
 msgid "The Wayland Display to use in windowed mode on platform Wayland."
 msgstr "Wayland 플랫폼의 창 모드에서 사용할 Wayland 디스플레이입니다."
 
-#: main_wayland.cpp:335
+#: main_wayland.cpp:341
 #, kde-format
 msgid "Render to a virtual framebuffer."
 msgstr "가상 프레임버퍼에 렌더링합니다."
 
-#: main_wayland.cpp:337
+#: main_wayland.cpp:343
 #, kde-format
 msgid "The width for windowed mode. Default width is 1024."
 msgstr "창 모드의 폭입니다. 기본 폭은 1024입니다."
 
-#: main_wayland.cpp:341
+#: main_wayland.cpp:347
 #, kde-format
 msgid "The height for windowed mode. Default height is 768."
 msgstr "창 모드의 높이입니다. 기본 높이는 768입니다."
 
-#: main_wayland.cpp:346
+#: main_wayland.cpp:352
 #, kde-format
 msgid "Whether or not to make windowed mode fullscreen"
 msgstr "창 모드를 전체 화면으로 전환할지 여부"
 
-#: main_wayland.cpp:350
+#: main_wayland.cpp:356
 #, kde-format
 msgid "The scale for windowed mode. Default value is 1."
 msgstr "창 모드의 크기 조정 비율입니다. 기본값은 1입니다."
 
-#: main_wayland.cpp:355
+#: main_wayland.cpp:361
 #, kde-format
 msgid ""
 "The number of windows to open as outputs in windowed mode. Default value is 1"
 msgstr "창 모드에서 출력으로 열 창 개수입니다. 기본값은 1입니다."
 
-#: main_wayland.cpp:360
+#: main_wayland.cpp:366
 #, kde-format
 msgid ""
 "Wayland socket to use for incoming connections. This can be combined with --"
@@ -1622,19 +1622,19 @@ msgstr ""
 "들어오는 연결에 사용할 Wayland 소켓입니다. --socket 옵션을 사용하여 이름을 지"
 "정할 수도 있습니다."
 
-#: main_wayland.cpp:364
+#: main_wayland.cpp:370
 #, kde-format
 msgid ""
 "XWayland socket to use for Xwayland's incoming connections. This can be set "
 "multiple times"
 msgstr "들어오는 연결에 사용할 XWayland 소켓입니다. 여러 번 지정할 수 있습니다"
 
-#: main_wayland.cpp:368
+#: main_wayland.cpp:374
 #, kde-format
 msgid "Name of the xwayland display that has been pre-set up"
 msgstr "사전에 설정된 XWayland 디스플레이 이름"
 
-#: main_wayland.cpp:372
+#: main_wayland.cpp:378
 #, fuzzy, kde-format
 #| msgid ""
 #| "XWayland socket to use for Xwayland's incoming connections. This can be "
@@ -1642,65 +1642,65 @@ msgstr "사전에 설정된 XWayland 디스플레이 이름"
 msgid "XWayland socket to use for Xwayland's init connections"
 msgstr "들어오는 연결에 사용할 XWayland 소켓입니다. 여러 번 지정할 수 있습니다"
 
-#: main_wayland.cpp:376
+#: main_wayland.cpp:382
 #, fuzzy, kde-format
 #| msgid "Name of the xwayland display that has been pre-set up"
 msgid "Name of the xwayland init display that has been pre-set up"
 msgstr "사전에 설정된 XWayland 디스플레이 이름"
 
-#: main_wayland.cpp:380
+#: main_wayland.cpp:386
 #, kde-format
 msgid "Name of the xauthority file "
 msgstr "xauthority 파일의 이름"
 
-#: main_wayland.cpp:384
+#: main_wayland.cpp:390
 #, kde-format
 msgid "Exits this instance so it can be restarted by kwin_wayland_wrapper."
 msgstr ""
 "kwin_wayland_wrapper에서 다시 시작할 수 있도록 이 인스턴스를 종료합니다."
 
-#: main_wayland.cpp:386
+#: main_wayland.cpp:392
 #, kde-format
 msgid "Render through drm node."
 msgstr "DRM 노드로 렌더링합니다."
 
-#: main_wayland.cpp:387
+#: main_wayland.cpp:393
 #, kde-format
 msgid ""
 "Extract locale information from locale1 rather than the user's configuration"
 msgstr "사용자 설정 대신 locale1에서 로캘 정보 추출"
 
-#: main_wayland.cpp:416
+#: main_wayland.cpp:422
 #, kde-format
 msgid "Input method that KWin starts."
 msgstr "KWin에서 불러오는 입력기입니다."
 
-#: main_wayland.cpp:422
+#: main_wayland.cpp:428
 #, kde-format
 msgid "Starts the session in locked mode."
 msgstr "세션을 잠긴 상태로 시작합니다."
 
-#: main_wayland.cpp:426
+#: main_wayland.cpp:432
 #, kde-format
 msgid "Starts the session without lock screen support."
 msgstr "잠금 화면 지원 없이 세션을 시작합니다."
 
-#: main_wayland.cpp:431
+#: main_wayland.cpp:437
 #, kde-format
 msgid "Starts the session without global shortcuts support."
 msgstr "전역 단축키 지원 없이 세션을 시작합니다."
 
-#: main_wayland.cpp:436
+#: main_wayland.cpp:442
 #, kde-format
 msgid "Disable KActivities integration."
 msgstr "KActivities 통합을 사용하지 않습니다."
 
-#: main_wayland.cpp:441
+#: main_wayland.cpp:447
 #, kde-format
 msgid "Exit after the session application, which is started by KWin, closed."
 msgstr "KWin에서 시작한 세션 앱이 끝난 후에 닫습니다."
 
-#: main_wayland.cpp:446
+#: main_wayland.cpp:452
 #, kde-format
 msgid "Applications to start once Wayland and Xwayland server are started"
 msgstr "Wayland 및 Xwayland 서버가 시작되었을 때 시작할 앱"
@@ -2195,25 +2195,25 @@ msgctxt "Duration of rotation"
 msgid "Default"
 msgstr "기본값"
 
-#: plugins/mouseclick/mouseclick.cpp:42
+#: plugins/mouseclick/mouseclick.cpp:40
 #: plugins/mouseclick/mouseclick_config.cpp:43
 #, kde-format
 msgid "Toggle Mouse Click Animation"
 msgstr "마우스 클릭 애니메이션 전환"
 
-#: plugins/mouseclick/mouseclick.cpp:48
+#: plugins/mouseclick/mouseclick.cpp:46
 #, kde-format
 msgctxt "Left mouse button"
 msgid "Left"
 msgstr "왼쪽"
 
-#: plugins/mouseclick/mouseclick.cpp:49
+#: plugins/mouseclick/mouseclick.cpp:47
 #, kde-format
 msgctxt "Middle mouse button"
 msgid "Middle"
 msgstr "가운데"
 
-#: plugins/mouseclick/mouseclick.cpp:50
+#: plugins/mouseclick/mouseclick.cpp:48
 #, kde-format
 msgctxt "Right mouse button"
 msgid "Right"
@@ -2311,12 +2311,12 @@ msgstr "글꼴:"
 msgid "Show Text:"
 msgstr "텍스트 표시:"
 
-#: plugins/mousemark/mousemark.cpp:43
+#: plugins/mousemark/mousemark.cpp:36
 #, kde-format
 msgid "Clear All Mouse Marks"
 msgstr "모든 마우스 자취 지우기"
 
-#: plugins/mousemark/mousemark.cpp:48 plugins/mousemark/mousemark_config.cpp:51
+#: plugins/mousemark/mousemark.cpp:41 plugins/mousemark/mousemark_config.cpp:51
 #, kde-format
 msgid "Clear Last Mouse Mark"
 msgstr "마지막 마우스 자취 지우기"
@@ -2595,12 +2595,12 @@ msgstr "출력을 찾을 수 없음"
 msgid "Invalid region"
 msgstr "잘못된 영역"
 
-#: plugins/screencast/screencaststream.cpp:378
+#: plugins/screencast/screencaststream.cpp:380
 #, kde-format
 msgid "OpenGL compositing is required for screencasting"
 msgstr "스크린캐스팅에는 OpenGL 컴포지팅이 필요함"
 
-#: plugins/screencast/screencaststream.cpp:386
+#: plugins/screencast/screencaststream.cpp:388
 #, kde-format
 msgid "Failed to create PipeWire stream"
 msgstr "PipeWire 스트림을 만들 수 없음"
@@ -3062,16 +3062,6 @@ msgstr "크기 조정된 영역을 위로 이동"
 msgid "Move Zoomed Area Downwards"
 msgstr "크기 조정된 영역을 아래로 이동"
 
-#: plugins/zoom/zoom.cpp:122
-#, kde-format
-msgid "Move Mouse to Focus"
-msgstr "마우스를 포커스로 이동"
-
-#: plugins/zoom/zoom.cpp:128
-#, kde-format
-msgid "Move Mouse to Center"
-msgstr "마우스를 가운데로 이동"
-
 #. i18n: ectx: label, entry (count), group (General)
 #: rulebooksettingsbase.kcfg:9
 #, kde-format
@@ -3433,220 +3423,178 @@ msgid "Fullscreen rule type"
 msgstr "전체 화면 규칙 종류"
 
 #. i18n: ectx: label, entry (noborder), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:307
+#: rulesettings.kcfg:311
 #, kde-format
 msgid "No titlebar and frame"
 msgstr "제목 표시줄과 프레임 없음"
 
 #. i18n: ectx: label, entry (noborderrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:311
+#: rulesettings.kcfg:315
 #, kde-format
 msgid "No titlebar rule type"
 msgstr "제목 표시줄 없음 규칙 종류"
 
+#. i18n: ectx: label, entry (decorationpolicy), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:322
+#, kde-format
+msgid "Decoration policy"
+msgstr ""
+
+#. i18n: ectx: label, entry (decorationpolicyrule), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:332
+#, fuzzy, kde-format
+#| msgid "Active opacity rule type"
+msgid "Decoration policy rule type"
+msgstr "활성 불투명도 규칙 종류"
+
 #. i18n: ectx: label, entry (decocolor), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:318
+#: rulesettings.kcfg:339
 #, kde-format
 msgid "Titlebar color and scheme"
 msgstr "제목 표시줄 색과 색 구성표"
 
 #. i18n: ectx: label, entry (decocolorrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:321
+#: rulesettings.kcfg:342
 #, kde-format
 msgid "Titlebar color rule type"
 msgstr "제목 표시줄 색 규칙 종류"
 
-#. i18n: ectx: label, entry (blockcompositing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:326
-#, kde-format
-msgid "Block Compositing"
-msgstr "컴포지팅 중단하기"
-
-#. i18n: ectx: label, entry (blockcompositingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:330
-#, kde-format
-msgid "Block Compositing rule type"
-msgstr "컴포지팅 중단하기 규칙 종류"
-
 #. i18n: ectx: label, entry (fsplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:335
+#: rulesettings.kcfg:347
 #, kde-format
 msgid "Focus stealing prevention"
 msgstr "포커스 훔치기 방지"
 
 #. i18n: ectx: label, entry (fsplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:341
+#: rulesettings.kcfg:353
 #, kde-format
 msgid "Focus stealing prevention rule type"
 msgstr "포커스 훔치기 방지 규칙 종류"
 
 #. i18n: ectx: label, entry (fpplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:346
+#: rulesettings.kcfg:358
 #, kde-format
 msgid "Focus protection"
 msgstr "포커스 보호"
 
 #. i18n: ectx: label, entry (fpplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:352
+#: rulesettings.kcfg:364
 #, kde-format
 msgid "Focus protection rule type"
 msgstr "포커스 보호 규칙 종류"
 
 #. i18n: ectx: label, entry (acceptfocus), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:357
+#: rulesettings.kcfg:369
 #, kde-format
 msgid "Accept Focus"
 msgstr "포커스 받아들이기"
 
 #. i18n: ectx: label, entry (acceptfocusrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:361
+#: rulesettings.kcfg:373
 #, kde-format
 msgid "Accept Focus rule type"
 msgstr "포커스 받아들이기 규칙 종류"
 
 #. i18n: ectx: label, entry (closeable), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:366
+#: rulesettings.kcfg:378
 #, kde-format
 msgid "Closeable"
 msgstr "닫을 수 있음"
 
 #. i18n: ectx: label, entry (closeablerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:370
+#: rulesettings.kcfg:382
 #, kde-format
 msgid "Closeable rule type"
 msgstr "닫을 수 있음 규칙 종류"
 
-#. i18n: ectx: label, entry (autogroup), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:375
-#, kde-format
-msgid "Autogroup with identical"
-msgstr "같은 속성으로 자동으로 묶기"
-
-#. i18n: ectx: label, entry (autogrouprule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:379
-#, kde-format
-msgid "Autogroup with identical rule type"
-msgstr "같은 속성으로 자동으로 묶기 규칙 종류"
-
-#. i18n: ectx: label, entry (autogroupfg), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:384
-#, kde-format
-msgid "Autogroup in foreground"
-msgstr "배경에 있는 창 자동으로 묶기"
-
-#. i18n: ectx: label, entry (autogroupfgrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:388
-#, kde-format
-msgid "Autogroup in foreground rule type"
-msgstr "배경에 있는 창 자동으로 묶기 규칙 종류"
-
-#. i18n: ectx: label, entry (autogroupid), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:393
-#, kde-format
-msgid "Autogroup by ID"
-msgstr "ID로 자동으로 묶기"
-
-#. i18n: ectx: label, entry (autogroupidrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:396
-#, kde-format
-msgid "Autogroup by ID rule type"
-msgstr "ID로 자동으로 묶기 규칙 종류"
-
-#. i18n: ectx: label, entry (strictgeometry), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:401
-#, kde-format
-msgid "Obey geometry restrictions"
-msgstr "크기 제한 받아들이기"
-
-#. i18n: ectx: label, entry (strictgeometryrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:405
-#, kde-format
-msgid "Obey geometry restrictions rule type"
-msgstr "크기 제한 받아들이기 규칙 종류"
-
 #. i18n: ectx: label, entry (shortcut), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:410
+#: rulesettings.kcfg:387
 #, kde-format
 msgid "Shortcut"
 msgstr "단축키"
 
 #. i18n: ectx: label, entry (shortcutrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:413
+#: rulesettings.kcfg:390
 #, kde-format
 msgid "Shortcut rule type"
 msgstr "단축키 규칙 종류"
 
 #. i18n: ectx: label, entry (disableglobalshortcuts), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:420
+#: rulesettings.kcfg:397
 #, kde-format
 msgid "Ignore global shortcuts"
 msgstr "전역 단축키 무시"
 
 #. i18n: ectx: label, entry (disableglobalshortcutsrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:424
+#: rulesettings.kcfg:401
 #, kde-format
 msgid "Ignore global shortcuts rule type"
 msgstr "전역 단축키 무시 규칙 종류"
 
 #. i18n: ectx: label, entry (desktopfile), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:429
+#: rulesettings.kcfg:406
 #, kde-format
 msgid "Desktop file name"
 msgstr "데스크톱 파일 이름"
 
 #. i18n: ectx: label, entry (desktopfilerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:432
+#: rulesettings.kcfg:409
 #, kde-format
 msgid "Desktop file name rule type"
 msgstr "데스크톱 파일 이름 규칙 종류"
 
 #. i18n: ectx: label, entry (layer), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:439
+#: rulesettings.kcfg:416
 #, kde-format
 msgid "Layer"
 msgstr "레이어"
 
 #. i18n: ectx: label, entry (layerrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:455
+#: rulesettings.kcfg:432
 #, kde-format
 msgid "Layer rule type"
 msgstr "레이어 규칙 종류"
 
 #. i18n: ectx: label, entry (adaptivesync), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:460
+#: rulesettings.kcfg:437
 #, kde-format
 msgid "AdaptiveSync"
 msgstr "적응형 동기화"
 
 #. i18n: ectx: label, entry (adaptivesyncrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:464
+#: rulesettings.kcfg:441
 #, kde-format
 msgid "AdaptiveSync rule type"
 msgstr "적응형 동기화 규칙 형식"
 
 #. i18n: ectx: label, entry (tearing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:469
+#: rulesettings.kcfg:446
 #, kde-format
 msgid "Allow Tearing"
 msgstr "티어링 허용"
 
 #. i18n: ectx: label, entry (tearingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:473
+#: rulesettings.kcfg:450
 #, kde-format
 msgid "Tearing rule type"
 msgstr "티어링 규칙 종류"
 
 #. i18n: ectx: label, entry (excludefromcapture), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:478
+#: rulesettings.kcfg:455
 #, kde-format
 msgid "Hide from screenshots and screen recordings"
 msgstr "스크린샷과 화면 녹화에서 숨기기"
 
 #. i18n: ectx: label, entry (excludefromcapturerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:482
+#: rulesettings.kcfg:459
 #, kde-format
 msgid "Hide from screenshots and screen recordings rule type"
 msgstr "스크린샷과 화면 녹화 규칙 형식에서 숨기기"
+
+#: scene/workspacescene.cpp:115
+#, kde-format
+msgid "Toggle “Show Compositing” effect"
+msgstr ""
 
 #. i18n: ectx: property (windowTitle), widget (QDialog, ShortcutDialog)
 #: shortcutdialog.ui:14
@@ -4233,7 +4181,19 @@ msgstr "바탕 화면 멀리 보기"
 msgid "Kill Window"
 msgstr "창 강제 종료"
 
-#: useractions.cpp:1080
+#: useractions.cpp:1017
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Focused Window"
+msgstr ""
+
+#: useractions.cpp:1018
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Screen"
+msgstr ""
+
+#: useractions.cpp:1083
 #, kde-format
 msgid "Activate Window (%1)"
 msgstr "창 활성화(%1)"
@@ -4283,91 +4243,98 @@ msgstr "아래쪽 바탕 화면으로 전환"
 msgid "Switch to Desktop %1"
 msgstr "바탕 화면 %1(으)로 전환"
 
-#: wayland/outputmanagement_v2.cpp:569
+#: wayland/outputmanagement_v2.cpp:521
+#, kde-format
+msgid ""
+"Setting custom modes with too old kde-output-management-v2 protocol versions "
+"is unsupported"
+msgstr ""
+
+#: wayland/outputmanagement_v2.cpp:575
 #, kde-format
 msgid "abm level is larger than the maximum (4): %1"
 msgstr "abm 수준이 최댓값(4)보다 높음: %1"
 
-#: wayland/outputmanagement_v2.cpp:647
+#: wayland/outputmanagement_v2.cpp:673
 #, kde-format
 msgid "One of the relevant outputs is no longer available"
 msgstr "하나 이상의 출력을 사용할 수 없음"
 
-#: wayland/outputmanagement_v2.cpp:665
+#: wayland/outputmanagement_v2.cpp:691
 #, kde-format
 msgid "Disabling all outputs through configuration changes is not allowed"
 msgstr "설정 변경으로 모든 출력 비활성화는 허용되지 않음"
 
-#: wayland/outputmanagement_v2.cpp:675
+#: wayland/outputmanagement_v2.cpp:701
 #, kde-format
 msgid "%1 cannot mirror itself"
 msgstr "%1이(가) 자기 자신을 복제할 수 없음"
 
-#: wayland/outputmanagement_v2.cpp:682
+#: wayland/outputmanagement_v2.cpp:708
 #, kde-format
 msgid "Cannot add a custom mode with an empty size"
 msgstr "크기가 비어 있는 사용자 정의 모드를 추가할 수 없음"
 
-#: wayland/outputmanagement_v2.cpp:686
+#: wayland/outputmanagement_v2.cpp:712
 #, kde-format
 msgid "Cannot add a custom mode with a refresh rate of zero Hz"
 msgstr "화면 주사율이 0 Hz인 사용자 정의 모드를 추가할 수 없음"
 
-#: wayland/outputmanagement_v2.cpp:697
+#: wayland/outputmanagement_v2.cpp:723
 #, kde-format
 msgid "Position of output %1 is way too negative (%2, %3)"
 msgstr "출력 %1의 위치가 너무 낮음(%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:700
+#: wayland/outputmanagement_v2.cpp:726
 #, kde-format
 msgid "Position of enabled output %1 is negative (%2, %3)"
 msgstr "활성화된 출력 %1의 위치가 너무 낮음(%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:704
+#: wayland/outputmanagement_v2.cpp:730
 #, kde-format
 msgid "Position of output %1 is way too large (%2, %3)"
 msgstr "출력 %1의 위치가 너무 큼(%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:721
+#: wayland/outputmanagement_v2.cpp:747
 #, kde-format
 msgid "The driver rejected the output configuration"
 msgstr "드라이버에서 출력 설정을 거부함"
 
-#: wayland/outputmanagement_v2.cpp:724
+#: wayland/outputmanagement_v2.cpp:750
 #, kde-format
 msgid "The session is not active"
 msgstr "세션이 활성화되어 있지 않음"
 
-#: window.cpp:3107
+#: window.cpp:3162
 #, kde-format
 msgctxt "Application is not responding, appended to window title"
 msgid "(Not Responding)"
 msgstr "(응답 없음)"
 
-#: workspace.cpp:1310
+#: workspace.cpp:1311
 #, kde-format
 msgid "Built-in Screen"
 msgstr "내장 화면"
 
-#: workspace.cpp:1323
+#: workspace.cpp:1324
 #, kde-format
 msgctxt "Display label: manufacturer + model name + connector name"
 msgid "%1 %2 %3"
 msgstr "%1 %2 %3"
 
-#: workspace.cpp:1333
+#: workspace.cpp:1334
 #, kde-format
 msgctxt "Display label: manufacturer + model name + serial number"
 msgid "%1 %2 %3"
 msgstr "%1 %2 %3"
 
-#: workspace.cpp:1336
+#: workspace.cpp:1337
 #, kde-format
 msgctxt "Display label: manufacturer + model name"
 msgid "%1 %2"
 msgstr "%1 %2"
 
-#: workspace.cpp:1805
+#: workspace.cpp:1806
 #, kde-format
 msgctxt "Introductory text shown in the support information."
 msgid ""
@@ -4394,6 +4361,42 @@ msgstr ""
 #, kde-format
 msgid "Xwayland has crashed"
 msgstr "Xwayland가 충돌함"
+
+#~ msgid "Block Compositing"
+#~ msgstr "컴포지팅 중단하기"
+
+#~ msgid "Block Compositing rule type"
+#~ msgstr "컴포지팅 중단하기 규칙 종류"
+
+#~ msgid "Autogroup with identical"
+#~ msgstr "같은 속성으로 자동으로 묶기"
+
+#~ msgid "Autogroup with identical rule type"
+#~ msgstr "같은 속성으로 자동으로 묶기 규칙 종류"
+
+#~ msgid "Autogroup in foreground"
+#~ msgstr "배경에 있는 창 자동으로 묶기"
+
+#~ msgid "Autogroup in foreground rule type"
+#~ msgstr "배경에 있는 창 자동으로 묶기 규칙 종류"
+
+#~ msgid "Autogroup by ID"
+#~ msgstr "ID로 자동으로 묶기"
+
+#~ msgid "Autogroup by ID rule type"
+#~ msgstr "ID로 자동으로 묶기 규칙 종류"
+
+#~ msgid "Obey geometry restrictions"
+#~ msgstr "크기 제한 받아들이기"
+
+#~ msgid "Obey geometry restrictions rule type"
+#~ msgstr "크기 제한 받아들이기 규칙 종류"
+
+#~ msgid "Move Mouse to Focus"
+#~ msgstr "마우스를 포커스로 이동"
+
+#~ msgid "Move Mouse to Center"
+#~ msgstr "마우스를 가운데로 이동"
 
 #~ msgid "Indicate that KWin has recently crashed n times"
 #~ msgstr "KWin이 최근 n번 충돌했다는 것을 알리기"

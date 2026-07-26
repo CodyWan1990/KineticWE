@@ -11,8 +11,8 @@
 #include "config-kwin.h"
 
 #include "backends/libinput/libinputbackend.h"
+#include "core/gpumanager.h"
 #include "core/outputconfiguration.h"
-#include "core/renderdevice.h"
 #include "core/session.h"
 #include "drm_egl_backend.h"
 #include "drm_gpu.h"
@@ -20,7 +20,6 @@
 #include "drm_logging.h"
 #include "drm_output.h"
 #include "drm_pipeline.h"
-#include "drm_qpainter_backend.h"
 #include "drm_render_backend.h"
 #include "drm_virtual_output.h"
 #include "utils/envvar.h"
@@ -51,34 +50,11 @@ using namespace std::chrono_literals;
 namespace KWin
 {
 
-static QStringList splitPathList(const QString &input, const QChar delimiter)
-{
-    QStringList ret;
-    QString tmp;
-    for (int i = 0; i < input.size(); i++) {
-        if (input[i] == delimiter) {
-            if (i > 0 && input[i - 1] == '\\') {
-                tmp[tmp.size() - 1] = delimiter;
-            } else if (!tmp.isEmpty()) {
-                ret.append(tmp);
-                tmp = QString();
-            }
-        } else {
-            tmp.append(input[i]);
-        }
-    }
-    if (!tmp.isEmpty()) {
-        ret.append(tmp);
-    }
-    return ret;
-}
-
 DrmBackend::DrmBackend(Session *session, QObject *parent)
     : OutputBackend(parent)
     , m_udev(std::make_unique<Udev>())
     , m_udevMonitor(m_udev->createMonitor())
     , m_session(session)
-    , m_explicitGpus(splitPathList(qEnvironmentVariable("KWIN_DRM_DEVICES"), ':'))
 {
 }
 
@@ -96,6 +72,8 @@ QList<BackendOutput *> DrmBackend::outputs() const
 
 bool DrmBackend::initialize()
 {
+    m_explicitGpus = GpuManager::splitPathList(qEnvironmentVariable("KWIN_DRM_DEVICES"));
+
     connect(m_session, &Session::devicePaused, this, [this](dev_t deviceId) {
         if (const auto gpu = findGpu(deviceId)) {
             gpu->setActive(false);
@@ -136,11 +114,6 @@ bool DrmBackend::initialize()
         }
     }
 
-    if (m_gpus.empty()) {
-        qCWarning(KWIN_DRM) << "No suitable DRM devices have been found";
-        return false;
-    }
-
     // setup udevMonitor
     if (m_udevMonitor) {
         m_udevMonitor->filterSubsystemDevType("drm");
@@ -152,29 +125,6 @@ bool DrmBackend::initialize()
         }
     }
     updateOutputs();
-
-    if (m_explicitGpus.empty() && m_gpus.size() > 1) {
-        std::ranges::sort(m_gpus, [](const auto &gpu1, const auto &gpu2) {
-            const bool software1 = !gpu1->renderDevice() || gpu1->renderDevice()->eglDisplay()->isSoftwareRenderer();
-            const bool software2 = !gpu2->renderDevice() || gpu2->renderDevice()->eglDisplay()->isSoftwareRenderer();
-            if (software1 != software2) {
-                // avoid needing to do software rendering with the primary GPU
-                return !software1;
-            }
-            const size_t internalOutputs1 = std::ranges::count_if(gpu1->drmOutputs(), &BackendOutput::isInternal);
-            const size_t internalOutputs2 = std::ranges::count_if(gpu2->drmOutputs(), &BackendOutput::isInternal);
-            if (internalOutputs1 != internalOutputs2) {
-                return internalOutputs1 > internalOutputs2;
-            }
-            const size_t desktopOutputs1 = std::ranges::count_if(gpu1->drmOutputs(), std::not_fn(&BackendOutput::isNonDesktop));
-            const size_t desktopOutputs2 = std::ranges::count_if(gpu2->drmOutputs(), std::not_fn(&BackendOutput::isNonDesktop));
-            if (desktopOutputs1 != desktopOutputs2) {
-                return desktopOutputs1 > desktopOutputs2;
-            }
-            return gpu1->drmOutputs().size() > gpu2->drmOutputs().size();
-        });
-        qCDebug(KWIN_DRM) << "chose" << m_gpus.front()->drmDevice()->path() << "as the primary GPU";
-    }
     return true;
 }
 
@@ -213,14 +163,8 @@ void DrmBackend::handleUdevEvent()
         } else if (device->action() == QLatin1StringView("remove")) {
             DrmGpu *gpu = findGpu(device->devNum());
             if (gpu) {
-                if (primaryGpu() == gpu) {
-                    qCCritical(KWIN_DRM) << "Primary gpu has been removed! Quitting...";
-                    QCoreApplication::exit(1);
-                    return;
-                } else {
-                    gpu->setRemoved();
-                    updateOutputs(gpu);
-                }
+                gpu->setRemoved();
+                updateOutputs(gpu);
             }
         } else if (device->action() == QLatin1StringView("change")) {
             DrmGpu *gpu = findGpu(device->devNum());
@@ -276,13 +220,13 @@ DrmGpu *DrmBackend::addGpu(const QString &fileName)
     return gpu;
 }
 
-void DrmBackend::addOutput(DrmAbstractOutput *o)
+void DrmBackend::addOutput(BackendOutput *o)
 {
     m_outputs.append(o);
     Q_EMIT outputAdded(o);
 }
 
-void DrmBackend::removeOutput(DrmAbstractOutput *o)
+void DrmBackend::removeOutput(BackendOutput *o)
 {
     m_outputs.removeOne(o);
     Q_EMIT outputRemoved(o);
@@ -302,7 +246,7 @@ void DrmBackend::updateOutputs(DrmGpu *onlyUpdate)
 
     for (auto it = m_gpus.begin(); it != m_gpus.end();) {
         DrmGpu *gpu = it->get();
-        if (gpu->isRemoved() || (gpu != primaryGpu() && gpu->drmOutputs().isEmpty())) {
+        if (gpu->isRemoved() || gpu->drmOutputs().isEmpty()) {
             qCDebug(KWIN_DRM) << "Removing GPU" << it->get();
             const std::unique_ptr<DrmGpu> keepAlive = std::move(*it);
             it = m_gpus.erase(it);
@@ -318,19 +262,14 @@ std::unique_ptr<InputBackend> DrmBackend::createInputBackend()
     return std::make_unique<LibinputBackend>(m_session);
 }
 
-std::unique_ptr<QPainterBackend> DrmBackend::createQPainterBackend()
+std::unique_ptr<EglBackend> DrmBackend::createOpenGLBackend(RenderDevice *device)
 {
-    return std::make_unique<DrmQPainterBackend>(this);
-}
-
-std::unique_ptr<EglBackend> DrmBackend::createOpenGLBackend()
-{
-    return std::make_unique<EglGbmBackend>(this);
+    return std::make_unique<EglGbmBackend>(this, device);
 }
 
 QList<CompositingType> DrmBackend::supportedCompositors() const
 {
-    return QList<CompositingType>{OpenGLCompositing, QPainterCompositing};
+    return QList<CompositingType>{OpenGLCompositing};
 }
 
 QString DrmBackend::supportInformation() const
@@ -365,11 +304,6 @@ void DrmBackend::removeVirtualOutput(BackendOutput *output)
     removeOutput(virtualOutput);
     Q_EMIT outputsQueried();
     virtualOutput->unref();
-}
-
-DrmGpu *DrmBackend::primaryGpu() const
-{
-    return m_gpus.empty() ? nullptr : m_gpus.front().get();
 }
 
 DrmGpu *DrmBackend::findGpu(dev_t deviceId) const

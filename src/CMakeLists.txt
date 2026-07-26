@@ -76,6 +76,7 @@ target_sources(kwin PRIVATE
     core/session_noop.cpp
     core/shmgraphicsbufferallocator.cpp
     core/syncobjtimeline.cpp
+    core/udmabufallocator.cpp
     cursor.cpp
     cursorsource.cpp
     dbusinterface.cpp
@@ -98,6 +99,7 @@ target_sources(kwin PRIVATE
     effect/offscreeneffect.cpp
     effect/offscreenquickview.cpp
     effect/quickeffect.cpp
+    effect/springmotion.cpp
     effect/timeline.cpp
     focuschain.cpp
     ftrace.cpp
@@ -161,7 +163,6 @@ target_sources(kwin PRIVATE
     pluginmanager.cpp
     pointer_input.cpp
     popup_input_filter.cpp
-    qpainter/qpainterbackend.cpp
     qpainter/qpainterswapchain.cpp
     renderloopdrivenqanimationdriver.cpp
     resources.qrc
@@ -179,14 +180,11 @@ target_sources(kwin PRIVATE
     scene/itemgeometry.cpp
     scene/itemrenderer.cpp
     scene/itemrenderer_opengl.cpp
-    scene/itemrenderer_qpainter.cpp
     scene/ninepatch.cpp
     scene/opengl/atlas.cpp
     scene/opengl/ninepatch.cpp
     scene/opengl/texture.cpp
     scene/outlinedborderitem.cpp
-    scene/qpainter/atlas.cpp
-    scene/qpainter/texture.cpp
     scene/rootitem.cpp
     scene/scene.cpp
     scene/shadowitem.cpp
@@ -597,6 +595,7 @@ install(FILES
     core/session_logind.h
     core/session_noop.h
     core/shmgraphicsbufferallocator.h
+    core/udmabufallocator.h
     DESTINATION ${KDE_INSTALL_INCLUDEDIR}/kwin/core COMPONENT Devel)
 
 install(FILES
@@ -673,14 +672,11 @@ install(FILES
     scene/itemgeometry.h
     scene/itemrenderer.h
     scene/itemrenderer_opengl.h
-    scene/itemrenderer_qpainter.h
     scene/ninepatch.h
     scene/opengl/atlas.h
     scene/opengl/ninepatch.h
     scene/opengl/texture.h
     scene/outlinedborderitem.h
-    scene/qpainter/atlas.h
-    scene/qpainter/texture.h
     scene/rootitem.h
     scene/scene.h
     scene/shadowitem.h

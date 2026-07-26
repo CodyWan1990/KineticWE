@@ -176,11 +176,11 @@ public:
 
     // for use by effects
     void prePaintScreen(ScreenPrePaintData &data);
-    void paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen);
+    [[nodiscard]] bool paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen);
     void postPaintScreen();
     void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data);
-    void paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data);
-    void drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data);
+    [[nodiscard]] bool paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data);
+    [[nodiscard]] bool drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data);
     void renderWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data);
     QVariant kwinOption(KWinOption kwopt);
     /**
@@ -475,15 +475,6 @@ public:
      */
     bool isOpenGLCompositing() const;
     EglContext *openglContext() const;
-    /**
-     * @brief Provides access to the QPainter which is rendering to the back buffer.
-     *
-     * Only relevant for CompositingType QPainterCompositing. For all other compositing types
-     * @c null is returned.
-     *
-     * @return QPainter* The Scene's QPainter or @c null.
-     */
-    QPainter *scenePainter();
     void reconfigure();
 
 #if KWIN_BUILD_X11

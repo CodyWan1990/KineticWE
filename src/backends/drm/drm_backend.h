@@ -25,7 +25,6 @@ class Udev;
 class UdevMonitor;
 class UdevDevice;
 
-class DrmAbstractOutput;
 class Cursor;
 class DrmGpu;
 class DrmVirtualOutput;
@@ -40,8 +39,7 @@ public:
     ~DrmBackend() override;
 
     std::unique_ptr<InputBackend> createInputBackend() override;
-    std::unique_ptr<QPainterBackend> createQPainterBackend() override;
-    std::unique_ptr<EglBackend> createOpenGLBackend() override;
+    std::unique_ptr<EglBackend> createOpenGLBackend(RenderDevice *device) override;
 
     bool initialize() override;
 
@@ -54,7 +52,6 @@ public:
     BackendOutput *createVirtualOutput(const QString &name, const QString &description, const QSize &size, double scale) override;
     void removeVirtualOutput(BackendOutput *output) override;
 
-    DrmGpu *primaryGpu() const;
     DrmGpu *findGpu(dev_t deviceId) const;
     size_t gpuCount() const;
 
@@ -76,8 +73,8 @@ protected:
 
 private:
     friend class DrmGpu;
-    void addOutput(DrmAbstractOutput *output);
-    void removeOutput(DrmAbstractOutput *output);
+    void addOutput(BackendOutput *output);
+    void removeOutput(BackendOutput *output);
     void handleUdevEvent();
     DrmGpu *addGpu(const QString &fileName);
 
@@ -85,9 +82,9 @@ private:
     std::unique_ptr<UdevMonitor> m_udevMonitor;
     std::unique_ptr<QSocketNotifier> m_socketNotifier;
     Session *m_session;
-    QList<DrmAbstractOutput *> m_outputs;
+    QList<BackendOutput *> m_outputs;
 
-    const QStringList m_explicitGpus;
+    QStringList m_explicitGpus;
     std::vector<std::unique_ptr<DrmGpu>> m_gpus;
     QList<DrmVirtualOutput *> m_virtualOutputs;
     DrmRenderBackend *m_renderBackend = nullptr;

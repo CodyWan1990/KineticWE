@@ -80,32 +80,26 @@ std::optional<QByteArray> GLShader::preprocess(const QByteArray &src, GLenum sha
     const auto split = src.split('\n');
 
     const auto context = EglContext::currentContext();
-    const bool coreShader = (context->isOpenGLES() && context->glslVersion() >= Version(3, 0))
-        || (!context->isOpenGLES() && context->glslVersion() >= Version(1, 40));
+    const bool coreShader = context->glslVersion() >= Version(3, 0);
 
     if (recursionDepth == 1) {
         if (coreShader) {
-            if (context->isOpenGLES()) {
-                // = OpenGL ES 3.0
-                ret.append("#version 300 es\n");
-            } else {
-                // = OpenGL 3.1
-                ret.append("#version 140\n");
-            }
-        }
-        if (context->isOpenGLES()) {
+            ret.append("#version 300 es\n");
             ret.append("precision highp float;\n");
             ret.append("precision highp sampler2D;\n");
             ret.append("precision highp sampler3D;\n");
-        }
-        if (!coreShader) {
+        } else {
+            // derivative functions are optional in 2.0
+            ret.append("#extension GL_OES_standard_derivatives : enable\n");
+            ret.append("precision highp float;\n");
+            // in OpenGL ES 2.0, it's not possible to specify
+            // default precision for samplers
+            ret.append("#define sampler2D highp sampler2D\n");
+            ret.append("#define sampler3D highp sampler3D\n");
             // without a version statement, OpenGL assumes GLSL 1.10,
             // which doesn't support the texture functions natively
             ret.append("vec4 texture(in sampler2D sampler, in vec2 coordinates) {\n");
             ret.append("    return texture2D(sampler, coordinates);\n");
-            ret.append("}\n");
-            ret.append("vec4 texture(in sampler3D sampler, in vec3 coordinates) {\n");
-            ret.append("    return texture3D(sampler, coordinates);\n");
             ret.append("}\n");
         }
     }
@@ -220,14 +214,6 @@ bool GLShader::load(const QByteArray &vertexSource, const QByteArray &fragmentSo
 void GLShader::bindAttributeLocation(const char *name, int index)
 {
     glBindAttribLocation(m_program, index, name);
-}
-
-void GLShader::bindFragDataLocation(const char *name, int index)
-{
-    const auto context = EglContext::currentContext();
-    if (!context->isOpenGLES() && (context->hasVersion(Version(3, 0)) || context->hasOpenglExtension(QByteArrayLiteral("GL_EXT_gpu_shader4")))) {
-        glBindFragDataLocation(m_program, index, name);
-    }
 }
 
 void GLShader::bind()
@@ -475,7 +461,14 @@ bool GLShader::setUniform(int location, const QMatrix4x4 &value)
 bool GLShader::setUniform(int location, const QColor &color)
 {
     if (location >= 0) {
-        glUniform4f(location, color.redF(), color.greenF(), color.blueF(), color.alphaF());
+        // Pre-multiply RGB values with the alpha channel. The blend equation that we often
+        // use assumes that colors are pre-multiplied by the alpha value.
+        const float alpha = color.alphaF();
+        const float red = color.redF() * alpha;
+        const float green = color.greenF() * alpha;
+        const float blue = color.blueF() * alpha;
+
+        glUniform4f(location, red, green, blue, alpha);
     }
     return (location >= 0);
 }

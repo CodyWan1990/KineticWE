@@ -26,12 +26,18 @@
 namespace KWin
 {
 
-bool EglDisplay::shouldUseOpenGLES()
+static void epoxyFailureWorkaround()
 {
-    if (qstrcmp(qgetenv("KWIN_COMPOSE"), "O2ES") == 0) {
-        return true;
-    }
-    return QOpenGLContext::openGLModuleType() == QOpenGLContext::LibGLES;
+    // do nothing
+}
+
+static epoxy_resolver_stub_t epoxyFailureHandler(const char *functionName)
+{
+    // Since epoxy calls glGetString(GL_VERSION) when resolving functions, and
+    // glGetString fails after a GPU reset, failing to resolve functions is expected
+    // and there's nothing we can or should do about it other than log it and move on.
+    qCWarning(KWIN_OPENGL, "Failed to resolve OpenGL function %s", functionName);
+    return epoxyFailureWorkaround;
 }
 
 std::unique_ptr<EglDisplay> EglDisplay::create(::EGLDisplay display, DrmDevice *drmDevice)
@@ -39,6 +45,9 @@ std::unique_ptr<EglDisplay> EglDisplay::create(::EGLDisplay display, DrmDevice *
     if (!display) {
         return nullptr;
     }
+
+    epoxy_set_resolver_failure_handler(epoxyFailureHandler);
+
     EGLint major, minor;
     if (eglInitialize(display, &major, &minor) == EGL_FALSE) {
         qCWarning(KWIN_OPENGL) << "eglInitialize failed";
@@ -54,7 +63,7 @@ std::unique_ptr<EglDisplay> EglDisplay::create(::EGLDisplay display, DrmDevice *
         return nullptr;
     }
     qCDebug(KWIN_OPENGL) << "Egl Initialize succeeded";
-    if (eglBindAPI(shouldUseOpenGLES() ? EGL_OPENGL_ES_API : EGL_OPENGL_API) == EGL_FALSE) {
+    if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
         qCCritical(KWIN_OPENGL) << "bind OpenGL API failed";
         return nullptr;
     }
@@ -393,7 +402,7 @@ EGLImageKHR EglDisplay::importBufferAsImage(GraphicsBuffer *buffer)
         image = importDmaBufAsImage(*buffer->dmabufAttributes());
         // On Nvidia, sampling from udmabuf just results in black,
         // and on i915 there are glitches on some systems
-    } else if (buffer->udmabufAttributes() && m_drmDevice && !s_disableUdmabuf.value_or(m_drmDevice->isNvidia() || m_drmDevice->isI915())) {
+    } else if (buffer->udmabufAttributes() && (!m_drmDevice || !s_disableUdmabuf.value_or(m_drmDevice->isNvidia() || m_drmDevice->isI915()))) {
         image = importDmaBufAsImage(*buffer->udmabufAttributes());
     }
     m_importCache[key] = image;

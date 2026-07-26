@@ -14,6 +14,7 @@
 #include "utils/udev.h"
 #include "vulkan/vulkan_device.h"
 
+#include <QFileInfo>
 #include <QSocketNotifier>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -47,13 +48,43 @@ static std::optional<dev_t> getDevId(const FileDescriptor &fd)
     return buf.st_rdev;
 }
 
+QStringList GpuManager::splitPathList(const QString &input)
+{
+    const QChar delimiter = ':';
+    QStringList ret;
+    QString tmp;
+    for (int i = 0; i < input.size(); i++) {
+        if (input[i] == delimiter) {
+            if (i > 0 && input[i - 1] == '\\') {
+                tmp[tmp.size() - 1] = delimiter;
+            } else if (!tmp.isEmpty()) {
+                ret.append(tmp);
+                tmp = QString();
+            }
+        } else {
+            tmp.append(input[i]);
+        }
+    }
+    if (!tmp.isEmpty()) {
+        ret.append(tmp);
+    }
+    return ret;
+}
+
 GpuManager::GpuManager()
     : m_udmabuf(::open("/dev/udmabuf", O_RDWR | O_CLOEXEC))
     , m_udmabufDevId(getDevId(m_udmabuf))
     , m_udev(std::make_unique<Udev>())
     , m_udevMonitor(m_udev->createMonitor())
     , m_udevNotifier(std::make_unique<QSocketNotifier>(m_udevMonitor->fd(), QSocketNotifier::Read))
+    , m_explicitRenderNodes(qEnvironmentVariableIsSet("KWIN_RENDER_NODES") ? splitPathList(qEnvironmentVariable("KWIN_RENDER_NODES")) : std::optional<QStringList>())
 {
+    if (m_udmabuf.isValid()) {
+        if (auto device = RenderDevice::createSoftwareDevice(*m_udmabufDevId)) {
+            m_softwareDevice = device.get();
+            addDevice(std::move(device));
+        }
+    }
     m_udevMonitor->filterSubsystemDevType("drm");
     connect(m_udevNotifier.get(), &QSocketNotifier::activated, this, &GpuManager::handleUdevEvent);
     m_udevMonitor->enable();
@@ -83,15 +114,22 @@ RenderDevice *GpuManager::compatibleRenderDevice(dev_t id) const
 
 RenderDevice *GpuManager::findDevice(dev_t id) const
 {
-    const auto it = std::ranges::find_if(m_renderDevices, [id](const auto &device) {
-        return device->drmDevice()->deviceId() == id;
-    });
+    const auto it = std::ranges::find(m_renderDevices, id, &RenderDevice::deviceId);
     return it == m_renderDevices.end() ? nullptr : it->get();
+}
+
+RenderDevice *GpuManager::softwareDevice() const
+{
+    return m_softwareDevice;
 }
 
 void GpuManager::updateCompatibilityMap()
 {
     m_compatibleDeviceMap.clear();
+
+    if (m_udmabufDevId) {
+        m_compatibleDeviceMap[*m_udmabufDevId] = m_softwareDevice;
+    }
 
     int numberOfDevices = drmGetDevices2(0, nullptr, 0);
     if (numberOfDevices <= 0) {
@@ -128,6 +166,9 @@ void GpuManager::updateCompatibilityMap()
 RenderDevice *GpuManager::findCompatibleRenderDevice(drmDevicePtr device) const
 {
     auto candidates = m_renderDevices | std::views::filter([device](const auto &renderDevice) {
+        if (!renderDevice->drmDevice()) {
+            return true;
+        }
         if (device->bustype == DRM_BUS_PLATFORM) {
             // devices with bus "platform" can be assumed to be compatible.
             return renderDevice->drmDevice()->busType() == DRM_BUS_PLATFORM;
@@ -147,7 +188,7 @@ RenderDevice *GpuManager::findCompatibleRenderDevice(drmDevicePtr device) const
             return !left->eglDisplay()->isSoftwareRenderer();
         }
         // if possible, we want Vulkan support as well
-        if (left->vulkanDevice() != right->vulkanDevice()) {
+        if (bool(left->vulkanDevice()) != bool(right->vulkanDevice())) {
             return bool(left->vulkanDevice());
         }
         // (also with hardware acceleration)
@@ -155,24 +196,44 @@ RenderDevice *GpuManager::findCompatibleRenderDevice(drmDevicePtr device) const
             && left->vulkanDevice()->isSoftwareRenderer() != right->vulkanDevice()->isSoftwareRenderer()) {
             return !left->vulkanDevice()->isSoftwareRenderer();
         }
-        // if both have hardware acceleration, prefer a matching device
-        const bool sameDeviceLeft = drmDevicesEqual(device, left->drmDevice()->libdrmDevice()) == 1;
-        const bool sameDeviceRight = drmDevicesEqual(device, right->drmDevice()->libdrmDevice()) == 1;
-        if (sameDeviceLeft != sameDeviceRight) {
-            return sameDeviceLeft;
+        if (bool(left->drmDevice()) != bool(right->drmDevice())) {
+            // prefer udmabuf over software rendering on dumb buffers,
+            // since the latter is usually slower
+            return left->drmDevice() == nullptr;
         }
-        // prefer render nodes over KMS nodes
-        if (left->drmDevice()->isKMS() != right->drmDevice()->isKMS()) {
-            return !left->drmDevice()->isKMS();
+        if (left->drmDevice()) {
+            // if both have hardware acceleration, prefer a matching device
+            const bool sameDeviceLeft = drmDevicesEqual(device, left->drmDevice()->libdrmDevice()) == 1;
+            const bool sameDeviceRight = drmDevicesEqual(device, right->drmDevice()->libdrmDevice()) == 1;
+            if (sameDeviceLeft != sameDeviceRight) {
+                return sameDeviceLeft;
+            }
+            // prefer render nodes over KMS nodes
+            if (left->drmDevice()->isKMS() != right->drmDevice()->isKMS()) {
+                return !left->drmDevice()->isKMS();
+            }
         }
         // fallback: if both are equally good,
         // make sure we always get the same device
-        return left->drmDevice()->deviceId() < right->drmDevice()->deviceId();
+        return left->deviceId() < right->deviceId();
     })->get();
 }
 
 void GpuManager::scanForRenderDevices()
 {
+    if (m_explicitRenderNodes.has_value()) {
+        for (const QString &path : *m_explicitRenderNodes) {
+            if (std::ranges::contains(m_renderDevices, path, &RenderDevice::path)) {
+                continue;
+            }
+            auto device = RenderDevice::open(path);
+            if (!device) {
+                continue;
+            }
+            addDevice(std::move(device));
+        }
+        return;
+    }
     const auto devices = m_udev->listRenderNodes();
     for (const auto &udevDevice : devices) {
         if (findDevice(udevDevice->devNum())) {
@@ -182,10 +243,7 @@ void GpuManager::scanForRenderDevices()
         if (!device) {
             continue;
         }
-        qCDebug(KWIN_CORE, "Adding render device %s", qPrintable(device->drmDevice()->path()));
-        m_renderDevices.push_back(std::move(device));
-        updateCompatibilityMap();
-        Q_EMIT renderDeviceAdded(m_renderDevices.back().get());
+        addDevice(std::move(device));
     }
 }
 
@@ -204,9 +262,13 @@ void GpuManager::handleUdevEvent()
         if (!isRenderNode) {
             continue;
         }
-        const auto renderDevIt = std::ranges::find_if(m_renderDevices, [&udevDevice](const auto &device) {
-            return udevDevice->devNum() == device->drmDevice()->deviceId();
-        });
+        if (m_explicitRenderNodes.has_value()) {
+            const auto canonicalPath = QFileInfo(udevDevice->devNode()).canonicalFilePath();
+            if (!m_explicitRenderNodes->contains(udevDevice->devNode())) {
+                continue;
+            }
+        }
+        const auto renderDevIt = std::ranges::find(m_renderDevices, udevDevice->devNum(), &RenderDevice::deviceId);
         if (udevDevice->action() == QLatin1StringView("add")) {
             if (renderDevIt != m_renderDevices.end()) {
                 continue;
@@ -282,7 +344,7 @@ void GpuManager::addDevice(std::unique_ptr<RenderDevice> &&device)
 {
     m_renderDevices.push_back(std::move(device));
     updateCompatibilityMap();
-    qCDebug(KWIN_CORE, "Added render device %s", qPrintable(m_renderDevices.back()->drmDevice()->path()));
+    qCDebug(KWIN_CORE, "Added render device %s", qPrintable(m_renderDevices.back()->path()));
     Q_EMIT renderDeviceAdded(m_renderDevices.back().get());
 }
 
@@ -297,7 +359,7 @@ void GpuManager::removeDevice(RenderDevice *device)
     auto ref = std::move(*it);
     m_renderDevices.erase(it);
     updateCompatibilityMap();
-    qCDebug(KWIN_CORE, "Removed render device %s", qPrintable(device->drmDevice()->path()));
+    qCDebug(KWIN_CORE, "Removed render device %s", qPrintable(device->path()));
     Q_EMIT renderDeviceRemoved(device);
 }
 

@@ -10,7 +10,6 @@
 // kwin
 #include "core/renderdevice.h"
 #include "core/syncobjtimeline.h"
-#include "drm_abstract_output.h"
 #include "drm_backend.h"
 #include "drm_egl_layer.h"
 #include "drm_gpu.h"
@@ -27,8 +26,9 @@
 namespace KWin
 {
 
-EglGbmBackend::EglGbmBackend(DrmBackend *drmBackend)
-    : m_backend(drmBackend)
+EglGbmBackend::EglGbmBackend(DrmBackend *drmBackend, RenderDevice *device)
+    : EglBackend(device)
+    , m_backend(drmBackend)
 {
     drmBackend->setRenderBackend(this);
 }
@@ -40,18 +40,9 @@ EglGbmBackend::~EglGbmBackend()
     m_backend->setRenderBackend(nullptr);
 }
 
-bool EglGbmBackend::initializeEgl()
-{
-    if (!initClientExtensions()) {
-        return false;
-    }
-    setRenderDevice(m_backend->primaryGpu()->renderDevice());
-    return true;
-}
-
 bool EglGbmBackend::init()
 {
-    if (!initializeEgl()) {
+    if (!initClientExtensions()) {
         qCWarning(KWIN_DRM, "Could not initialize egl");
         return false;
     }
@@ -63,11 +54,6 @@ bool EglGbmBackend::init()
     initWayland();
     m_backend->createLayers();
     return true;
-}
-
-DrmDevice *EglGbmBackend::drmDevice() const
-{
-    return gpu()->drmDevice();
 }
 
 QList<OutputLayer *> EglGbmBackend::compatibleOutputLayers(BackendOutput *output)
@@ -92,11 +78,6 @@ std::unique_ptr<DrmPipelineLayer> EglGbmBackend::createDrmPlaneLayer(DrmGpu *gpu
 std::unique_ptr<DrmOutputLayer> EglGbmBackend::createLayer(DrmVirtualOutput *output)
 {
     return std::make_unique<VirtualEglGbmLayer>(this, output);
-}
-
-DrmGpu *EglGbmBackend::gpu() const
-{
-    return m_backend->primaryGpu();
 }
 
 } // namespace KWin

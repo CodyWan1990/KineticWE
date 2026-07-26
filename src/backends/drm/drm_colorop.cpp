@@ -34,8 +34,6 @@ DrmAbstractColorOp *DrmAbstractColorOp::next() const
     return m_next;
 }
 
-static const auto s_disableAmdgpuWorkaround = environmentVariableBoolValue("KWIN_DRM_DISABLE_AMD_GAMMA_WORKAROUND");
-
 bool DrmAbstractColorOp::canBypass() const
 {
     return m_features & Feature::Bypass;
@@ -232,11 +230,7 @@ static std::optional<Assignments> findColorPipelineAssignments(DrmAbstractColorO
 
 bool DrmAbstractColorOp::matchPipeline(DrmAtomicCommit *commit, const ColorPipeline &pipeline)
 {
-    if (m_cachedPipeline && *m_cachedPipeline == pipeline) {
-        commit->merge(m_cache.get());
-        return true;
-    }
-    if (pipeline.isIdentity() && s_disableAmdgpuWorkaround.value_or(!commit->gpu()->drmDevice()->isAmdgpu())) {
+    if (pipeline.isIdentity()) {
         // Applying this config is very simple and cheap, so do it directly
         // and avoid invalidating the cache
         DrmAbstractColorOp *currentOp = this;
@@ -244,6 +238,25 @@ bool DrmAbstractColorOp::matchPipeline(DrmAtomicCommit *commit, const ColorPipel
             currentOp->bypass(commit);
             currentOp = currentOp->next();
         }
+        return true;
+    }
+    if (m_cachedPipeline && *m_cachedPipeline == pipeline) {
+        commit->merge(m_cache.get());
+        return true;
+    }
+    if (!matchPipeline(commit->gpu(), pipeline)) {
+        return false;
+    }
+    commit->merge(m_cache.get());
+    return true;
+}
+
+bool DrmAbstractColorOp::matchPipeline(DrmGpu *gpu, const ColorPipeline &pipeline)
+{
+    if (pipeline.isIdentity()) {
+        return true;
+    }
+    if (m_cachedPipeline && *m_cachedPipeline == pipeline) {
         return true;
     }
     if (m_cachedPipelineFail && *m_cachedPipelineFail == pipeline) {
@@ -258,7 +271,7 @@ bool DrmAbstractColorOp::matchPipeline(DrmAtomicCommit *commit, const ColorPipel
     }
 
     // now actually program the properties
-    m_cache = std::make_unique<DrmAtomicCommit>(commit->gpu());
+    m_cache = std::make_unique<DrmAtomicCommit>(gpu);
     DrmAbstractColorOp *currentOp = this;
     while (currentOp) {
         const auto it = ret->assignments.find(currentOp);
@@ -270,7 +283,6 @@ bool DrmAbstractColorOp::matchPipeline(DrmAtomicCommit *commit, const ColorPipel
         }
         currentOp = currentOp->next();
     }
-    commit->merge(m_cache.get());
     m_cachedPipeline = pipeline;
     return true;
 }
@@ -336,6 +348,9 @@ void DrmLutColorOp16::program(DrmAtomicCommit *commit, const std::deque<ColorOp:
         };
     }
     commit->addBlob(*m_prop, DrmBlob::create(m_prop->drmObject()->gpu(), m_components.data(), sizeof(drm_color_lut) * m_maxSize));
+    if (m_interpolationMode) {
+        commit->addEnum(*m_interpolationMode, Lut1DInterpolation::Linear);
+    }
     if (m_bypass) {
         commit->addProperty(*m_bypass, 0);
     }
@@ -471,6 +486,9 @@ void DrmLutColorOp32::program(DrmAtomicCommit *commit, const std::deque<ColorOp:
         };
     }
     commit->addBlob(*m_prop, DrmBlob::create(m_prop->drmObject()->gpu(), m_components.data(), sizeof(LutComponent32) * m_maxSize));
+    if (m_interpolationMode) {
+        commit->addEnum(*m_interpolationMode, Lut1DInterpolation::Linear);
+    }
     if (m_bypass) {
         commit->addProperty(*m_bypass, 0);
     }
@@ -749,6 +767,9 @@ void DrmLut3DColorOp::program(DrmAtomicCommit *commit, const std::deque<ColorOp:
         }
     }
     commit->addBlob(*m_value, DrmBlob::create(m_value->drmObject()->gpu(), m_components.data(), m_components.size() * sizeof(LutComponent32)));
+    if (m_interpolation) {
+        commit->addEnum(*m_interpolation, Lut3DInterpolation::Tetrahedal);
+    }
     if (m_bypass) {
         commit->addProperty(*m_bypass, 0);
     }

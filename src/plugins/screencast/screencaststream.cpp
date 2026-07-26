@@ -12,11 +12,13 @@
 #include "core/drmdevice.h"
 #include "core/graphicsbufferallocator.h"
 #include "core/renderbackend.h"
+#include "core/renderdevice.h"
 #include "cursor.h"
 #include "kwinscreencast_logging.h"
 #include "main.h"
 #include "opengl/eglbackend.h"
 #include "opengl/eglnativefence.h"
+#include "opengl/glframebuffer.h"
 #include "opengl/glplatform.h"
 #include "opengl/gltexture.h"
 #include "pipewirecore.h"
@@ -885,7 +887,7 @@ std::optional<ScreenCastDmaBufTextureParams> ScreenCastStream::testCreateDmaBuf(
         return std::nullopt;
     }
 
-    GraphicsBuffer *buffer = backend->drmDevice()->allocator()->allocate(GraphicsBufferOptions{
+    GraphicsBuffer *buffer = backend->renderDevice()->allocator()->allocate(GraphicsBufferOptions{
         .size = size,
         .format = format,
         .modifiers = modifiers,
@@ -903,13 +905,29 @@ std::optional<ScreenCastDmaBufTextureParams> ScreenCastStream::testCreateDmaBuf(
         return std::nullopt;
     }
 
+    // Also test if we can actually create the framebuffer,
+    // since this may fail on some drivers with some modifiers
+    // (namely Nvidia with the implicit modifier)
+    if (!backend->openglContext()->makeCurrent()) {
+        return std::nullopt;
+    }
+
+    auto texture = backend->importDmaBufAsTexture(*attrs);
+    if (!texture) {
+        return std::nullopt;
+    }
+    auto framebuffer = std::make_unique<GLFramebuffer>(texture.get());
+    if (!framebuffer->valid()) {
+        return std::nullopt;
+    }
+
     return ScreenCastDmaBufTextureParams{
         .planeCount = attrs->planeCount,
         .width = attrs->width,
         .height = attrs->height,
         .format = attrs->format,
         .modifier = attrs->modifier,
-        .supportsSyncObj = backend->drmDevice()->supportsSyncObjTimelines(),
+        .supportsSyncObj = backend->renderDevice()->drmDevice() && backend->renderDevice()->drmDevice()->supportsSyncObjTimelines(),
     };
 }
 

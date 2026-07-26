@@ -23,6 +23,7 @@ class OutputChangeSet;
 class BrightnessDevice;
 class OutputFrame;
 class OutputLayer;
+class DrmDevice;
 
 class KWIN_EXPORT AutoBrightnessCurve
 {
@@ -129,7 +130,7 @@ public:
     };
     Q_ENUM(BrightnessReason);
 
-    explicit BackendOutput();
+    explicit BackendOutput(DrmDevice *scanoutDevice = nullptr);
     ~BackendOutput() override;
 
     void ref();
@@ -202,7 +203,7 @@ public:
      * rendering, all outputs will share the same render loop.
      * FIXME: remove this and decouple RenderLoop from Output
      */
-    virtual RenderLoop *renderLoop() const = 0;
+    RenderLoop *renderLoop() const;
 
     OutputTransform transform() const;
     /**
@@ -322,7 +323,7 @@ public:
     const AutoBrightnessCurve &autoBrightnessCurve() const;
     bool automaticBrightness() const;
     BrightnessReason lastBrightnessAdjustmentReason() const;
-    QList<CustomModeDefinition> customModes() const;
+    QList<OutputModeline> customModes() const;
 
     /**
      * The setting for the scale factor, which may differ from scale
@@ -337,6 +338,8 @@ public:
     QPoint deviceOffset() const;
 
     uint32_t abmLevel() const;
+
+    DrmDevice *scanoutDevice() const;
 
 Q_SIGNALS:
     /**
@@ -443,6 +446,7 @@ protected:
         QList<std::shared_ptr<OutputMode>> modes;
         std::shared_ptr<OutputMode> currentMode;
         OutputModeline desiredMode;
+        QList<OutputModeline> customModes;
         DpmsMode dpmsMode = DpmsMode::On;
         SubPixel subPixel = SubPixel::Unknown;
         bool enabled = false;
@@ -489,7 +493,6 @@ protected:
         EdrPolicy edrPolicy = EdrPolicy::Always;
         double sharpnessSetting = 0;
         uint32_t priority = 0;
-        QList<CustomModeDefinition> customModes;
         double scaleSetting = 1;
         QPoint deviceOffset;
         bool automaticBrightness = false;
@@ -504,6 +507,8 @@ protected:
     State m_state;
     Information m_information;
     int m_refCount = 1;
+    std::unique_ptr<RenderLoop> m_renderLoop;
+    DrmDevice *m_scanoutDevice = nullptr;
 };
 
 }

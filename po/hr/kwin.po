@@ -10,7 +10,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kwin 0\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-06-25 00:45+0000\n"
+"POT-Creation-Date: 2026-07-24 00:46+0000\n"
 "PO-Revision-Date: 2011-07-12 17:48+0200\n"
 "Last-Translator: Marko Dimjašević <marko@dimjasevic.net>\n"
 "Language-Team: Croatian <kde-croatia-list@lists.sourceforge.net>\n"
@@ -38,49 +38,49 @@ msgstr ""
 "renato@translator-shop.org, zarko.pintar@gmail.com, adundovi@gmail.com, "
 "marko@dimjasevic.net"
 
-#: backends/wayland/wayland_output.cpp:480
+#: backends/wayland/wayland_output.cpp:474
 #, kde-format
 msgid "Press right control to ungrab pointer"
 msgstr ""
 
-#: backends/wayland/wayland_output.cpp:482
+#: backends/wayland/wayland_output.cpp:476
 #, kde-format
 msgid "Press right control key to grab pointer"
 msgstr ""
 
-#: backends/wayland/wayland_output.cpp:486
+#: backends/wayland/wayland_output.cpp:480
 #, kde-format
 msgctxt ""
 "Title of nested KWin Wayland with Wayland socket identifier as argument"
 msgid "KDE Wayland Compositor %1"
 msgstr ""
 
-#: backends/wayland/wayland_output.cpp:489
+#: backends/wayland/wayland_output.cpp:483
 #, kde-format
 msgid "- Output disabled"
 msgstr ""
 
-#: backends/wayland/wayland_output.cpp:491
+#: backends/wayland/wayland_output.cpp:485
 #, kde-format
 msgid "- Output dimmed"
 msgstr ""
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control to ungrab input"
 msgstr ""
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control key to grab input"
 msgstr ""
 
-#: backends/x11/x11_windowed_backend.cpp:500
+#: backends/x11/x11_windowed_backend.cpp:501
 #, kde-format
 msgid "KDE Wayland Compositor"
 msgstr ""
 
-#: compositor.cpp:650
+#: compositor.cpp:750
 #, kde-format
 msgid "Desktop effects were restarted due to a graphics reset"
 msgstr ""
@@ -1623,139 +1623,139 @@ msgstr "Vrlo ogroman"
 msgid "Disable configuration options"
 msgstr "Onemogući konfiguracijske opcije"
 
-#: main_wayland.cpp:322
+#: main_wayland.cpp:328
 #, kde-format
 msgid "Start a rootless Xwayland server."
 msgstr ""
 
-#: main_wayland.cpp:325
+#: main_wayland.cpp:331
 #, kde-format
 msgid ""
 "Name of the Wayland socket to listen on. If not set \"wayland-0\" is used."
 msgstr ""
 
-#: main_wayland.cpp:329
+#: main_wayland.cpp:335
 #, kde-format
 msgid "The X11 Display to use in windowed mode on platform X11."
 msgstr ""
 
-#: main_wayland.cpp:333
+#: main_wayland.cpp:339
 #, kde-format
 msgid "The Wayland Display to use in windowed mode on platform Wayland."
 msgstr ""
 
-#: main_wayland.cpp:335
+#: main_wayland.cpp:341
 #, kde-format
 msgid "Render to a virtual framebuffer."
 msgstr ""
 
-#: main_wayland.cpp:337
+#: main_wayland.cpp:343
 #, kde-format
 msgid "The width for windowed mode. Default width is 1024."
 msgstr ""
 
-#: main_wayland.cpp:341
+#: main_wayland.cpp:347
 #, kde-format
 msgid "The height for windowed mode. Default height is 768."
 msgstr ""
 
-#: main_wayland.cpp:346
+#: main_wayland.cpp:352
 #, kde-format
 msgid "Whether or not to make windowed mode fullscreen"
 msgstr ""
 
-#: main_wayland.cpp:350
+#: main_wayland.cpp:356
 #, kde-format
 msgid "The scale for windowed mode. Default value is 1."
 msgstr ""
 
-#: main_wayland.cpp:355
+#: main_wayland.cpp:361
 #, kde-format
 msgid ""
 "The number of windows to open as outputs in windowed mode. Default value is 1"
 msgstr ""
 
-#: main_wayland.cpp:360
+#: main_wayland.cpp:366
 #, kde-format
 msgid ""
 "Wayland socket to use for incoming connections. This can be combined with --"
 "socket to name the socket"
 msgstr ""
 
-#: main_wayland.cpp:364
+#: main_wayland.cpp:370
 #, kde-format
 msgid ""
 "XWayland socket to use for Xwayland's incoming connections. This can be set "
 "multiple times"
 msgstr ""
 
-#: main_wayland.cpp:368
+#: main_wayland.cpp:374
 #, kde-format
 msgid "Name of the xwayland display that has been pre-set up"
 msgstr ""
 
-#: main_wayland.cpp:372
+#: main_wayland.cpp:378
 #, kde-format
 msgid "XWayland socket to use for Xwayland's init connections"
 msgstr ""
 
-#: main_wayland.cpp:376
+#: main_wayland.cpp:382
 #, kde-format
 msgid "Name of the xwayland init display that has been pre-set up"
 msgstr ""
 
-#: main_wayland.cpp:380
+#: main_wayland.cpp:386
 #, kde-format
 msgid "Name of the xauthority file "
 msgstr ""
 
-#: main_wayland.cpp:384
+#: main_wayland.cpp:390
 #, kde-format
 msgid "Exits this instance so it can be restarted by kwin_wayland_wrapper."
 msgstr ""
 
-#: main_wayland.cpp:386
+#: main_wayland.cpp:392
 #, kde-format
 msgid "Render through drm node."
 msgstr ""
 
-#: main_wayland.cpp:387
+#: main_wayland.cpp:393
 #, kde-format
 msgid ""
 "Extract locale information from locale1 rather than the user's configuration"
 msgstr ""
 
-#: main_wayland.cpp:416
+#: main_wayland.cpp:422
 #, kde-format
 msgid "Input method that KWin starts."
 msgstr ""
 
-#: main_wayland.cpp:422
+#: main_wayland.cpp:428
 #, kde-format
 msgid "Starts the session in locked mode."
 msgstr ""
 
-#: main_wayland.cpp:426
+#: main_wayland.cpp:432
 #, kde-format
 msgid "Starts the session without lock screen support."
 msgstr ""
 
-#: main_wayland.cpp:431
+#: main_wayland.cpp:437
 #, kde-format
 msgid "Starts the session without global shortcuts support."
 msgstr ""
 
-#: main_wayland.cpp:436
+#: main_wayland.cpp:442
 #, kde-format
 msgid "Disable KActivities integration."
 msgstr ""
 
-#: main_wayland.cpp:441
+#: main_wayland.cpp:447
 #, kde-format
 msgid "Exit after the session application, which is started by KWin, closed."
 msgstr ""
 
-#: main_wayland.cpp:446
+#: main_wayland.cpp:452
 #, kde-format
 msgid "Applications to start once Wayland and Xwayland server are started"
 msgstr ""
@@ -2282,28 +2282,28 @@ msgctxt "Duration of rotation"
 msgid "Default"
 msgstr "Uobičajeno"
 
-#: plugins/mouseclick/mouseclick.cpp:42
+#: plugins/mouseclick/mouseclick.cpp:40
 #: plugins/mouseclick/mouseclick_config.cpp:43
 #, fuzzy, kde-format
 #| msgid "Toggle Invert Effect"
 msgid "Toggle Mouse Click Animation"
 msgstr "Uključi obrnuti efekt"
 
-#: plugins/mouseclick/mouseclick.cpp:48
+#: plugins/mouseclick/mouseclick.cpp:46
 #, fuzzy, kde-format
 #| msgid "To the left"
 msgctxt "Left mouse button"
 msgid "Left"
 msgstr "Na lijevo"
 
-#: plugins/mouseclick/mouseclick.cpp:49
+#: plugins/mouseclick/mouseclick.cpp:47
 #, fuzzy, kde-format
 #| msgid "Middle button:"
 msgctxt "Middle mouse button"
 msgid "Middle"
 msgstr "Srednji gumb:"
 
-#: plugins/mouseclick/mouseclick.cpp:50
+#: plugins/mouseclick/mouseclick.cpp:48
 #, fuzzy, kde-format
 #| msgid "To the right"
 msgctxt "Right mouse button"
@@ -2412,12 +2412,12 @@ msgstr ""
 msgid "Show Text:"
 msgstr "Pokaži radnu površinu"
 
-#: plugins/mousemark/mousemark.cpp:43
+#: plugins/mousemark/mousemark.cpp:36
 #, kde-format
 msgid "Clear All Mouse Marks"
 msgstr "Izbriši sve oznake miša"
 
-#: plugins/mousemark/mousemark.cpp:48 plugins/mousemark/mousemark_config.cpp:51
+#: plugins/mousemark/mousemark.cpp:41 plugins/mousemark/mousemark_config.cpp:51
 #, kde-format
 msgid "Clear Last Mouse Mark"
 msgstr "Izbriši zadnju oznaku miša"
@@ -2717,12 +2717,12 @@ msgstr ""
 msgid "Invalid region"
 msgstr ""
 
-#: plugins/screencast/screencaststream.cpp:378
+#: plugins/screencast/screencaststream.cpp:380
 #, kde-format
 msgid "OpenGL compositing is required for screencasting"
 msgstr ""
 
-#: plugins/screencast/screencaststream.cpp:386
+#: plugins/screencast/screencaststream.cpp:388
 #, kde-format
 msgid "Failed to create PipeWire stream"
 msgstr ""
@@ -3210,18 +3210,6 @@ msgstr ""
 msgid "Move Zoomed Area Downwards"
 msgstr ""
 
-#: plugins/zoom/zoom.cpp:122
-#, fuzzy, kde-format
-#| msgid "Mouse Emulation"
-msgid "Move Mouse to Focus"
-msgstr "Emulacija miša"
-
-#: plugins/zoom/zoom.cpp:128
-#, fuzzy, kde-format
-#| msgid "Move Window to Group"
-msgid "Move Mouse to Center"
-msgstr "Premjesti prozor u grupu"
-
 #. i18n: ectx: label, entry (count), group (General)
 #: rulebooksettingsbase.kcfg:9
 #, kde-format
@@ -3609,229 +3597,186 @@ msgid "Fullscreen rule type"
 msgstr "P&reko cijelog zaslona"
 
 #. i18n: ectx: label, entry (noborder), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:307
+#: rulesettings.kcfg:311
 #, kde-format
 msgid "No titlebar and frame"
 msgstr ""
 
 #. i18n: ectx: label, entry (noborderrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:311
+#: rulesettings.kcfg:315
 #, kde-format
 msgid "No titlebar rule type"
 msgstr ""
 
+#. i18n: ectx: label, entry (decorationpolicy), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:322
+#, kde-format
+msgid "Decoration policy"
+msgstr ""
+
+#. i18n: ectx: label, entry (decorationpolicyrule), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:332
+#, fuzzy, kde-format
+#| msgid "Keep above others"
+msgid "Decoration policy rule type"
+msgstr "Drži iznad ostalih"
+
 #. i18n: ectx: label, entry (decocolor), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:318
+#: rulesettings.kcfg:339
 #, kde-format
 msgid "Titlebar color and scheme"
 msgstr ""
 
 #. i18n: ectx: label, entry (decocolorrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:321
+#: rulesettings.kcfg:342
 #, kde-format
 msgid "Titlebar color rule type"
 msgstr ""
 
-#. i18n: ectx: label, entry (blockcompositing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:326
-#, fuzzy, kde-format
-#| msgid "Suspend Compositing"
-msgid "Block Compositing"
-msgstr "Zaustavi 3D efekte"
-
-#. i18n: ectx: label, entry (blockcompositingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:330
-#, kde-format
-msgid "Block Compositing rule type"
-msgstr ""
-
 #. i18n: ectx: label, entry (fsplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:335
+#: rulesettings.kcfg:347
 #, kde-format
 msgid "Focus stealing prevention"
 msgstr ""
 
 #. i18n: ectx: label, entry (fsplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:341
+#: rulesettings.kcfg:353
 #, kde-format
 msgid "Focus stealing prevention rule type"
 msgstr ""
 
 #. i18n: ectx: label, entry (fpplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:346
+#: rulesettings.kcfg:358
 #, kde-format
 msgid "Focus protection"
 msgstr ""
 
 #. i18n: ectx: label, entry (fpplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:352
+#: rulesettings.kcfg:364
 #, kde-format
 msgid "Focus protection rule type"
 msgstr ""
 
 #. i18n: ectx: label, entry (acceptfocus), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:357
+#: rulesettings.kcfg:369
 #, kde-format
 msgid "Accept Focus"
 msgstr ""
 
 #. i18n: ectx: label, entry (acceptfocusrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:361
+#: rulesettings.kcfg:373
 #, kde-format
 msgid "Accept Focus rule type"
 msgstr ""
 
 #. i18n: ectx: label, entry (closeable), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:366
+#: rulesettings.kcfg:378
 #, fuzzy, kde-format
 #| msgid "Close"
 msgid "Closeable"
 msgstr "Zatvori"
 
 #. i18n: ectx: label, entry (closeablerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:370
+#: rulesettings.kcfg:382
 #, kde-format
 msgid "Closeable rule type"
 msgstr ""
 
-#. i18n: ectx: label, entry (autogroup), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:375
-#, kde-format
-msgid "Autogroup with identical"
-msgstr ""
-
-#. i18n: ectx: label, entry (autogrouprule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:379
-#, kde-format
-msgid "Autogroup with identical rule type"
-msgstr ""
-
-#. i18n: ectx: label, entry (autogroupfg), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:384
-#, kde-format
-msgid "Autogroup in foreground"
-msgstr ""
-
-#. i18n: ectx: label, entry (autogroupfgrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:388
-#, kde-format
-msgid "Autogroup in foreground rule type"
-msgstr ""
-
-#. i18n: ectx: label, entry (autogroupid), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:393
-#, kde-format
-msgid "Autogroup by ID"
-msgstr ""
-
-#. i18n: ectx: label, entry (autogroupidrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:396
-#, kde-format
-msgid "Autogroup by ID rule type"
-msgstr ""
-
-#. i18n: ectx: label, entry (strictgeometry), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:401
-#, kde-format
-msgid "Obey geometry restrictions"
-msgstr ""
-
-#. i18n: ectx: label, entry (strictgeometryrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:405
-#, kde-format
-msgid "Obey geometry restrictions rule type"
-msgstr ""
-
 #. i18n: ectx: label, entry (shortcut), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:410
+#: rulesettings.kcfg:387
 #, kde-format
 msgid "Shortcut"
 msgstr "Prečac"
 
 #. i18n: ectx: label, entry (shortcutrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:413
+#: rulesettings.kcfg:390
 #, kde-format
 msgid "Shortcut rule type"
 msgstr ""
 
 #. i18n: ectx: label, entry (disableglobalshortcuts), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:420
+#: rulesettings.kcfg:397
 #, fuzzy, kde-format
 #| msgid "Block Global Shortcuts"
 msgid "Ignore global shortcuts"
 msgstr "Blokiraj opće prečace"
 
 #. i18n: ectx: label, entry (disableglobalshortcutsrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:424
+#: rulesettings.kcfg:401
 #, kde-format
 msgid "Ignore global shortcuts rule type"
 msgstr ""
 
 #. i18n: ectx: label, entry (desktopfile), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:429
+#: rulesettings.kcfg:406
 #, fuzzy, kde-format
 #| msgid "Desktop %1"
 msgid "Desktop file name"
 msgstr "Radna površina %1"
 
 #. i18n: ectx: label, entry (desktopfilerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:432
+#: rulesettings.kcfg:409
 #, kde-format
 msgid "Desktop file name rule type"
 msgstr ""
 
 #. i18n: ectx: label, entry (layer), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:439
+#: rulesettings.kcfg:416
 #, kde-format
 msgid "Layer"
 msgstr ""
 
 #. i18n: ectx: label, entry (layerrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:455
+#: rulesettings.kcfg:432
 #, fuzzy, kde-format
 #| msgid "Keep above others"
 msgid "Layer rule type"
 msgstr "Drži iznad ostalih"
 
 #. i18n: ectx: label, entry (adaptivesync), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:460
+#: rulesettings.kcfg:437
 #, kde-format
 msgid "AdaptiveSync"
 msgstr ""
 
 #. i18n: ectx: label, entry (adaptivesyncrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:464
+#: rulesettings.kcfg:441
 #, fuzzy, kde-format
 #| msgid "Keep above others"
 msgid "AdaptiveSync rule type"
 msgstr "Drži iznad ostalih"
 
 #. i18n: ectx: label, entry (tearing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:469
+#: rulesettings.kcfg:446
 #, kde-format
 msgid "Allow Tearing"
 msgstr ""
 
 #. i18n: ectx: label, entry (tearingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:473
+#: rulesettings.kcfg:450
 #, fuzzy, kde-format
 #| msgid "Keep above others"
 msgid "Tearing rule type"
 msgstr "Drži iznad ostalih"
 
 #. i18n: ectx: label, entry (excludefromcapture), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:478
+#: rulesettings.kcfg:455
 #, fuzzy, kde-format
 #| msgid "&Fullscreen"
 msgid "Hide from screenshots and screen recordings"
 msgstr "P&reko cijelog zaslona"
 
 #. i18n: ectx: label, entry (excludefromcapturerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:482
+#: rulesettings.kcfg:459
 #, fuzzy, kde-format
 #| msgid "&Fullscreen"
 msgid "Hide from screenshots and screen recordings rule type"
 msgstr "P&reko cijelog zaslona"
+
+#: scene/workspacescene.cpp:115
+#, kde-format
+msgid "Toggle “Show Compositing” effect"
+msgstr ""
 
 #. i18n: ectx: property (windowTitle), widget (QDialog, ShortcutDialog)
 #: shortcutdialog.ui:14
@@ -4461,7 +4406,19 @@ msgstr "Na &radnu površinu"
 msgid "Kill Window"
 msgstr "Uništi prozor"
 
-#: useractions.cpp:1080
+#: useractions.cpp:1017
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Focused Window"
+msgstr ""
+
+#: useractions.cpp:1018
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Screen"
+msgstr ""
+
+#: useractions.cpp:1083
 #, kde-format
 msgid "Activate Window (%1)"
 msgstr "Aktiviraj prozor (%1)"
@@ -4511,91 +4468,98 @@ msgstr "Prebaci na donju radnu površinu"
 msgid "Switch to Desktop %1"
 msgstr "Prebaci na radnu površinu %1"
 
-#: wayland/outputmanagement_v2.cpp:569
+#: wayland/outputmanagement_v2.cpp:521
+#, kde-format
+msgid ""
+"Setting custom modes with too old kde-output-management-v2 protocol versions "
+"is unsupported"
+msgstr ""
+
+#: wayland/outputmanagement_v2.cpp:575
 #, kde-format
 msgid "abm level is larger than the maximum (4): %1"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:647
+#: wayland/outputmanagement_v2.cpp:673
 #, kde-format
 msgid "One of the relevant outputs is no longer available"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:665
+#: wayland/outputmanagement_v2.cpp:691
 #, kde-format
 msgid "Disabling all outputs through configuration changes is not allowed"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:675
+#: wayland/outputmanagement_v2.cpp:701
 #, kde-format
 msgid "%1 cannot mirror itself"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:682
+#: wayland/outputmanagement_v2.cpp:708
 #, kde-format
 msgid "Cannot add a custom mode with an empty size"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:686
+#: wayland/outputmanagement_v2.cpp:712
 #, kde-format
 msgid "Cannot add a custom mode with a refresh rate of zero Hz"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:697
+#: wayland/outputmanagement_v2.cpp:723
 #, kde-format
 msgid "Position of output %1 is way too negative (%2, %3)"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:700
+#: wayland/outputmanagement_v2.cpp:726
 #, kde-format
 msgid "Position of enabled output %1 is negative (%2, %3)"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:704
+#: wayland/outputmanagement_v2.cpp:730
 #, kde-format
 msgid "Position of output %1 is way too large (%2, %3)"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:721
+#: wayland/outputmanagement_v2.cpp:747
 #, kde-format
 msgid "The driver rejected the output configuration"
 msgstr ""
 
-#: wayland/outputmanagement_v2.cpp:724
+#: wayland/outputmanagement_v2.cpp:750
 #, kde-format
 msgid "The session is not active"
 msgstr ""
 
-#: window.cpp:3107
+#: window.cpp:3162
 #, kde-format
 msgctxt "Application is not responding, appended to window title"
 msgid "(Not Responding)"
 msgstr ""
 
-#: workspace.cpp:1310
+#: workspace.cpp:1311
 #, kde-format
 msgid "Built-in Screen"
 msgstr ""
 
-#: workspace.cpp:1323
+#: workspace.cpp:1324
 #, kde-format
 msgctxt "Display label: manufacturer + model name + connector name"
 msgid "%1 %2 %3"
 msgstr ""
 
-#: workspace.cpp:1333
+#: workspace.cpp:1334
 #, kde-format
 msgctxt "Display label: manufacturer + model name + serial number"
 msgid "%1 %2 %3"
 msgstr ""
 
-#: workspace.cpp:1336
+#: workspace.cpp:1337
 #, kde-format
 msgctxt "Display label: manufacturer + model name"
 msgid "%1 %2"
 msgstr ""
 
-#: workspace.cpp:1805
+#: workspace.cpp:1806
 #, kde-format
 msgctxt "Introductory text shown in the support information."
 msgid ""
@@ -4614,6 +4578,21 @@ msgstr ""
 #, kde-format
 msgid "Xwayland has crashed"
 msgstr ""
+
+#, fuzzy
+#~| msgid "Suspend Compositing"
+#~ msgid "Block Compositing"
+#~ msgstr "Zaustavi 3D efekte"
+
+#, fuzzy
+#~| msgid "Mouse Emulation"
+#~ msgid "Move Mouse to Focus"
+#~ msgstr "Emulacija miša"
+
+#, fuzzy
+#~| msgid "Move Window to Group"
+#~ msgid "Move Mouse to Center"
+#~ msgstr "Premjesti prozor u grupu"
 
 #~ msgid "Indicate that KWin has recently crashed n times"
 #~ msgstr "Ukazuje da se KWin nedavno srušio n puta"
