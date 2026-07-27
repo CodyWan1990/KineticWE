@@ -132,6 +132,18 @@ TilingController::TilingController(Workspace *workspace)
     // Initial reads so the very first border paint already has the right color.
     readNoctaliaColors();
     readSystemAccent();
+
+    // Watch kwinrc so that changes made via the KCM (border color source,
+    // border mode, thickness, etc.) take effect live on the running session
+    // without requiring a restart or DBus reconfigure call.
+    m_kwinrcConfig = KSharedConfig::openConfig(KWIN_CONFIG);
+    m_kwinrcWatcher = KConfigWatcher::create(m_kwinrcConfig);
+    connect(m_kwinrcWatcher.data(), &KConfigWatcher::configChanged,
+            this, [this](const KConfigGroup &group, const QByteArrayList &) {
+        if (group.name() == QLatin1StringView("Tiling")) {
+            reconfigure();
+        }
+    });
 }
 
 void TilingController::onColorSourcesChanged()
@@ -419,7 +431,7 @@ void TilingController::updateBorders()
             || (window->skipTaskbar() && window->skipPager());
         bool shouldShow = false;
         if (m_borderMode != BorderMode::None) {
-            if (allWindows || isTiled) {
+            if (allWindows || isTiled || (activeOnly && window == activeWindow)) {
                 if (allWindows && isSystemSurface) {
                     // Skip system surfaces even in AllWindows mode.
                 } else if (!activeOnly || window == activeWindow) {
@@ -432,7 +444,7 @@ void TilingController::updateBorders()
         const ColorSource source = (window == activeWindow) ? m_colorSourceActive : m_colorSourceInactive;
         const QColor borderColor = resolveColor(source, sourceColor);
 
-        if (isTiled || allWindows) {
+        if (isTiled || allWindows || (activeOnly && window == activeWindow)) {
             applyCornerRadius(window);
         }
 

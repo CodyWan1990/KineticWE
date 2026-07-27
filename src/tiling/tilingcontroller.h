@@ -260,6 +260,7 @@ private:
     // file changes (via KConfigWatcher), and so all reads see fresh data.
     KSharedConfigPtr m_noctaliaConfig;
     KSharedConfigPtr m_kdeglobalsConfig;
+    KSharedConfigPtr m_kwinrcConfig;
     KConfigWatcher::Ptr m_noctaliaWatcher;
     // QFileSystemWatcher is used for the noctalia colors file because
     // KConfigWatcher silently refuses to watch absolute paths, and
@@ -271,6 +272,7 @@ private:
     // produces multiple fileChanged events in quick succession.
     QTimer m_colorReloadTimer;
     KConfigWatcher::Ptr m_kdeglobalsWatcher;
+    KConfigWatcher::Ptr m_kwinrcWatcher;
 
     struct MoveContext {
         QPointer<LayoutEngine> engine;
