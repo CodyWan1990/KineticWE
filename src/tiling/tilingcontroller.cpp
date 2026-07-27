@@ -432,8 +432,9 @@ void TilingController::updateBorders()
         bool shouldShow = false;
         if (m_borderMode != BorderMode::None) {
             if (allWindows || isTiled || (activeOnly && window == activeWindow)) {
-                if (allWindows && isSystemSurface) {
-                    // Skip system surfaces even in AllWindows mode.
+                if (isSystemSurface) {
+                    // Skip system surfaces (desktop, panels, notifications,
+                    // popups, lock screen, etc.) in all border modes.
                 } else if (!activeOnly || window == activeWindow) {
                     shouldShow = true;
                 }
