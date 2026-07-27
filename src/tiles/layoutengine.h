@@ -95,6 +95,59 @@ public:
     virtual bool endMoveWindow(Window *window, Window *target) { Q_UNUSED(window) Q_UNUSED(target) return false; }
 
     /**
+     * Where on the target window an interactive drag was released.
+     *
+     * Swap        — the cursor was over the middle of the target; the dragged
+     *               window and the target trade places (classic behaviour).
+     * InsertAbove — the cursor was over the top zone of the target; the
+     *               dragged window joins the target's column above it.
+     * InsertBelow — the cursor was over the bottom zone of the target; the
+     *               dragged window joins the target's column below it.
+     */
+    enum class DropZone {
+        Swap,
+        InsertAbove,
+        InsertBelow,
+    };
+
+    /**
+     * Drop-zone aware variant of endMoveWindow(). Called when an interactive
+     * move ends and the controller knows which zone of the target window the
+     * cursor was released over. Engines that do not distinguish drop zones
+     * simply fall back to endMoveWindow().
+     * Returns true if the engine handled the window.
+     */
+    virtual bool endMoveWindowOnZone(Window *window, Window *target, DropZone zone)
+    {
+        Q_UNUSED(zone)
+        return endMoveWindow(window, target);
+    }
+
+    /**
+     * Column-consume action (Columns layout).
+     *
+     * Moves @p window out of its column and into the column to its right; if
+     * there is no column to the right, it joins the column to its left.
+     * No-op for layouts without a column concept.
+     */
+    virtual void consumeWindow(Window *window) { Q_UNUSED(window) }
+
+    /**
+     * Column-expel action (Columns layout).
+     *
+     * Removes @p window from its column and gives it its own new column,
+     * inserted to the right of its old column (or to the left if its old
+     * column is the rightmost). No-op for layouts without a column concept.
+     */
+    virtual void expelWindow(Window *window) { Q_UNUSED(window) }
+
+    /**
+     * Sets the maximum number of columns the layout may grow to. Only
+     * meaningful for column-based layouts; ignored by everything else.
+     */
+    virtual void setMaxColumns(int maxColumns) { Q_UNUSED(maxColumns) }
+
+    /**
      * Called when a dragged tiled window was moved to a different output and
      * should be removed from this engine's layout. The engine should clean up
      * the empty source tile and reflow the remaining windows.

@@ -116,19 +116,6 @@ ZoomEffect::ZoomEffect()
 
     KGlobalAccel::setInverseShortcutActions(moveZoomUpAction, moveZoomDownAction);
 
-    // TODO: these two actions don't belong into the effect. They need to be moved into KWin core
-    a = new QAction(this);
-    a->setObjectName(QStringLiteral("MoveMouseToFocus"));
-    a->setText(i18n("Move Mouse to Focus"));
-    KGlobalAccel::setGlobalShortcut(a, QKeySequence(Qt::META | Qt::Key_F5));
-    connect(a, &QAction::triggered, this, &ZoomEffect::moveMouseToFocus);
-
-    a = new QAction(this);
-    a->setObjectName(QStringLiteral("MoveMouseToCenter"));
-    a->setText(i18n("Move Mouse to Center"));
-    KGlobalAccel::setGlobalShortcut(a, QKeySequence(Qt::META | Qt::Key_F6));
-    connect(a, &QAction::triggered, this, &ZoomEffect::moveMouseToCenter);
-
     m_timeline.setDuration(350);
     m_timeline.setFrameRange(0, 100);
     connect(&m_timeline, &QTimeLine::frameChanged, this, &ZoomEffect::timelineFrameChanged);
@@ -371,18 +358,21 @@ GLShader *ZoomEffect::shaderForZoom(double zoom)
     return ShaderManager::instance()->shader(ShaderTrait::MapTexture | ShaderTrait::TransformColorspace);
 }
 
-void ZoomEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
+bool ZoomEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
 {
     OffscreenData *offscreenData = ensureOffscreenData(renderTarget, viewport, screen);
     if (!offscreenData) {
-        return;
+        EglContext::currentContext()->setFailed();
+        return false;
     }
 
     // Render the scene in an offscreen texture and then upscale it.
     RenderTarget offscreenRenderTarget(offscreenData->framebuffer.get(), renderTarget.colorDescription());
     RenderViewport offscreenViewport(viewport.renderRect(), viewport.scale(), offscreenRenderTarget, QPoint());
     GLFramebuffer::pushFramebuffer(offscreenData->framebuffer.get());
-    effects->paintScreen(offscreenRenderTarget, offscreenViewport, mask, deviceRegion, screen);
+    if (!effects->paintScreen(offscreenRenderTarget, offscreenViewport, mask, deviceRegion, screen)) {
+        return false;
+    }
     GLFramebuffer::popFramebuffer();
 
     const auto scale = viewport.scale();
@@ -408,6 +398,7 @@ void ZoomEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewp
         offscreen.texture->render(offscreen.viewport.size() * scale);
     }
     ShaderManager::instance()->popShader();
+    return true;
 }
 
 void ZoomEffect::postPaintScreen()
@@ -514,22 +505,6 @@ void ZoomEffect::moveZoomUp()
 void ZoomEffect::moveZoomDown()
 {
     moveZoom(0, 1);
-}
-
-void ZoomEffect::moveMouseToFocus()
-{
-    const auto window = effects->activeWindow();
-    if (!window) {
-        return;
-    }
-    const auto center = window->frameGeometry().center();
-    QCursor::setPos(center.x(), center.y());
-}
-
-void ZoomEffect::moveMouseToCenter()
-{
-    const Rect r = effects->activeScreen()->geometry();
-    QCursor::setPos(r.horizontalCenter(), r.verticalCenter());
 }
 
 void ZoomEffect::slotMouseChanged(const QPointF &pos, const QPointF &old)

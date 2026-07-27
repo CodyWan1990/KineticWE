@@ -104,6 +104,12 @@
       <min>0.01</min>
       <max>1.0</max>
     </entry>
+    <entry name="columnsMaxColumns" key="ColumnsMaxColumns" type="Int">
+      <label>Maximum number of columns the Columns layout will create. Once this many columns exist, additional windows stack vertically within a column instead. Lowering this below the current column count does not merge existing columns; it only limits further growth.</label>
+      <default>3</default>
+      <min>3</min>
+      <max>5</max>
+    </entry>
   </group>
   <group name="TilingRules">
     <entry name="floatingClasses" key="FloatingClass" type="StringList">

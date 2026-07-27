@@ -66,6 +66,8 @@ static std::optional<DrmFormat> chooseFormat(uint32_t inputFormat, const FormatM
     return ret;
 }
 
+static const auto s_forceLinear = environmentVariableBoolValue("KWIN_VULKAN_FORCE_LINEAR_DST");
+
 std::unique_ptr<MultiGpuSwapchain> MultiGpuSwapchain::create(RenderDevice *copyDevice, DrmDevice *targetDevice, uint32_t format, uint64_t modifier, const QSize &size, const FormatModifierMap &importFormats, bool scanout)
 {
     if (copyDevice->isInReset()) {
@@ -73,9 +75,19 @@ std::unique_ptr<MultiGpuSwapchain> MultiGpuSwapchain::create(RenderDevice *copyD
         return nullptr;
     }
     if (copyDevice->vulkanDevice() && copyDevice->vulkanDevice()->supportedFormats().containsFormat(format, modifier)) {
-        const auto fmt = chooseFormat(format, copyDevice->vulkanDevice()->supportedFormats(), importFormats);
+        auto fmt = chooseFormat(format, copyDevice->vulkanDevice()->supportedFormats(), importFormats);
         if (fmt) {
-            auto swapchain = VulkanSwapchain::create(copyDevice->vulkanDevice(), targetDevice->allocator(), size, fmt->format, fmt->modifiers, scanout);
+            GraphicsBufferOptions options{
+                .size = size,
+                .format = fmt->format,
+                .modifiers = fmt->modifiers,
+                .software = false,
+                .scanout = scanout,
+            };
+            if (s_forceLinear.value_or(targetDevice->isAmdgpu()) && fmt->modifiers.contains(DRM_FORMAT_MOD_LINEAR)) {
+                options.modifiers = {DRM_FORMAT_MOD_LINEAR};
+            }
+            auto swapchain = VulkanSwapchain::create(copyDevice->vulkanDevice(), targetDevice->allocator(), options);
             if (swapchain) {
                 return std::make_unique<MultiGpuSwapchain>(copyDevice, targetDevice, std::move(swapchain));
             }
@@ -96,7 +108,14 @@ std::unique_ptr<MultiGpuSwapchain> MultiGpuSwapchain::create(RenderDevice *copyD
         if (!formatMod) {
             return nullptr;
         }
-        auto eglSwapchain = EglSwapchain::create(copyDevice->drmDevice()->allocator(), context.get(), size, formatMod->format, formatMod->modifiers, scanout);
+        GraphicsBufferOptions options{
+            .size = size,
+            .format = formatMod->format,
+            .modifiers = formatMod->modifiers,
+            .software = false,
+            .scanout = scanout,
+        };
+        auto eglSwapchain = EglSwapchain::create(copyDevice->allocator(), context.get(), options);
         if (eglSwapchain) {
             return std::make_unique<MultiGpuSwapchain>(copyDevice, targetDevice, context, std::move(eglSwapchain));
         }
@@ -194,7 +213,7 @@ std::optional<MultiGpuSwapchain::Ret> MultiGpuSwapchain::copyWithVulkan(Graphics
 
     std::unique_ptr<VulkanRenderTimeQuery> query;
     if (frame) {
-        query = VulkanRenderTimeQuery::begin(copyVk, commandBuffer, copyVk->transferQueueFamily());
+        query = VulkanRenderTimeQuery::begin(copyVk, commandBuffer, copyVk->graphicsQueueFamily());
     }
 
     vk::ImageMemoryBarrier2 memoryBarrier{
@@ -205,7 +224,7 @@ std::optional<MultiGpuSwapchain::Ret> MultiGpuSwapchain::copyWithVulkan(Graphics
         vk::ImageLayout::eGeneral,
         vk::ImageLayout::eGeneral,
         vk::QueueFamilyExternal,
-        copyVk->transferQueueFamily(),
+        copyVk->graphicsQueueFamily(),
         m_currentVulkanSlot->texture()->handle(),
         vk::ImageSubresourceRange{
             vk::ImageAspectFlagBits::eColor,
@@ -252,7 +271,7 @@ std::optional<MultiGpuSwapchain::Ret> MultiGpuSwapchain::copyWithVulkan(Graphics
                             m_currentVulkanSlot->texture()->handle(), vk::ImageLayout::eGeneral,
                             regions, vk::Filter::eNearest);
 
-    memoryBarrier.setSrcQueueFamilyIndex(copyVk->transferQueueFamily());
+    memoryBarrier.setSrcQueueFamilyIndex(copyVk->graphicsQueueFamily());
     memoryBarrier.setDstQueueFamilyIndex(vk::QueueFamilyExternal);
     commandBuffer.pipelineBarrier2(vk::DependencyInfo{
         vk::DependencyFlags{},

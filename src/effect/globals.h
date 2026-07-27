@@ -34,6 +34,10 @@ KWIN_EXPORT Q_NAMESPACE
          * use EffectsHandler::isOpenGLCompositing().
          */
         OpenGLCompositing = 1,
+        /**
+         * Deprecated, but needs to be kept around for backwards compat with
+         * user configs
+         */
         QPainterCompositing = 1 << 2,
     };
 
@@ -408,6 +412,28 @@ enum class OutputConfigurationError {
     TooManyEnabledOutputs,
     Timeout,
     NotActive,
+};
+
+/**
+ * The DecorationPolicy enum indicates how the decoration mode is determined.
+ */
+enum class DecorationPolicy {
+    /**
+     * Force no decoration.
+     */
+    None,
+    /**
+     * Follow the preferred decoration mode of the client.
+     */
+    ClientPreference,
+    /**
+     * Force the server side decoration mode.
+     */
+    Server,
+    /**
+     * Force the server side drop shadow + maybe an outline.
+     */
+    Shadow,
 };
 
 } // namespace

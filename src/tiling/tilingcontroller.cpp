@@ -132,6 +132,18 @@ TilingController::TilingController(Workspace *workspace)
     // Initial reads so the very first border paint already has the right color.
     readNoctaliaColors();
     readSystemAccent();
+
+    // Watch kwinrc so that changes made via the KCM (border color source,
+    // border mode, thickness, etc.) take effect live on the running session
+    // without requiring a restart or DBus reconfigure call.
+    m_kwinrcConfig = KSharedConfig::openConfig(KWIN_CONFIG);
+    m_kwinrcWatcher = KConfigWatcher::create(m_kwinrcConfig);
+    connect(m_kwinrcWatcher.data(), &KConfigWatcher::configChanged,
+            this, [this](const KConfigGroup &group, const QByteArrayList &) {
+        if (group.name() == QLatin1StringView("Tiling")) {
+            reconfigure();
+        }
+    });
 }
 
 void TilingController::onColorSourcesChanged()
@@ -170,6 +182,12 @@ void TilingController::reconfigure()
     // to kwinrc whenever the user interactively adjusts the centre-column
     // width via mouse resize or keyboard shortcut. Clamped to [0.2, 0.95].
     m_lastCenterTileRatio = std::clamp(tilingGroup.readEntry("CenterTileLastMasterRatio", 0.75), 0.2, 0.95);
+
+    // Maximum number of columns the Columns layout may grow to. Clamped to
+    // the range the KCM exposes so a misconfigured kwinrc cannot produce
+    // unusably narrow columns.
+    m_columnsMaxColumns = std::clamp(tilingGroup.readEntry("ColumnsMaxColumns", 3), 3, 5);
+    applyMaxColumnsToEngines();
 
     const QString borderModeString = tilingGroup.readEntry("TilingBorderMode", QStringLiteral("None"));
     if (borderModeString == QLatin1String("AllTiled")) {
@@ -264,6 +282,7 @@ void TilingController::setupLayoutEngine(TileManager *manager, VirtualDesktop *d
     }
 
     auto engine = createLayoutEngine(kind, manager);
+    engine->setMaxColumns(m_columnsMaxColumns);
     if (kind == LayoutEngine::LayoutKind::CenterTile) {
         if (auto *ct = qobject_cast<CenterTileLayoutEngine *>(engine.get())) {
             // Apply the persisted last-used ratio so the user sees their
@@ -275,6 +294,24 @@ void TilingController::setupLayoutEngine(TileManager *manager, VirtualDesktop *d
         }
     }
     manager->setLayoutEngine(desktop, std::move(engine));
+}
+
+void TilingController::applyMaxColumnsToEngines()
+{
+    if (!m_workspace) {
+        return;
+    }
+    for (LogicalOutput *output : m_workspace->outputs()) {
+        TileManager *manager = m_workspace->tileManager(output);
+        if (!manager) {
+            continue;
+        }
+        for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+            if (LayoutEngine *engine = manager->layoutEngine(desktop)) {
+                engine->setMaxColumns(m_columnsMaxColumns);
+            }
+        }
+    }
 }
 
 LayoutEngine::LayoutKind TilingController::globalDefaultLayoutKind() const
@@ -394,7 +431,7 @@ void TilingController::updateBorders()
             || (window->skipTaskbar() && window->skipPager());
         bool shouldShow = false;
         if (m_borderMode != BorderMode::None) {
-            if (allWindows || isTiled) {
+            if (allWindows || isTiled || (activeOnly && window == activeWindow)) {
                 if (allWindows && isSystemSurface) {
                     // Skip system surfaces even in AllWindows mode.
                 } else if (!activeOnly || window == activeWindow) {
@@ -407,7 +444,7 @@ void TilingController::updateBorders()
         const ColorSource source = (window == activeWindow) ? m_colorSourceActive : m_colorSourceInactive;
         const QColor borderColor = resolveColor(source, sourceColor);
 
-        if (isTiled || allWindows) {
+        if (isTiled || allWindows || (activeOnly && window == activeWindow)) {
             applyCornerRadius(window);
         }
 
@@ -1144,7 +1181,8 @@ void TilingController::onWindowMoveFinished(Window *window)
 
         if (context.engine) {
             Window *target = windowUnderCursorInEngine(context.engine);
-            if (context.engine->endMoveWindow(window, target)) {
+            const LayoutEngine::DropZone zone = target ? dropZoneForTarget(target) : LayoutEngine::DropZone::Swap;
+            if (context.engine->endMoveWindowOnZone(window, target, zone)) {
                 window->setGeometryRestore(context.originalGeometryRestore);
                 return;
             }
@@ -1228,6 +1266,26 @@ Window *TilingController::windowUnderCursorInEngine(LayoutEngine *engine) const
     return nullptr;
 }
 
+LayoutEngine::DropZone TilingController::dropZoneForTarget(Window *target) const
+{
+    if (!target) {
+        return LayoutEngine::DropZone::Swap;
+    }
+    const RectF geometry = target->frameGeometry();
+    if (geometry.height() <= 0) {
+        return LayoutEngine::DropZone::Swap;
+    }
+    const QPointF pos = Cursors::self()->mouse()->pos();
+    const qreal relativeY = (pos.y() - geometry.top()) / geometry.height();
+    if (relativeY < 0.25) {
+        return LayoutEngine::DropZone::InsertAbove;
+    }
+    if (relativeY > 0.75) {
+        return LayoutEngine::DropZone::InsertBelow;
+    }
+    return LayoutEngine::DropZone::Swap;
+}
+
 void TilingController::promoteToMaster()
 {
     Window *window = activeTiledWindow();
@@ -1267,6 +1325,34 @@ void TilingController::moveWindowPrevious()
         return;
     }
     engine->moveWindow(window, -1);
+}
+
+void TilingController::consume()
+{
+    Window *window = activeTiledWindow();
+    if (!window) {
+        return;
+    }
+    LayoutEngine *engine = layoutEngineForWindow(window);
+    if (!engine) {
+        return;
+    }
+    engine->consumeWindow(window);
+    updateBorders();
+}
+
+void TilingController::expel()
+{
+    Window *window = activeTiledWindow();
+    if (!window) {
+        return;
+    }
+    LayoutEngine *engine = layoutEngineForWindow(window);
+    if (!engine) {
+        return;
+    }
+    engine->expelWindow(window);
+    updateBorders();
 }
 
 void TilingController::setLayout(LayoutEngine::LayoutKind kind)
@@ -1340,6 +1426,7 @@ void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *deskto
     }
 
     auto engine = createLayoutEngine(kind, manager);
+    engine->setMaxColumns(m_columnsMaxColumns);
     if (kind == LayoutEngine::LayoutKind::CenterTile) {
         if (auto *ct = qobject_cast<CenterTileLayoutEngine *>(engine.get())) {
             ct->setMasterRatio(m_lastCenterTileRatio);

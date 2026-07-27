@@ -14,6 +14,7 @@
 #include "core/backendoutput.h"
 #include "core/drmdevice.h"
 #include "core/outputbackend.h"
+#include "core/renderdevice.h"
 #include "core/session.h"
 #include "idle_inhibition.h"
 #include "inputpanelv1integration.h"
@@ -143,6 +144,12 @@ public:
     bool allowInterface(ClientConnection *client, const QByteArray &interfaceName) override
     {
         if (client != waylandServer()->xWaylandConnection() && xwaylandInterfaces.contains(interfaceName)) {
+            return false;
+        }
+
+        if (client == waylandServer()->inputMethodConnection()) {
+            return true;
+        } else if (inputmethodInterfaces.contains(interfaceName)) {
             return false;
         }
 
@@ -816,7 +823,8 @@ ExtBackgroundEffectManagerV1 *WaylandServer::backgroundEffectManager() const
 
 void WaylandServer::setRenderBackend(RenderBackend *backend)
 {
-    if (backend->drmDevice()->supportsSyncObjTimelines()) {
+    if (backend->renderDevice()->drmDevice()
+        && backend->renderDevice()->drmDevice()->supportsSyncObjTimelines()) {
         // ensure the DRM_IOCTL_SYNCOBJ_EVENTFD ioctl is supported
         const auto linuxVersion = linuxKernelVersion();
         if (linuxVersion.majorVersion() < 6 && linuxVersion.minorVersion() < 6) {
@@ -827,7 +835,7 @@ void WaylandServer::setRenderBackend(RenderBackend *backend)
             return;
         }
         if (!m_linuxDrmSyncObj) {
-            m_linuxDrmSyncObj = new LinuxDrmSyncObjV1Interface(m_display, m_display, backend->drmDevice());
+            m_linuxDrmSyncObj = new LinuxDrmSyncObjV1Interface(m_display, m_display, backend->renderDevice()->drmDevice());
         }
     } else if (m_linuxDrmSyncObj) {
         m_linuxDrmSyncObj->remove();

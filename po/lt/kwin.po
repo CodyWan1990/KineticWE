@@ -8,8 +8,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kwin\n"
 "Report-Msgid-Bugs-To: https://bugs.kde.org\n"
-"POT-Creation-Date: 2026-06-25 00:45+0000\n"
-"PO-Revision-Date: 2026-06-24 02:09+0300\n"
+"POT-Creation-Date: 2026-07-24 00:46+0000\n"
+"PO-Revision-Date: 2026-07-24 01:20+0300\n"
 "Last-Translator: Moo <<>>\n"
 "Language-Team: Lithuanian <kde-i18n-lt@kde.org>\n"
 "Language: lt\n"
@@ -30,49 +30,49 @@ msgctxt "EMAIL OF TRANSLATORS"
 msgid "Your emails"
 msgstr "rch@richard.eu.org,dgvirtual@akl.lt, <>"
 
-#: backends/wayland/wayland_output.cpp:480
+#: backends/wayland/wayland_output.cpp:474
 #, kde-format
 msgid "Press right control to ungrab pointer"
 msgstr "Paspauskite dešinįjį valdymo klavišą norėdami paleisti rodyklę"
 
-#: backends/wayland/wayland_output.cpp:482
+#: backends/wayland/wayland_output.cpp:476
 #, kde-format
 msgid "Press right control key to grab pointer"
 msgstr "Paspauskite dešinįjį valdymo klavišą norėdami pagriebti rodyklę"
 
-#: backends/wayland/wayland_output.cpp:486
+#: backends/wayland/wayland_output.cpp:480
 #, kde-format
 msgctxt ""
 "Title of nested KWin Wayland with Wayland socket identifier as argument"
 msgid "KDE Wayland Compositor %1"
 msgstr "KDE Wayland kompozitorius %1"
 
-#: backends/wayland/wayland_output.cpp:489
+#: backends/wayland/wayland_output.cpp:483
 #, kde-format
 msgid "- Output disabled"
 msgstr "- Išvedimas išjungtas"
 
-#: backends/wayland/wayland_output.cpp:491
+#: backends/wayland/wayland_output.cpp:485
 #, kde-format
 msgid "- Output dimmed"
 msgstr "- Išvedimas pritemdytas"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control to ungrab input"
 msgstr "Paspauskite dešinįjį valdymo klavišą norėdami paleisti įvestį"
 
-#: backends/x11/x11_windowed_backend.cpp:499
+#: backends/x11/x11_windowed_backend.cpp:500
 #, kde-format
 msgid "Press right control key to grab input"
 msgstr "Paspauskite dešinįjį valdymo klavišą norėdami pagriebti įvestį"
 
-#: backends/x11/x11_windowed_backend.cpp:500
+#: backends/x11/x11_windowed_backend.cpp:501
 #, kde-format
 msgid "KDE Wayland Compositor"
 msgstr "KDE Wayland kompozitorius"
 
-#: compositor.cpp:650
+#: compositor.cpp:750
 #, kde-format
 msgid "Desktop effects were restarted due to a graphics reset"
 msgstr "Darbalaukio efektai buvo paleisti iš naujo dėl grafikos atstatymo"
@@ -1572,12 +1572,12 @@ msgstr "Xaver Hugl"
 msgid "Disable configuration options"
 msgstr "Išjungti konfigūracijos parinktis"
 
-#: main_wayland.cpp:322
+#: main_wayland.cpp:328
 #, kde-format
 msgid "Start a rootless Xwayland server."
 msgstr "Paleisti bešaknį Xwayland serverį."
 
-#: main_wayland.cpp:325
+#: main_wayland.cpp:331
 #, kde-format
 msgid ""
 "Name of the Wayland socket to listen on. If not set \"wayland-0\" is used."
@@ -1585,42 +1585,42 @@ msgstr ""
 "Wayland lizdo, kurio klausytis, pavadinimas. Jei nenustatyta, bus naudojamas "
 "„wayland-0“."
 
-#: main_wayland.cpp:329
+#: main_wayland.cpp:335
 #, kde-format
 msgid "The X11 Display to use in windowed mode on platform X11."
 msgstr "X11 ekranas, kurį naudoti lango veiksenoje, X11 platformoje."
 
-#: main_wayland.cpp:333
+#: main_wayland.cpp:339
 #, kde-format
 msgid "The Wayland Display to use in windowed mode on platform Wayland."
 msgstr "Wayland ekranas, kurį naudoti lango veiksenoje, Wayland platformoje."
 
-#: main_wayland.cpp:335
+#: main_wayland.cpp:341
 #, kde-format
 msgid "Render to a virtual framebuffer."
 msgstr "Atvaizduoti į virtualų vaizdų atnaujinimo buferį."
 
-#: main_wayland.cpp:337
+#: main_wayland.cpp:343
 #, kde-format
 msgid "The width for windowed mode. Default width is 1024."
 msgstr "Lango veiksenos plotis. Numatytasis plotis yra 1024."
 
-#: main_wayland.cpp:341
+#: main_wayland.cpp:347
 #, kde-format
 msgid "The height for windowed mode. Default height is 768."
 msgstr "Lango veiksenos aukštis. Numatytasis aukštis yra 768."
 
-#: main_wayland.cpp:346
+#: main_wayland.cpp:352
 #, kde-format
 msgid "Whether or not to make windowed mode fullscreen"
 msgstr "Ar padaryti, kad lango veiksena būtų rodoma per visą ekraną"
 
-#: main_wayland.cpp:350
+#: main_wayland.cpp:356
 #, kde-format
 msgid "The scale for windowed mode. Default value is 1."
 msgstr "Lango veiksenos mastelis. Numatytoji reikšmė yra 1."
 
-#: main_wayland.cpp:355
+#: main_wayland.cpp:361
 #, kde-format
 msgid ""
 "The number of windows to open as outputs in windowed mode. Default value is 1"
@@ -1628,7 +1628,7 @@ msgstr ""
 "Langų, kuriuos atverti kaip išvestis lango veiksenoje, skaičius. Numatytoji "
 "reiškmė yra 1"
 
-#: main_wayland.cpp:360
+#: main_wayland.cpp:366
 #, kde-format
 msgid ""
 "Wayland socket to use for incoming connections. This can be combined with --"
@@ -1637,7 +1637,7 @@ msgstr ""
 "Wayland lizdas, naudojamas gaunamiesiems ryšiams. Tai gali būti naudojama "
 "kartu su --socket, kad būtų išvardytas lizdas"
 
-#: main_wayland.cpp:364
+#: main_wayland.cpp:370
 #, kde-format
 msgid ""
 "XWayland socket to use for Xwayland's incoming connections. This can be set "
@@ -1646,77 +1646,77 @@ msgstr ""
 "XWayland lizdas, skirtas naudoti Xwayland gaunamiesiems ryšiams. Tai gali "
 "būti nustatyta kelis kartus"
 
-#: main_wayland.cpp:368
+#: main_wayland.cpp:374
 #, kde-format
 msgid "Name of the xwayland display that has been pre-set up"
 msgstr "Xwayland ekrano, kuris buvo iš anksto paruoštas, pavadinimas"
 
-#: main_wayland.cpp:372
+#: main_wayland.cpp:378
 #, kde-format
 msgid "XWayland socket to use for Xwayland's init connections"
 msgstr "XWayland lizdas, skirtas naudoti Xwayland inicijavimo ryšiams"
 
-#: main_wayland.cpp:376
+#: main_wayland.cpp:382
 #, kde-format
 msgid "Name of the xwayland init display that has been pre-set up"
 msgstr ""
 "Xwayland inicijavimo ekrano, kuris buvo iš anksto paruoštas, pavadinimas"
 
-#: main_wayland.cpp:380
+#: main_wayland.cpp:386
 #, kde-format
 msgid "Name of the xauthority file "
 msgstr "Xauthority failo pavadinimas"
 
-#: main_wayland.cpp:384
+#: main_wayland.cpp:390
 #, kde-format
 msgid "Exits this instance so it can be restarted by kwin_wayland_wrapper."
 msgstr ""
 "Išeina iš šio egzemplioriaus, kad kwin_wayland_wrapper galėtų paleisti jį iš "
 "naujo."
 
-#: main_wayland.cpp:386
+#: main_wayland.cpp:392
 #, kde-format
 msgid "Render through drm node."
 msgstr "Atvaizduoti per drm mazgą."
 
-#: main_wayland.cpp:387
+#: main_wayland.cpp:393
 #, kde-format
 msgid ""
 "Extract locale information from locale1 rather than the user's configuration"
 msgstr ""
 "Išpakuoti lokalės informaciją iš locale1, o ne iš naudotojo konfigūracijos"
 
-#: main_wayland.cpp:416
+#: main_wayland.cpp:422
 #, kde-format
 msgid "Input method that KWin starts."
 msgstr "Įvedimo metodas, kurį KWin paleidžia."
 
-#: main_wayland.cpp:422
+#: main_wayland.cpp:428
 #, kde-format
 msgid "Starts the session in locked mode."
 msgstr "Paleidžia seansą užrakintoje veiksenoje."
 
-#: main_wayland.cpp:426
+#: main_wayland.cpp:432
 #, kde-format
 msgid "Starts the session without lock screen support."
 msgstr "Paleidžia seansą be ekrano užrakto palaikymo."
 
-#: main_wayland.cpp:431
+#: main_wayland.cpp:437
 #, kde-format
 msgid "Starts the session without global shortcuts support."
 msgstr "Paleidžia seansą be visuotinių sparčiųjų klavišų palaikymo."
 
-#: main_wayland.cpp:436
+#: main_wayland.cpp:442
 #, kde-format
 msgid "Disable KActivities integration."
 msgstr "Išjungti KActivities integraciją."
 
-#: main_wayland.cpp:441
+#: main_wayland.cpp:447
 #, kde-format
 msgid "Exit after the session application, which is started by KWin, closed."
 msgstr "Išeiti po to, kai KWin paleista seanso programa yra užverta."
 
-#: main_wayland.cpp:446
+#: main_wayland.cpp:452
 #, kde-format
 msgid "Applications to start once Wayland and Xwayland server are started"
 msgstr ""
@@ -2218,25 +2218,25 @@ msgctxt "Duration of rotation"
 msgid "Default"
 msgstr "Numatytoji"
 
-#: plugins/mouseclick/mouseclick.cpp:42
+#: plugins/mouseclick/mouseclick.cpp:40
 #: plugins/mouseclick/mouseclick_config.cpp:43
 #, kde-format
 msgid "Toggle Mouse Click Animation"
 msgstr "Perjungti pelės spustelėjimo animaciją"
 
-#: plugins/mouseclick/mouseclick.cpp:48
+#: plugins/mouseclick/mouseclick.cpp:46
 #, kde-format
 msgctxt "Left mouse button"
 msgid "Left"
 msgstr "Kairysis"
 
-#: plugins/mouseclick/mouseclick.cpp:49
+#: plugins/mouseclick/mouseclick.cpp:47
 #, kde-format
 msgctxt "Middle mouse button"
 msgid "Middle"
 msgstr "Vidurinysis"
 
-#: plugins/mouseclick/mouseclick.cpp:50
+#: plugins/mouseclick/mouseclick.cpp:48
 #, kde-format
 msgctxt "Right mouse button"
 msgid "Right"
@@ -2335,12 +2335,12 @@ msgstr "Šriftas:"
 msgid "Show Text:"
 msgstr "Rodyti tekstą:"
 
-#: plugins/mousemark/mousemark.cpp:43
+#: plugins/mousemark/mousemark.cpp:36
 #, kde-format
 msgid "Clear All Mouse Marks"
 msgstr "Išvalyti visus žymėjimus pele"
 
-#: plugins/mousemark/mousemark.cpp:48 plugins/mousemark/mousemark_config.cpp:51
+#: plugins/mousemark/mousemark.cpp:41 plugins/mousemark/mousemark_config.cpp:51
 #, kde-format
 msgid "Clear Last Mouse Mark"
 msgstr "Išvalyti paskutinį žymėjimą pele"
@@ -2623,12 +2623,12 @@ msgstr "Nepavyko rasti išvesties"
 msgid "Invalid region"
 msgstr "Neteisinga sritis"
 
-#: plugins/screencast/screencaststream.cpp:378
+#: plugins/screencast/screencaststream.cpp:380
 #, kde-format
 msgid "OpenGL compositing is required for screencasting"
 msgstr "Reikia OpenGL komponavimo, kad būtų filmuojamas ekranas"
 
-#: plugins/screencast/screencaststream.cpp:386
+#: plugins/screencast/screencaststream.cpp:388
 #, kde-format
 msgid "Failed to create PipeWire stream"
 msgstr "Nepavyko sukurti PipeWire srauto"
@@ -3105,16 +3105,6 @@ msgstr "Perkelti didintą sritį į viršų"
 msgid "Move Zoomed Area Downwards"
 msgstr "Perkelti didintą sritį į apačią"
 
-#: plugins/zoom/zoom.cpp:122
-#, kde-format
-msgid "Move Mouse to Focus"
-msgstr "Perkelti pelę į fokusavimą"
-
-#: plugins/zoom/zoom.cpp:128
-#, kde-format
-msgid "Move Mouse to Center"
-msgstr "Perkelti pelę į centrą"
-
 #. i18n: ectx: label, entry (count), group (General)
 #: rulebooksettingsbase.kcfg:9
 #, kde-format
@@ -3476,221 +3466,178 @@ msgid "Fullscreen rule type"
 msgstr "Viso ekrano taisyklės tipas"
 
 #. i18n: ectx: label, entry (noborder), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:307
+#: rulesettings.kcfg:311
 #, kde-format
 msgid "No titlebar and frame"
 msgstr "Be antraštės juostos ir rėmelio"
 
 #. i18n: ectx: label, entry (noborderrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:311
+#: rulesettings.kcfg:315
 #, kde-format
 msgid "No titlebar rule type"
 msgstr "Be antraštės juostos taisyklės tipas"
 
+#. i18n: ectx: label, entry (decorationpolicy), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:322
+#, kde-format
+msgid "Decoration policy"
+msgstr "Dekoravimo politika"
+
+#. i18n: ectx: label, entry (decorationpolicyrule), group ($(ruleDescriptionOrNumber))
+#: rulesettings.kcfg:332
+#, kde-format
+msgid "Decoration policy rule type"
+msgstr "Dekoravimo politikos taisyklės tipas"
+
 #. i18n: ectx: label, entry (decocolor), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:318
+#: rulesettings.kcfg:339
 #, kde-format
 msgid "Titlebar color and scheme"
 msgstr "Antraštės juostos spalva ir rinkinys"
 
 #. i18n: ectx: label, entry (decocolorrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:321
+#: rulesettings.kcfg:342
 #, kde-format
 msgid "Titlebar color rule type"
 msgstr "Antraštės juostos spalvos taisyklės tipas"
 
-#. i18n: ectx: label, entry (blockcompositing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:326
-#, kde-format
-msgid "Block Compositing"
-msgstr "Blokuoti komponavimą"
-
-#. i18n: ectx: label, entry (blockcompositingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:330
-#, kde-format
-msgid "Block Compositing rule type"
-msgstr "Komponavimo blokavimo taisyklės tipas"
-
 #. i18n: ectx: label, entry (fsplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:335
+#: rulesettings.kcfg:347
 #, kde-format
 msgid "Focus stealing prevention"
 msgstr "Fokusavimo vogimo prevencija"
 
 #. i18n: ectx: label, entry (fsplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:341
+#: rulesettings.kcfg:353
 #, kde-format
 msgid "Focus stealing prevention rule type"
 msgstr "Fokusavimo vogimo prevencijos taisyklės tipas"
 
 #. i18n: ectx: label, entry (fpplevel), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:346
+#: rulesettings.kcfg:358
 #, kde-format
 msgid "Focus protection"
 msgstr "Fokusavimo apsauga"
 
 #. i18n: ectx: label, entry (fpplevelrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:352
+#: rulesettings.kcfg:364
 #, kde-format
 msgid "Focus protection rule type"
 msgstr "Fokusavimo apsaugos taisyklės tipas"
 
 #. i18n: ectx: label, entry (acceptfocus), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:357
+#: rulesettings.kcfg:369
 #, kde-format
 msgid "Accept Focus"
 msgstr "Priimti fokusavimą"
 
 #. i18n: ectx: label, entry (acceptfocusrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:361
+#: rulesettings.kcfg:373
 #, kde-format
 msgid "Accept Focus rule type"
 msgstr "Fokusavimo priėmimo taisyklės tipas"
 
 #. i18n: ectx: label, entry (closeable), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:366
+#: rulesettings.kcfg:378
 #, kde-format
 msgid "Closeable"
 msgstr "Užveriamas"
 
 #. i18n: ectx: label, entry (closeablerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:370
+#: rulesettings.kcfg:382
 #, kde-format
 msgid "Closeable rule type"
 msgstr "Užveriamo taisyklės tipas"
 
-#. i18n: ectx: label, entry (autogroup), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:375
-#, kde-format
-msgid "Autogroup with identical"
-msgstr "Automatiškai grupuoti su identiškais"
-
-#. i18n: ectx: label, entry (autogrouprule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:379
-#, kde-format
-msgid "Autogroup with identical rule type"
-msgstr "Automatinio grupavimo su identiškais taisyklės tipas"
-
-#. i18n: ectx: label, entry (autogroupfg), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:384
-#, kde-format
-msgid "Autogroup in foreground"
-msgstr "Automatiškai grupuoti priekiniame plane"
-
-#. i18n: ectx: label, entry (autogroupfgrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:388
-#, kde-format
-msgid "Autogroup in foreground rule type"
-msgstr "Automatinio grupavimo priekiniame plane taisyklės tipas"
-
-#. i18n: ectx: label, entry (autogroupid), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:393
-#, kde-format
-msgid "Autogroup by ID"
-msgstr "Automatiškai grupuoti pagal ID"
-
-#. i18n: ectx: label, entry (autogroupidrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:396
-#, kde-format
-msgid "Autogroup by ID rule type"
-msgstr "Automatinio grupavimo pagal ID taisyklės tipas"
-
-#. i18n: ectx: label, entry (strictgeometry), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:401
-#, kde-format
-msgid "Obey geometry restrictions"
-msgstr "Paklusti geometrijos apribojimams"
-
-#. i18n: ectx: label, entry (strictgeometryrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:405
-#, kde-format
-msgid "Obey geometry restrictions rule type"
-msgstr "Paklusimo geometrijos apribojimams taisyklės tipas"
-
 #. i18n: ectx: label, entry (shortcut), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:410
+#: rulesettings.kcfg:387
 #, kde-format
 msgid "Shortcut"
 msgstr "Spartusis klavišas"
 
 #. i18n: ectx: label, entry (shortcutrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:413
+#: rulesettings.kcfg:390
 #, kde-format
 msgid "Shortcut rule type"
 msgstr "Sparčiojo klavišo taisyklės tipas"
 
 #. i18n: ectx: label, entry (disableglobalshortcuts), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:420
+#: rulesettings.kcfg:397
 #, kde-format
 msgid "Ignore global shortcuts"
 msgstr "Nepaisyti visuotinių sparčiųjų klavišų"
 
 #. i18n: ectx: label, entry (disableglobalshortcutsrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:424
+#: rulesettings.kcfg:401
 #, kde-format
 msgid "Ignore global shortcuts rule type"
 msgstr "Visuotinių sparčiųjų klavišų nepaisymo taisyklės tipas"
 
 #. i18n: ectx: label, entry (desktopfile), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:429
+#: rulesettings.kcfg:406
 #, kde-format
 msgid "Desktop file name"
 msgstr "Darbalaukio failo pavadinimas"
 
 #. i18n: ectx: label, entry (desktopfilerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:432
+#: rulesettings.kcfg:409
 #, kde-format
 msgid "Desktop file name rule type"
 msgstr "Darbalaukio failo pavadinimo taisyklės tipas"
 
 #. i18n: ectx: label, entry (layer), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:439
+#: rulesettings.kcfg:416
 #, kde-format
 msgid "Layer"
 msgstr "Sluoksnis"
 
 #. i18n: ectx: label, entry (layerrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:455
+#: rulesettings.kcfg:432
 #, kde-format
 msgid "Layer rule type"
 msgstr "Sluoksnio taisyklės tipas"
 
 #. i18n: ectx: label, entry (adaptivesync), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:460
+#: rulesettings.kcfg:437
 #, kde-format
 msgid "AdaptiveSync"
 msgstr "„AdaptiveSync“"
 
 #. i18n: ectx: label, entry (adaptivesyncrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:464
+#: rulesettings.kcfg:441
 #, kde-format
 msgid "AdaptiveSync rule type"
 msgstr "„AdaptiveSync“ taisyklės tipas"
 
 #. i18n: ectx: label, entry (tearing), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:469
+#: rulesettings.kcfg:446
 #, kde-format
 msgid "Allow Tearing"
 msgstr "Leisti plėšymą"
 
 #. i18n: ectx: label, entry (tearingrule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:473
+#: rulesettings.kcfg:450
 #, kde-format
 msgid "Tearing rule type"
 msgstr "Plėšymo taisyklės tipas"
 
 #. i18n: ectx: label, entry (excludefromcapture), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:478
+#: rulesettings.kcfg:455
 #, kde-format
 msgid "Hide from screenshots and screen recordings"
 msgstr "Slėpti, kai daromos ekrano kopijos ir filmuojamas ekranas"
 
 #. i18n: ectx: label, entry (excludefromcapturerule), group ($(ruleDescriptionOrNumber))
-#: rulesettings.kcfg:482
+#: rulesettings.kcfg:459
 #, kde-format
 msgid "Hide from screenshots and screen recordings rule type"
 msgstr ""
 "„Slėpti, kai daromos ekrano kopijos ir filmuojamas ekranas“ taisyklės tipas"
+
+#: scene/workspacescene.cpp:115
+#, kde-format
+msgid "Toggle “Show Compositing” effect"
+msgstr "Perjungti „Rodyti komponavimą“ efektą"
 
 #. i18n: ectx: property (windowTitle), widget (QDialog, ShortcutDialog)
 #: shortcutdialog.ui:14
@@ -4277,7 +4224,19 @@ msgstr "Žvilgsnis į darbalaukį"
 msgid "Kill Window"
 msgstr "Nutraukti lango darbą"
 
-#: useractions.cpp:1080
+#: useractions.cpp:1017
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Focused Window"
+msgstr "Centruoti pelės rodyklę fokusuotame lange"
+
+#: useractions.cpp:1018
+#, kde-format
+msgctxt "@action"
+msgid "Center Pointer in Screen"
+msgstr "Centruoti pelės rodyklę ekrane"
+
+#: useractions.cpp:1083
 #, kde-format
 msgid "Activate Window (%1)"
 msgstr "Aktyvuoti langą (%1)"
@@ -4327,93 +4286,102 @@ msgstr "Perjungti vienu darbalaukiu į apačią"
 msgid "Switch to Desktop %1"
 msgstr "Perjungti į darbalaukį %1"
 
-#: wayland/outputmanagement_v2.cpp:569
+#: wayland/outputmanagement_v2.cpp:521
+#, kde-format
+msgid ""
+"Setting custom modes with too old kde-output-management-v2 protocol versions "
+"is unsupported"
+msgstr ""
+"Tinkintų veiksenų nustatymas naudojant per senas kde-output-management-v2 "
+"protokolo versijas yra nepalaikomas"
+
+#: wayland/outputmanagement_v2.cpp:575
 #, kde-format
 msgid "abm level is larger than the maximum (4): %1"
 msgstr "abm lygis yra didesnis nei maksimumas (4): %1"
 
-#: wayland/outputmanagement_v2.cpp:647
+#: wayland/outputmanagement_v2.cpp:673
 #, kde-format
 msgid "One of the relevant outputs is no longer available"
 msgstr "Vienas iš aktualių išvedimų daugiau nebeprieinamas"
 
-#: wayland/outputmanagement_v2.cpp:665
+#: wayland/outputmanagement_v2.cpp:691
 #, kde-format
 msgid "Disabling all outputs through configuration changes is not allowed"
 msgstr ""
 "Visų išvedimų išjungimas per konfigūracijos pakeitimus yra neleidžiamas"
 
-#: wayland/outputmanagement_v2.cpp:675
+#: wayland/outputmanagement_v2.cpp:701
 #, kde-format
 msgid "%1 cannot mirror itself"
 msgstr "%1 negali savęs dubliuoti"
 
-#: wayland/outputmanagement_v2.cpp:682
+#: wayland/outputmanagement_v2.cpp:708
 #, kde-format
 msgid "Cannot add a custom mode with an empty size"
 msgstr "Negalima pridėti tinkintos veiksenos, kurios dydis būtų tuščias"
 
-#: wayland/outputmanagement_v2.cpp:686
+#: wayland/outputmanagement_v2.cpp:712
 #, kde-format
 msgid "Cannot add a custom mode with a refresh rate of zero Hz"
 msgstr ""
 "Negalima pridėti tinkintos veiksenos, kurios atnaujinimo dažnis būtų 0 Hz"
 
-#: wayland/outputmanagement_v2.cpp:697
+#: wayland/outputmanagement_v2.cpp:723
 #, kde-format
 msgid "Position of output %1 is way too negative (%2, %3)"
 msgstr "Išvedimo %1 pozicija yra pernelyg neigiama (%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:700
+#: wayland/outputmanagement_v2.cpp:726
 #, kde-format
 msgid "Position of enabled output %1 is negative (%2, %3)"
 msgstr "Įjungto išvedimo %1 pozicija yra neigiama (%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:704
+#: wayland/outputmanagement_v2.cpp:730
 #, kde-format
 msgid "Position of output %1 is way too large (%2, %3)"
 msgstr "Išvedimo %1 pozicija yra pernelyg didelė (%2, %3)"
 
-#: wayland/outputmanagement_v2.cpp:721
+#: wayland/outputmanagement_v2.cpp:747
 #, kde-format
 msgid "The driver rejected the output configuration"
 msgstr "Tvarkyklė atmetė išvedimo konfigūraciją"
 
-#: wayland/outputmanagement_v2.cpp:724
+#: wayland/outputmanagement_v2.cpp:750
 #, kde-format
 msgid "The session is not active"
 msgstr "Seansas nėra aktyvus"
 
-#: window.cpp:3107
+#: window.cpp:3162
 #, kde-format
 msgctxt "Application is not responding, appended to window title"
 msgid "(Not Responding)"
 msgstr "(Nereaguoja)"
 
-#: workspace.cpp:1310
+#: workspace.cpp:1311
 #, kde-format
 msgid "Built-in Screen"
 msgstr "Įtaisytas ekranas"
 
-#: workspace.cpp:1323
+#: workspace.cpp:1324
 #, kde-format
 msgctxt "Display label: manufacturer + model name + connector name"
 msgid "%1 %2 %3"
 msgstr "%1 %2 %3"
 
-#: workspace.cpp:1333
+#: workspace.cpp:1334
 #, kde-format
 msgctxt "Display label: manufacturer + model name + serial number"
 msgid "%1 %2 %3"
 msgstr "%1 %2 %3"
 
-#: workspace.cpp:1336
+#: workspace.cpp:1337
 #, kde-format
 msgctxt "Display label: manufacturer + model name"
 msgid "%1 %2"
 msgstr "%1 %2"
 
-#: workspace.cpp:1805
+#: workspace.cpp:1806
 #, kde-format
 msgctxt "Introductory text shown in the support information."
 msgid ""
@@ -4441,6 +4409,42 @@ msgstr ""
 #, kde-format
 msgid "Xwayland has crashed"
 msgstr "Xwayland užstrigo"
+
+#~ msgid "Block Compositing"
+#~ msgstr "Blokuoti komponavimą"
+
+#~ msgid "Block Compositing rule type"
+#~ msgstr "Komponavimo blokavimo taisyklės tipas"
+
+#~ msgid "Autogroup with identical"
+#~ msgstr "Automatiškai grupuoti su identiškais"
+
+#~ msgid "Autogroup with identical rule type"
+#~ msgstr "Automatinio grupavimo su identiškais taisyklės tipas"
+
+#~ msgid "Autogroup in foreground"
+#~ msgstr "Automatiškai grupuoti priekiniame plane"
+
+#~ msgid "Autogroup in foreground rule type"
+#~ msgstr "Automatinio grupavimo priekiniame plane taisyklės tipas"
+
+#~ msgid "Autogroup by ID"
+#~ msgstr "Automatiškai grupuoti pagal ID"
+
+#~ msgid "Autogroup by ID rule type"
+#~ msgstr "Automatinio grupavimo pagal ID taisyklės tipas"
+
+#~ msgid "Obey geometry restrictions"
+#~ msgstr "Paklusti geometrijos apribojimams"
+
+#~ msgid "Obey geometry restrictions rule type"
+#~ msgstr "Paklusimo geometrijos apribojimams taisyklės tipas"
+
+#~ msgid "Move Mouse to Focus"
+#~ msgstr "Perkelti pelę į fokusavimą"
+
+#~ msgid "Move Mouse to Center"
+#~ msgstr "Perkelti pelę į centrą"
 
 #~ msgid "Indicate that KWin has recently crashed n times"
 #~ msgstr "Rodoma, kad KWin neseniai nulūžo n kartų"

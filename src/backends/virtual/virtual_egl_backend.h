@@ -36,7 +36,6 @@ public:
     std::optional<OutputLayerBeginFrameInfo> doBeginFrame() override;
     bool doEndFrame(const Region &renderedDeviceRegion, const Region &damagedDeviceRegion, OutputFrame *frame) override;
 
-    DrmDevice *scanoutDevice() const override;
     FormatModifierMap supportedDrmFormats() const override;
     void releaseBuffers() override;
 
@@ -58,18 +57,15 @@ class VirtualEglBackend : public EglBackend
     Q_OBJECT
 
 public:
-    VirtualEglBackend(VirtualBackend *b);
+    VirtualEglBackend(VirtualBackend *b, RenderDevice *renderDevice);
     ~VirtualEglBackend() override;
 
     QList<OutputLayer *> compatibleOutputLayers(BackendOutput *output) override;
     bool init() override;
 
     VirtualBackend *backend() const;
-    DrmDevice *drmDevice() const override;
 
 private:
-    bool initializeEgl();
-
     void addOutput(BackendOutput *output);
 
     VirtualBackend *m_backend;

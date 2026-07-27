@@ -37,6 +37,7 @@ class ItemView;
 class RenderLoopDrivenQAnimationDriver;
 class RenderView;
 class Item;
+class RenderDevice;
 
 class KWIN_EXPORT Compositor : public QObject
 {
@@ -81,6 +82,8 @@ Q_SIGNALS:
     void compositingToggled(bool active);
     void aboutToDestroy();
     void aboutToToggleCompositing();
+    void aboutToStop();
+    void primaryGpuChanged();
 
 protected:
     explicit Compositor(QObject *parent = nullptr);
@@ -97,7 +100,6 @@ protected:
     BackendOutput *findOutput(RenderLoop *loop) const;
 
     bool attemptOpenGLCompositing();
-    bool attemptQPainterCompositing();
     void handleOutputsChanged();
     void addOutput(LogicalOutput *logicalOutput, BackendOutput *backendOutput);
     void removeOutput(BackendOutput *output);
@@ -112,16 +114,11 @@ protected:
         Region surfaceDamage;
         uint32_t requiredAlphaBits;
     };
-    enum class SetupType {
-        Ideal,
-        Fallback,
-    };
     std::pair<QList<LayerData>, bool> setupLayers(SceneView *primaryView, LogicalOutput *logicalOutput,
                                                   BackendOutput *backendOutput,
                                                   const QList<OutputLayer *> &outputLayers,
                                                   const std::unordered_map<OutputLayer *, Item *> &assignments,
                                                   const std::shared_ptr<OutputFrame> &frame,
-                                                  SetupType type,
                                                   std::unordered_set<OutputLayer *> &toUpdate);
 
     CompositingType m_selectedCompositor = NoCompositing;
@@ -133,6 +130,7 @@ protected:
     std::unordered_set<RenderLoop *> m_brokenCursors;
     std::optional<bool> m_allowOverlaysEnv;
     RenderLoopDrivenQAnimationDriver *m_renderLoopDrivenAnimationDriver;
+    RenderDevice *m_renderDevice = nullptr;
 };
 
 } // namespace KWin

@@ -19,12 +19,14 @@ qt6_generate_wayland_protocol_client_sources(KWinIntegrationTestFramework
         ${WaylandProtocols_DATADIR}/stable/tablet/tablet-v2.xml
         ${WaylandProtocols_DATADIR}/stable/viewporter/viewporter.xml
         ${WaylandProtocols_DATADIR}/stable/xdg-shell/xdg-shell.xml
+        ${WaylandProtocols_DATADIR}/staging/alpha-modifier/alpha-modifier-v1.xml
         ${WaylandProtocols_DATADIR}/staging/color-management/color-management-v1.xml
         ${WaylandProtocols_DATADIR}/staging/color-representation/color-representation-v1.xml
         ${WaylandProtocols_DATADIR}/staging/cursor-shape/cursor-shape-v1.xml
         ${WaylandProtocols_DATADIR}/staging/fifo/fifo-v1.xml
         ${WaylandProtocols_DATADIR}/staging/fractional-scale/fractional-scale-v1.xml
         ${WaylandProtocols_DATADIR}/staging/security-context/security-context-v1.xml
+        ${WaylandProtocols_DATADIR}/staging/tearing-control/tearing-control-v1.xml
         ${WaylandProtocols_DATADIR}/staging/xdg-activation/xdg-activation-v1.xml
         ${WaylandProtocols_DATADIR}/staging/xdg-dialog/xdg-dialog-v1.xml
         ${WaylandProtocols_DATADIR}/staging/xdg-session-management/xdg-session-management-v1.xml
@@ -35,8 +37,8 @@ qt6_generate_wayland_protocol_client_sources(KWinIntegrationTestFramework
         ${WaylandProtocols_DATADIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml
 
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/fake-input.xml
-        ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-output-device-v2.xml
-        ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-output-management-v2.xml
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../src/wayland/protocols/kde-output-device-v2.xml
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../src/wayland/protocols/kde-output-management-v2.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-screen-edge-v1.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/keystate.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/zkde-screencast-unstable-v1.xml
@@ -122,7 +124,9 @@ integrationTest(NAME testPlasmaSurface SRCS plasma_surface_test.cpp)
 integrationTest(NAME testMaximized SRCS maximize_test.cpp LIBS KDecoration3::KDecoration KF6::Package)
 integrationTest(NAME testXdgShellWindow SRCS xdgshellwindow_test.cpp LIBS KDecoration3::KDecoration)
 integrationTest(NAME testSceneOpenGL SRCS scene_opengl_test.cpp )
-integrationTest(NAME testSceneOpenGLES SRCS scene_opengl_es_test.cpp )
+integrationTest(NAME testSceneOpenGLES2 SRCS scene_opengl_test.cpp )
+target_compile_definitions(testSceneOpenGLES2 PRIVATE MESA_GLES_VERSION_OVERRIDE="2.0")
+
 integrationTest(NAME testScreenChanges SRCS screen_changes_test.cpp)
 if (KWIN_BUILD_TABBOX)
     integrationTest(NAME testTabBox SRCS tabbox_test.cpp)
@@ -149,6 +153,7 @@ integrationTest(NAME testTilingController SRCS tiling_controller_test.cpp OPTION
 integrationTest(NAME testTilingResize SRCS tiling_resize_test.cpp OPTIONAL_LIBS XCB::ICCCM)
 integrationTest(NAME testTilingCenterTile SRCS tiling_center_tile_test.cpp OPTIONAL_LIBS XCB::ICCCM)
 integrationTest(NAME testTilingAutoGrid SRCS tiling_autogrid_test.cpp OPTIONAL_LIBS XCB::ICCCM)
+integrationTest(NAME testTilingColumns SRCS tiling_columns_test.cpp OPTIONAL_LIBS XCB::ICCCM)
 integrationTest(NAME testFractionalScaling SRCS fractional_scaling_test.cpp)
 integrationTest(NAME testMoveResize SRCS move_resize_window_test.cpp)
 integrationTest(NAME testPlasmaWindow SRCS plasmawindow_test.cpp OPTIONAL_LIBS XCB::ICCCM PROPERTIES RUN_SERIAL TRUE)
@@ -162,6 +167,8 @@ integrationTest(NAME testStickyKeys SRCS sticky_keys_test.cpp)
 integrationTest(NAME testWorkspace SRCS workspace_test.cpp)
 integrationTest(NAME testMouseActions SRCS mouseactions_test.cpp LIBS)
 integrationTest(NAME testColorManagement SRCS test_colormanagement.cpp)
+integrationTest(NAME testAlphaModifier SRCS alpha_modifier_test.cpp)
+integrationTest(NAME testTearingControl SRCS tearing_control_test.cpp)
 integrationTest(NAME testKeyboardInput SRCS keyboard_input_test.cpp)
 integrationTest(NAME testFifo SRCS test_fifo.cpp PROPERTIES RUN_SERIAL TRUE)
 integrationTest(NAME testMouseKeys SRCS mouse_keys_test.cpp)
@@ -174,6 +181,8 @@ integrationTest(NAME testDrmLegacy SRCS drm_test.cpp PROPERTIES RESOURCE_LOCK "v
 target_compile_definitions(testDrmLegacy PRIVATE FORCE_DRM_LEGACY=1)
 integrationTest(NAME testDrmNoModifiers SRCS drm_test.cpp PROPERTIES RESOURCE_LOCK "vkms")
 target_compile_definitions(testDrmNoModifiers PRIVATE FORCE_NO_DRM_MODIFIERS=1)
+integrationTest(NAME testDrmNoRenderNodes SRCS drm_test.cpp PROPERTIES RESOURCE_LOCK "vkms")
+target_compile_definitions(testDrmNoRenderNodes PRIVATE FORCE_NO_RENDERNODES=1)
 
 integrationTest(NAME testSelection SRCS selection_test.cpp)
 integrationTest(NAME testToplevelDrag SRCS topleveldrag_test.cpp)
@@ -212,6 +221,13 @@ endif()
 if (KWIN_BUILD_EIS)
     pkg_check_modules(PKG_libei REQUIRED IMPORTED_TARGET libei-1.0)
     integrationTest(NAME testInputCapture SRCS input_capture_test.cpp  LIBS PkgConfig::PKG_libei PROPERTIES RUN_SERIAL TRUE)
+    integrationTest(NAME testLibeiInput SRCS libei_test.cpp LIBS PkgConfig::PKG_libei PROPERTIES RUN_SERIAL TRUE)
+    if (PKG_libei_VERSION VERSION_GREATER_EQUAL "1.6")
+        set(EIS_HAVE_16 1)
+    else()
+        set(EIS_HAVE_16 0)
+    endif()
+    target_compile_definitions(testLibeiInput PRIVATE -DEIS_HAVE_16=${EIS_HAVE_16})
 endif()
 
 

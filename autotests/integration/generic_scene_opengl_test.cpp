@@ -18,9 +18,7 @@
 
 using namespace KWin;
 
-GenericSceneOpenGLTest::GenericSceneOpenGLTest(const QByteArray &envVariable)
-    : QObject()
-    , m_envVariable(envVariable)
+GenericSceneOpenGLTest::GenericSceneOpenGLTest()
 {
 }
 
@@ -35,10 +33,6 @@ void GenericSceneOpenGLTest::cleanup()
 
 void GenericSceneOpenGLTest::initTestCase()
 {
-    if (!Test::renderNodeAvailable()) {
-        QSKIP("no render node available");
-        return;
-    }
     qRegisterMetaType<KWin::Window *>();
     QVERIFY(waylandServer()->init(qAppName()));
 
@@ -55,7 +49,6 @@ void GenericSceneOpenGLTest::initTestCase()
 
     qputenv("XCURSOR_THEME", QByteArrayLiteral("breeze_cursors"));
     qputenv("XCURSOR_SIZE", QByteArrayLiteral("24"));
-    qputenv("KWIN_COMPOSE", m_envVariable);
 
     kwinApp()->start();
     Test::setOutputConfig({

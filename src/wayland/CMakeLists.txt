@@ -18,8 +18,8 @@ ecm_add_qtwayland_server_protocol_kde(WaylandProtocols_xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/idle.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-external-brightness-v1.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-lockscreen-overlay-v1.xml
-        ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-output-device-v2.xml
-        ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-output-management-v2.xml
+        ${PROJECT_SOURCE_DIR}/src/wayland/protocols/kde-output-device-v2.xml
+        ${PROJECT_SOURCE_DIR}/src/wayland/protocols/kde-output-management-v2.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-output-order-v1.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/kde-screen-edge-v1.xml
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/keystate.xml

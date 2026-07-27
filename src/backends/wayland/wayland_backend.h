@@ -215,8 +215,7 @@ public:
     bool initialize() override;
 
     std::unique_ptr<InputBackend> createInputBackend() override;
-    std::unique_ptr<EglBackend> createOpenGLBackend() override;
-    std::unique_ptr<QPainterBackend> createQPainterBackend() override;
+    std::unique_ptr<EglBackend> createOpenGLBackend(RenderDevice *device) override;
 
     WaylandDisplay *display() const
     {

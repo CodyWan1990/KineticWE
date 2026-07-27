@@ -9,7 +9,7 @@
 */
 #pragma once
 
-#include "drm_abstract_output.h"
+#include "core/backendoutput.h"
 
 #include <QObject>
 
@@ -18,9 +18,10 @@ namespace KWin
 
 class SoftwareVsyncMonitor;
 class VirtualBackend;
-class DrmPipelineLayer;
+class DrmBackend;
+class DrmOutputLayer;
 
-class DrmVirtualOutput : public DrmAbstractOutput
+class DrmVirtualOutput : public BackendOutput
 {
     Q_OBJECT
 
@@ -41,7 +42,6 @@ private:
     DrmBackend *const m_backend;
     std::shared_ptr<DrmOutputLayer> m_layer;
     std::shared_ptr<OutputFrame> m_frame;
-
     std::unique_ptr<SoftwareVsyncMonitor> m_vsyncMonitor;
 };
 

@@ -39,10 +39,6 @@ private Q_SLOTS:
 
 void DesktopSwitchingAnimationTest::initTestCase()
 {
-    if (!Test::renderNodeAvailable()) {
-        QSKIP("no render node available");
-        return;
-    }
     qputenv("XDG_DATA_DIRS", QCoreApplication::applicationDirPath().toUtf8());
 
     qRegisterMetaType<KWin::Window *>();
@@ -57,7 +53,6 @@ void DesktopSwitchingAnimationTest::initTestCase()
     config->sync();
     kwinApp()->setConfig(config);
 
-    qputenv("KWIN_COMPOSE", QByteArrayLiteral("O2"));
     qputenv("KWIN_EFFECTS_FORCE_ANIMATIONS", QByteArrayLiteral("1"));
 
     kwinApp()->start();

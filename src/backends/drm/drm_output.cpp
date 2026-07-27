@@ -28,7 +28,6 @@
 // Qt
 #include <QCryptographicHash>
 #include <QMatrix4x4>
-#include <QPainter>
 // c++
 #include <cerrno>
 // drm
@@ -42,7 +41,8 @@ namespace KWin
 static const auto s_disableTripleBuffering = environmentVariableBoolValue("KWIN_DRM_DISABLE_TRIPLE_BUFFERING");
 
 DrmOutput::DrmOutput(const std::shared_ptr<DrmConnector> &conn, DrmPipeline *pipeline)
-    : m_gpu(conn->gpu())
+    : BackendOutput(pipeline->gpu()->drmDevice())
+    , m_gpu(conn->gpu())
     , m_pipeline(pipeline)
     , m_connector(conn)
 {
@@ -175,12 +175,11 @@ void DrmOutput::refreshModes(State *nextState) const
         nextState->modes.append(drmMode);
     }
 
-    for (const auto &custom : nextState->customModes) {
-        const OutputModeline modeline = OutputModeline::custom(custom);
+    for (const auto &modeline : nextState->customModes) {
         if (auto mode = modeline.match(previousModes)) {
             nextState->modes.append(mode);
         } else {
-            nextState->modes.append(m_pipeline->connector()->generateMode(custom.size, custom.refreshRate / 1000.0f, custom.flags | OutputModeline::Flag::Custom));
+            nextState->modes.append(m_pipeline->connector()->generateMode(modeline));
         }
     }
 }
@@ -576,7 +575,10 @@ bool DrmOutput::queueChanges(const std::shared_ptr<OutputChangeSet> &props)
     m_nextState->edrPolicy = props->edrPolicy.value_or(m_state.edrPolicy);
     m_nextState->dpmsMode = props->dpmsMode.value_or(m_state.dpmsMode);
     if (props->customModes) {
-        m_nextState->customModes = *props->customModes;
+        m_nextState->customModes = *props->customModes | std::views::transform([](const OutputModeline &modeline) {
+            return modeline.withFlags(OutputModeline::Flag::Generated | OutputModeline::Flag::Custom);
+        }) | std::ranges::to<QList>();
+
         refreshModes(&*m_nextState);
     }
     if (props->currentMode) {
@@ -876,7 +878,7 @@ Colorimetry DrmOutput::wireColor(const State &next) const
     if (next.wideColorGamut && (capabilities() & Capability::WideColorGamut)) {
         return Colorimetry::BT2020;
     } else {
-        return Colorimetry::BT709;
+        return next.originalColorDescription->containerColorimetry();
     }
 }
 

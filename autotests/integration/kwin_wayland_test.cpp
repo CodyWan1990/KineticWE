@@ -20,6 +20,7 @@
 #include "pluginmanager.h"
 #include "wayland_server.h"
 #include "workspace.h"
+#include "wayland/display.h"
 
 #include <KWayland/Client/seat.h>
 
@@ -65,9 +66,6 @@ WaylandTestApplication::WaylandTestApplication(int &argc, char **argv, bool runO
 #if KWIN_BUILD_ACTIVITIES
     setUseKActivities(false);
 #endif
-    if (!runOnKMS) {
-        qputenv("KWIN_COMPOSE", QByteArrayLiteral("Q"));
-    }
     qputenv("XDG_CURRENT_DESKTOP", QByteArrayLiteral("KDE"));
     qunsetenv("XKB_DEFAULT_RULES");
     qunsetenv("XKB_DEFAULT_MODEL");
@@ -89,8 +87,6 @@ WaylandTestApplication::WaylandTestApplication(int &argc, char **argv, bool runO
     removeLibraryPath(ownPath);
     addLibraryPath(ownPath);
 
-    createGpuManager();
-
     if (runOnKMS) {
         // in order to allow running the test manually on a tty,
         // we need the real session. This doesn't work in CI though,
@@ -107,6 +103,10 @@ WaylandTestApplication::WaylandTestApplication(int &argc, char **argv, bool runO
     }
     m_waylandServer.reset(WaylandServer::create());
     setProcessStartupEnvironment(QProcessEnvironment::systemEnvironment());
+
+    // Kwin uses QAbstractEventDispatcher::aboutToBlock to flush calls
+    // QTRY_COMPARE dispatches events manually but only calls awake and not aboutToBlock, so we have a new hook just for tests
+    connect(eventDispatcher(), &QAbstractEventDispatcher::awake, m_waylandServer->display(), &Display::flush);
 }
 
 WaylandTestApplication::~WaylandTestApplication()
@@ -184,7 +184,7 @@ void WaylandTestApplication::destroyVirtualInputDevices()
     if (m_virtualTabletPad) {
         input()->removeInputDevice(m_virtualTabletPad.get());
     }
-    if (m_virtualTabletTool) {
+    if (m_virtualTablet) {
         input()->removeInputDevice(m_virtualTablet.get());
     }
 }
@@ -201,6 +201,8 @@ void WaylandTestApplication::performStartup()
 
     // first load options - done internally by a different thread
     createOptions();
+
+    createGpuManager();
     if (!outputBackend()->initialize()) {
         std::exit(1);
     }
@@ -402,6 +404,12 @@ Test::SimpleKeyboard::SimpleKeyboard(QObject *parent)
 KWayland::Client::Keyboard *Test::SimpleKeyboard::keyboard()
 {
     return m_keyboard;
+}
+
+void Test::SimpleKeyboard::clearReceivedText()
+{
+    m_receviedText.clear();
+    Q_EMIT receviedTextChanged();
 }
 
 QString Test::SimpleKeyboard::receviedText()

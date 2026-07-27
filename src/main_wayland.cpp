@@ -138,6 +138,7 @@ void ApplicationWayland::performStartup()
 {
     createOptions();
 
+    createGpuManager();
     if (!outputBackend()->initialize()) {
         std::exit(1);
     }
@@ -170,6 +171,11 @@ void ApplicationWayland::performStartup()
         m_xwayland->xwaylandLauncher()->addEnvironmentVariables(m_xwaylandExtraEnvironment);
         m_xwayland->xwaylandLauncher()->passFileDescriptors(std::move(m_xwaylandFds));
         m_xwayland->init();
+        connect(Compositor::self(), &Compositor::primaryGpuChanged, m_xwayland.get(), [this]() {
+            // Xwayland will automatically be started again
+            // once a client tries to connect to it
+            m_xwayland->xwaylandLauncher()->stop();
+        });
     }
 #endif
     startSession();
@@ -465,8 +471,6 @@ int main(int argc, char *argv[])
     if (parser.isSet(exitWithSessionOption)) {
         a.setSessionArgument(parser.value(exitWithSessionOption));
     }
-
-    a.createGpuManager();
 
     enum class BackendType {
         Kms,

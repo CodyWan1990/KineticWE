@@ -24,12 +24,12 @@ namespace KWin
 class LogicalOutput;
 class InputBackend;
 class EglBackend;
-class QPainterBackend;
 class OutputConfiguration;
 class EglDisplay;
 class Session;
 class BackendOutput;
 class EglContext;
+class RenderDevice;
 
 class KWIN_EXPORT OutputBackend : public QObject
 {
@@ -40,8 +40,7 @@ public:
 
     virtual bool initialize() = 0;
     virtual std::unique_ptr<InputBackend> createInputBackend();
-    virtual std::unique_ptr<EglBackend> createOpenGLBackend();
-    virtual std::unique_ptr<QPainterBackend> createQPainterBackend();
+    virtual std::unique_ptr<EglBackend> createOpenGLBackend(RenderDevice *device);
 
     /**
      * The CompositingTypes supported by the Platform.

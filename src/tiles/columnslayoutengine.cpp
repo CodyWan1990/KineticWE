@@ -421,6 +421,18 @@ int ColumnsLayoutEngine::columnOfWindow(Window *window) const
     return -1;
 }
 
+QPair<int, int> ColumnsLayoutEngine::columnAndRowOfWindow(Window *window) const
+{
+    for (int c = 0; c < m_columns.size(); ++c) {
+        for (int r = 0; r < m_columns[c].leaves.size(); ++r) {
+            if (m_columns[c].leaves[r] && m_columns[c].leaves[r]->windows().contains(window)) {
+                return {c, r};
+            }
+        }
+    }
+    return {-1, -1};
+}
+
 int ColumnsLayoutEngine::columnWithFewestWindows() const
 {
     int bestCol = 0;
@@ -631,6 +643,155 @@ bool ColumnsLayoutEngine::endMoveWindow(Window *window, Window *target)
     }
     reflow();
     return true;
+}
+
+bool ColumnsLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, DropZone zone)
+{
+    if (zone == DropZone::Swap || !target || target == window) {
+        return endMoveWindow(window, target);
+    }
+
+    QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;
+    const int srcCol = m_moveSourceColumn;
+    const int srcRow = m_moveSourceRow;
+    m_moveSourceLeaf.clear();
+    m_moveSourceColumn = -1;
+    m_moveSourceRow = -1;
+
+    if (!sourceLeaf || srcCol < 0 || srcCol >= m_columns.size()
+        || srcRow < 0 || srcRow >= m_columns[srcCol].leaves.size()
+        || m_columns[srcCol].leaves[srcRow] != sourceLeaf) {
+        return false;
+    }
+
+    // Locate the target window's column and row.
+    const auto [targetCol0, targetRow0] = columnAndRowOfWindow(target);
+    if (targetCol0 < 0) {
+        // The target vanished mid-drag; restore the window to its source.
+        if (!sourceLeaf->windows().contains(window)) {
+            sourceLeaf->manage(window);
+        }
+        reflow();
+        return true;
+    }
+    int targetCol = targetCol0;
+    int targetRow = targetRow0;
+
+    // Detach the dragged window's leaf from its column. The leaf itself is
+    // moved into the target column, so the window stays managed throughout.
+    m_columns[srcCol].leaves.removeAt(srcRow);
+    m_columns[srcCol].weights.removeAt(srcRow);
+
+    if (m_columns[srcCol].leaves.isEmpty()) {
+        // The dragged window was alone in its column; the column goes away
+        // and the remaining columns take over its share of the width.
+        removeColumn(srcCol);
+        rebalanceColumnWidths();
+        if (srcCol < targetCol) {
+            targetCol -= 1;
+        }
+    } else if (srcCol == targetCol && srcRow < targetRow) {
+        // Same-column reorder: removing the source shifted the target up.
+        targetRow -= 1;
+    }
+
+    const int insertRow = (zone == DropZone::InsertAbove) ? targetRow : targetRow + 1;
+    m_columns[targetCol].leaves.insert(insertRow, sourceLeaf);
+    m_columns[targetCol].weights.insert(insertRow, m_defaultWeight);
+    // A real interactive drag detaches the window from its tile on the first
+    // movement (Window::updateInteractiveMoveResize untiles moved windows), so
+    // the leaf we just moved is usually empty. Re-attach the window so it
+    // snaps into its new slot instead of staying floating and leaving an
+    // empty "ghost" tile behind.
+    if (!sourceLeaf->windows().contains(window)) {
+        sourceLeaf->manage(window);
+    }
+    reflow();
+    return true;
+}
+
+void ColumnsLayoutEngine::consumeWindow(Window *window)
+{
+    if (!m_root || !window) {
+        return;
+    }
+
+    const auto [col, row] = columnAndRowOfWindow(window);
+    if (col < 0) {
+        return;
+    }
+
+    // Prefer the column to the right; fall back to the one to the left.
+    int targetCol = col + 1;
+    if (targetCol >= m_columns.size()) {
+        targetCol = col - 1;
+    }
+    if (targetCol < 0) {
+        // Only one column: nowhere to be consumed into.
+        return;
+    }
+
+    // Detach the window's leaf from its column and append it at the bottom
+    // of the target column.
+    QPointer<CustomTile> leaf = m_columns[col].leaves.takeAt(row);
+    m_columns[col].weights.removeAt(row);
+
+    if (m_columns[col].leaves.isEmpty()) {
+        removeColumn(col);
+        rebalanceColumnWidths();
+        if (col < targetCol) {
+            targetCol -= 1;
+        }
+    }
+
+    m_columns[targetCol].leaves.append(leaf);
+    m_columns[targetCol].weights.append(m_defaultWeight);
+    reflow();
+}
+
+void ColumnsLayoutEngine::expelWindow(Window *window)
+{
+    if (!m_root || !window) {
+        return;
+    }
+
+    const auto [col, row] = columnAndRowOfWindow(window);
+    if (col < 0) {
+        return;
+    }
+    if (m_columns[col].leaves.size() <= 1) {
+        // Already alone in its column.
+        return;
+    }
+    if (m_columns.size() >= m_maxColumns) {
+        // At the configured column cap.
+        return;
+    }
+
+    // Detach the window's leaf and give it its own column.
+    QPointer<CustomTile> leaf = m_columns[col].leaves.takeAt(row);
+    const qreal weight = m_columns[col].weights.takeAt(row);
+
+    Column newColumn;
+    newColumn.leaves.append(leaf);
+    newColumn.weights.append(weight);
+    newColumn.width = 0.0; // placeholder; rebalanced below
+
+    // The new column goes to the right of the old one; if the old column is
+    // the rightmost, the new column goes to its left instead.
+    int insertAt = col + 1;
+    if (col == m_columns.size() - 1) {
+        insertAt = col;
+    }
+    m_columns.insert(insertAt, newColumn);
+
+    rebalanceColumnWidths();
+    reflow();
+}
+
+void ColumnsLayoutEngine::setMaxColumns(int maxColumns)
+{
+    m_maxColumns = std::clamp(maxColumns, m_minMaxColumns, m_maxMaxColumns);
 }
 
 

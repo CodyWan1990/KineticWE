@@ -13,8 +13,6 @@
 #include <QMatrix4x4>
 #include <memory>
 
-class QPainter;
-
 namespace KWin
 {
 
@@ -36,8 +34,6 @@ public:
     ItemRenderer();
     virtual ~ItemRenderer();
 
-    virtual QPainter *painter() const;
-
     virtual std::unique_ptr<Texture> createTexture(GraphicsBuffer *buffer, const std::shared_ptr<SyncReleasePoint> &releasePoint) = 0;
     virtual std::unique_ptr<Texture> createTexture(const QImage &image) = 0;
 
@@ -57,7 +53,7 @@ public:
     virtual void endFrame();
 
     virtual void renderBackground(const RenderTarget &renderTarget, const RenderViewport &viewport, const Region &deviceRegion) = 0;
-    virtual void renderItem(const RenderTarget &renderTarget, const RenderViewport &viewport, Item *item, int mask, const Region &deviceRegion, const WindowPaintData &data, const std::function<bool(Item *)> &filter, const std::function<bool(Item *)> &holeFilter) = 0;
+    [[nodiscard]] virtual bool renderItem(const RenderTarget &renderTarget, const RenderViewport &viewport, Item *item, int mask, const Region &deviceRegion, const WindowPaintData &data, const std::function<bool(Item *)> &filter, const std::function<bool(Item *)> &holeFilter) = 0;
 
     virtual void setLayerDebugging(bool enable);
 };

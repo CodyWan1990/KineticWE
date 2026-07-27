@@ -67,7 +67,7 @@ find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS
     Svg
 )
 
-find_package(Qt6GuiPrivate ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
+find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)
 
 find_package(Qt6Test ${QT_MIN_VERSION} CONFIG QUIET)
 set_package_properties(Qt6Test PROPERTIES
@@ -82,7 +82,7 @@ endif()
 if (BUILD_TESTING)
     find_package(KPipeWire)
 
-    find_package(Qt6WaylandClientPrivate ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
+    find_package(Qt6WaylandClientPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)
 endif()
 
 # required frameworks by Core
@@ -103,6 +103,22 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
     WidgetsAddons
     WindowSystem
 )
+
+# KineticWE downstream: kconfig_compiler from KConfig < 6.30 generates
+# uncompilable setters for enum-class kcfg entries (fixed upstream in KConfig
+# commit 41592ccfd9748be82c83ce98912037bffb73954e, first released in 6.30).
+# Distros shipping older KConfig (e.g. Fedora 44 with 6.28) cannot build this
+# project. Pass -DKWIN_KCONFIG_COMPILER=/path/to/fixed/kconfig_compiler_kf6 to
+# override the compiler used for kcfg code generation. Drop this once all
+# targeted distros ship KConfig >= 6.30.
+set(KWIN_KCONFIG_COMPILER "" CACHE FILEPATH "Override kconfig_compiler used for kcfg code generation")
+if(KWIN_KCONFIG_COMPILER AND TARGET KF6::kconfig_compiler)
+    foreach(_kcfg_prop IMPORTED_LOCATION IMPORTED_LOCATION_RELEASE IMPORTED_LOCATION_RELWITHDEBINFO IMPORTED_LOCATION_DEBUG)
+        set_target_properties(KF6::kconfig_compiler PROPERTIES ${_kcfg_prop} "${KWIN_KCONFIG_COMPILER}")
+    endforeach()
+    message(STATUS "Using overridden kconfig_compiler: ${KWIN_KCONFIG_COMPILER}")
+endif()
+
 # required frameworks by config modules
 if(KWIN_BUILD_KCMS)
     find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
@@ -207,6 +223,9 @@ set_package_properties(Wayland PROPERTIES
     TYPE REQUIRED
     PURPOSE "Required for building KWin with Wayland support"
 )
+if (Wayland_VERSION VERSION_GREATER_EQUAL "1.25.91")
+    add_compile_definitions(HAVE_ACK_GLOBAL_REMOVE=1)
+endif()
 
 find_package(WaylandProtocols 1.48)
 set_package_properties(WaylandProtocols PROPERTIES

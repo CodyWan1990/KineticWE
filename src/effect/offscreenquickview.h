@@ -32,9 +32,11 @@ namespace KWin
 class GLTexture;
 
 class OffscreenQuickView;
-class PointerAxisEvent;
-class PointerButtonEvent;
-class PointerMotionEvent;
+struct PointerAxisEvent;
+struct PointerButtonEvent;
+struct PointerMotionEvent;
+struct TabletToolTipEvent;
+struct TabletToolAxisEvent;
 class OutputFrame;
 
 /**

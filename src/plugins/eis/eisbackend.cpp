@@ -6,6 +6,7 @@
 
 #include "eisbackend.h"
 
+#include "config-eis.h"
 #include "eiscontext.h"
 #include "eisdevice.h"
 #include "libeis_logging.h"
@@ -116,6 +117,9 @@ QDBusUnixFileDescriptor EisBackend::connectToEIS(const int &capabilities, int &c
     QFlags<eis_device_capability> eisCapabilities;
     if (capabilities & keyboardPortal) {
         eisCapabilities |= EIS_DEVICE_CAP_KEYBOARD;
+#if EIS_HAVE_16
+        eisCapabilities |= EIS_DEVICE_CAP_TEXT;
+#endif
     }
     if (capabilities & pointerPortal) {
         eisCapabilities |= EIS_DEVICE_CAP_POINTER;
@@ -180,6 +184,7 @@ eis_device *EisBackend::createAbsoluteDevice(eis_seat *seat)
         eis_region_set_offset(region, outputGeometry.x(), outputGeometry.y());
         eis_region_set_size(region, outputGeometry.width(), outputGeometry.height());
         eis_region_set_physical_scale(region, output->scale());
+        eis_region_set_mapping_id(region, output->name().toUtf8());
         eis_region_add(region);
         eis_region_unref(region);
     };
@@ -199,6 +204,17 @@ eis_device *EisBackend::createKeyboard(eis_seat *seat)
     }
 
     return device;
+}
+eis_device *EisBackend::createText(eis_seat *seat)
+{
+#if EIS_HAVE_16
+    auto device = createDevice(seat, "eis text");
+    eis_device_configure_capability(device, EIS_DEVICE_CAP_TEXT);
+    return device;
+#else
+    Q_UNUSED(seat)
+    return nullptr;
+#endif
 }
 
 }

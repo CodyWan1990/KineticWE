@@ -1067,6 +1067,16 @@ void Workspace::initShortcuts()
             m_tilingController->swapRight();
         }
     }, true);
+    initShortcut("Tiling Consume Window", i18n("Tiling Consume Window Into Column"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->consume();
+        }
+    }, true);
+    initShortcut("Tiling Expel Window", i18n("Tiling Expel Window To Own Column"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->expel();
+        }
+    }, true);
     initShortcut("Tiling Toggle Floating", i18n("Tiling Toggle Floating"), Qt::META | Qt::Key_W, [this]() {
         if (m_tilingController) {
             m_tilingController->toggleFloating();
@@ -1135,6 +1145,9 @@ void Workspace::initShortcuts()
             m_tilingController->setLayout(LayoutEngine::LayoutKind::AutoGrid);
         }
     }, true);
+
+    initShortcut(QStringLiteral("MoveMouseToFocus"), i18nc("@action", "Center Pointer in Focused Window"), QKeySequence(Qt::META | Qt::Key_F5), &Workspace::slotMouseToFocus, false);
+    initShortcut(QStringLiteral("MoveMouseToCenter"), i18nc("@action", "Center Pointer in Screen"), QKeySequence(Qt::META | Qt::Key_F6), &Workspace::slotMouseToCenter, false);
 
 #if KWIN_BUILD_TABBOX
     m_tabbox->initShortcuts();
@@ -1825,6 +1838,18 @@ void Workspace::slotWindowResize()
     if (USABLE_ACTIVE_WINDOW) {
         performWindowOperation(m_activeWindow, Options::UnrestrictedResizeOp);
     }
+}
+
+void Workspace::slotMouseToFocus()
+{
+    if (USABLE_ACTIVE_WINDOW) {
+        input()->pointer()->warp(m_activeWindow->frameGeometry().center());
+    }
+}
+
+void Workspace::slotMouseToCenter()
+{
+    input()->pointer()->warp(m_activeOutput->geometryF().center());
 }
 
 #undef USABLE_ACTIVE_WINDOW

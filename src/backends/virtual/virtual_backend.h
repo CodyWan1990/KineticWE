@@ -17,7 +17,6 @@ namespace KWin
 
 class VirtualBackend;
 class VirtualOutput;
-class DrmDevice;
 class RenderDevice;
 
 class KWIN_EXPORT VirtualBackend : public OutputBackend
@@ -30,8 +29,7 @@ public:
 
     bool initialize() override;
 
-    std::unique_ptr<QPainterBackend> createQPainterBackend() override;
-    std::unique_ptr<EglBackend> createOpenGLBackend() override;
+    std::unique_ptr<EglBackend> createOpenGLBackend(RenderDevice *renderDevice) override;
 
     BackendOutput *createVirtualOutput(const QString &name, const QString &description, const QSize &size, qreal scale) override;
     void removeVirtualOutput(BackendOutput *output) override;
@@ -56,10 +54,6 @@ public:
 
     QList<CompositingType> supportedCompositors() const override;
 
-    RenderDevice *renderDevice() const;
-
-    DrmDevice *drmDevice() const;
-
 Q_SIGNALS:
     void virtualOutputsSet(bool countChanged);
 
@@ -68,7 +62,6 @@ private:
     void removeOutput(VirtualOutput *output);
 
     QList<VirtualOutput *> m_outputs;
-    RenderDevice *m_renderDevice = nullptr;
 };
 
 } // namespace KWin

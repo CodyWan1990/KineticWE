@@ -34,6 +34,13 @@ class QTimer;
 class KStartupInfoData;
 class KStartupInfoId;
 
+namespace KDecoration3
+{
+
+enum class Style;
+
+}
+
 namespace KWin
 {
 
@@ -148,7 +155,7 @@ public:
     RectF resizeWithChecks(const RectF &geometry, const QSizeF &size) const override;
     RectF resizeWithChecks(const RectF &geometry, qreal w, qreal h, xcb_gravity_t gravity) const;
     RectF resizeWithChecks(const RectF &geometry, const QSizeF &s, xcb_gravity_t gravity) const;
-    QSizeF constrainClientSize(const QSizeF &size, SizeMode mode = SizeModeAny) const override;
+    QSizeF constrainClientSize(const QSizeF &size) const override;
 
     bool providesContextHelp() const override;
 
@@ -164,7 +171,6 @@ public:
         return cap_suffix;
     }
 
-    QPointF gravityAdjustment(xcb_gravity_t gravity) const;
     const QPointF calculateGravitation(bool invert) const;
 
     void NETMoveResize(qreal x_root, qreal y_root, NET::Direction direction, xcb_button_t button);
@@ -298,6 +304,7 @@ private:
     Xcb::Property fetchSkipCloseAnimation() const;
     void readSkipCloseAnimation(Xcb::Property &prop);
     void getSkipCloseAnimation();
+    void detectShape();
 
     void configureRequest(int value_mask, qreal rx, qreal ry, qreal rw, qreal rh, int gravity, bool from_tool);
     void getSyncCounter();
@@ -331,8 +338,9 @@ private:
 
     DecorationMode preferredDecorationMode() const;
     void updateDecoration(bool check_workspace_pos, bool force = false);
-    void createDecoration();
+    void createDecoration(KDecoration3::Style style, bool force);
     void destroyDecoration();
+    bool wantsServerDropShadow() const;
 
     void checkOutput();
     void handleXwaylandScaleChanged();
@@ -372,7 +380,7 @@ private:
     xcb_window_t m_transientForId;
     xcb_window_t m_originalTransientForId;
     Xcb::MotifHints m_motif;
-    DecorationPolicy m_decorationPolicy = DecorationPolicy::PreferredByClient;
+    DecorationPolicy m_decorationPolicy = DecorationPolicy::ClientPreference;
     bool m_wantsNoDecoration = false;
     bool ignore_focus_stealing = false; ///< Don't apply focus stealing prevention to this client
     bool is_shape = false;

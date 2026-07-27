@@ -17,7 +17,6 @@
 #include "opengl/glutils.h"
 
 #include <QAction>
-#include <QPainter>
 
 namespace KWin
 {
@@ -34,17 +33,16 @@ static const QList<QColor> s_colors{
 
 ShowPaintEffect::ShowPaintEffect() = default;
 
-void ShowPaintEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
+bool ShowPaintEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
 {
-    effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
-    if (effects->isOpenGLCompositing()) {
-        paintGL(renderTarget, viewport, deviceRegion);
-    } else if (effects->compositingType() == QPainterCompositing) {
-        paintQPainter(viewport, deviceRegion);
+    if (!effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen)) {
+        return false;
     }
+    paintGL(renderTarget, viewport, deviceRegion);
     if (++m_colorIndex == s_colors.count()) {
         m_colorIndex = 0;
     }
+    return true;
 }
 
 void ShowPaintEffect::paintGL(const RenderTarget &renderTarget, const RenderViewport &viewport, const Region &deviceRegion)
@@ -55,7 +53,7 @@ void ShowPaintEffect::paintGL(const RenderTarget &renderTarget, const RenderView
     binder.shader()->setUniform(GLShader::Mat4Uniform::ModelViewProjectionMatrix, viewport.projectionMatrix());
     binder.shader()->setColorspaceUniforms(ColorDescription::sRGB, renderTarget.colorDescription(), RenderingIntent::Perceptual);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     QColor color = s_colors[m_colorIndex];
     color.setAlphaF(s_alpha);
     binder.shader()->setUniform(GLShader::ColorUniform::Color, color);
@@ -73,15 +71,6 @@ void ShowPaintEffect::paintGL(const RenderTarget &renderTarget, const RenderView
     vbo->setVertices(verts);
     vbo->render(GL_TRIANGLES);
     glDisable(GL_BLEND);
-}
-
-void ShowPaintEffect::paintQPainter(const RenderViewport &viewport, const Region &deviceRegion)
-{
-    QColor color = s_colors[m_colorIndex];
-    color.setAlphaF(s_alpha);
-    for (const Rect &deviceRect : deviceRegion.rects()) {
-        effects->scenePainter()->fillRect(viewport.mapFromDeviceCoordinates(deviceRect), color);
-    }
 }
 
 } // namespace KWin

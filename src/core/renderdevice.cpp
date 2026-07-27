@@ -9,9 +9,11 @@
 #include "renderdevice.h"
 
 #include "drmdevice.h"
+#include "gpumanager.h"
 #include "graphicsbuffer.h"
 #include "opengl/eglcontext.h"
 #include "opengl/egldisplay.h"
+#include "udmabufallocator.h"
 #include "utils/common.h"
 #include "utils/envvar.h"
 #include "vulkan/vulkan_device.h"
@@ -82,6 +84,19 @@ RenderDevice::RenderDevice(std::unique_ptr<DrmDevice> &&device, std::unique_ptr<
     : m_device(std::move(device))
     , m_display(std::move(display))
     , m_vulkanInstance(createVulkanInstance(m_vulkanContext))
+    , m_path(m_device->path())
+    , m_deviceId(m_device->deviceId())
+{
+    createVulkanDevice();
+    m_allImportableFormats = getImportFormats(m_display.get(), m_vulkanDevice.get());
+}
+
+RenderDevice::RenderDevice(std::unique_ptr<UDmabufAllocator> &&allocator, std::unique_ptr<EglDisplay> &&display, dev_t deviceId)
+    : m_udmabufAllocator(std::move(allocator))
+    , m_display(std::move(display))
+    , m_vulkanInstance(createVulkanInstance(m_vulkanContext))
+    , m_path(QStringLiteral("/dev/udmabuf"))
+    , m_deviceId(deviceId)
 {
     createVulkanDevice();
     m_allImportableFormats = getImportFormats(m_display.get(), m_vulkanDevice.get());
@@ -94,6 +109,21 @@ RenderDevice::~RenderDevice()
 DrmDevice *RenderDevice::drmDevice() const
 {
     return m_device.get();
+}
+
+QString RenderDevice::path() const
+{
+    return m_path;
+}
+
+dev_t RenderDevice::deviceId() const
+{
+    return m_deviceId;
+}
+
+GraphicsBufferAllocator *RenderDevice::allocator() const
+{
+    return m_udmabufAllocator ? m_udmabufAllocator.get() : m_device->allocator();
 }
 
 EglDisplay *RenderDevice::eglDisplay() const
@@ -133,7 +163,7 @@ static constexpr std::array s_requiredVulkanExtensions = {
     VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
 };
 
-static std::unique_ptr<VulkanDevice> openVulkanDevice(const vk::raii::Instance &instance, DrmDevice *drm)
+static std::unique_ptr<VulkanDevice> openVulkanDevice(const vk::raii::Instance &instance, DrmDevice *drm, const QString &path)
 {
     const auto [enumerateResult, physicalDevices] = instance.enumeratePhysicalDevices();
     if (enumerateResult != vk::Result::eSuccess) {
@@ -141,7 +171,7 @@ static std::unique_ptr<VulkanDevice> openVulkanDevice(const vk::raii::Instance &
         return nullptr;
     }
     // with faux devices like vkms and vgem, we can only do software rendering
-    const bool needsSoftwareDevice = drm->busType() == DRM_BUS_FAUX;
+    const bool needsSoftwareDevice = !drm || drm->busType() == DRM_BUS_FAUX;
     for (const vk::raii::PhysicalDevice &physicalDevice : physicalDevices) {
         const auto basicProperties = physicalDevice.getProperties2();
         const bool isSoftwareDevice = basicProperties.properties.deviceType == vk::PhysicalDeviceType::eCpu;
@@ -192,11 +222,11 @@ static std::unique_ptr<VulkanDevice> openVulkanDevice(const vk::raii::Instance &
             }
         }
         std::vector<vk::QueueFamilyProperties> queueProperties = physicalDevice.getQueueFamilyProperties();
-        const bool hasTransfer = std::ranges::any_of(queueProperties, [](const vk::QueueFamilyProperties &props) {
-            return bool(props.queueFlags & vk::QueueFlagBits::eTransfer);
+        const bool hasGraphics = std::ranges::any_of(queueProperties, [](const vk::QueueFamilyProperties &props) {
+            return bool(props.queueFlags & vk::QueueFlagBits::eGraphics);
         });
-        if (!hasTransfer) {
-            qCWarning(KWIN_VULKAN, "Physical device %s has no transfer queue", deviceName);
+        if (!hasGraphics) {
+            qCWarning(KWIN_VULKAN, "Physical device %s has no graphics queue", deviceName);
             continue;
         }
 
@@ -245,10 +275,10 @@ static std::unique_ptr<VulkanDevice> openVulkanDevice(const vk::raii::Instance &
         if (ret->supportedFormats().isEmpty()) {
             continue;
         }
-        qCDebug(KWIN_VULKAN, "Found Vulkan device %s for %s", deviceName, qPrintable(drm->path()));
+        qCDebug(KWIN_VULKAN, "Found Vulkan device %s for %s", deviceName, qPrintable(path));
         return ret;
     }
-    qCDebug(KWIN_VULKAN, "No Vulkan device found for %s", qPrintable(drm->path()));
+    qCDebug(KWIN_VULKAN, "No Vulkan device found for %s", qPrintable(path));
     return nullptr;
 }
 
@@ -268,7 +298,7 @@ void RenderDevice::createVulkanDevice()
     if (!*m_vulkanInstance) {
         return;
     }
-    m_vulkanDevice = openVulkanDevice(m_vulkanInstance, m_device.get());
+    m_vulkanDevice = openVulkanDevice(m_vulkanInstance, m_device.get(), m_path);
     if (m_vulkanDevice) {
         connect(m_vulkanDevice.get(), &VulkanDevice::deviceLost, this, &RenderDevice::handleVulkanDeviceLoss);
     }
@@ -291,6 +321,31 @@ std::unique_ptr<RenderDevice> RenderDevice::open(const QString &path, int authen
         return nullptr;
     }
     return std::make_unique<RenderDevice>(std::move(drmDevice), std::move(eglDisplay));
+}
+
+std::unique_ptr<RenderDevice> RenderDevice::createSoftwareDevice(dev_t deviceId)
+{
+    EGLint numDevices = 0;
+    if (eglQueryDevicesEXT(0, nullptr, &numDevices) != EGL_TRUE) {
+        return nullptr;
+    }
+    QList<EGLDeviceEXT> devices;
+    devices.resize(numDevices);
+    if (eglQueryDevicesEXT(numDevices, devices.data(), &numDevices) != EGL_TRUE) {
+        return nullptr;
+    }
+    devices.resize(numDevices);
+    const auto it = std::ranges::find_if(devices, [](EGLDeviceEXT device) {
+        return QByteArrayView(eglQueryDeviceStringEXT(device, EGL_EXTENSIONS)).contains("EGL_MESA_device_software");
+    });
+    if (it == devices.end()) {
+        return nullptr;
+    }
+    auto eglDisplay = EglDisplay::create(eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, *it, nullptr), nullptr);
+    if (!eglDisplay) {
+        return nullptr;
+    }
+    return std::make_unique<RenderDevice>(std::make_unique<UDmabufAllocator>(), std::move(eglDisplay), deviceId);
 }
 
 bool RenderDevice::isSoftwareDevice() const

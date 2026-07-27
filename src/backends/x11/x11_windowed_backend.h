@@ -100,7 +100,6 @@ public:
     xcb_screen_t *screen() const;
     int screenNumer() const;
     xcb_window_t rootWindow() const;
-    DrmDevice *drmDevice() const;
 
     bool hasXInput() const;
 
@@ -112,8 +111,7 @@ public:
     int driMinorVersion() const;
 
     bool initialize() override;
-    std::unique_ptr<EglBackend> createOpenGLBackend() override;
-    std::unique_ptr<QPainterBackend> createQPainterBackend() override;
+    std::unique_ptr<EglBackend> createOpenGLBackend(RenderDevice *device) override;
     std::unique_ptr<InputBackend> createInputBackend() override;
     QList<CompositingType> supportedCompositors() const override;
     QList<BackendOutput *> outputs() const override;

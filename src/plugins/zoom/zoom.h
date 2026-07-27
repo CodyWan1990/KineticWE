@@ -44,7 +44,7 @@ public:
 
     void reconfigure(ReconfigureFlags flags) override;
     void prePaintScreen(ScreenPrePaintData &data) override;
-    void paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
+    bool paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen) override;
     void postPaintScreen() override;
     bool isActive() const override;
     int requestedEffectChainPosition() const override;
@@ -66,8 +66,6 @@ private Q_SLOTS:
     void moveZoomRight();
     void moveZoomUp();
     void moveZoomDown();
-    void moveMouseToFocus();
-    void moveMouseToCenter();
     void timelineFrameChanged(int frame);
     void moveFocus(const QPointF &point);
     void slotMouseChanged(const QPointF &pos, const QPointF &old);

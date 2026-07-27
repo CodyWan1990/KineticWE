@@ -108,6 +108,11 @@ bool OutputLayer::needsRepaint() const
     return m_repaintScheduled || !m_repaints.isEmpty();
 }
 
+bool OutputLayer::earlyScanoutChecks()
+{
+    return false;
+}
+
 bool OutputLayer::importScanoutBuffer(GraphicsBuffer *buffer, const std::shared_ptr<OutputFrame> &frame)
 {
     return false;
@@ -172,6 +177,14 @@ Rect OutputLayer::targetRect() const
 void OutputLayer::setTargetRect(const Rect &rect)
 {
     m_targetRect = rect;
+}
+
+DrmDevice *OutputLayer::scanoutDevice() const
+{
+    if (!m_output) {
+        return nullptr;
+    }
+    return m_output->scanoutDevice();
 }
 
 FormatModifierMap OutputLayer::supportedAsyncDrmFormats() const

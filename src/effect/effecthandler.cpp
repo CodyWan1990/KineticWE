@@ -63,7 +63,6 @@
 #include <QFontMetrics>
 #include <QMatrix4x4>
 #include <QMouseEvent>
-#include <QPainter>
 #include <QPixmap>
 #include <QTimeLine>
 #include <QVariant>
@@ -349,13 +348,14 @@ void EffectsHandler::prePaintScreen(ScreenPrePaintData &data)
     // no special final code
 }
 
-void EffectsHandler::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
+bool EffectsHandler::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
 {
     if (m_currentPaintScreenIterator != m_activeEffects.constEnd()) {
-        (*m_currentPaintScreenIterator++)->paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
+        const bool ret = (*m_currentPaintScreenIterator++)->paintScreen(renderTarget, viewport, mask, deviceRegion, screen);
         --m_currentPaintScreenIterator;
+        return ret;
     } else {
-        m_scene->finalPaintScreen(renderTarget, viewport, mask, deviceRegion, screen);
+        return m_scene->finalPaintScreen(renderTarget, viewport, mask, deviceRegion, screen);
     }
 }
 
@@ -377,13 +377,14 @@ void EffectsHandler::prePaintWindow(RenderView *view, EffectWindow *w, WindowPre
     // no special final code
 }
 
-void EffectsHandler::paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data)
+bool EffectsHandler::paintWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data)
 {
     if (m_currentPaintWindowIterator != m_activeEffects.constEnd()) {
-        (*m_currentPaintWindowIterator++)->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+        const bool ret = (*m_currentPaintWindowIterator++)->paintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
         --m_currentPaintWindowIterator;
+        return ret;
     } else {
-        m_scene->finalPaintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+        return m_scene->finalPaintWindow(renderTarget, viewport, w, mask, deviceRegion, data);
     }
 }
 
@@ -397,13 +398,14 @@ Effect *EffectsHandler::provides(Effect::Feature ef)
     return nullptr;
 }
 
-void EffectsHandler::drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data)
+bool EffectsHandler::drawWindow(const RenderTarget &renderTarget, const RenderViewport &viewport, EffectWindow *w, int mask, const Region &deviceRegion, WindowPaintData &data)
 {
     if (m_currentDrawWindowIterator != m_activeEffects.constEnd()) {
-        (*m_currentDrawWindowIterator++)->drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+        const bool ret = (*m_currentDrawWindowIterator++)->drawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
         --m_currentDrawWindowIterator;
+        return ret;
     } else {
-        m_scene->finalDrawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
+        return m_scene->finalDrawWindow(renderTarget, viewport, w, mask, deviceRegion, data);
     }
 }
 
@@ -1139,11 +1141,6 @@ void EffectsHandler::registerRealtimeTouchBorder(ElectricBorder border, QAction 
 void EffectsHandler::unregisterTouchBorder(ElectricBorder border, QAction *action)
 {
     workspace()->screenEdges()->unreserveTouch(border, action);
-}
-
-QPainter *EffectsHandler::scenePainter()
-{
-    return m_scene->renderer()->painter();
 }
 
 void EffectsHandler::toggleEffect(const QString &name)

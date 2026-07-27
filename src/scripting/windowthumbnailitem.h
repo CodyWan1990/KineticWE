@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "core/rect.h"
+
 #include <QQuickItem>
 #include <QUuid>
 
@@ -110,10 +112,10 @@ private Q_SLOTS:
     void invalidateSceneGraph();
 
 private:
-    QRectF paintedRect() const;
+    RectF paintedRect() const;
     void updateImplicitSize();
     void updateSource();
-    void resetSource();
+    void releaseOpenGlResources();
 
     QUuid m_wId;
     QPointer<Window> m_client;

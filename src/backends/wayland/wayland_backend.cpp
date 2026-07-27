@@ -18,7 +18,6 @@
 #include "wayland_egl_backend.h"
 #include "wayland_logging.h"
 #include "wayland_output.h"
-#include "wayland_qpainter_backend.h"
 
 #include <KWayland/Client/keyboard.h>
 #include <KWayland/Client/pointer.h>
@@ -439,10 +438,7 @@ bool WaylandBackend::initialize()
     }
 
     if (WaylandClient::LinuxDmabufV1 *dmabuf = m_display->linuxDmabuf()) {
-        auto device = DrmDevice::open(dmabuf->mainDevice());
-        if (device) {
-            m_renderDevice = GpuManager::self()->compatibleRenderDevice(device.get());
-        }
+        m_renderDevice = GpuManager::self()->compatibleRenderDevice(dmabuf->mainDevice());
     }
 
     createOutputs();
@@ -505,14 +501,9 @@ std::unique_ptr<InputBackend> WaylandBackend::createInputBackend()
     return std::make_unique<WaylandInputBackend>(this);
 }
 
-std::unique_ptr<EglBackend> WaylandBackend::createOpenGLBackend()
+std::unique_ptr<EglBackend> WaylandBackend::createOpenGLBackend(RenderDevice *device)
 {
-    return std::make_unique<WaylandEglBackend>(this);
-}
-
-std::unique_ptr<QPainterBackend> WaylandBackend::createQPainterBackend()
-{
-    return std::make_unique<WaylandQPainterBackend>(this);
+    return std::make_unique<WaylandEglBackend>(this, device);
 }
 
 WaylandOutput *WaylandBackend::findOutput(KWayland::Client::Surface *nativeSurface) const
@@ -590,7 +581,6 @@ QList<CompositingType> WaylandBackend::supportedCompositors() const
     if (m_display->linuxDmabuf() && m_renderDevice) {
         ret.append(OpenGLCompositing);
     }
-    ret.append(QPainterCompositing);
     return ret;
 }
 

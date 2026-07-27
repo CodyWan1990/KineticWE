@@ -186,6 +186,35 @@ KCM.SimpleKCM {
                 }
             }
 
+            QQC2.ComboBox {
+                id: columnsMaxColumns
+                Kirigami.FormData.label: i18n("Maximum columns:")
+                model: [
+                    { text: "3", value: 3 },
+                    { text: "4", value: 4 },
+                    { text: "5", value: 5 }
+                ]
+                textRole: "text"
+                valueRole: "value"
+                currentIndex: {
+                    const idx = model.findIndex(item => item.value === kcm.settings.columnsMaxColumns);
+                    return idx >= 0 ? idx : 0;
+                }
+                onActivated: kcm.settings.columnsMaxColumns = currentValue
+                KCM.SettingStateBinding {
+                    configObject: kcm.settings
+                    settingName: "columnsMaxColumns"
+                }
+            }
+
+            QQC2.Label {
+                Kirigami.FormData.label: i18nc("@info", "Note:")
+                text: xi18nc("@info", "The maximum number of columns the <interface>Columns</interface> layout will create before stacking new windows vertically within a column.")
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                opacity: 0.7
+            }
+
             Item {
                 Kirigami.FormData.isSection: true
                 Kirigami.FormData.label: i18n("Resizing")

@@ -8,7 +8,7 @@
 */
 #pragma once
 
-#include "drm_abstract_output.h"
+#include "core/backendoutput.h"
 #include "drm_object.h"
 #include "drm_plane.h"
 #include "utils/filedescriptor.h"
@@ -32,7 +32,7 @@ class DumbSwapchain;
 class DrmLease;
 class OutputChangeSet;
 
-class KWIN_EXPORT DrmOutput : public DrmAbstractOutput
+class KWIN_EXPORT DrmOutput : public BackendOutput
 {
     Q_OBJECT
 

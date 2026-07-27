@@ -59,7 +59,6 @@ public:
     Version glslVersion() const;
     QByteArrayView vendor() const;
     QByteArrayView renderer() const;
-    bool isOpenGLES() const;
     bool hasOpenglExtension(QByteArrayView name) const;
     bool isSoftwareRenderer() const;
     bool supportsTimerQueries() const;
@@ -91,6 +90,11 @@ public:
      *          or the context was reset
      */
     bool isFailed() const;
+    /**
+     * Mark the context as needing to be re-created. This can be useful
+     * for non-reset errors that can't be recovered from.
+     */
+    void setFailed();
 
     GLenum checkGraphicsResetStatus();
     void glReadnPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLsizei bufSize, GLvoid *data);
@@ -129,7 +133,6 @@ private:
     const Version m_glslVersion;
     const QByteArrayView m_vendor;
     const QByteArrayView m_renderer;
-    const bool m_isOpenglES;
     const QSet<QByteArray> m_extensions;
     const bool m_supportsTimerQueries;
     const bool m_supportsTextureStorage;

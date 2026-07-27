@@ -7,6 +7,7 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 #include "drm_virtual_egl_layer.h"
+#include "core/renderdevice.h"
 #include "drm_egl_backend.h"
 #include "drm_gpu.h"
 #include "drm_logging.h"
@@ -15,6 +16,7 @@
 #include "opengl/eglswapchain.h"
 #include "opengl/glrendertimequery.h"
 #include "scene/surfaceitem_wayland.h"
+#include "utils/envvar.h"
 #include "wayland/surface.h"
 
 #include <drm_fourcc.h>
@@ -38,7 +40,8 @@ VirtualEglGbmLayer::~VirtualEglGbmLayer()
 
 std::optional<OutputLayerBeginFrameInfo> VirtualEglGbmLayer::doBeginFrame()
 {
-    // gbm surface
+    m_scanoutBuffer.reset();
+
     if (doesGbmSwapchainFit(m_gbmSwapchain.get())) {
         m_oldGbmSwapchain.reset();
         m_oldDamageJournal.clear();
@@ -104,14 +107,14 @@ std::shared_ptr<EglSwapchain> VirtualEglGbmLayer::createGbmSwapchain() const
             const auto format = it.key();
             const auto modifiers = it.value();
 
-            if (allowModifiers && !modifiers.empty()) {
-                if (auto swapchain = EglSwapchain::create(m_eglBackend->gpu()->drmDevice()->allocator(), m_eglBackend->openglContext(), size, format, modifiers, false)) {
-                    return swapchain;
-                }
-            }
-
-            static const ModifierList implicitModifier{DRM_FORMAT_MOD_INVALID};
-            if (auto swapchain = EglSwapchain::create(m_eglBackend->gpu()->drmDevice()->allocator(), m_eglBackend->openglContext(), size, format, implicitModifier, false)) {
+            GraphicsBufferOptions options{
+                .size = size,
+                .format = format,
+                .modifiers = allowModifiers ? modifiers : ModifierList{DRM_FORMAT_MOD_INVALID},
+                .software = false,
+                .scanout = false,
+            };
+            if (auto swapchain = EglSwapchain::create(m_eglBackend->renderDevice()->allocator(), m_eglBackend->openglContext(), options)) {
                 return swapchain;
             }
         }
@@ -125,17 +128,13 @@ bool VirtualEglGbmLayer::doesGbmSwapchainFit(EglSwapchain *swapchain) const
     return swapchain && swapchain->size() == m_output->modeSize();
 }
 
+bool VirtualEglGbmLayer::earlyScanoutChecks()
+{
+    return true;
+}
+
 bool VirtualEglGbmLayer::importScanoutBuffer(GraphicsBuffer *buffer, const std::shared_ptr<OutputFrame> &frame)
 {
-    static bool valid;
-    static const bool directScanoutDisabled = qEnvironmentVariableIntValue("KWIN_DRM_NO_DIRECT_SCANOUT", &valid) == 1 && valid;
-    if (directScanoutDisabled) {
-        return false;
-    }
-
-    if (sourceRect() != targetRect() || targetRect().topLeft() != QPointF(0, 0) || targetRect().size() != m_output->modeSize() || targetRect().size() != buffer->size() || offloadTransform() != OutputTransform::Kind::Normal) {
-        return false;
-    }
     m_scanoutBuffer = buffer;
     return true;
 }
@@ -147,11 +146,6 @@ void VirtualEglGbmLayer::releaseBuffers()
     m_oldGbmSwapchain.reset();
     m_currentSlot.reset();
     m_scanoutBuffer.reset();
-}
-
-DrmDevice *VirtualEglGbmLayer::scanoutDevice() const
-{
-    return m_eglBackend->drmDevice();
 }
 
 FormatModifierMap VirtualEglGbmLayer::supportedDrmFormats() const

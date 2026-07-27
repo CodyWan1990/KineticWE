@@ -23,17 +23,10 @@
 #include <KLocalizedString>
 #include <QAction>
 
-#include <QPainter>
-
 #include <cmath>
 
 namespace KWin
 {
-
-static consteval QPoint nullPoint()
-{
-    return QPoint(-1, -1);
-}
 
 MouseMarkEffect::MouseMarkEffect()
 {
@@ -185,20 +178,15 @@ void MouseMarkEffect::endDrawings()
     effects->addRepaintFull();
 }
 
-void MouseMarkEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
+bool MouseMarkEffect::paintScreen(const RenderTarget &renderTarget, const RenderViewport &viewport, int mask, const Region &deviceRegion, LogicalOutput *screen)
 {
-    effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen); // paint normal screen
-    if (marks.isEmpty() && drawings.isEmpty()) {
-        return;
+    if (!effects->paintScreen(renderTarget, viewport, mask, deviceRegion, screen)) { // paint normal screen
+        return false;
     }
-    if (const auto context = effects->openglContext()) {
-        if (!context->isOpenGLES()) {
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-            glEnable(GL_LINE_SMOOTH);
-            glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-        }
+    if (marks.isEmpty() && drawings.isEmpty()) {
+        return true;
+    }
+    if (effects->openglContext()) {
         glLineWidth(width);
         GLVertexBuffer *vbo = GLVertexBuffer::streamingBuffer();
         vbo->reset();
@@ -229,34 +217,8 @@ void MouseMarkEffect::paintScreen(const RenderTarget &renderTarget, const Render
             }
         }
         glLineWidth(1.0);
-        if (!context->isOpenGLES()) {
-            glDisable(GL_LINE_SMOOTH);
-            glDisable(GL_BLEND);
-        }
-    } else if (effects->compositingType() == QPainterCompositing) {
-        QPainter *painter = effects->scenePainter();
-        painter->save();
-        QPen pen(color);
-        pen.setWidth(width);
-        painter->setPen(pen);
-        for (const Mark &mark : std::as_const(marks)) {
-            drawMark(painter, mark);
-        }
-        for (const Mark &drawing : std::as_const(drawings)) {
-            drawMark(painter, drawing);
-        }
-        painter->restore();
     }
-}
-
-void MouseMarkEffect::drawMark(QPainter *painter, const Mark &mark)
-{
-    if (mark.count() <= 1) {
-        return;
-    }
-    for (int i = 0; i < mark.count() - 1; ++i) {
-        painter->drawLine(mark[i], mark[i + 1]);
-    }
+    return true;
 }
 
 bool MouseMarkEffect::touchDown(qint32 id, const QPointF &pos, std::chrono::microseconds time)
