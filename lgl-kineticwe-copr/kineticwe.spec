@@ -8,7 +8,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -265,6 +265,11 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Mon Jul 27 2026 LGL <lgl@localhost> - 6.7.80-11
+- Fix system surfaces (app launcher, logout menu, and other popup/overlay
+  windows) incorrectly receiving a tiling border in ActiveOnly border mode
+  when focused
+
 * Wed Jul 22 2026 LGL <lgl@localhost> - 6.7.80-10
 - Supervise noctalia in the session launcher: the shell is restarted after
   a crash or manual kill instead of tearing down the whole session, which
