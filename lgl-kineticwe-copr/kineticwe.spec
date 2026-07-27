@@ -1,5 +1,10 @@
 %global __cmake_in_source_build 0
 %{!?kglobalacceld_ref:%global kglobalacceld_ref master}
+# kconfig_compiler from KConfig < 6.30 generates uncompilable setters for
+# enum-class kcfg entries (fixed in KConfig commit 41592cc, first released
+# in 6.30). Build the fixed compiler from this pinned KConfig commit and use
+# it for kcfg code generation. Drop this once the buildroot ships KConfig >= 6.30.
+%{!?kconfig_compiler_ref:%global kconfig_compiler_ref 41592ccfd9748be82c83ce98912037bffb73954e}
 
 Name:           kineticwe
 Version:        6.7.80
@@ -13,6 +18,7 @@ Source1:        kglobalacceld-%{kglobalacceld_ref}.tar.gz
 Source2:        start-kineticwe
 Source3:        kineticwe.desktop
 Source4:        kglobalacceld-mask.conf
+Source5:        kconfig-%{kconfig_compiler_ref}.tar.gz
 
 BuildRequires:  cmake
 BuildRequires:  ninja-build
@@ -152,6 +158,10 @@ rm -rf ../kglobalacceld
 mkdir -p ../kglobalacceld
 tar xf %{SOURCE1} -C ../kglobalacceld --strip-components=1
 
+rm -rf ../kconfig
+mkdir -p ../kconfig
+tar xf %{SOURCE5} -C ../kconfig --strip-components=1
+
 %build
 KGA_SRC=%{_builddir}/kglobalacceld
 KGA_BUILD=%{_builddir}/kglobalacceld-build
@@ -168,12 +178,22 @@ cmake --build "${KGA_BUILD}"
 mkdir -p "${KGA_TMP_PREFIX}"
 DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 
+# Build the fixed kconfig_compiler (build-time tool only, nothing is installed)
+KCFG_BUILD=%{_builddir}/kconfig-build
+cmake -S %{_builddir}/kconfig \
+    -B "${KCFG_BUILD}" \
+    -GNinja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTING=OFF
+cmake --build "${KCFG_BUILD}" --target kconfig_compiler
+
 %cmake \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
     -DCMAKE_PREFIX_PATH="${KGA_TMP_PREFIX}%{_prefix}" \
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_TESTING=OFF \
+    -DKWIN_KCONFIG_COMPILER=${KCFG_BUILD}/bin/kconfig_compiler_kf6 \
     -DKWIN_BUILD_GLOBALSHORTCUTS=ON
 %cmake_build
 

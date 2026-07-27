@@ -21,16 +21,24 @@ KGLOBALACCELD_REF ?= master
 KGLOBALACCELD_SRC := kglobalacceld-$(KGLOBALACCELD_REF).tar.gz
 KGLOBALACCELD_URL := https://invent.kde.org/plasma/kglobalacceld/-/archive/$(KGLOBALACCELD_REF)/$(KGLOBALACCELD_SRC)
 
+# Pinned KConfig commit containing the kconfig_compiler enum-class setter fix
+# (KConfig 41592cc, first released in 6.30). Build-time only; drop once the
+# buildroot ships KConfig >= 6.30.
+KCONFIG_COMPILER_REF ?= 41592ccfd9748be82c83ce98912037bffb73954e
+KCONFIG_SRC := kconfig-$(KCONFIG_COMPILER_REF).tar.gz
+KCONFIG_URL := https://invent.kde.org/frameworks/kconfig/-/archive/$(KCONFIG_COMPILER_REF)/$(KCONFIG_SRC)
+
 SRPM := $(OUTDIR)/$(PACKAGE)-$(VERSION)-1.src.rpm
 
 srpm: $(SRPM)
 
-$(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/start-kineticwe $(OUTDIR)/kineticwe.desktop $(OUTDIR)/kglobalacceld-mask.conf
+$(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/$(KCONFIG_SRC) $(OUTDIR)/start-kineticwe $(OUTDIR)/kineticwe.desktop $(OUTDIR)/kglobalacceld-mask.conf
 	rpmbuild -bs \
 		--define "_sourcedir $(OUTDIR)" \
 		--define "_srcrpmdir $(OUTDIR)" \
 		--define "_specdir $(SELF_DIR)" \
 		--define "kglobalacceld_ref $(KGLOBALACCELD_REF)" \
+		--define "kconfig_compiler_ref $(KCONFIG_COMPILER_REF)" \
 		$(SPECFILE)
 
 $(OUTDIR)/$(KINETICWE_SRC):
@@ -52,6 +60,11 @@ $(OUTDIR)/$(KGLOBALACCELD_SRC):
 	mkdir -p $(OUTDIR)
 	curl -fsSL -o $(OUTDIR)/$(KGLOBALACCELD_SRC) $(KGLOBALACCELD_URL) || \
 		wget -q -O $(OUTDIR)/$(KGLOBALACCELD_SRC) $(KGLOBALACCELD_URL)
+
+$(OUTDIR)/$(KCONFIG_SRC):
+	mkdir -p $(OUTDIR)
+	curl -fsSL -o $(OUTDIR)/$(KCONFIG_SRC) $(KCONFIG_URL) || \
+		wget -q -O $(OUTDIR)/$(KCONFIG_SRC) $(KCONFIG_URL)
 
 $(OUTDIR)/start-kineticwe: $(SELF_DIR)SOURCES/start-kineticwe
 	mkdir -p $(OUTDIR)

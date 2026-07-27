@@ -251,6 +251,26 @@ quick_build() {
             rm -rf '\$KGA_BUILD'
         fi
 
+        # kconfig_compiler from KConfig < 6.30 generates uncompilable setters
+        # for enum-class kcfg entries (fixed in KConfig commit 41592cc, first
+        # released in 6.30). Fedora 44 ships 6.28, so build a fixed compiler
+        # if the system one is affected. Drop this once the container's KConfig
+        # is >= 6.30.
+        KCFG_COMPILER_OVERRIDE=""
+        KCFG_TEST=\$(mktemp -d /tmp/kcfg-test.XXXXXX)
+        /usr/libexec/kf6/kconfig_compiler_kf6 src/rulesettings.kcfg src/rulesettings.kcfgc -d "\$KCFG_TEST" 2>/dev/null || true
+        if ! grep -q 'mDecorationpolicy = int(v)' "\$KCFG_TEST/rulesettings.h" 2>/dev/null; then
+            echo '[STEP] System kconfig_compiler is broken (KConfig <6.30); building fixed one...'
+            KCFG_FIX=\$(mktemp -d /tmp/kconfig-fix.XXXXXX)
+            git clone --depth 1 https://invent.kde.org/frameworks/kconfig "\$KCFG_FIX/src"
+            cmake -B "\$KCFG_FIX/build" -S "\$KCFG_FIX/src" \\
+                -DCMAKE_BUILD_TYPE=Release \\
+                -DBUILD_TESTING=OFF
+            cmake --build "\$KCFG_FIX/build" --target kconfig_compiler --parallel \$(nproc)
+            KCFG_COMPILER_OVERRIDE="\$KCFG_FIX/build/bin/kconfig_compiler_kf6"
+        fi
+        rm -rf "\$KCFG_TEST"
+
         echo '[STEP] Configuring KineticWE...'
         rm -rf '$build_dir'
         cmake -B '$build_dir' -S . \\
@@ -258,6 +278,7 @@ quick_build() {
             -DCMAKE_PREFIX_PATH='${TEST_PREFIX}' \\
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
             -DBUILD_TESTING=OFF \\
+            -DKWIN_KCONFIG_COMPILER=\$KCFG_COMPILER_OVERRIDE \\
             -DKWIN_BUILD_GLOBALSHORTCUTS=ON
 
         echo '[STEP] Building KineticWE...'

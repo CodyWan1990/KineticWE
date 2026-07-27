@@ -148,13 +148,22 @@ provides=('kglobalacceld' 'kglobalacceld-devel' 'kwin' 'kwin-common' 'kwin-libs'
 conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel')
 
 
+# Pinned KConfig commit containing the kconfig_compiler enum-class setter fix
+# (KConfig 41592cc, first released in KConfig 6.30). kconfig_compiler from
+# KConfig < 6.30 generates uncompilable setters for enum-class kcfg entries.
+# Build-time tool only; drop this once Arch ships kconfig >= 6.30.
+_kconfig_ref=41592ccfd9748be82c83ce98912037bffb73954e
+
 # Source: kwin-we from GitLab + kglobalacceld from KDE invent
 _sourcebase="$pkgname-$pkgver"
 source=(
     "$url/-/archive/v$pkgver/$pkgname-v$pkgver.tar.gz"
     "kglobalacceld::git+https://invent.kde.org/plasma/kglobalacceld.git"
+    "kconfig-$_kconfig_ref.tar.gz::https://invent.kde.org/frameworks/kconfig/-/archive/$_kconfig_ref/kconfig-$_kconfig_ref.tar.gz"
 )
-sha256sums=('SKIP' 'SKIP')
+sha256sums=('SKIP'
+            'SKIP'
+            '7c6b355a97f44fe694011d40535d8f989298e8b36fd38640093d8576cf1a00b2')
 
 prepare() {
     cd "$srcdir"
@@ -198,7 +207,21 @@ build() {
     mkdir -p "$srcdir/kga-staging"
     DESTDIR="$srcdir/kga-staging" cmake --install kglobalacceld/build
 
-    # --- Phase 2: Build kwin-we ---
+    # --- Phase 2: Build the fixed kconfig_compiler (build-time tool only) ---
+    echo "==> Building fixed kconfig_compiler (KConfig <6.30 workaround)..."
+
+    mkdir -p "kconfig-$_kconfig_ref/build"
+    pushd "kconfig-$_kconfig_ref/build"
+
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTING=OFF \
+        -Wno-dev
+
+    cmake --build . --target kconfig_compiler --parallel "$(nproc)"
+    popd
+
+    # --- Phase 3: Build kwin-we ---
     echo "==> Building kwin-we..."
 
     mkdir -p "$_sourcebase/build"
@@ -209,6 +232,7 @@ build() {
         -DCMAKE_PREFIX_PATH="$srcdir/kga-staging/usr" \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_TESTING=OFF \
+        -DKWIN_KCONFIG_COMPILER="$srcdir/kconfig-$_kconfig_ref/build/bin/kconfig_compiler_kf6" \
         -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
         -Wno-dev
 

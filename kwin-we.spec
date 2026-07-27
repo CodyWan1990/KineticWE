@@ -28,6 +28,11 @@ License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause 
 URL:            https://gitlab.com/theblackdon/kineticwe
 Source0:        %{url}/archive/v%{version}.tar.gz
 Source1:        https://invent.kde.org/plasma/kglobalacceld/-/archive/master/kglobalacceld-master.tar.gz
+# kconfig_compiler from KConfig < 6.30 generates uncompilable setters for
+# enum-class kcfg entries (fixed in KConfig commit 41592cc, first released in
+# 6.30). Build the fixed compiler from this pinned commit (build-time only).
+# Drop this once the buildroot ships KConfig >= 6.30.
+Source2:        https://invent.kde.org/frameworks/kconfig/-/archive/41592ccfd9748be82c83ce98912037bffb73954e/kconfig-41592ccfd9748be82c83ce98912037bffb73954e.tar.gz
 
 # =============================================================================
 # Build Dependencies (from install-fedora.sh, devel packages only)
@@ -191,6 +196,12 @@ cd ../kglobalacceld
 tar xf %{SOURCE1} --strip-components=1
 cd -
 
+# Extract kconfig source alongside (for the fixed kconfig_compiler)
+mkdir -p ../kconfig
+cd ../kconfig
+tar xf %{SOURCE2} --strip-components=1
+cd -
+
 # =============================================================================
 # Build
 # =============================================================================
@@ -210,7 +221,16 @@ pushd ../kglobalacceld/build
 %cmake_build
 popd
 
-# --- Phase 2: Build kwin-we against the kglobalacceld we just built ---
+# --- Phase 2: Build the fixed kconfig_compiler (build-time tool only) ---
+mkdir -p ../kconfig/build
+pushd ../kconfig/build
+%cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTING=OFF
+%cmake_build --target kconfig_compiler
+popd
+
+# --- Phase 3: Build kwin-we against the kglobalacceld we just built ---
 # We install kglobalacceld into a temp dir so kwin-we's CMake can find it
 mkdir -p ${KGA_TMP_PREFIX}
 DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kglobalacceld/build --prefix %{_prefix}
@@ -221,6 +241,7 @@ DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kglobalacceld/build --prefix %{_pre
     -DCMAKE_SKIP_RPATH=ON \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_TESTING=OFF \
+    -DKWIN_KCONFIG_COMPILER=%{_builddir}/kconfig/build/bin/kconfig_compiler_kf6 \
     -DKWIN_BUILD_GLOBALSHORTCUTS=ON
 %cmake_build
 
