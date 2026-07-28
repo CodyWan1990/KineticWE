@@ -452,7 +452,15 @@ void TilingController::updateBorders()
         const ColorSource source = (window == activeWindow) ? m_colorSourceActive : m_colorSourceInactive;
         const QColor borderColor = resolveColor(source, sourceColor);
 
-        if ((isTiled || allWindows || (activeOnly && window == activeWindow)) && !isMaximizedOrFullscreen) {
+        if (isMaximizedOrFullscreen) {
+            // Square corners for fullscreen/maximized windows: reset any
+            // radius applied while tiled/floating so it does not linger
+            // (rounded corners clash with the edge-to-edge appearance and
+            // leak onto adjacent outputs).
+            if (window->borderRadius() != BorderRadius()) {
+                window->setBorderRadius(BorderRadius());
+            }
+        } else if (isTiled || allWindows || (activeOnly && window == activeWindow)) {
             applyCornerRadius(window);
         }
 
@@ -667,10 +675,25 @@ void TilingController::onWindowAdded(Window *window)
     connect(window, &Window::maximizedChanged, this,
             [this, window]() { onWindowMaximizedChanged(window); });
 
+    // Fullscreen, unlike maximize, keeps the window attached to its tile
+    // (core KWin does not call exitQuickTileMode() on the fullscreen path,
+    // so the tile association restores the geometry on exit). We must NOT
+    // touch layout membership here — doing so mid-transition makes the
+    // engine reflow and fight the fullscreen moveResize (flicker, artifacts,
+    // window never settling into fullscreen). All that is needed is a
+    // border/corner-radius re-evaluation: updateBorders() hides the border
+    // and squares the corners while fullscreen, and restores them on exit.
+    connect(window, &Window::fullScreenChanged, this,
+            [this, window]() { onWindowFullScreenChanged(window); });
+
     // When the decoration is (re-)applied, it overwrites the window's
-    // borderRadius. Re-apply our corner radius if the window is tiled.
+    // borderRadius. Re-apply our corner radius if the window is tiled —
+    // but not while maximized/fullscreen, where corners stay square
+    // (configureDecoration() fires during the fullscreen transition,
+    // before fullScreenChanged is emitted).
     connect(window, &Window::decorationChanged, this, [this, window]() {
-        if (window->tilingState().mode == TilingState::Mode::Tiled) {
+        if (window->tilingState().mode == TilingState::Mode::Tiled
+            && !window->isFullScreen() && window->maximizeMode() != MaximizeFull) {
             applyCornerRadius(window);
         }
     });
@@ -771,6 +794,21 @@ void TilingController::onWindowMaximizedChanged(Window *window)
             : window->desktops().constFirst();
         addWindowToLayout(window, output, desktop);
     }
+    updateBorders();
+}
+
+void TilingController::onWindowFullScreenChanged(Window *window)
+{
+    if (!m_enabled || !window) {
+        return;
+    }
+
+    // Fullscreen keeps the window attached to its tile, so layout membership
+    // is deliberately left untouched — only the visuals change. updateBorders()
+    // hides the border and resets the corner radius while fullscreen, and
+    // restores them on exit. It also re-evaluates every other window, since
+    // a fullscreen window may cover neighbors whose borders would otherwise
+    // leak onto adjacent outputs.
     updateBorders();
 }
 

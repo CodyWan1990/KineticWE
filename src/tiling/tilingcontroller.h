@@ -166,6 +166,7 @@ private Q_SLOTS:
     void onWindowDesktopsChanged(Window *window);
     void onWindowMinimizedChanged(Window *window);
     void onWindowMaximizedChanged(Window *window);
+    void onWindowFullScreenChanged(Window *window);
     // Called when the noctalia colors file (or kdeglobals) reports a
     // change. Debounces the actual re-read so we only re-resolve colors
     // once per batch of file events.
