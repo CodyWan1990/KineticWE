@@ -402,6 +402,11 @@ void TilingController::updateBorders()
         }
 
         const bool isTiled = (window->tilingState().mode == TilingState::Mode::Tiled);
+        // Fullscreen and maximized windows should not show borders or rounded
+        // corners — they take the full usable area and a border would look
+        // redundant (like a frame around an edge-to-edge canvas).
+        const bool isMaximizedOrFullscreen = window->isFullScreen()
+            || window->maximizeMode() == MaximizeFull;
         // AllWindows should still skip non-application surfaces: the
         // desktop background, panels/docks, notifications, OSDs, screen
         // locker, and the compositor's own outline. Drawing a border on
@@ -432,9 +437,11 @@ void TilingController::updateBorders()
         bool shouldShow = false;
         if (m_borderMode != BorderMode::None) {
             if (allWindows || isTiled || (activeOnly && window == activeWindow)) {
-                if (isSystemSurface) {
+                if (isSystemSurface || isMaximizedOrFullscreen) {
                     // Skip system surfaces (desktop, panels, notifications,
                     // popups, lock screen, etc.) in all border modes.
+                    // Also skip fullscreen and maximized windows — they fill
+                    // the usable area and a border would be redundant.
                 } else if (!activeOnly || window == activeWindow) {
                     shouldShow = true;
                 }
@@ -445,7 +452,7 @@ void TilingController::updateBorders()
         const ColorSource source = (window == activeWindow) ? m_colorSourceActive : m_colorSourceInactive;
         const QColor borderColor = resolveColor(source, sourceColor);
 
-        if (isTiled || allWindows || (activeOnly && window == activeWindow)) {
+        if ((isTiled || allWindows || (activeOnly && window == activeWindow)) && !isMaximizedOrFullscreen) {
             applyCornerRadius(window);
         }
 
