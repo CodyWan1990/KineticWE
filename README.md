@@ -22,7 +22,7 @@ If you want to support this project, you can donate here: [Ko-fi — theblackdon
 >
 > Please do **note** use KineticWE as your daily driver on a production system. Feedback and bug reports are welcome, but you are running pre-release software.
 
-> ## 🤖 LLM-Generated Code Disclaimer
+> # LLM-Generated Code Disclaimer
 >
 > Portions of this project — including (but not limited to) installer scripts, build glue, configuration files, documentation, and some C++/QML/JS source files — were **authored with the assistance of LLM tools** (large language models coding assistants).
 >
