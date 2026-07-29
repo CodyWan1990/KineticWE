@@ -46,11 +46,8 @@ The repository already contains:
 - `kwin-we.spec`, which builds KineticWE and also builds kglobalacceld first.
 - `copr/Makefile`, which creates an SRPM for COPR SCM builds.
 - `scripts/start-kineticwe.sh` and `scripts/kineticwe.desktop.in`, which are
-  used by the manual installer but are not currently installed by CMake or listed
-  in the spec.
-- `install-fedora.sh`, which is useful as dependency reference but includes
-  build dependencies and Noctalia behavior that must not be copied into runtime
-  RPM dependencies.
+  installed by the RPM/AUR packages as the session launcher and Wayland
+  session entry.
 
 ## Required Packaging Work
 

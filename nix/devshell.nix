@@ -45,11 +45,6 @@ stdenv.mkDerivation {
     echo "  just build release"
     echo "  just install release"
     echo
-    echo "Or use the top-level install scripts:"
-    echo "  ../install-fedora.sh"
-    echo "  ../install-arch.sh"
-    echo "  ../install-debian.sh"
-    echo
     echo "Or build via the Nix flake:"
     echo "  nix build .#kwin-we"
     echo "  nix build .#session"

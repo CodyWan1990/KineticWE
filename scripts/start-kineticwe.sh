@@ -13,8 +13,8 @@
 set -e
 
 # Installation prefix for KineticWE binaries and libraries.
-# When installed via install-fedora.sh this is set automatically.
-# When run manually it defaults to $HOME/.local.
+# Set at package/install time; when run from a raw source checkout
+# it defaults to $HOME/.local.
 _INSTALL_PREFIX_="@INSTALL_PREFIX@"
 if [[ "${_INSTALL_PREFIX_%%@*}" == "" ]]; then
     # @INSTALL_PREFIX@ was NOT replaced by sed (raw template) —

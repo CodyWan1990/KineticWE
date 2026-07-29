@@ -53,8 +53,12 @@ After installation, select **KineticWE** from your display manager's session men
 or run `start-kineticwe` from a TTY.
 
 The `kineticwe` package provides and obsoletes Fedora's stock `kwin`, `kwin-common`,
-and `kwin-libs` packages — it replaces the stock compositor rather than installing
-alongside it.
+`kwin-libs`, `kglobalacceld`, and `kdecoration` packages — it replaces the stock
+compositor rather than installing alongside it.
+
+> **Note:** The first time you install, reboot before logging in to a KineticWE session. On subsequent logins Noctalia will load automatically.
+>
+> **Tip:** Press **Meta+Space** to open the app drawer.
 
 ### Bazzite / Universal Blue (rpm-ostree)
 
@@ -64,103 +68,16 @@ alongside it.
 
 On rpm-ostree based systems (Bazzite, Bluefin, Aurora, Silverblue, Kinoite),
 `kineticwe` replaces the system's stock `kwin`, `kwin-common`, `kwin-libs`,
-and `kglobalacceld`. These base packages must be removed from the immutable
-image first via `override remove`:
+`kglobalacceld`, and `kdecoration`. These base packages must be removed from
+the immutable image first via `override remove`:
 
 ```bash
 sudo dnf copr enable lionheartp/Hyprland
 sudo dnf copr enable theblackdon/kineticwe
-sudo rpm-ostree override remove kwin kwin-common kwin-libs kglobalacceld \
+sudo rpm-ostree override remove kwin kwin-common kwin-libs kglobalacceld kdecoration \
     --install kineticwe --install noctalia-git
 systemctl reboot
 ```
-
-A convenience script is also provided that handles this automatically,
-including checking the Qt version:
-
-```bash
-git clone https://gitlab.com/theblackdon/kineticwe.git
-cd kineticwe
-./install-bazzite.sh
-systemctl reboot
-```
-
-### Install via Scripts (Alternative / Other Distros)
-
-Convenience scripts are provided that install all dependencies, build kglobalacceld
-(the global shortcuts daemon), build kwin-we, install the
-[noctalia-shell](https://github.com/noctalia-dev/noctalia), and set up session
-files so you can launch KineticWE from a TTY.
-
-
-> **For Fedora users:** Pre-built packages are available via COPR — see [Fedora / RHEL](#copr-fedora--recommended---use-fedora-linux-for-the-best-and-tested-experience) above.
-> **For Arch users:** The preferred way to install on Arch-based distros is the [AUR](https://aur.archlinux.org/packages/kineticwe) package (`yay -S kineticwe`) — see [Arch Linux](#arch-linux) below.
-
-> **Why kglobalacceld is built from source:** kwin-we calls `keyEvent()`, `pointerPressed()`, `axisTriggered()` and `resetModifierOnlyState()` directly on the `KGlobalAccelD` object — an API introduced in kglobalacceld git master (post-6.7.0). The system package on most distros is still 6.7.0 or older and routes those calls through a separate `KGlobalAccelInterface` class, so kwin-we cannot compile against it. The install scripts clone kglobalacceld from `invent.kde.org/plasma/kglobalacceld.git` and build it into `$INSTALL_PREFIX` so kwin-we's CMake finds the newer version first. This requires **Qt ≥ 6.10** and **KF6 ≥ 6.26** (satisfied on Fedora 44+, Arch rolling, and Debian Trixie/Ubuntu 24.04+ with backports).
-
-Convenience scripts are provided that install all dependencies, build kglobalacceld
-(the global shortcuts daemon), build kwin-we, install the
-[noctalia-shell](https://github.com/noctalia-dev/noctalia), and set up session
-files so you can launch KineticWE from a TTY.
-
-** Again! Please Note** The COPR build on FEDORA is the best experience that is well tested as these scripts SHOULD work but may have issues. 
-
-**Quick start (copy & paste):**
-
-```bash
-git clone https://gitlab.com/theblackdon/kineticwe.git
-cd kineticwe
-./install-fedora.sh   # or install-arch.sh, install-debian.sh
-```
-
-Pick the script that matches your distribution:
-
-| Distro | Method |
-|--------|--------|
-| Fedora / RHEL | COPR (recommended) — see below |
-| Fedora / RHEL | `./install-fedora.sh` (manual build) |
-| **Bazzite / uBlue (rpm-ostree)** | `./install-bazzite.sh` — see below |
-| Arch Linux / Arch-derivatives | [AUR](https://aur.archlinux.org/packages/kineticwe) (preferred) — `yay -S kineticwe` |
-| Arch Linux / Arch-derivatives | `./install-arch.sh` (manual build) |
-| Debian / Ubuntu | `./install-debian.sh` |
-| NixOS / Nix (flake) | — see below |
-| Gentoo | `./install-gentoo.sh` — uses the community Portage overlay |
-
-In all cases, by default binaries are installed to `$HOME/.local`. You can change this with the `INSTALL_PREFIX` environment variable:
-
-```bash
-INSTALL_PREFIX=/opt/kineticwe ./install-<distro>.sh
-```
-
-After installation:
-
-- Start KineticWE from a TTY with:
-  ```bash
-  $HOME/.local/bin/start-kineticwe
-  ```
-- Or select **KineticWE** from the session menu in SDDM or another Wayland-compatible greeter. (This does not work well with PlasmaLogin, please use SDDM, LightDM, or another wayland greeter)
-- If `$HOME/.local/bin` is not in your `PATH`, add the following lines to your shell profile (`~/.bashrc` or `~/.zshrc`):
-  ```bash
-  export PATH="$HOME/.local/bin:$PATH"
-  # Fedora / Arch (64-bit lib dir):
-  export LD_LIBRARY_PATH="$HOME/.local/lib64:$LD_LIBRARY_PATH"
-  # Debian / Ubuntu (multiarch lib dir):
-  # export LD_LIBRARY_PATH="$HOME/.local/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
-  ```
-
-### Fedora / RHEL (COPR — Recommended)
-
-KineticWE is available via COPR for Fedora. Enable both the Noctalia and KineticWE repositories, then install:
-
-```bash
-sudo dnf copr enable lionheartp/Hyprland
-sudo dnf copr enable theblackdon/kineticwe
-sudo dnf install kineticwe noctalia-git
-```
-
-> **Note:** The first time you install, reboot before logging in to a KineticWE session. On subsequent logins Noctalia will load automatically.
->
-> **Tip:** Press **Meta+Space** to open the app drawer.
 
 ### Arch Linux
 
@@ -169,22 +86,6 @@ The preferred way to install KineticWE on Arch-based distros (Arch, CachyOS, End
 ```bash
 yay -S kineticwe
 ```
-
-Alternatively, build manually with the install script:
-
-```bash
-./install-arch.sh
-```
-
-> **Note:** The script uses `sudo` to install system packages via `pacman`. Arch unifies runtime and headers into a single package (no `-devel` split), so the package list is slightly different from the Fedora script — see the comments inside the script for details.
-
-### Debian / Ubuntu
-
-```bash
-./install-debian.sh
-```
-
-> **Note:** Should work on **Debian 13 (Trixie)** and **Ubuntu 24.04+** with Plasma 6 packages available. On older releases you may need to enable backports (Debian) or the Kubuntu backports PPA (Ubuntu) so that KF6, Qt6 and Plasma 6 are available. The `sdbus-cpp-dev` package is not in the official Debian/Ubuntu repos; it is only needed for a small portion of the codebase and the build will succeed without it.
 
 ### NixOS / Nix
 
@@ -222,45 +123,6 @@ A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of k
 ```
 
 > **Note:** On the first build, Nix may error with a hash mismatch for `kglobalacceld-git`. Copy the expected hash from the error into `nix/kglobalacceld-git.nix` and rebuild. (This should be resolved)
-
-### Gentoo
-
-Gentoo installation is provided through a community-maintained Portage overlay:
-
-```text
-https://github.com/TwelfthFace/kineticwe-overlay
-```
-
-The recommended install method is to use the Gentoo installer script:
-
-```bash
-./install-gentoo.sh
-```
-
-The script will:
-
-* install `dev-vcs/git` if needed
-* install `app-eselect/eselect-repository` if needed
-* add the `kineticwe-overlay` Portage repository
-* sync the overlay
-* install `kde-plasma/kineticwe`
-
-Manual installation:
-
-```bash
-sudo emerge --ask app-eselect/eselect-repository dev-vcs/git
-sudo eselect repository add kineticwe-overlay git https://github.com/TwelfthFace/kineticwe-overlay.git
-sudo emaint sync -r kineticwe-overlay
-sudo emerge --ask kde-plasma/kineticwe
-```
-
-> **Note:** The Gentoo package is currently provided as a `9999` live ebuild.
->
-> This means Portage builds KineticWE directly from the current upstream Git repository. Installing or updating the package may pull the latest development code, which can include new features, fixes, regressions, or breaking changes.
->
-> In other words, the Gentoo package should currently be considered bleeding edge.
->
-> Once KineticWE has stable tagged releases, the overlay will provide versioned ebuilds alongside the live `9999` ebuild.
 
 ---
 

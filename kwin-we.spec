@@ -42,7 +42,7 @@ Source2:        https://invent.kde.org/frameworks/kconfig/-/archive/41592ccfd974
 Source3:        https://invent.kde.org/plasma/kdecoration/-/archive/d13049250c0ea1afc279aa8dc99243565c0d83e8/kdecoration-d13049250c0ea1afc279aa8dc99243565c0d83e8.tar.gz
 
 # =============================================================================
-# Build Dependencies (from install-fedora.sh, devel packages only)
+# Build Dependencies (devel packages only)
 # =============================================================================
 
 BuildRequires:  cmake ninja-build gcc-c++ git
