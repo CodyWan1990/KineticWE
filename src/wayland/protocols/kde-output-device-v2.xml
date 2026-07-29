@@ -629,7 +629,7 @@
       <arg name="flags" type="uint" enum="flags"/>
     </event>
 
-    <event name="cvt" since="23">
+    <event name="cvt" since="24">
       <description summary="CVT modeline">
         This event describes the mode timings via a CVT modeline. It is only
         sent when the mode is a CVT mode.
