@@ -8,7 +8,7 @@ keep="${KEEP_BUILDS:-4}"
 
 cd "$repo_dir"
 shopt -s nullglob
-mapfile -t pkgs < <(ls -1t kineticwe-*.pkg.tar.zst)
+mapfile -t pkgs < <(ls -1t kineticwe-[0-9]*.pkg.tar.zst)
 
 if ((${#pkgs[@]} == 0)); then
     echo "repo.sh: no kineticwe packages found in $repo_dir" >&2
@@ -22,7 +22,7 @@ if ((${#pkgs[@]} > keep)); then
 fi
 
 rm -f kineticwe.db kineticwe.db.tar.gz kineticwe.files kineticwe.files.tar.gz
-repo-add kineticwe.db.tar.gz kineticwe-*.pkg.tar.zst
+repo-add kineticwe.db.tar.gz kineticwe-[0-9]*.pkg.tar.zst
 
 echo 'Repo database rebuilt with:'
 tar -tf kineticwe.db.tar.gz | grep '/desc$'

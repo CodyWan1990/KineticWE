@@ -13,7 +13,7 @@ pacman -S --noconfirm --needed libarchive curl >/dev/null
 
 echo ">> Fetching repo database from $server"
 curl -sfL "$server/kineticwe.db.tar.gz" -o db.tar.gz
-entry="$(bsdtar -tf db.tar.gz | grep '/desc$' | sort -V | tail -1)"
+entry="$(bsdtar -tf db.tar.gz | grep '/desc$' | grep -v -- '-debug-' | sort -V | tail -1)"
 pkg="${entry%/desc}-x86_64.pkg.tar.zst"
 echo ">> Latest published package: $pkg"
 

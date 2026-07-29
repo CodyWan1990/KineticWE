@@ -32,6 +32,9 @@ variables:
 # Shared setup: fresh keyring first (avoids the classic expired-key CI
 # failure), then full system upgrade (Arch never supports partial upgrades).
 .arch-sync: &arch-sync
+  # fresh containers have no local secret key; without this the keyring
+  # post-install hook prints a scary (but harmless) signing error
+  - pacman-key --init 2>/dev/null || true
   - pacman -Sy --noconfirm archlinux-keyring
   - pacman -Su --noconfirm
 
@@ -51,6 +54,8 @@ build-package:
   script:
     - *arch-sync
     - pacman -S --noconfirm --needed pacman-contrib
+    # no -debug split packages: 200+ MB each, useless in a binary repo
+    - echo 'OPTIONS+=( !debug )' >> /etc/makepkg.conf
     - sed -i "s|^#CacheDir.*|CacheDir = $CI_PROJECT_DIR/.pkg-cache/|" /etc/pacman.conf
     # ABI refreshes between releases get a CI-only pkgrel suffix so pacman
     # offers them as upgrades; the next source release (e.g. 16) sorts higher.
