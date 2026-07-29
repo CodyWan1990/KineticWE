@@ -12,7 +12,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        12%{?dist}
+Release:        13%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -302,6 +302,12 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-13
+- Rebuild from testing merge: ship the border color source fixes (live
+  updates, ActiveOnly floating windows, system-surface skip) that the
+  previous source snapshot predated, and exclude fullscreen/maximized
+  windows from borders and corner radius
+
 * Tue Jul 28 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-12
 - Bundle kdecoration built from pinned KDE master commit d1304925: kwin-we
   now uses KDecoration3::Style (server-side drop shadows for CSD windows),
