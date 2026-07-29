@@ -3,4 +3,4 @@ Name=KineticWE
 Comment=KineticWE Wayland session
 Exec=/usr/bin/start-kineticwe
 Type=Application
-DesktopNames=KineticWE:KDE
+DesktopNames=KDE

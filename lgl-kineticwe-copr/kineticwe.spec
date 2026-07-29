@@ -12,14 +12,13 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        13%{?dist}
+Release:        14%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
 URL:            https://gitlab.com/theblackdon/kineticwe
 Source0:        %{name}-%{version}.tar.gz
 Source1:        kglobalacceld-%{kglobalacceld_ref}.tar.gz
-Source2:        start-kineticwe
 Source3:        kineticwe.desktop
 Source4:        kglobalacceld-mask.conf
 Source5:        kconfig-%{kconfig_compiler_ref}.tar.gz
@@ -232,7 +231,13 @@ DESTDIR=%{buildroot} cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 DESTDIR=%{buildroot} cmake --install %{_builddir}/kdecoration-build --prefix %{_prefix}
 %cmake_install
 
-install -Dpm 0755 %{SOURCE2} %{buildroot}%{_bindir}/start-kineticwe
+# Install the canonical session launcher from the source tree (same file the
+# AUR package ships). Older revisions packaged a forked copy from SOURCES/
+# that drifted out of sync (and broke logout -> greeter return).
+sed -e 's|@INSTALL_PREFIX@|%{_prefix}|g' \
+    %{_builddir}/%{name}-%{version}/scripts/start-kineticwe.sh \
+    > %{buildroot}%{_bindir}/start-kineticwe
+chmod 0755 %{buildroot}%{_bindir}/start-kineticwe
 install -Dpm 0644 %{SOURCE3} %{buildroot}%{_datadir}/wayland-sessions/kineticwe.desktop
 install -Dpm 0644 %{SOURCE4} %{buildroot}%{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
@@ -302,6 +307,15 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-14
+- Ship the canonical scripts/start-kineticwe.sh from the source tree as the
+  session launcher instead of the forked SOURCES/ copy: it runs kinetic-we
+  in the background and waits on it instead of exec'ing with
+  --exit-with-session, fixing logout stalling on a black screen instead of
+  returning to the greeter (noctalia logout -> loginctl terminate-session)
+- Session desktop entry now declares DesktopNames=KDE, matching the
+  environment the launcher exports
+
 * Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-13
 - Rebuild from testing merge: ship the border color source fixes (live
   updates, ActiveOnly floating windows, system-surface skip) that the

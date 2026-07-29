@@ -3,8 +3,18 @@
 # KineticWE - A Kwin Window Environment
 # Session startup script
 # =============================================================================
-# This script launches the KineticWE Wayland session. It can be run directly
-# from a TTY after logging in, or invoked by a display manager / greeter.
+# Launches the KineticWE Wayland session. It can be run directly from a TTY
+# after logging in, or invoked by a display manager / greeter.
+#
+# Session model: kinetic-we runs in the background and this script waits on
+# it. When the compositor exits (logout, crash, or logind tearing down the
+# session) the script ends and the display manager returns to the greeter.
+# Noctalia runs supervised in the background so a shell crash or manual
+# restart does not end the session.
+#
+# Older revisions exec'd kinetic-we with --exit-with-session running a
+# separate payload script; that coupling stalled session teardown and left a
+# black screen on logout instead of returning to the greeter.
 #
 # Environment:
 #   INSTALL_PREFIX  - Override the installation prefix (default: $HOME/.local)
@@ -109,109 +119,7 @@ POWERDEVIL="$(find_bin org_kde_powerdevil)"
 UPOWERD="$(find_bin upowerd)"
 
 # ---------------------------------------------------------------------------
-# 4. Build the KWin startup payload (runs as KWin's child)
-# ---------------------------------------------------------------------------
-STARTUP_PAYLOAD_DIR="${XDG_RUNTIME_DIR:-/tmp}/kineticwe-$USER"
-mkdir -p "$STARTUP_PAYLOAD_DIR"
-STARTUP_PAYLOAD="$STARTUP_PAYLOAD_DIR/startup.sh"
-
-# Write payload script
-cat > "$STARTUP_PAYLOAD" << EOF
-#!/bin/bash
-# KineticWE startup payload — run by KWin as a detached child process.
-
-export PATH="$INSTALL_PREFIX/bin:\$PATH"
-export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
-export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins:$INSTALL_PREFIX/lib64/plugins"
-export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
-export XDG_DATA_DIRS="$INSTALL_PREFIX/share:\$XDG_DATA_DIRS"
-export XDG_CURRENT_DESKTOP=KDE
-export XDG_SESSION_TYPE=wayland
-export XDG_SESSION_DESKTOP=KDE
-export KDE_SESSION_VERSION=6
-export KDE_FULL_SESSION=true
-export XDG_MENU_PREFIX=plasma-
-
-# KWin exports WAYLAND_DISPLAY and DISPLAY (XWayland) before launching this
-# payload; the fallback guards against the payload being started other ways.
-export WAYLAND_DISPLAY="\${WAYLAND_DISPLAY:-wayland-0}"
-
-# Publish the session environment to D-Bus/systemd-activated services.
-# Without this, on-demand services (e.g. Spectacle via its global shortcut)
-# start without WAYLAND_DISPLAY/DISPLAY and crash at launch:
-# "could not activate remote peer org.kde.spectacle: startup job failed".
-dbus-update-activation-environment --systemd --all 2>/dev/null || true
-
-# ---------------------------------------------------------------------------
-# 1. Rebuild KDE service cache so System Settings finds installed KCMs
-# ---------------------------------------------------------------------------
-if command -v kbuildsycoca6 >/dev/null 2>&1; then
-    kbuildsycoca6 --noincremental 2>/dev/null || true
-fi
-
-# ---------------------------------------------------------------------------
-# 2. Start XDG Desktop Portals
-# ---------------------------------------------------------------------------
-# The KDE portal backend MUST start before the generic portal frontend so that
-# the frontend can discover the backend's capabilities (Screenshot, ScreenCast).
-
-killall -q xdg-desktop-portal-kde xdg-desktop-portal xdg-desktop-portal-gtk xdg-document-portal 2>/dev/null || true
-sleep 1
-
-mkdir -p "\$HOME/.local/share"
-
-if [[ -x "$PORTAL_KDE" ]]; then
-    nohup "$PORTAL_KDE" >"\$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
-else
-    echo "Warning: xdg-desktop-portal-kde not found" >&2
-fi
-
-sleep 2
-
-if [[ -x "$PORTAL" ]]; then
-    nohup "$PORTAL" >"\$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
-else
-    echo "Warning: xdg-desktop-portal not found" >&2
-fi
-
-# ---------------------------------------------------------------------------
-# 3. Start power management
-# ---------------------------------------------------------------------------
-# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset; it is
-# exported at the top of this payload.
-
-# upowerd provides battery and power device monitoring via D-Bus
-if [[ -n "$UPOWERD" ]]; then
-    nohup "$UPOWERD" >"\$HOME/.local/share/upowerd.log" 2>&1 &
-fi
-
-# org_kde_powerdevil provides idle timeouts, DPMS, suspend, brightness,
-# and power profile management
-if [[ -n "$POWERDEVIL" ]]; then
-    nohup "$POWERDEVIL" >"\$HOME/.local/share/powerdevil.log" 2>&1 &
-else
-    echo "Warning: org_kde_powerdevil not found; power management unavailable" >&2
-fi
-
-# ---------------------------------------------------------------------------
-# 4. Start the shell (supervised)
-# ---------------------------------------------------------------------------
-# Run noctalia under a supervisor loop: if it crashes or is killed (e.g.
-# pkill noctalia to recover a broken shell), it restarts automatically
-# instead of taking the whole session down. The session ends only when the
-# login session itself is terminated (logout -> loginctl terminate-session,
-# or the display manager), which tears down this payload and KWin together.
-while true; do
-    noctalia
-    echo "noctalia exited (code \$?), restarting in 2s..."
-    sleep 2
-done
-EOF
-
-chmod +x "$STARTUP_PAYLOAD"
-
-# ---------------------------------------------------------------------------
-# 5. Stop any competing global-shortcuts daemon
+# 4. Stop any competing global-shortcuts daemon
 # ---------------------------------------------------------------------------
 # kwin-we embeds kglobalacceld and registers the org.kde.kglobalaccel D-Bus
 # service at startup (KGlobalAccelD::init).  If a Plasma session was
@@ -226,9 +134,137 @@ systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
 pkill -x kglobalacceld 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# 6. Launch KWin
+# 5. Make sure there is a D-Bus session bus (TTY logins may not have one)
 # ---------------------------------------------------------------------------
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    echo "No D-Bus session bus found; wrapping in dbus-run-session..."
+    exec dbus-run-session -- "$0" "$@"
+fi
+
 # ---------------------------------------------------------------------------
-# KWin will run the startup payload as a child process. The child inherits
-# the environment captured here (including QT_PLUGIN_PATH).
-exec "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --exit-with-session "$STARTUP_PAYLOAD"
+# 6. Start kinetic-we in the background and wait for its Wayland socket
+# ---------------------------------------------------------------------------
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+# Snapshot existing sockets so we can tell which one kinetic-we creates —
+# the greeter (or a previous session) may already own wayland-0 / :0.
+_before_wayland="$(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep '^wayland-' || true)"
+_before_x11="$(ls -1 /tmp/.X11-unix 2>/dev/null | grep '^X[0-9]' || true)"
+
+"$INSTALL_PREFIX/bin/kinetic-we" --xwayland &
+KWIN_PID=$!
+
+# If this script dies for any reason (logout, Ctrl-C, logind teardown), make
+# sure the compositor goes with it.
+trap 'kill "$KWIN_PID" 2>/dev/null || true' EXIT
+
+WAYLAND_SOCK=""
+for _ in $(seq 1 20); do
+    sleep 0.5
+    for _sock in "$RUNTIME_DIR"/wayland-*; do
+        [[ -S "$_sock" ]] || continue
+        _name="$(basename "$_sock")"
+        if ! grep -qx "$_name" <<< "$_before_wayland"; then
+            WAYLAND_SOCK="$_name"
+            break 2
+        fi
+    done
+done
+
+if [[ -z "$WAYLAND_SOCK" ]]; then
+    echo "kinetic-we did not create a Wayland socket within 10s; aborting." >&2
+    exit 1
+fi
+
+export WAYLAND_DISPLAY="$WAYLAND_SOCK"
+
+# Best-effort: discover the XWayland display so X11 clients (Electron apps,
+# etc.) work. Uses the same before/after snapshot trick as the Wayland socket.
+for _ in $(seq 1 20); do
+    for _x in /tmp/.X11-unix/X*; do
+        [[ -S "$_x" ]] || continue
+        _name="$(basename "$_x")"
+        if ! grep -qx "$_name" <<< "$_before_x11"; then
+            export DISPLAY=":${_name#X}"
+            break 2
+        fi
+    done
+    sleep 0.5
+done
+
+# ---------------------------------------------------------------------------
+# 7. Session services (this ran as the KWin startup payload in older revisions)
+# ---------------------------------------------------------------------------
+mkdir -p "$HOME/.local/share"
+
+# Publish the session environment to D-Bus/systemd-activated services.
+# Without this, on-demand services (e.g. Spectacle via its global shortcut)
+# start without WAYLAND_DISPLAY/DISPLAY and crash at launch:
+# "could not activate remote peer org.kde.spectacle: startup job failed".
+dbus-update-activation-environment --systemd --all 2>/dev/null || true
+
+# Rebuild the KDE service cache so System Settings finds installed KCMs.
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+fi
+
+# XDG Desktop Portals. The KDE backend MUST start before the generic portal
+# frontend so the frontend can discover its capabilities (Screenshot,
+# ScreenCast).
+killall -q xdg-desktop-portal-kde xdg-desktop-portal xdg-desktop-portal-gtk xdg-document-portal 2>/dev/null || true
+sleep 1
+
+if [[ -x "$PORTAL_KDE" ]]; then
+    nohup "$PORTAL_KDE" >"$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
+else
+    echo "Warning: xdg-desktop-portal-kde not found" >&2
+fi
+
+sleep 2
+
+if [[ -x "$PORTAL" ]]; then
+    nohup "$PORTAL" >"$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
+else
+    echo "Warning: xdg-desktop-portal not found" >&2
+fi
+
+# Power management. org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY
+# is unset; it is exported above.
+if [[ -n "$UPOWERD" ]]; then
+    nohup "$UPOWERD" >"$HOME/.local/share/upowerd.log" 2>&1 &
+fi
+
+# org_kde_powerdevil provides idle timeouts, DPMS, suspend, brightness,
+# and power profile management
+if [[ -n "$POWERDEVIL" ]]; then
+    nohup "$POWERDEVIL" >"$HOME/.local/share/powerdevil.log" 2>&1 &
+else
+    echo "Warning: org_kde_powerdevil not found; power management unavailable" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# 8. Start the shell (supervised, in the background)
+# ---------------------------------------------------------------------------
+# Run noctalia under a supervisor loop: if it crashes or is killed (e.g.
+# pkill noctalia to recover a broken shell), it restarts automatically
+# instead of taking the whole session down. The session ends when the
+# compositor exits (logout -> loginctl terminate-session, or a crash),
+# which logind propagates to every process in the session.
+(
+    while true; do
+        noctalia >"$HOME/.local/share/noctalia.log" 2>&1
+        echo "noctalia exited (code $?), restarting in 2s..."
+        sleep 2
+    done
+) &
+SHELL_PID=$!
+
+# ---------------------------------------------------------------------------
+# 9. Wait on the compositor; its exit ends the session
+# ---------------------------------------------------------------------------
+wait "$KWIN_PID" || true
+
+# Compositor exited — stop the supervised shell and let the greeter return.
+kill "$SHELL_PID" 2>/dev/null || true
+pkill -x noctalia 2>/dev/null || true
+trap - EXIT

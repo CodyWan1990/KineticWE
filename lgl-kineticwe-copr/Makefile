@@ -38,7 +38,7 @@ SRPM := $(OUTDIR)/$(PACKAGE)-$(VERSION)-1.src.rpm
 
 srpm: $(SRPM)
 
-$(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/$(KDECORATION_SRC) $(OUTDIR)/$(KCONFIG_SRC) $(OUTDIR)/start-kineticwe $(OUTDIR)/kineticwe.desktop $(OUTDIR)/kglobalacceld-mask.conf
+$(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/$(KDECORATION_SRC) $(OUTDIR)/$(KCONFIG_SRC) $(OUTDIR)/kineticwe.desktop $(OUTDIR)/kglobalacceld-mask.conf
 	rpmbuild -bs \
 		--define "_sourcedir $(OUTDIR)" \
 		--define "_srcrpmdir $(OUTDIR)" \
@@ -77,10 +77,6 @@ $(OUTDIR)/$(KCONFIG_SRC):
 	mkdir -p $(OUTDIR)
 	curl -fsSL -o $(OUTDIR)/$(KCONFIG_SRC) $(KCONFIG_URL) || \
 		wget -q -O $(OUTDIR)/$(KCONFIG_SRC) $(KCONFIG_URL)
-
-$(OUTDIR)/start-kineticwe: $(SELF_DIR)SOURCES/start-kineticwe
-	mkdir -p $(OUTDIR)
-	cp $< $@
 
 $(OUTDIR)/kineticwe.desktop: $(SELF_DIR)SOURCES/kineticwe.desktop
 	mkdir -p $(OUTDIR)
