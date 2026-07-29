@@ -41,21 +41,29 @@ variables:
 build-package:
   stage: build
   image: archlinux:base-devel
+  # a cold kwin build takes ~2h on a shared runner; the default 1h job
+  # timeout kills it (first v6.7.80-16 pipeline died at exactly 60m08s)
+  timeout: 3h
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "schedule" && $REBUILD == "1"
     - if: $CI_PIPELINE_SOURCE == "web"
-  # Keep downloaded packages between runs (GitLab cache is limited to paths
-  # inside the project dir, so point pacman's CacheDir there).
+  # Keep downloaded packages + ccache between runs (GitLab cache is limited
+  # to paths inside the project dir, so point pacman's CacheDir there).
   cache:
-    key: pacman-pkg-cache
+    key: build-cache
     paths:
       - .pkg-cache/
+      - .ccache/
   script:
     - *arch-sync
-    - pacman -S --noconfirm --needed pacman-contrib
+    - pacman -S --noconfirm --needed pacman-contrib ccache
     # no -debug split packages: 200+ MB each, useless in a binary repo
     - echo 'OPTIONS+=( !debug )' >> /etc/makepkg.conf
+    # ccache between runs: recurring (ABI-refresh) builds drop to ~20 min
+    - echo 'BUILDENV+=( ccache )' >> /etc/makepkg.conf
+    - export CCACHE_DIR="$CI_PROJECT_DIR/.ccache"
+    - mkdir -p "$CCACHE_DIR" && chmod 777 "$CCACHE_DIR"
     - sed -i "s|^#CacheDir.*|CacheDir = $CI_PROJECT_DIR/.pkg-cache/|" /etc/pacman.conf
     # ABI refreshes between releases get a CI-only pkgrel suffix so pacman
     # offers them as upgrades; the next source release (e.g. 16) sorts higher.
@@ -94,7 +102,7 @@ smoke-test:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $SMOKE == "1"
   cache:
-    key: pacman-pkg-cache
+    key: smoke-pkg-cache
     paths:
       - .pkg-cache/
   script:
