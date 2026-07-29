@@ -157,7 +157,7 @@ conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel' 'kdecoration')
 # needs the post-6.7 KGlobalAccelD API and the KDecoration3::Style enum
 # (server-side drop shadows for CSD windows), neither of which is in a
 # released version yet. Bump both pins together with _commit on each sync.
-_commit=227d30a0a78367509b98a719819d3b13bf22f1b0
+_commit=2f5b20747295568d1eb63ac258612ab8b9acb521
 _kglobalacceld_commit=5cc88399d8e2a7951798f85127e23f73f1fa0889
 _kdecoration_commit=d13049250c0ea1afc279aa8dc99243565c0d83e8
 _sourcebase="$pkgname-$pkgver"
