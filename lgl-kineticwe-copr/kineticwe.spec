@@ -12,7 +12,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        14%{?dist}
+Release:        11%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -307,7 +307,7 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
-* Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-14
+* Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-11
 - Ship the canonical scripts/start-kineticwe.sh from the source tree as the
   session launcher instead of the forked SOURCES/ copy: it runs kinetic-we
   in the background and waits on it instead of exec'ing with
@@ -316,13 +316,11 @@ systemctl daemon-reload 2>/dev/null || true
 - Session desktop entry now declares DesktopNames=KDE, matching the
   environment the launcher exports
 
-* Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-13
 - Rebuild from testing merge: ship the border color source fixes (live
   updates, ActiveOnly floating windows, system-surface skip) that the
   previous source snapshot predated, and exclude fullscreen/maximized
   windows from borders and corner radius
 
-* Tue Jul 28 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-12
 - Bundle kdecoration built from pinned KDE master commit d1304925: kwin-we
   now uses KDecoration3::Style (server-side drop shadows for CSD windows),
   which is not in the buildroot's kdecoration 6.7.x; Provides/Obsoletes
@@ -330,7 +328,6 @@ systemctl daemon-reload 2>/dev/null || true
 - Pin kglobalacceld to master commit 5cc88399 instead of floating master so
   SRPM builds are reproducible
 
-* Mon Jul 27 2026 LGL <lgl@localhost> - 6.7.80-11
 - Fix system surfaces (app launcher, logout menu, and other popup/overlay
   windows) incorrectly receiving a tiling border in ActiveOnly border mode
   when focused
