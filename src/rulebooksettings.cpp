@@ -86,7 +86,7 @@ void RuleBookSettings::usrRead()
         // TODO Plasma 7: Drop this migration path.
         if (const int noBorderRule = ruleSettings->noborderrule()) {
             ruleSettings->setDecorationpolicyrule(noBorderRule);
-            ruleSettings->setDecorationpolicy(ruleSettings->noborder() ? DecorationPolicy::None : DecorationPolicy::Server);
+            ruleSettings->setDecorationpolicy(int(ruleSettings->noborder() ? DecorationPolicy::None : DecorationPolicy::Server)); // HACK: stored as int, see rulesettings.kcfg
 
             // Set the default values so the noborder rule gets removed from the config.
             ruleSettings->setNoborderrule(0);

@@ -318,15 +318,16 @@
       <default code="true">Rules::UnusedSetRule</default>
     </entry>
 
-    <entry name="decorationpolicy" type="Enum">
+    <!--
+      HACK: Store as Int instead of Enum until KF6 >= 6.29 is required.
+      Released kconfig_compiler (KF6 <= 6.28) generates a setter that assigns the
+      KWin::DecorationPolicy enum class to the int member, which does not compile
+      (fixed in kconfig commit 41592ccf, which missed the KF 6.28.0 tag and ships
+      with KF 6.29). Revert to upstream's Enum entry once KF6_MIN_VERSION >= 6.29.
+    -->
+    <entry name="decorationpolicy" type="Int">
       <label>Decoration policy</label>
-      <choices name="KWin::DecorationPolicy">
-        <choice name="None" value="none" />
-        <choice name="ClientPreference" value="client-preference" />
-        <choice name="Server" value="server" />
-        <choice name="Shadow" value="shadow" />
-      </choices>
-      <default code="true">KWin::DecorationPolicy::ClientPreference</default>
+      <default code="true">int(KWin::DecorationPolicy::ClientPreference)</default>
     </entry>
     <entry name="decorationpolicyrule" type="Int">
       <label>Decoration policy rule type</label>

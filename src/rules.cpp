@@ -144,7 +144,9 @@ void Rules::readFromSettings(const RuleSettings *settings)
     READ_SET_RULE(above);
     READ_SET_RULE(below);
     READ_SET_RULE(fullscreen);
-    READ_SET_RULE(decorationpolicy);
+    // HACK: decorationpolicy is stored as int until KF6 >= 6.29, see rulesettings.kcfg
+    decorationpolicy = static_cast<KWin::DecorationPolicy>(settings->decorationpolicy());
+    decorationpolicyrule = static_cast<SetRule>(settings->decorationpolicyrule());
     READ_FORCE_RULE(decocolor, getDecoColor);
     if (decocolor.isEmpty()) {
         decocolorrule = UnusedForceRule;
@@ -229,7 +231,7 @@ void Rules::write(RuleSettings *settings) const
     WRITE_SET_RULE(above, Above, );
     WRITE_SET_RULE(below, Below, );
     WRITE_SET_RULE(fullscreen, Fullscreen, );
-    WRITE_SET_RULE(decorationpolicy, Decorationpolicy, );
+    WRITE_SET_RULE(decorationpolicy, Decorationpolicy, int); // HACK: stored as int until KF6 >= 6.29, see rulesettings.kcfg
 
     auto colorToString = [](const QString &value) -> QString {
         if (value.endsWith(QLatin1StringView(".colors"))) {
