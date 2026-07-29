@@ -3,9 +3,15 @@
 # COPR spec file
 # =============================================================================
 #
-# This spec builds kglobalacceld from git master first (as a sub-package),
-# then builds kwin-we against it. The system kglobalacceld package is too
-# old (6.7.0) and lacks the direct KGlobalAccelD API that kwin-we requires.
+# NOTE: the authoritative COPR spec is lgl-kineticwe-copr/kineticwe.spec
+# (used by .copr/Makefile and build-rpm-dev.sh). This file is kept in sync
+# for manual builds only.
+#
+# This spec builds kglobalacceld and kdecoration from pinned KDE master
+# commits first, then builds kwin-we against them. The system kglobalacceld
+# package is too old (6.7.0) and lacks the direct KGlobalAccelD API that
+# kwin-we requires; the system kdecoration (6.7.x) lacks KDecoration3::Style
+# (server-side drop shadows for CSD windows).
 #
 # To trigger a build in COPR:
 #   1. Tag a release:  git tag -a v6.7.80 -m "Release 6.7.80"
@@ -21,18 +27,19 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        9%{?dist}
+Release:        10%{?dist}
 Summary:        KineticWE - A tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
 URL:            https://gitlab.com/theblackdon/kineticwe
 Source0:        %{url}/archive/v%{version}.tar.gz
-Source1:        https://invent.kde.org/plasma/kglobalacceld/-/archive/master/kglobalacceld-master.tar.gz
+Source1:        https://invent.kde.org/plasma/kglobalacceld/-/archive/5cc88399d8e2a7951798f85127e23f73f1fa0889/kglobalacceld-5cc88399d8e2a7951798f85127e23f73f1fa0889.tar.gz
 # kconfig_compiler from KConfig < 6.30 generates uncompilable setters for
 # enum-class kcfg entries (fixed in KConfig commit 41592cc, first released in
 # 6.30). Build the fixed compiler from this pinned commit (build-time only).
 # Drop this once the buildroot ships KConfig >= 6.30.
 Source2:        https://invent.kde.org/frameworks/kconfig/-/archive/41592ccfd9748be82c83ce98912037bffb73954e/kconfig-41592ccfd9748be82c83ce98912037bffb73954e.tar.gz
+Source3:        https://invent.kde.org/plasma/kdecoration/-/archive/d13049250c0ea1afc279aa8dc99243565c0d83e8/kdecoration-d13049250c0ea1afc279aa8dc99243565c0d83e8.tar.gz
 
 # =============================================================================
 # Build Dependencies (from install-fedora.sh, devel packages only)
@@ -79,7 +86,6 @@ BuildRequires:  kf6-kirigami-devel
 
 # Plasma / KDE
 BuildRequires:  kwayland-devel
-BuildRequires:  kdecoration-devel
 BuildRequires:  kscreenlocker-devel
 BuildRequires:  knighttime-devel
 BuildRequires:  plasma-wayland-protocols-devel
@@ -146,7 +152,6 @@ Requires:       kf6-ksvg
 Requires:       kf6-krunner
 Requires:       kf6-kirigami
 Requires:       kwayland
-Requires:       kdecoration
 Requires:       kscreenlocker
 Requires:       knighttime
 Requires:       libplasma
@@ -161,6 +166,12 @@ Requires:       hwdata
 Requires:       xdg-desktop-portal
 Requires:       xdg-desktop-portal-kde
 
+# Bundled kdecoration runtime (pinned KDE master) replaces the system package
+Provides:       kdecoration = %{version}-%{release}
+Provides:       kdecoration%{?_isa} = %{version}-%{release}
+Obsoletes:      kdecoration < %{version}-%{release}
+Obsoletes:      kdecoration-devel < %{version}-%{release}
+
 # Soft deps — nice to have for full experience
 Recommends:     noctalia-git
 
@@ -170,7 +181,8 @@ It is designed to pair with the Noctalia shell to form a complete desktop
 experience called "KineticWE — A Kwin Window Environment."
 
 KineticWE bundles an in-process global shortcuts daemon (kglobalacceld)
-built from git master for API compatibility.
+and the kdecoration runtime libraries, both built from pinned KDE master
+commits for API compatibility.
 
 %package -n kineticwe-kglobalacceld
 Summary:        KDE Global Shortcuts Daemon (for KineticWE)
@@ -194,6 +206,12 @@ system kglobalacceld package (6.7.0 or older).
 mkdir -p ../kglobalacceld
 cd ../kglobalacceld
 tar xf %{SOURCE1} --strip-components=1
+cd -
+
+# Extract kdecoration source alongside
+mkdir -p ../kdecoration
+cd ../kdecoration
+tar xf %{SOURCE3} --strip-components=1
 cd -
 
 # Extract kconfig source alongside (for the fixed kconfig_compiler)
@@ -230,10 +248,24 @@ pushd ../kconfig/build
 %cmake_build --target kconfig_compiler
 popd
 
+# --- Phase 2b: Build and stage kdecoration (pinned KDE master commit) ---
+# kwin-we uses KDecoration3::Style (server-side drop shadows for CSD
+# windows), which is not present in the buildroot's kdecoration 6.7.x.
+mkdir -p ../kdecoration/build
+pushd ../kdecoration/build
+%cmake \
+    -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=OFF \
+    ..
+%cmake_build
+popd
+
 # --- Phase 3: Build kwin-we against the kglobalacceld we just built ---
 # We install kglobalacceld into a temp dir so kwin-we's CMake can find it
 mkdir -p ${KGA_TMP_PREFIX}
 DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kglobalacceld/build --prefix %{_prefix}
+DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kdecoration/build --prefix %{_prefix}
 
 %cmake \
     -DCMAKE_INSTALL_PREFIX=%{_prefix} \
@@ -253,17 +285,25 @@ DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kglobalacceld/build --prefix %{_pre
 # Install kglobalacceld to the buildroot
 DESTDIR=%{buildroot} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 
+# Install kdecoration to the buildroot
+DESTDIR=%{buildroot} cmake --install ../kdecoration/build --prefix %{_prefix}
+
 # Install kwin-we to the buildroot
 %cmake_install
 
 # Remove unnecessary devel files from main package (they go in -devel if needed)
 rm -f %{buildroot}%{_libdir}/cmake/KGlobalAccelD/*.cmake 2>/dev/null || true
+rm -rf %{buildroot}%{_libdir}/cmake/KDecoration3/ 2>/dev/null || true
 
 # Remove .so symlinks (devel files) — prevents conflict with system kwin-devel
 rm -f %{buildroot}%{_libdir}/libKGlobalAccelD.so 2>/dev/null || true
+rm -f %{buildroot}%{_libdir}/libkdecorations3.so 2>/dev/null || true
+rm -f %{buildroot}%{_libdir}/libkdecorations3private.so 2>/dev/null || true
 
-# Remove header files installed by kglobalacceld and kwin-we (devel content)
+# Remove header files installed by kglobalacceld, kdecoration and kwin-we (devel content)
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD/ 2>/dev/null || true
+rm -rf %{buildroot}%{_includedir}/KDecoration3/ 2>/dev/null || true
+rm -f %{buildroot}%{_includedir}/KF6/kdecoration3_version.h 2>/dev/null || true
 rm -rf %{buildroot}%{_includedir}/kwin/ 2>/dev/null || true
 
 # Remove knotifications6 .notifyrc file to avoid conflict with system kwin-notifications
@@ -279,13 +319,15 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 # =============================================================================
 
 %files
-%license LICENSES/*
+%license LICENSES/* ../kdecoration/LICENSES/*
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
 %{_bindir}/kwindowprop
 %{_bindir}/kwin-we_wayland_wrapper
 %{_libdir}/libkwin.so.*
 %{_libdir}/libkcmkwincommon.so.*
+%{_libdir}/libkdecorations3.so.*
+%{_libdir}/libkdecorations3private.so.*
 %{_libdir}/qt6/plugins/kwin/
 %{_libdir}/qt6/plugins/plasma/kcms/
 %{_libdir}/qt6/plugins/kf6/packagestructure/
@@ -311,6 +353,13 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 # =============================================================================
 
 %changelog
+* Tue Jul 28 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-10
+- Bundle kdecoration built from pinned KDE master commit d1304925
+  (KDecoration3::Style for server-side CSD drop shadows; not in 6.7.x);
+  Provides/Obsoletes kdecoration and kdecoration-devel
+- Pin kglobalacceld to master commit 5cc88399 for reproducible builds
+- Note that lgl-kineticwe-copr/kineticwe.spec is the authoritative COPR spec
+
 * Sat Jun 28 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-9
 - Fix %%files qt6/ prefix for plugin/qml paths (required by COPR build env)
 - Update URL and Source0 from codeberg.org to gitlab.com

@@ -17,9 +17,15 @@ OUTDIR   := $(SELF_DIR)results
 SOURCE_PREFIX    := $(PACKAGE)-$(VERSION)
 KINETICWE_SRC    := $(PACKAGE)-$(VERSION).tar.gz
 
-KGLOBALACCELD_REF ?= master
+KGLOBALACCELD_REF ?= 5cc88399d8e2a7951798f85127e23f73f1fa0889
 KGLOBALACCELD_SRC := kglobalacceld-$(KGLOBALACCELD_REF).tar.gz
 KGLOBALACCELD_URL := https://invent.kde.org/plasma/kglobalacceld/-/archive/$(KGLOBALACCELD_REF)/$(KGLOBALACCELD_SRC)
+
+# Pinned kdecoration master commit: kwin-we needs KDecoration3::Style
+# (server-side drop shadows for CSD windows), not yet in a released version.
+KDECORATION_REF ?= d13049250c0ea1afc279aa8dc99243565c0d83e8
+KDECORATION_SRC := kdecoration-$(KDECORATION_REF).tar.gz
+KDECORATION_URL := https://invent.kde.org/plasma/kdecoration/-/archive/$(KDECORATION_REF)/$(KDECORATION_SRC)
 
 # Pinned KConfig commit containing the kconfig_compiler enum-class setter fix
 # (KConfig 41592cc, first released in 6.30). Build-time only; drop once the
@@ -32,12 +38,13 @@ SRPM := $(OUTDIR)/$(PACKAGE)-$(VERSION)-1.src.rpm
 
 srpm: $(SRPM)
 
-$(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/$(KCONFIG_SRC) $(OUTDIR)/start-kineticwe $(OUTDIR)/kineticwe.desktop $(OUTDIR)/kglobalacceld-mask.conf
+$(SRPM): $(OUTDIR)/$(KINETICWE_SRC) $(OUTDIR)/$(KGLOBALACCELD_SRC) $(OUTDIR)/$(KDECORATION_SRC) $(OUTDIR)/$(KCONFIG_SRC) $(OUTDIR)/start-kineticwe $(OUTDIR)/kineticwe.desktop $(OUTDIR)/kglobalacceld-mask.conf
 	rpmbuild -bs \
 		--define "_sourcedir $(OUTDIR)" \
 		--define "_srcrpmdir $(OUTDIR)" \
 		--define "_specdir $(SELF_DIR)" \
 		--define "kglobalacceld_ref $(KGLOBALACCELD_REF)" \
+		--define "kdecoration_ref $(KDECORATION_REF)" \
 		--define "kconfig_compiler_ref $(KCONFIG_COMPILER_REF)" \
 		$(SPECFILE)
 
@@ -60,6 +67,11 @@ $(OUTDIR)/$(KGLOBALACCELD_SRC):
 	mkdir -p $(OUTDIR)
 	curl -fsSL -o $(OUTDIR)/$(KGLOBALACCELD_SRC) $(KGLOBALACCELD_URL) || \
 		wget -q -O $(OUTDIR)/$(KGLOBALACCELD_SRC) $(KGLOBALACCELD_URL)
+
+$(OUTDIR)/$(KDECORATION_SRC):
+	mkdir -p $(OUTDIR)
+	curl -fsSL -o $(OUTDIR)/$(KDECORATION_SRC) $(KDECORATION_URL) || \
+		wget -q -O $(OUTDIR)/$(KDECORATION_SRC) $(KDECORATION_URL)
 
 $(OUTDIR)/$(KCONFIG_SRC):
 	mkdir -p $(OUTDIR)

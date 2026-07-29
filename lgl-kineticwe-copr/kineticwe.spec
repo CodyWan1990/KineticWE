@@ -1,5 +1,9 @@
 %global __cmake_in_source_build 0
-%{!?kglobalacceld_ref:%global kglobalacceld_ref master}
+# Pinned KDE master commits. kwin-we needs the post-6.7 KGlobalAccelD API and
+# the KDecoration3::Style enum (server-side drop shadows for CSD windows);
+# neither is in a released version yet. Bump both pins on each upstream sync.
+%{!?kglobalacceld_ref:%global kglobalacceld_ref 5cc88399d8e2a7951798f85127e23f73f1fa0889}
+%{!?kdecoration_ref:%global kdecoration_ref d13049250c0ea1afc279aa8dc99243565c0d83e8}
 # kconfig_compiler from KConfig < 6.30 generates uncompilable setters for
 # enum-class kcfg entries (fixed in KConfig commit 41592cc, first released
 # in 6.30). Build the fixed compiler from this pinned KConfig commit and use
@@ -8,7 +12,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        11%{?dist}
+Release:        12%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -19,6 +23,7 @@ Source2:        start-kineticwe
 Source3:        kineticwe.desktop
 Source4:        kglobalacceld-mask.conf
 Source5:        kconfig-%{kconfig_compiler_ref}.tar.gz
+Source6:        kdecoration-%{kdecoration_ref}.tar.gz
 
 BuildRequires:  cmake
 BuildRequires:  ninja-build
@@ -60,7 +65,6 @@ BuildRequires:  kf6-knotifications-devel
 BuildRequires:  kf6-kirigami-devel
 
 BuildRequires:  kwayland-devel
-BuildRequires:  kdecoration-devel
 BuildRequires:  kscreenlocker-devel
 BuildRequires:  knighttime-devel
 BuildRequires:  plasma-wayland-protocols-devel
@@ -136,19 +140,24 @@ Provides:       kwin-wayland = %{version}-%{release}
 Provides:       kwin-wayland%{?_isa} = %{version}-%{release}
 Provides:       kglobalacceld = %{version}-%{release}
 Provides:       kglobalacceld%{?_isa} = %{version}-%{release}
+Provides:       kdecoration = %{version}-%{release}
+Provides:       kdecoration%{?_isa} = %{version}-%{release}
 Obsoletes:      kwin < %{version}-%{release}
 Obsoletes:      kwin-common < %{version}-%{release}
 Obsoletes:      kwin-libs < %{version}-%{release}
 Obsoletes:      kwin-wayland < %{version}-%{release}
 Obsoletes:      kglobalacceld < %{version}-%{release}
 Obsoletes:      kglobalacceld-devel < %{version}-%{release}
+Obsoletes:      kdecoration < %{version}-%{release}
+Obsoletes:      kdecoration-devel < %{version}-%{release}
 
 %description
 KineticWE is a fork of KWin that adds native tiling support for Wayland.
 
 This package installs the compositor, runtime plugins, helpers, and a Wayland
-session entry, and the private kglobalacceld runtime library that KineticWE
-links against. Noctalia v5 (noctalia-shell-v5 or noctalia-git) from the
+session entry, plus the private kglobalacceld and kdecoration runtime
+libraries (built from pinned KDE master commits) that KineticWE links
+against. Noctalia v5 (noctalia-shell-v5 or noctalia-git) from the
 lionheartp/Hyprland COPR is required for the full desktop shell.
 
 %prep
@@ -157,6 +166,10 @@ lionheartp/Hyprland COPR is required for the full desktop shell.
 rm -rf ../kglobalacceld
 mkdir -p ../kglobalacceld
 tar xf %{SOURCE1} -C ../kglobalacceld --strip-components=1
+
+rm -rf ../kdecoration
+mkdir -p ../kdecoration
+tar xf %{SOURCE6} -C ../kdecoration --strip-components=1
 
 rm -rf ../kconfig
 mkdir -p ../kconfig
@@ -177,6 +190,22 @@ cmake --build "${KGA_BUILD}"
 
 mkdir -p "${KGA_TMP_PREFIX}"
 DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${KGA_BUILD}" --prefix %{_prefix}
+
+# Build kdecoration (pinned KDE master commit) and stage it next to
+# kglobalacceld. kwin-we uses KDecoration3::Style (server-side drop shadows
+# for CSD windows), which does not exist in the buildroot's kdecoration 6.7.x.
+KDECO_SRC=%{_builddir}/kdecoration
+KDECO_BUILD=%{_builddir}/kdecoration-build
+
+cmake -S "${KDECO_SRC}" \
+    -B "${KDECO_BUILD}" \
+    -GNinja \
+    -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=OFF
+cmake --build "${KDECO_BUILD}"
+
+DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${KDECO_BUILD}" --prefix %{_prefix}
 
 # Build the fixed kconfig_compiler (build-time tool only, nothing is installed)
 KCFG_BUILD=%{_builddir}/kconfig-build
@@ -200,6 +229,7 @@ cmake --build "${KCFG_BUILD}" --target kconfig_compiler
 %install
 KGA_BUILD=%{_builddir}/kglobalacceld-build
 DESTDIR=%{buildroot} cmake --install "${KGA_BUILD}" --prefix %{_prefix}
+DESTDIR=%{buildroot} cmake --install %{_builddir}/kdecoration-build --prefix %{_prefix}
 %cmake_install
 
 install -Dpm 0755 %{SOURCE2} %{buildroot}%{_bindir}/start-kineticwe
@@ -212,11 +242,16 @@ ln -s kwin-we_wayland_wrapper %{buildroot}%{_bindir}/kwin_wayland_wrapper
 
 # Drop development files. This COPR package intentionally ships runtime only.
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD
+rm -rf %{buildroot}%{_includedir}/KDecoration3
+rm -f %{buildroot}%{_includedir}/KF6/kdecoration3_version.h
 rm -rf %{buildroot}%{_includedir}/kwin
 rm -rf %{buildroot}%{_libdir}/cmake/KGlobalAccelD
+rm -rf %{buildroot}%{_libdir}/cmake/KDecoration3
 rm -rf %{buildroot}%{_libdir}/cmake/KWin
 rm -rf %{buildroot}%{_libdir}/cmake/KWinDBusInterface
 rm -f %{buildroot}%{_libdir}/libKGlobalAccelD.so
+rm -f %{buildroot}%{_libdir}/libkdecorations3.so
+rm -f %{buildroot}%{_libdir}/libkdecorations3private.so
 rm -f %{buildroot}%{_libdir}/libkwin.so
 rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so
 
@@ -231,7 +266,7 @@ systemctl daemon-reload 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 
 %files
-%license LICENSES/* ../kglobalacceld/LICENSES/*
+%license LICENSES/* ../kglobalacceld/LICENSES/* ../kdecoration/LICENSES/*
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
 %{_bindir}/kwin_wayland
@@ -240,6 +275,8 @@ systemctl daemon-reload 2>/dev/null || true
 %{_bindir}/kwin-we_wayland_wrapper
 %{_bindir}/start-kineticwe
 %{_libdir}/libKGlobalAccelD.so.*
+%{_libdir}/libkdecorations3.so.*
+%{_libdir}/libkdecorations3private.so.*
 %{_libdir}/libkwin.so.*
 %{_libdir}/libkcmkwincommon.so.*
 %{_qt6_plugindir}/kwin/
@@ -265,6 +302,14 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Tue Jul 28 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-12
+- Bundle kdecoration built from pinned KDE master commit d1304925: kwin-we
+  now uses KDecoration3::Style (server-side drop shadows for CSD windows),
+  which is not in the buildroot's kdecoration 6.7.x; Provides/Obsoletes
+  kdecoration and kdecoration-devel like the bundled kglobalacceld runtime
+- Pin kglobalacceld to master commit 5cc88399 instead of floating master so
+  SRPM builds are reproducible
+
 * Mon Jul 27 2026 LGL <lgl@localhost> - 6.7.80-11
 - Fix system surfaces (app launcher, logout menu, and other popup/overlay
   windows) incorrectly receiving a tiling border in ActiveOnly border mode
