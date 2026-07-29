@@ -12,7 +12,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        11%{?dist}
+Release:        12%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -307,6 +307,14 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-12
+- Work around a kconfig_compiler bug (KF6 <= 6.28, i.e. every released
+  Fedora/Arch build) that misgenerates the RuleSettings mutator for the
+  decorationpolicy window rule and fails to compile: store the setting as
+  Int with explicit casts instead of the KWin::DecorationPolicy enum class;
+  the Rules object API stays fully typed, only the KConfigXT storage layer
+  changes. Revert once the buildroot's KConfig is >= 6.29.
+
 * Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-11
 - Ship the canonical scripts/start-kineticwe.sh from the source tree as the
   session launcher instead of the forked SOURCES/ copy: it runs kinetic-we
