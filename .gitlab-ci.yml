@@ -1,0 +1,124 @@
+# KineticWE binary pacman repo, built on Arch and hosted on GitLab Pages.
+#
+# Triggers (plain branch pushes never run a pipeline - see workflow:rules):
+#   * tag push ................... release build, pkgrel exactly as committed
+#   * schedule "weekly-rebuild" .. ABI refresh against current Arch; pkgrel gets
+#                                  a .YYYYMMDD suffix so pacman offers it as an
+#                                  upgrade (e.g. 15 -> 15.20260803)
+#   * schedule "daily-smoke" ..... installs the published package on a fully
+#                                  updated Arch container and link-checks it;
+#                                  a failure emails you (GitLab default)
+#   * manual "Run pipeline" ...... on-demand rebuild
+#
+# Users add this to /etc/pacman.conf:
+#   [kineticwe]
+#   SigLevel = Never
+#   Server = https://theblackdon.gitlab.io/kineticwe/$arch
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+stages:
+  - build
+  - smoke
+  - deploy
+
+variables:
+  KEEP_BUILDS: "4"   # how many package versions to keep in the repo
+
+# Shared setup: fresh keyring first (avoids the classic expired-key CI
+# failure), then full system upgrade (Arch never supports partial upgrades).
+.arch-sync: &arch-sync
+  - pacman -Sy --noconfirm archlinux-keyring
+  - pacman -Su --noconfirm
+
+build-package:
+  stage: build
+  image: archlinux:base-devel
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $REBUILD == "1"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  # Keep downloaded packages between runs (GitLab cache is limited to paths
+  # inside the project dir, so point pacman's CacheDir there).
+  cache:
+    key: pacman-pkg-cache
+    paths:
+      - .pkg-cache/
+  script:
+    - *arch-sync
+    - pacman -S --noconfirm --needed pacman-contrib
+    - sed -i "s|^#CacheDir.*|CacheDir = $CI_PROJECT_DIR/.pkg-cache/|" /etc/pacman.conf
+    # ABI refreshes between releases get a CI-only pkgrel suffix so pacman
+    # offers them as upgrades; the next source release (e.g. 16) sorts higher.
+    - |
+      if [ -z "$CI_COMMIT_TAG" ]; then
+        sed -i "s/^pkgrel=.*/&.$(date +%Y%m%d)/" PKGBUILD
+        grep '^pkgrel' PKGBUILD
+      fi
+    # Install every dependency the PKGBUILD declares that exists in the Arch
+    # repos. AUR-only entries (noctalia-git) are runtime-only and skipped.
+    - |
+      mapfile -t deps < <(bash -c 'source PKGBUILD; printf "%s\n" "${depends[@]}" "${makedepends[@]}"' | sed 's/[<>=].*$//' | sort -u)
+      todo=()
+      for d in "${deps[@]}"; do
+        if pacman -Si "$d" &>/dev/null; then
+          todo+=("$d")
+        else
+          echo "Skipping (not in Arch repos): $d"
+        fi
+      done
+      pacman -S --noconfirm --needed "${todo[@]}"
+    # makepkg refuses to run as root; runuser is in util-linux (base).
+    - useradd -m builder
+    - cp PKGBUILD /home/builder/ && chown -R builder:builder /home/builder
+    - runuser -u builder -- bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
+    - mkdir -p public/x86_64
+    - cp /home/builder/kineticwe-*.pkg.tar.zst public/x86_64/
+    - ci/repo.sh public/x86_64
+  artifacts:
+    paths:
+      - public/
+
+smoke-test:
+  stage: smoke
+  image: archlinux:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $SMOKE == "1"
+  cache:
+    key: pacman-pkg-cache
+    paths:
+      - .pkg-cache/
+  script:
+    - *arch-sync
+    - sed -i "s|^#CacheDir.*|CacheDir = $CI_PROJECT_DIR/.pkg-cache/|" /etc/pacman.conf
+    # If this fails, GitLab emails the schedule owner: the published binary no
+    # longer links against current Arch (Qt private API or a soname bump).
+    # Rebuild via Build -> Pipelines -> Run pipeline.
+    - ci/smoke.sh "https://theblackdon.gitlab.io/$CI_PROJECT_NAME/x86_64"
+
+pages:
+  stage: deploy
+  image: alpine:latest
+  needs: ["build-package"]
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $REBUILD == "1"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  script:
+    - |
+      cat > public/index.html <<'HTML'
+      <!doctype html>
+      <meta charset="utf-8">
+      <title>KineticWE pacman repo</title>
+      <h1>KineticWE pacman repo</h1>
+      <p>Add this to <code>/etc/pacman.conf</code>:</p>
+      <pre>[kineticwe]
+      SigLevel = Never
+      Server = https://theblackdon.gitlab.io/kineticwe/$arch</pre>
+      <p>Then: <code>sudo pacman -Sy kineticwe</code></p>
+      HTML
+  publish: public
