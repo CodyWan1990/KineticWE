@@ -81,13 +81,41 @@ systemctl reboot
 
 ### Arch Linux
 
-The preferred way to install KineticWE on Arch-based distros (Arch, CachyOS, EndeavourOS, Manjaro, etc.) is via the [AUR](https://aur.archlinux.org/packages/kineticwe):
+#### Binary repo (recommended)
+
+The fastest way to install KineticWE on Arch-based distros (Arch, CachyOS, EndeavourOS, Manjaro, etc.) is the pre-built binary repo hosted on GitLab Pages — no compiling needed.
+
+The repo only ships the `kineticwe` package itself; its shell dependency `noctalia-git` comes from the AUR, so install that first with your AUR helper:
+
+```bash
+paru -S noctalia-git   # or: yay -S noctalia-git
+```
+
+Then add the repo to `/etc/pacman.conf` (e.g. `sudo nano /etc/pacman.conf`):
+
+```ini
+[kineticwe]
+SigLevel = Never
+Server = https://theblackdon.gitlab.io/kineticwe/$arch
+```
+
+and install:
+
+```bash
+sudo pacman -Sy kineticwe
+```
+
+#### AUR (alternative)
+
+If you prefer to build from source, the [AUR package](https://aur.archlinux.org/packages/kineticwe) remains available — the AUR helper resolves `noctalia-git` automatically:
 
 ```bash
 yay -S kineticwe
 ```
 
 ### NixOS / Nix
+
+> **⚠ Work in progress:** The Nix flake is experimental — it is not fully tested or complete. **Use at your own risk**; things may be broken or change without notice.
 
 A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kwin-we, the full KineticWE session (kwin-we + noctalia), and Home Manager / NixOS modules.
 
