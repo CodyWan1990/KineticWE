@@ -327,12 +327,12 @@ static constexpr const auto s_appAltRev = kli18n("Walk Through Windows of Curren
 
 void TabBox::initShortcuts()
 {
-    QAction *windowsAction = key(s_windows, &TabBox::slotWalkThroughWindows, {Qt::MetaModifier | Qt::Key_Tab, Qt::AltModifier | Qt::Key_Tab});
-    QAction *windowsRevAction = key(s_windowsRev, &TabBox::slotWalkBackThroughWindows, {Qt::MetaModifier | Qt::ShiftModifier | Qt::Key_Tab, Qt::AltModifier | Qt::ShiftModifier | Qt::Key_Tab});
+    QAction *windowsAction = key(s_windows, &TabBox::slotWalkThroughWindows);
+    QAction *windowsRevAction = key(s_windowsRev, &TabBox::slotWalkBackThroughWindows);
     KGlobalAccel::setInverseShortcutActions(windowsAction, windowsRevAction);
 
-    QAction *appAction = key(s_app, &TabBox::slotWalkThroughCurrentAppWindows, {Qt::MetaModifier | Qt::Key_QuoteLeft, Qt::AltModifier | Qt::Key_QuoteLeft});
-    QAction *appRevAction = key(s_appRev, &TabBox::slotWalkBackThroughCurrentAppWindows, {Qt::MetaModifier | Qt::Key_AsciiTilde, Qt::AltModifier | Qt::Key_AsciiTilde});
+    QAction *appAction = key(s_app, &TabBox::slotWalkThroughCurrentAppWindows);
+    QAction *appRevAction = key(s_appRev, &TabBox::slotWalkBackThroughCurrentAppWindows);
     KGlobalAccel::setInverseShortcutActions(appAction, appRevAction);
 
     QAction *windowsAltAction = key(s_windowsAlt, &TabBox::slotWalkThroughWindowsAlternative);

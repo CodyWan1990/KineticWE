@@ -9,6 +9,7 @@
 #pragma once
 
 #include <QObject>
+#include <QKeySequence>
 
 class QAction;
 
@@ -24,7 +25,7 @@ public:
     ~NoctaliaSettings() override;
 
 private:
-    void registerShortcut(const QString &id, const QString &description, const QStringList &args);
+    void registerShortcut(const QString &id, const QString &description, const QStringList &args, const QKeySequence &defaultShortcut = QKeySequence());
     QList<QAction *> m_actions;
 };
 

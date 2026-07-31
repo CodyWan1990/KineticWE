@@ -32,7 +32,8 @@ NoctaliaSettings::NoctaliaSettings(QObject *parent)
 
     registerShortcut(QStringLiteral("NoctaliaWindowSwitcher"),
                      i18n("Open Noctalia Window Switcher"),
-                     {QStringLiteral("msg"), QStringLiteral("window-switcher")});
+                     {QStringLiteral("msg"), QStringLiteral("window-switcher")},
+                     QKeySequence(Qt::ALT | Qt::Key_Tab));
 
     registerShortcut(QStringLiteral("NoctaliaSessionLock"),
                      i18n("Lock Session"),
@@ -112,7 +113,7 @@ NoctaliaSettings::NoctaliaSettings(QObject *parent)
 
 NoctaliaSettings::~NoctaliaSettings() = default;
 
-void NoctaliaSettings::registerShortcut(const QString &id, const QString &description, const QStringList &args)
+void NoctaliaSettings::registerShortcut(const QString &id, const QString &description, const QStringList &args, const QKeySequence &defaultShortcut)
 {
     QAction *action = new QAction(this);
     action->setProperty("componentName", QStringLiteral("noctalia"));
@@ -120,7 +121,11 @@ void NoctaliaSettings::registerShortcut(const QString &id, const QString &descri
     action->setObjectName(id);
     action->setText(description);
 
-    KGlobalAccel::setGlobalShortcut(action, QList<QKeySequence>());
+    QList<QKeySequence> shortcuts;
+    if (!defaultShortcut.isEmpty()) {
+        shortcuts.append(defaultShortcut);
+    }
+    KGlobalAccel::setGlobalShortcut(action, shortcuts);
 
     connect(action, &QAction::triggered, this, [args]() {
         QProcess::startDetached(QStringLiteral("noctalia"), args);

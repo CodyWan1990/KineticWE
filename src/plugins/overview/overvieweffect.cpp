@@ -151,13 +151,13 @@ OverviewEffect::OverviewEffect()
     overviewAction->setObjectName(QStringLiteral("Overview"));
     overviewAction->setText(i18nc("@action Overview is the name of a Kwin effect", "Toggle Overview"));
     overviewAction->setAutoRepeat(false);
-    KGlobalAccel::setGlobalShortcut(overviewAction, QKeySequence(Qt::META | Qt::Key_W));
+    KGlobalAccel::setGlobalShortcut(overviewAction, QKeySequence(Qt::META | Qt::Key_O));
 
     auto gridAction = m_gridState->toggleAction();
     gridAction->setObjectName(QStringLiteral("Grid View"));
     gridAction->setText(i18nc("@action Grid view is the name of a Kwin effect", "Toggle Grid View"));
     gridAction->setAutoRepeat(false);
-    KGlobalAccel::setGlobalShortcut(gridAction, QKeySequence(Qt::META | Qt::Key_G));
+    KGlobalAccel::setGlobalShortcut(gridAction, QList<QKeySequence>{});
 
     connect(effects, &EffectsHandler::screenAboutToLock, this, &OverviewEffect::deactivateNow);
 

@@ -931,13 +931,17 @@ void VirtualDesktopManager::initSwitchToShortcuts()
 {
     const QString toDesktop = QStringLiteral("Switch to Desktop %1");
     const KLocalizedString toDesktopLabel = ki18n("Switch to Desktop %1");
-    // TODO Plasma 7: Remove Ctrl keybindings
-    addAction(toDesktop, toDesktopLabel, 1, QList<QKeySequence>{QKeySequence(Qt::META | Qt::Key_F1), QKeySequence(Qt::CTRL | Qt::Key_F1)}, &VirtualDesktopManager::slotSwitchTo);
-    addAction(toDesktop, toDesktopLabel, 2, QList<QKeySequence>{QKeySequence(Qt::META | Qt::Key_F2), QKeySequence(Qt::CTRL | Qt::Key_F2)}, &VirtualDesktopManager::slotSwitchTo);
-    addAction(toDesktop, toDesktopLabel, 3, QList<QKeySequence>{QKeySequence(Qt::META | Qt::Key_F3), QKeySequence(Qt::CTRL | Qt::Key_F3)}, &VirtualDesktopManager::slotSwitchTo);
-    addAction(toDesktop, toDesktopLabel, 4, QList<QKeySequence>{QKeySequence(Qt::META | Qt::Key_F4), QKeySequence(Qt::CTRL | Qt::Key_F4)}, &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 1, QKeySequence(Qt::META | Qt::Key_1), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 2, QKeySequence(Qt::META | Qt::Key_2), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 3, QKeySequence(Qt::META | Qt::Key_3), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 4, QKeySequence(Qt::META | Qt::Key_4), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 5, QKeySequence(Qt::META | Qt::Key_5), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 6, QKeySequence(Qt::META | Qt::Key_6), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 7, QKeySequence(Qt::META | Qt::Key_7), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 8, QKeySequence(Qt::META | Qt::Key_8), &VirtualDesktopManager::slotSwitchTo);
+    addAction(toDesktop, toDesktopLabel, 9, QKeySequence(Qt::META | Qt::Key_9), &VirtualDesktopManager::slotSwitchTo);
 
-    for (uint i = 5; i <= maximum(); ++i) {
+    for (uint i = 10; i <= maximum(); ++i) {
         addAction(toDesktop, toDesktopLabel, i, QKeySequence(), &VirtualDesktopManager::slotSwitchTo);
     }
 }
