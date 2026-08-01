@@ -12,7 +12,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        12%{?dist}
+Release:        13%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -307,6 +307,20 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Sat Aug 01 2026 LGL <lgl@localhost> - 6.7.80-13
+- Rebuild from latest master to pick up:
+  - kde-output-device-v2.xml cvt event fixed to since=24 (matching the
+    interface version and the client-side plasma-wayland-protocols copy);
+    the previous since=23 mismatch shifted event opcodes on the wire and
+    crashed System Settings > Display & Monitor on open
+  - KineticWE default global shortcuts for fresh installs (Window Close:
+    Meta+Q, Overview: Meta+O, Tiling Toggle Floating: Meta+V, Swap Tiled
+    Window: Meta+Shift+arrows, Switch to Desktop: Meta+N, NoctaliaWindow
+    Switcher: Alt+Tab, several stale upstream defaults removed); registered
+    via KGlobalAccel autoloading so existing user keybind configs are
+    untouched
+  - Fix wallpaper showing through in the Overview effect
+
 * Wed Jul 29 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-12
 - Work around a kconfig_compiler bug (KF6 <= 6.28, i.e. every released
   Fedora/Arch build) that misgenerates the RuleSettings mutator for the
