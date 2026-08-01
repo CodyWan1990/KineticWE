@@ -32,7 +32,15 @@ static WindowType scopeToType(const QString &scope)
         {QStringLiteral("splash"), WindowType::Splash},
         {QStringLiteral("utility"), WindowType::Utility},
     };
-    return scopeToType.value(scope.toLower(), WindowType::Normal);
+    const QString lowerScope = scope.toLower();
+    // Noctalia renders the wallpaper as a layer shell surface; treat it like
+    // plasmashell's desktop window so that effects looking for the desktop
+    // background (overview, desktop grid, present windows) can find it.
+    // Prefix match in case the scope gets suffixed (e.g. per output).
+    if (lowerScope.startsWith(QStringLiteral("noctalia-wallpaper"))) {
+        return WindowType::Desktop;
+    }
+    return scopeToType.value(lowerScope, WindowType::Normal);
 }
 
 LayerShellV1Window::LayerShellV1Window(LayerSurfaceV1Interface *shellSurface,
