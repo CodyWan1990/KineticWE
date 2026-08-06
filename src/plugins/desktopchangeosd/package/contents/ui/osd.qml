@@ -29,6 +29,7 @@ PlasmaCore.Window {
             } else {
                 dialogItem.showGrid = true;
             }
+            dialogItem.showTilingLayout = (KWin.readConfig("ShowTilingLayout", "false") == "true");
         }
 
         id: dialogItem
@@ -38,9 +39,10 @@ PlasmaCore.Window {
         property int previousIndex: 0
         property int animationDuration: 1000
         property bool showGrid: true
+        property bool showTilingLayout: false
 
-        implicitWidth: dialogItem.showGrid ? view.itemWidth * view.columns : Math.ceil(textElement.implicitWidth)
-        implicitHeight: dialogItem.showGrid ? view.itemHeight * view.rows + textElement.implicitHeight : textElement.implicitHeight
+        implicitWidth: dialogItem.showGrid ? view.itemWidth * view.columns : Math.ceil(Math.max(textElement.implicitWidth, layoutElement.visible ? layoutElement.implicitWidth : 0))
+        implicitHeight: (dialogItem.showGrid ? view.itemHeight * view.rows : 0) + textElement.implicitHeight + (layoutElement.visible ? layoutElement.implicitHeight : 0)
 
         Kirigami.Heading {
             id: textElement
@@ -52,6 +54,19 @@ PlasmaCore.Window {
             elide: Text.ElideRight
         }
 
+        Kirigami.Heading {
+            id: layoutElement
+            level: 4
+            anchors.top: textElement.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.NoWrap
+            elide: Text.ElideRight
+            opacity: 0.8
+            visible: dialogItem.showTilingLayout && text.length > 0
+        }
+
         Grid {
             id: view
             columns: 1
@@ -59,7 +74,7 @@ PlasmaCore.Window {
             property int itemWidth: dialogItem.screenWidth * Math.min(0.8/columns, 0.1)
             property int itemHeight: Math.min(itemWidth * (dialogItem.screenHeight / dialogItem.screenWidth), dialogItem.screenHeight * Math.min(0.8/rows, 0.1))
             anchors {
-                top: textElement.bottom
+                top: layoutElement.visible ? layoutElement.bottom : textElement.bottom
                 left: parent.left
                 right: parent.right
                 bottom: parent.bottom
@@ -276,6 +291,11 @@ PlasmaCore.Window {
             view.rows = Workspace.desktopGridHeight;
         }
         textElement.text = current.name;
+        if (dialogItem.showTilingLayout) {
+            layoutElement.text = Workspace.tilingLayoutDisplayName(screen, current);
+        } else {
+            layoutElement.text = "";
+        }
         dialog.visible = true;
         // position might have changed
         dialog.x = screenGeometry.x + screenGeometry.width/2 - dialogItem.width/2;

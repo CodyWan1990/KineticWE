@@ -404,6 +404,15 @@ public:
     Q_INVOKABLE KWin::Tile *rootTile(KWin::LogicalOutput *output, KWin::VirtualDesktop *desktop) const;
 
     /*!
+     * \qmlmethod string Workspace::tilingLayoutDisplayName(LogicalOutput output, VirtualDesktop desktop)
+     *
+     * Returns the display name of the tiling layout in effect for the given
+     * @a output and @a desktop (e.g. "Master & Stack"), or an empty string
+     * when native tiling is disabled.
+     */
+    Q_INVOKABLE QString tilingLayoutDisplayName(KWin::LogicalOutput *output, KWin::VirtualDesktop *desktop) const;
+
+    /*!
      * \qmlmethod rect Workspace::clientArea(enumeration option, LogicalOutput output, VirtualDesktop desktop)
      *
      * Returns the geometry a Client can use with the specified option.

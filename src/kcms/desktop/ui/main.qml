@@ -359,6 +359,27 @@ KCM.ScrollViewKCM {
                     }
                 }
             }
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                Item {
+                    Layout.preferredWidth: Kirigami.Units.gridUnit
+                }
+
+                QQC2.CheckBox {
+                    id: osdShowTilingLayout
+                    text: i18n("Show current tiling layout")
+                    checked: kcm.virtualDesktopsSettings.showTilingLayout
+                    onToggled: kcm.virtualDesktopsSettings.showTilingLayout = checked
+
+                    KCM.SettingStateBinding {
+                        configObject: kcm.virtualDesktopsSettings
+                        settingName: "showTilingLayout"
+                        extraEnabledConditions: osdEnabled.checked
+                    }
+                }
+            }
         }
     }
 }
