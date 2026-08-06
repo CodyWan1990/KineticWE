@@ -33,5 +33,9 @@
       <label>Whether or not to display desktop layout in the OSD</label>
       <default>false</default>
     </entry>
+    <entry name="showTilingLayout" key="ShowTilingLayout" type="Bool">
+      <label>Whether or not to display the current tiling layout in the OSD</label>
+      <default>false</default>
+    </entry>
   </group>
 </kcfg>

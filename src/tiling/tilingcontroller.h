@@ -153,6 +153,17 @@ public:
 
     TilingRules *rules() const { return m_rules.get(); }
 
+    /** Whether native tiling is currently enabled (kwinrc [Tiling] Enabled). */
+    bool isEnabled() const { return m_enabled; }
+
+    /**
+     * The layout kind in effect for (@p output, @p desktop): the live
+     * engine's kind when one is attached (reflecting runtime layout
+     * switches), otherwise the configured kind from the kwinrc fallback
+     * chain (per-desktop+output -> per-output -> global default).
+     */
+    LayoutEngine::LayoutKind layoutKindFor(LogicalOutput *output, VirtualDesktop *desktop) const;
+
     enum class BorderMode {
         None,
         AllTiled,

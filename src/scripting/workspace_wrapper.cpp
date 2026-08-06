@@ -16,6 +16,7 @@
 #include "outline.h"
 #include "scripting_logging.h"
 #include "tiles/tilemanager.h"
+#include "tiling/tilingcontroller.h"
 #include "virtualdesktops.h"
 #include "window.h"
 #include "workspace.h"
@@ -495,6 +496,15 @@ KWin::TileManager *WorkspaceWrapper::tilingForScreen(LogicalOutput *output) cons
 Tile *WorkspaceWrapper::rootTile(LogicalOutput *output, VirtualDesktop *desktop) const
 {
     return workspace()->rootTile(output, desktop);
+}
+
+QString WorkspaceWrapper::tilingLayoutDisplayName(LogicalOutput *output, VirtualDesktop *desktop) const
+{
+    TilingController *controller = workspace()->tilingController();
+    if (!controller || !controller->isEnabled()) {
+        return QString();
+    }
+    return LayoutEngine::layoutDisplayName(controller->layoutKindFor(output, desktop));
 }
 
 QtScriptWorkspaceWrapper::QtScriptWorkspaceWrapper(QObject *parent)

@@ -319,6 +319,18 @@ LayoutEngine::LayoutKind TilingController::globalDefaultLayoutKind() const
     return m_defaultLayout;
 }
 
+LayoutEngine::LayoutKind TilingController::layoutKindFor(LogicalOutput *output, VirtualDesktop *desktop) const
+{
+    if (m_workspace && output && desktop) {
+        if (TileManager *manager = m_workspace->tileManager(output)) {
+            if (LayoutEngine *engine = manager->layoutEngine(desktop)) {
+                return engine->layoutKind();
+            }
+        }
+    }
+    return resolveLayoutKind(output, desktop);
+}
+
 LayoutEngine::LayoutKind TilingController::resolveLayoutKind(LogicalOutput *output, VirtualDesktop *desktop) const
 {
     KSharedConfigPtr config = KSharedConfig::openConfig(KWIN_CONFIG);
