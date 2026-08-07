@@ -109,19 +109,34 @@ systemctl --user start plasma-kded6.service 2>/dev/null || true
 systemctl --user start plasma-ksmserver.service 2>/dev/null || true
 
 # Rebuild KDE service cache so shortcuts / System Settings find components.
+# Backgrounded: a cold rebuild can take 15-25s and must not stall the shell.
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
-    kbuildsycoca6 --noincremental 2>/dev/null || true
+    kbuildsycoca6 --noincremental 2>/dev/null &
 fi
 
 # Portals: KDE backend first so the frontend discovers Screenshot/ScreenCast.
 killall -q xdg-desktop-portal-kde xdg-desktop-portal xdg-desktop-portal-gtk xdg-document-portal 2>/dev/null || true
-sleep 1
+
+# Wait for a stale backend (if any) to release its D-Bus name; instant on a
+# fresh login (replaces the fixed sleep 1).
+for _ in $(seq 1 20); do
+    busctl --user status org.freedesktop.impl.portal.desktop.kde >/dev/null 2>&1 || break
+    sleep 0.1
+done
 
 mkdir -p "$HOME/.local/share" 2>/dev/null || true
 
 # xdg-desktop-portal-kde needs XDG_CURRENT_DESKTOP=KDE to register correctly.
 XDG_CURRENT_DESKTOP=KDE nohup @xdg_desktop_portal_kde@ >"$HOME/.local/share/xdg-desktop-portal-kde.log" 2>&1 &
-sleep 2
+
+# Start the frontend once the backend owns its D-Bus name (replaces the
+# fixed sleep 2; normally instant). Skip the wait if busctl is missing.
+if command -v busctl >/dev/null 2>&1; then
+    for _ in $(seq 1 50); do
+        busctl --user status org.freedesktop.impl.portal.desktop.kde >/dev/null 2>&1 && break
+        sleep 0.1
+    done
+fi
 nohup @xdg_desktop_portal@ >"$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
 
 # Power management (best-effort; paths are Nix store binaries).
@@ -148,6 +163,14 @@ chmod +x "${dl}STARTUP_PAYLOAD"
 # Stop any competing global-shortcuts daemon so kwin-we can own the D-Bus name.
 systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
 pkill -x kglobalacceld 2>/dev/null || true
+
+# Publish the pre-compositor session environment to D-Bus/systemd now, so
+# services D-Bus-activated during compositor startup (portals, kwalletd6,
+# ksecretd) see XDG_CURRENT_DESKTOP & co. The payload re-publishes the full
+# environment (including WAYLAND_DISPLAY/DISPLAY) once KWin is up.
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP KDE_SESSION_VERSION KDE_FULL_SESSION XDG_MENU_PREFIX XDG_DATA_DIRS 2>/dev/null || true
+fi
 
 log "Launching: ${dl}KINETIC_WE --xwayland --exit-with-session ${dl}STARTUP_PAYLOAD"
 exec "${dl}KINETIC_WE" --xwayland --exit-with-session "${dl}STARTUP_PAYLOAD"
