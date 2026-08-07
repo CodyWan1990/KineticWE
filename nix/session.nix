@@ -43,7 +43,7 @@ DesktopNames=KDE
 DESKTOPEOF
 
     cat > "$out/bin/start-kineticwe" << 'SCRIPTEOF'
-#!/bin/bash
+#!/usr/bin/env bash
 # KineticWE — session launcher (Nix-built).
 # Mirrors scripts/start-kineticwe.sh / the COPR RPM launcher.
 set -e
@@ -82,7 +82,7 @@ mkdir -p "${dl}STARTUP_PAYLOAD_DIR" 2>/dev/null || true
 STARTUP_PAYLOAD="${dl}STARTUP_PAYLOAD_DIR/startup.sh"
 
 cat > "${dl}STARTUP_PAYLOAD" << 'PAYLOADEOF'
-#!/bin/bash
+#!/usr/bin/env bash
 export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
 export XDG_SESSION_DESKTOP=KDE
@@ -101,6 +101,12 @@ export WAYLAND_DISPLAY="${dl}{WAYLAND_DISPLAY:-wayland-0}"
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd --all 2>/dev/null || true
 fi
+
+# KDE session daemons: kded6 loads plasma-pa's audioshortcutsservice module
+# (volume/mute keys via the "kmix" kglobalaccel component); ksmserver provides
+# session management. Best-effort on systems without plasma-workspace units.
+systemctl --user start plasma-kded6.service 2>/dev/null || true
+systemctl --user start plasma-ksmserver.service 2>/dev/null || true
 
 # Rebuild KDE service cache so shortcuts / System Settings find components.
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
@@ -153,8 +159,8 @@ SCRIPTEOF
     substituteInPlace "$out/bin/start-kineticwe" \
       --replace-fail "@noctalia@" "${noctalia}/bin/noctalia" \
       --replace-fail "@kwin_share@" "${kwinWe}/share" \
-      --replace-fail "@xdg_desktop_portal@" "${xdg-desktop-portal}/bin/xdg-desktop-portal" \
-      --replace-fail "@xdg_desktop_portal_kde@" "${kdePackages.xdg-desktop-portal-kde}/bin/xdg-desktop-portal-kde" \
+      --replace-fail "@xdg_desktop_portal@" "${xdg-desktop-portal}/libexec/xdg-desktop-portal" \
+      --replace-fail "@xdg_desktop_portal_kde@" "${kdePackages.xdg-desktop-portal-kde}/libexec/xdg-desktop-portal-kde" \
       --replace-fail "@upowerd@" "${upower}/libexec/upowerd" \
       --replace-fail "@powerdevil@" "${kdePackages.powerdevil}/libexec/org_kde_powerdevil"
 

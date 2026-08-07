@@ -203,6 +203,14 @@ mkdir -p "$HOME/.local/share"
 # "could not activate remote peer org.kde.spectacle: startup job failed".
 dbus-update-activation-environment --systemd --all 2>/dev/null || true
 
+# KDE session daemons. kded6 loads plasma-pa's audioshortcutsservice module,
+# which registers the volume/mute media keys under the "kmix" kglobalaccel
+# component; ksmserver provides session management. Without them the media
+# keys and other kded-registered global shortcuts never fire. Best-effort:
+# minimal installs without plasma-workspace units skip this.
+systemctl --user start plasma-kded6.service 2>/dev/null || true
+systemctl --user start plasma-ksmserver.service 2>/dev/null || true
+
 # Rebuild the KDE service cache so System Settings finds installed KCMs.
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 --noincremental 2>/dev/null || true
