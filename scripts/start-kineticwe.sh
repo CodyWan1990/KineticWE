@@ -203,6 +203,13 @@ mkdir -p "$HOME/.local/share"
 # "could not activate remote peer org.kde.spectacle: startup job failed".
 dbus-update-activation-environment --systemd --all 2>/dev/null || true
 
+# Bring up the curated session target. This pulls graphical-session.target
+# in as a dependency (the only way targets with RefuseManualStart=yes become
+# active), which starts the shell-independent Plasma session services
+# (KWallet PAM unlock, polkit agent, kcminit, session restore, XDG autostart,
+# ...) and any user unit with WantedBy=graphical-session.target.
+systemctl --user start kineticwe-workspace.target 2>/dev/null || true
+
 # Rebuild the KDE service cache so System Settings finds installed KCMs.
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 --noincremental 2>/dev/null || true
@@ -235,8 +242,13 @@ if [[ -n "$UPOWERD" ]]; then
 fi
 
 # org_kde_powerdevil provides idle timeouts, DPMS, suspend, brightness,
-# and power profile management
-if [[ -n "$POWERDEVIL" ]]; then
+# and power profile management. Where the Plasma user units exist it is
+# started via plasma-powerdevil.service by kineticwe-workspace.target (the
+# unit is Type=dbus and claims org.kde.Solid.PowerManagement); launch the
+# binary directly only when the unit is absent (e.g. NixOS).
+if systemctl --user cat plasma-powerdevil.service >/dev/null 2>&1; then
+    : # started via kineticwe-workspace.target
+elif [[ -n "$POWERDEVIL" ]]; then
     nohup "$POWERDEVIL" >"$HOME/.local/share/powerdevil.log" 2>&1 &
 else
     echo "Warning: org_kde_powerdevil not found; power management unavailable" >&2
@@ -264,7 +276,13 @@ SHELL_PID=$!
 # ---------------------------------------------------------------------------
 wait "$KWIN_PID" || true
 
-# Compositor exited — stop the supervised shell and let the greeter return.
+# Compositor exited — take the session services down with it. Stopping
+# graphical-session.target cascades to every PartOf= unit (kded6, ksmserver,
+# portals-era services, autostart apps) and via BindsTo stops our target.
+# (Manual stop is allowed; RefuseManualStart only blocks manual starts.)
+systemctl --user stop kineticwe-workspace.target graphical-session.target 2>/dev/null || true
+
+# Stop the supervised shell and let the greeter return.
 kill "$SHELL_PID" 2>/dev/null || true
 pkill -x noctalia 2>/dev/null || true
 trap - EXIT

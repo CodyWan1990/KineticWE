@@ -102,6 +102,12 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd --all 2>/dev/null || true
 fi
 
+# Pull the curated session target up: activates graphical-session.target via
+# dependency (despite RefuseManualStart) so user services with
+# WantedBy=graphical-session.target (e.g. Home Manager units) and XDG
+# autostart run. No-op where the unit file is not installed.
+systemctl --user start kineticwe-workspace.target 2>/dev/null || true
+
 # Rebuild KDE service cache so shortcuts / System Settings find components.
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 --noincremental 2>/dev/null || true
