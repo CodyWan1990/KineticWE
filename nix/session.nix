@@ -108,6 +108,12 @@ fi
 systemctl --user start plasma-kded6.service 2>/dev/null || true
 systemctl --user start plasma-ksmserver.service 2>/dev/null || true
 
+# Pull the curated session target up: activates graphical-session.target via
+# dependency (despite RefuseManualStart) so user services with
+# WantedBy=graphical-session.target (e.g. Home Manager units) and XDG
+# autostart run. No-op where the unit file is not installed.
+systemctl --user start kineticwe-workspace.target 2>/dev/null || true
+
 # Rebuild KDE service cache so shortcuts / System Settings find components.
 # Backgrounded: a cold rebuild can take 15-25s and must not stall the shell.
 if command -v kbuildsycoca6 >/dev/null 2>&1; then

@@ -330,6 +330,13 @@ ExecStart=
 MASKEOF
     chmod 0644 "$pkgdir/etc/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf"
 
+    # Install the KineticWE session target: a curated plasma-workspace.target
+    # replacement that pulls graphical-session.target up via dependency and
+    # starts the shell-independent Plasma session services (KWallet PAM,
+    # polkit agent, kcminit, session restore, XDG autostart, ...).
+    echo "==> Installing kineticwe-workspace.target systemd unit..."
+    install -Dm644 "$srcdir/$_sourcebase/scripts/kineticwe-workspace.target" "$pkgdir/usr/lib/systemd/user/kineticwe-workspace.target"
+
     # Install D-Bus service activation file for org.kde.kglobalaccel
     # The original kglobalacceld package provides this file, but since kineticwe
     # replaces/conflicts with kglobalacceld, the file is missing. Without it,

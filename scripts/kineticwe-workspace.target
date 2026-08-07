@@ -1,0 +1,48 @@
+# KineticWE session target — a curated replacement for plasma-workspace.target
+# for sessions running kinetic-we (KWin) + noctalia instead of plasmashell.
+#
+# Starting this target pulls graphical-session.target in as a dependency —
+# the only way a target with RefuseManualStart=yes (graphical-session.target,
+# xdg-desktop-autostart.target) becomes active. This mirrors the mechanism
+# startplasma uses via plasma-workspace-wayland.target, which KineticWE cannot
+# use because that unit Requires/BindsTo the stock plasma-kwin_wayland.service.
+#
+# Reaching graphical-session.target activates every user unit wired to it,
+# including any user/Home Manager service with:
+#   [Install] WantedBy=graphical-session.target
+#
+# plasma-plasmashell.service and plasma-kglobalaccel.service are deliberately
+# NOT wanted: noctalia replaces the shell, and kinetic-we embeds kglobalacceld
+# in-process (the standalone daemon is masked by kineticwe-mask.conf).
+
+[Unit]
+Description=KineticWE Workspace (Plasma session services without plasmashell)
+Requires=graphical-session.target
+BindsTo=graphical-session.target
+Before=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+
+# Shell-independent Plasma session services, curated from the Wants= lists of
+# plasma-workspace.target and plasma-core.target. All soft wants: units that
+# do not exist (minimal installs, NixOS) are skipped without failing.
+Wants=plasma-ksmserver.service
+Wants=plasma-kded6.service
+Wants=plasma-kcminit-phase1.service
+Wants=plasma-kcminit.service
+Wants=plasma-kwallet-pam.service
+Wants=plasma-powerdevil.service
+Wants=plasma-polkit-agent.service
+Wants=plasma-restoresession.service
+Wants=plasma-gmenudbusmenuproxy.service
+Wants=plasma-xembedsniproxy.service
+Wants=plasma-kaccess.service
+Wants=kde-baloo.service
+
+# XDG autostart applications (~/.config/autostart, /etc/xdg/autostart),
+# reached through the units created by systemd-xdg-autostart-generator.
+Wants=xdg-desktop-autostart.target
+Before=xdg-desktop-autostart.target
+Before=plasma-restoresession.service
+Before=plasma-startupsound.service
+

@@ -240,6 +240,7 @@ sed -e 's|@INSTALL_PREFIX@|%{_prefix}|g' \
 chmod 0755 %{buildroot}%{_bindir}/start-kineticwe
 install -Dpm 0644 %{SOURCE3} %{buildroot}%{_datadir}/wayland-sessions/kineticwe.desktop
 install -Dpm 0644 %{SOURCE4} %{buildroot}%{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
+install -Dpm 0644 %{_builddir}/%{name}-%{version}/scripts/kineticwe-workspace.target %{buildroot}%{_userunitdir}/kineticwe-workspace.target
 
 # Compatibility symlinks so the Plasma session can find its compositor
 ln -s kinetic-we %{buildroot}%{_bindir}/kwin_wayland
@@ -279,6 +280,7 @@ systemctl daemon-reload 2>/dev/null || true
 %{_bindir}/kwindowprop
 %{_bindir}/kwin-we_wayland_wrapper
 %{_bindir}/start-kineticwe
+%{_userunitdir}/kineticwe-workspace.target
 %{_libdir}/libKGlobalAccelD.so.*
 %{_libdir}/libkdecorations3.so.*
 %{_libdir}/libkdecorations3private.so.*
