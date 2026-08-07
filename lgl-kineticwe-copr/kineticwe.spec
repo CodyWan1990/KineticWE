@@ -12,7 +12,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        13%{?dist}
+Release:        14%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -307,6 +307,11 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Fri Aug 07 2026 LGL <lgl@localhost> - 6.7.80-14
+- Rebuild from latest master to pick up:
+  - Show current tiling layout in the desktop-switch on-screen display and
+    in System Settings > Desktop Effects/Virtual Desktops
+
 * Sat Aug 01 2026 LGL <lgl@localhost> - 6.7.80-13
 - Rebuild from latest master to pick up:
   - kde-output-device-v2.xml cvt event fixed to since=24 (matching the
