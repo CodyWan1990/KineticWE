@@ -112,6 +112,12 @@ systemctl --user start plasma-ksmserver.service 2>/dev/null || true
 # dependency (despite RefuseManualStart) so user services with
 # WantedBy=graphical-session.target (e.g. Home Manager units) and XDG
 # autostart run. No-op where the unit file is not installed.
+# Re-run the systemd user generators before bringing the session up: the
+# user manager can survive quick logout/login cycles (UserStopDelaySec),
+# so autostart entries added since it started would otherwise never get
+# generated units and silently not start.
+systemctl --user daemon-reload 2>/dev/null || true
+
 systemctl --user start kineticwe-workspace.target 2>/dev/null || true
 
 # Rebuild KDE service cache so shortcuts / System Settings find components.

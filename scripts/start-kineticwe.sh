@@ -226,6 +226,12 @@ systemctl --user start plasma-ksmserver.service 2>/dev/null || true
 # active), which starts the shell-independent Plasma session services
 # (KWallet PAM unlock, polkit agent, kcminit, session restore, XDG autostart,
 # ...) and any user unit with WantedBy=graphical-session.target.
+# Re-run the systemd user generators before bringing the session up: the
+# user manager can survive quick logout/login cycles (UserStopDelaySec),
+# so autostart entries added since it started would otherwise never get
+# generated units and silently not start.
+systemctl --user daemon-reload 2>/dev/null || true
+
 systemctl --user start kineticwe-workspace.target 2>/dev/null || true
 
 # Rebuild the KDE service cache so System Settings finds installed KCMs.
