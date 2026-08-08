@@ -31,6 +31,17 @@ void TilingRules::load(const KConfigGroup &group)
     m_floatDialog = group.readEntry("FloatDialog", true);
     m_floatTransient = group.readEntry("FloatTransient", true);
 
+    // Windows that must never be tiled, regardless of user configuration:
+    // system surfaces that deliberately present themselves as NORMAL-type,
+    // resizable windows and would otherwise be swept into a tile.
+    //
+    // xwaylandvideobridge: its capture surface (ContentsWindow) is a
+    // borderless, input-transparent, fully transparent (opacity 0) window
+    // sized to the union of all screens and shown at startup so X11 clients
+    // can capture it. Tiling it moves/resizes/decorates an invisible system
+    // surface, presenting it as a black box covering a monitor.
+    m_ignoreClasses.append(QStringLiteral("xwaylandvideobridge"));
+
     // Normalize class patterns: strip whitespace and lower-case for case-insensitive matching.
     auto normalize = [](QStringList &list) {
         for (QString &s : list) {
