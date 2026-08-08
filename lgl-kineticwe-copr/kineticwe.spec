@@ -12,7 +12,7 @@
 
 Name:           kineticwe
 Version:        6.7.80
-Release:        14%{?dist}
+Release:        15%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -307,6 +307,13 @@ systemctl daemon-reload 2>/dev/null || true
 %{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 
 %changelog
+* Sat Aug 08 2026 LGL <lgl@localhost> - 6.7.80-15
+- Rebuild from latest master to pick up:
+  - Expose live tiling layout state on the session bus at org.kde.KWin.Tiling
+    /Tiling, so the Noctalia kineticwe-layouts bar plugin and other external
+    consumers can read the active output's current layout, list enabled
+    layouts, and request layout switches (setLayout/cycleLayout)
+
 * Fri Aug 07 2026 LGL <lgl@localhost> - 6.7.80-14
 - Rebuild from latest master to pick up:
   - Show current tiling layout in the desktop-switch on-screen display and
