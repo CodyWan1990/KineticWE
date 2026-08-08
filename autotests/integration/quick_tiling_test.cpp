@@ -121,6 +121,7 @@ private Q_SLOTS:
     void testDontCrashWithMaximizeWindowRule();
     void testRestoreFromTiled();
     void testRestorePriorityOrder();
+    void testQuickTileStaysFullScreenAcrossDesktops();
 };
 
 void QuickTilingTest::initTestCase()
@@ -2491,6 +2492,66 @@ void QuickTilingTest::testRestorePriorityOrder()
     Test::render(surface.get(), toplevelConfigureRequestedSpy.last().at(0).toSize(), Qt::red);
     QTRY_COMPARE(window->quickTileMode(), QuickTileMode(QuickTileFlag::None));
     QTRY_COMPARE(window->frameGeometry(), originalGeometry);
+}
+
+void QuickTilingTest::testQuickTileStaysFullScreenAcrossDesktops()
+{
+    // Regression test: a fullscreen window that is attached to a tile must
+    // stay fullscreen when you leave and return to its desktop. Previously
+    // Workspace::updateWindowVisibilityAndActivateOnDesktopChange() re-applied
+    // the tile geometry on desktop return, dropping the window out of
+    // fullscreen (it looked like a freshly re-tiled window).
+    VirtualDesktopManager::self()->setCount(2);
+    VirtualDesktopManager::self()->setCurrent(1);
+
+    std::unique_ptr<KWayland::Client::Surface> surface(Test::createSurface());
+    std::unique_ptr<Test::XdgToplevel> shellSurface(Test::createXdgToplevelSurface(surface.get()));
+
+    const auto originalGeometry = Rect(0, 0, 100, 50);
+    auto window = Test::renderAndWaitForShown(surface.get(), originalGeometry.size(), Qt::blue);
+    QCOMPARE(workspace()->activeWindow(), window);
+    QCOMPARE(window->frameGeometry(), originalGeometry);
+
+    QSignalSpy toplevelConfigureRequestedSpy(shellSurface.get(), &Test::XdgToplevel::configureRequested);
+    QSignalSpy surfaceConfigureRequestedSpy(shellSurface->xdgSurface(), &Test::XdgSurface::configureRequested);
+    QVERIFY(surfaceConfigureRequestedSpy.wait());
+
+    const auto ackConfigure = [&]() {
+        shellSurface->xdgSurface()->ack_configure(surfaceConfigureRequestedSpy.last().at(0).value<quint32>());
+        Test::render(surface.get(), toplevelConfigureRequestedSpy.last().at(0).toSize(), Qt::red);
+    };
+
+    // Tile the window on the left half of the first desktop.
+    window->setQuickTileModeAtCurrentPosition(QuickTileFlag::Left);
+    QVERIFY(surfaceConfigureRequestedSpy.wait());
+    ackConfigure();
+    QTRY_COMPARE(window->quickTileMode(), QuickTileMode(QuickTileFlag::Left));
+    QCOMPARE(window->frameGeometry(), RectF(0, 0, 640, 1024));
+
+    // Make it fullscreen while still attached to its tile.
+    window->setFullScreen(true);
+    QVERIFY(surfaceConfigureRequestedSpy.wait());
+    ackConfigure();
+    QTRY_VERIFY(window->isFullScreen());
+    QCOMPARE(window->frameGeometry(), RectF(0, 0, 1280, 1024));
+
+    // Leave and come back to the first desktop. The window must remain
+    // fullscreen, not be forced back to its 640-wide tile.
+    VirtualDesktopManager::self()->setCurrent(2);
+    QVERIFY(window->isFullScreen());
+    VirtualDesktopManager::self()->setCurrent(1);
+    QTRY_VERIFY(window->isFullScreen());
+    QCOMPARE(window->frameGeometry(), RectF(0, 0, 1280, 1024));
+
+    // Leaving fullscreen still restores the tile association.
+    toplevelConfigureRequestedSpy.clear();
+    surfaceConfigureRequestedSpy.clear();
+    window->setFullScreen(false);
+    QVERIFY(surfaceConfigureRequestedSpy.wait());
+    ackConfigure();
+    QTRY_VERIFY(!window->isFullScreen());
+    QTRY_COMPARE(window->quickTileMode(), QuickTileMode(QuickTileFlag::Left));
+    QTRY_COMPARE(window->frameGeometry(), RectF(0, 0, 640, 1024));
 }
 
 }

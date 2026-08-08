@@ -7,6 +7,7 @@
   python3,
   kdePackages,           # all KF6 / Plasma / KDE deps live here
   kglobalacceldGit,      # git master build (replaces system kglobalacceld)
+  kdecorationGit,        # git master build (KDecoration3::Style; replaces system kdecoration)
   # Qt6
   qt6,
   # Other libraries
@@ -45,7 +46,7 @@ let
     kcmutils knewstuff knotifications kpackage krunner
     kservice ksvg kwidgetsaddons kwindowsystem kdeclarative kxmlgui
     kirigami
-    kdecoration kscreenlocker kwayland knighttime
+    kscreenlocker kwayland knighttime
     libplasma plasma-activities plasma-wayland-protocols
     aurorae breeze breeze-icons milou
     libqaccessibilityclient
@@ -113,7 +114,7 @@ stdenv.mkDerivation {
     kirigami
 
     # Plasma / Wayland
-    kdecoration
+    kdecorationGit
     kscreenlocker
     kwayland
     knighttime

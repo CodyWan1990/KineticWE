@@ -267,7 +267,14 @@ void WindowItem::updateTilingBorderItem()
 
     const TilingState &state = m_window->tilingState();
     if (!state.showBorder || qFuzzyIsNull(state.borderThickness)) {
-        m_tilingBorderItem.reset();
+        if (m_tilingBorderItem) {
+            m_tilingBorderItem.reset();
+            // The border is being removed (e.g. a fullscreen window now covers
+            // this neighbour). Repaint so no stale border pixels are left
+            // behind here; otherwise the old border keeps flickering until
+            // some unrelated window forces a redraw.
+            markDamaged();
+        }
         return;
     }
 
@@ -283,6 +290,10 @@ void WindowItem::updateTilingBorderItem()
     if (!m_tilingBorderItem) {
         m_tilingBorderItem = std::make_unique<OutlinedBorderItem>(innerRect, outline, this);
         m_tilingBorderItem->stackAfter(m_windowContainer.get());
+        // A freshly created border (e.g. this window just came back out of
+        // fullscreen) needs an explicit repaint; without it the border region
+        // goes stale on screen until an unrelated window forces a redraw.
+        markDamaged();
     } else {
         m_tilingBorderItem->setInnerRect(innerRect);
         m_tilingBorderItem->setOutline(outline);

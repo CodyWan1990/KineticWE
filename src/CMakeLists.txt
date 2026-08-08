@@ -227,6 +227,7 @@ target_sources(kwin PRIVATE
     tiles/tile.cpp
     tiles/tilemanager.cpp
     tiling/tilingcontroller.cpp
+    tiling/tilingdbusinterface.cpp
     tiling/tilingrules.cpp
     touch_input.cpp
     useractionprompt.cpp

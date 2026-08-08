@@ -1,10 +1,9 @@
 # Home Manager module for KineticWE.
 #
 # Usage:
-#   programs.kineticwe = {
-#     enable = true;
-#     # package = pkgs.kineticwe; # optional override
-#   };
+#   imports = [ inputs.kineticwe.homeModules.default ];
+#   nixpkgs.overlays = [ inputs.kineticwe.overlays.default ];
+#   programs.kineticwe.enable = true;   # optional: .package, .autostart
 #
 # This will:
 #   - Put `start-kineticwe` on the user's PATH
@@ -17,36 +16,11 @@
 #
 { config, lib, pkgs, ... }:
 
-let
-  cfg = config.programs.kineticwe;
-in
 {
-  options.programs.kineticwe = {
-    enable = lib.mkEnableOption "KineticWE — KWin window environment with noctalia";
+  imports = [ ./options.nix ];
 
-    package = lib.mkOption {
-      type = lib.types.package;
-      default = pkgs.kineticwe or (throw "programs.kineticwe.package is not set and pkgs.kineticwe is not available. Did you forget to apply the kineticwe overlay? Add `kineticwe.overlays.default` to `nixpkgs.overlays`, or set programs.kineticwe.package explicitly.");
-      defaultText = lib.literalExpression "pkgs.kineticwe";
-      description = ''
-        The KineticWE session package providing `bin/start-kineticwe`.
-        Typically the output of the kineticwe flake.
-      '';
-    };
-
-    autostart = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Whether to autostart KineticWE from the graphical session.
-        Most users should leave this `false` and pick "KineticWE" from
-        the display manager instead.
-      '';
-    };
-  };
-
-  config = lib.mkIf cfg.enable {
-    home.packages = [ cfg.package ];
+  config = lib.mkIf config.programs.kineticwe.enable {
+    home.packages = [ config.programs.kineticwe.package ];
 
     # wayland-sessions entry — picked up by greeters that search XDG data dirs.
     xdg.dataFile."wayland-sessions/KineticWE.desktop".text = ''
@@ -54,18 +28,18 @@ in
       Name=KineticWE
       Comment=A Kwin Window Environment
       Type=Application
-      Exec=${cfg.package}/bin/start-kineticwe
+      Exec=${config.programs.kineticwe.package}/bin/start-kineticwe
       DesktopNames=KDE
     '';
 
     # Optional: autostart from within an existing DE (rare).
-    xdg.configFile."autostart/kineticwe.desktop" = lib.mkIf cfg.autostart {
+    xdg.configFile."autostart/kineticwe.desktop" = lib.mkIf config.programs.kineticwe.autostart {
       text = ''
         [Desktop Entry]
         Name=KineticWE
         Comment=Start KineticWE (kwin-we + noctalia)
         Type=Application
-        Exec=${cfg.package}/bin/start-kineticwe
+        Exec=${config.programs.kineticwe.package}/bin/start-kineticwe
         Terminal=false
         X-GNOME-Autostart-enabled=true
       '';

@@ -35,6 +35,10 @@
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
         kwin-we = self.packages.${prev.stdenv.hostPlatform.system}.kwin-we
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
+        kdecoration = self.packages.${prev.stdenv.hostPlatform.system}.kdecoration
+          or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
+        kglobalacceld = self.packages.${prev.stdenv.hostPlatform.system}.kglobalacceld
+          or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
         noctalia = self.packages.${prev.stdenv.hostPlatform.system}.noctalia
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
       };
@@ -49,8 +53,11 @@
           config.allowUnfree = true;
         };
 
+        kglobalacceldGit = pkgs.callPackage ./nix/kglobalacceld-git.nix { };
+        kdecorationGit = pkgs.callPackage ./nix/kdecoration-git.nix { };
+
         kwinWe = pkgs.callPackage ./nix/kwin-we.nix {
-          kglobalacceldGit = pkgs.callPackage ./nix/kglobalacceld-git.nix { };
+          inherit kglobalacceldGit kdecorationGit;
         };
 
         # The session package wires kwin-we + noctalia + xdg-desktop-portal
@@ -67,6 +74,8 @@
           default = session;
           kwin-we = kwinWe;
           session = session;
+          kdecoration = kdecorationGit;
+          kglobalacceld = kglobalacceldGit;
           noctalia = noctalia.packages.${system}.default;
         };
 

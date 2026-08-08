@@ -1134,7 +1134,13 @@ void Workspace::updateWindowVisibilityAndActivateOnDesktopChange(VirtualDesktop 
         // For tiled windows, always update geometry from the tile even if the
         // requested tile hasn't changed, because the tile's geometry may have
         // been updated by a reflow (e.g. when another window was removed).
-        if (tile && window->tilingState().mode == TilingState::Mode::Tiled) {
+        //
+        // But never stomp a fullscreen window's geometry. Fullscreen keeps its
+        // tile membership by design (so it restores to the tile on exit), so
+        // without this guard the force-resize below would re-tile a fullscreen
+        // window the moment the user returns to its desktop.
+        if (tile && window->tilingState().mode == TilingState::Mode::Tiled
+            && !window->isFullScreen()) {
             window->moveResize(tile->windowGeometry());
         }
         window->requestTile(tile);
@@ -1198,7 +1204,17 @@ Window *Workspace::findWindowToActivateOnDesktop(VirtualDesktop *desktop)
             }
         }
     }
-    return m_focusChain->getForActivation(desktop);
+    Window *window = m_focusChain->getForActivation(desktop);
+    // With per-output virtual desktops, each output is its own workspace:
+    // never activate a window living on another output as a side effect of
+    // switching this output's desktop. Doing so would move the active output
+    // (see Workspace::activateWindow) and misroute the next desktop switch.
+    // Returning nullptr here makes activateWindowOnDesktop() fall back to the
+    // desktop window on the correct output (or resetFocus()).
+    if (window && VirtualDesktopManager::self()->isPerOutputVirtualDesktops() && window->output() != activeOutput()) {
+        return nullptr;
+    }
+    return window;
 }
 
 /**
