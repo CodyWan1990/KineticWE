@@ -29,6 +29,7 @@ namespace KWin
 class LayoutEngine;
 class LogicalOutput;
 class TileManager;
+class TilingDBusInterface;
 class VirtualDesktop;
 class Window;
 class Workspace;
@@ -164,6 +165,19 @@ public:
      */
     LayoutEngine::LayoutKind layoutKindFor(LogicalOutput *output, VirtualDesktop *desktop) const;
 
+    /**
+     * Kind string of the layout in effect for the active output's current
+     * desktop, or an empty string when tiling is disabled or there is no
+     * active output/desktop. Exposed for the D-Bus interface.
+     */
+    QString currentLayoutKindString() const;
+
+    /**
+     * The layouts enabled in kwinrc ([Tiling] EnabledLayouts), in cycle
+     * order. Exposed for the D-Bus interface.
+     */
+    QList<LayoutEngine::LayoutKind> enabledLayoutKinds() const;
+
     enum class BorderMode {
         None,
         AllTiled,
@@ -207,7 +221,6 @@ private:
     void setupLayoutEngine(TileManager *manager, VirtualDesktop *desktop, LayoutEngine::LayoutKind kind);
     LayoutEngine::LayoutKind resolveLayoutKind(LogicalOutput *output, VirtualDesktop *desktop = nullptr) const;
     LayoutEngine::LayoutKind globalDefaultLayoutKind() const;
-    QList<LayoutEngine::LayoutKind> enabledLayoutKinds() const;
     bool isLayoutEnabled(LayoutEngine::LayoutKind kind) const;
     void applyGapSettingsToOutput(LogicalOutput *output);
     void applyCenterTileRatioToOutput(LogicalOutput *output);
@@ -225,6 +238,8 @@ private:
 
     QPointer<Workspace> m_workspace;
     std::unique_ptr<TilingRules> m_rules;
+    // Owned by this controller. Registered on the session bus at /Tiling.
+    TilingDBusInterface *m_dbusInterface = nullptr;
     bool m_enabled = true;
     LayoutEngine::LayoutKind m_defaultLayout = LayoutEngine::LayoutKind::MasterStack;
     // Per-tile resize step. Units: weight (master/stack column ratio) for

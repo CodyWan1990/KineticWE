@@ -6,6 +6,8 @@
 
 #include "tilingcontroller.h"
 
+#include "tilingdbusinterface.h"
+
 #include "core/output.h"
 #include "core/rect.h"
 #include "cursor.h"
@@ -66,6 +68,14 @@ TilingController::TilingController(Workspace *workspace)
     , m_workspace(workspace)
     , m_rules(std::make_unique<TilingRules>())
 {
+    // Expose the live tiling state on the session bus before the first
+    // reconfigure() so external consumers (Noctalia bar plugin, scripts)
+    // see the /Tiling object from the start. The object becomes reachable
+    // once DBusInterface acquires the org.kde.KWin service name.
+    m_dbusInterface = new TilingDBusInterface(this, this);
+    QDBusConnection::sessionBus().registerObject(QStringLiteral("/Tiling"), m_dbusInterface,
+                                                 QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals);
+
     reconfigure();
 
     if (m_workspace) {
@@ -164,11 +174,13 @@ void TilingController::reconfigure()
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
     KConfigGroup rulesGroup(config, QStringLiteral("TilingRules"));
 
+    const bool wasEnabled = m_enabled;
     m_enabled = tilingGroup.readEntry("Enabled", true);
     m_defaultLayout = LayoutEngine::layoutKindFromString(
         tilingGroup.readEntry("DefaultLayout", QStringLiteral("MasterStack")));
     // Whitelist of layouts the user wants available. Order in the list also
     // defines the cycle order used by cycleLayout().
+    const QStringList previousEnabledLayouts = m_enabledLayouts;
     m_enabledLayouts = tilingGroup.readEntry("EnabledLayouts",
         QStringList{QLatin1String("MasterStack"), QLatin1String("Stacked"), QLatin1String("CenterTile"), QLatin1String("Columns"), QLatin1String("Monocle"), QLatin1String("AutoGrid")});
     m_rules->load(rulesGroup);
@@ -230,6 +242,17 @@ void TilingController::reconfigure()
 
     initializeLayouts();
     reconcileLayoutKinds();
+
+    if (m_dbusInterface) {
+        if (m_enabledLayouts != previousEnabledLayouts) {
+            Q_EMIT m_dbusInterface->enabledLayoutsChanged(m_enabledLayouts);
+        }
+        // Toggling tiling on/off changes what currentLayout() reports even
+        // though no engine kind changed.
+        if (m_enabled != wasEnabled) {
+            Q_EMIT m_dbusInterface->layoutChanged(currentLayoutKindString());
+        }
+    }
 
     if (m_workspace) {
         for (LogicalOutput *output : m_workspace->outputs()) {
@@ -329,6 +352,22 @@ LayoutEngine::LayoutKind TilingController::layoutKindFor(LogicalOutput *output, 
         }
     }
     return resolveLayoutKind(output, desktop);
+}
+
+QString TilingController::currentLayoutKindString() const
+{
+    if (!m_enabled || !m_workspace) {
+        return QString();
+    }
+    LogicalOutput *output = m_workspace->activeOutput();
+    if (!output) {
+        return QString();
+    }
+    VirtualDesktop *desktop = VirtualDesktopManager::self()->currentDesktop(output);
+    if (!desktop) {
+        return QString();
+    }
+    return LayoutEngine::layoutKindToString(layoutKindFor(output, desktop));
 }
 
 LayoutEngine::LayoutKind TilingController::resolveLayoutKind(LogicalOutput *output, VirtualDesktop *desktop) const
@@ -1458,6 +1497,7 @@ void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *deskto
     if (!existing) {
         // No engine yet — just create one in the requested kind.
         setupLayoutEngine(manager, desktop, kind);
+        Q_EMIT m_dbusInterface->layoutChanged(LayoutEngine::layoutKindToString(kind));
         return;
     }
 
@@ -1505,6 +1545,8 @@ void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *deskto
         }
         fresh->addWindow(w);
     }
+
+    Q_EMIT m_dbusInterface->layoutChanged(LayoutEngine::layoutKindToString(kind));
 }
 
 void TilingController::reconcileLayoutKinds()
