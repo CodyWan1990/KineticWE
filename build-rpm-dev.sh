@@ -262,7 +262,12 @@ quick_build() {
         if ! grep -q 'mDecorationpolicy = int(v)' "\$KCFG_TEST/rulesettings.h" 2>/dev/null; then
             echo '[STEP] System kconfig_compiler is broken (KConfig <6.30); building fixed one...'
             KCFG_FIX=\$(mktemp -d /tmp/kconfig-fix.XXXXXX)
-            git clone --depth 1 https://invent.kde.org/frameworks/kconfig "\$KCFG_FIX/src"
+            # Pin to the enum-setter fix commit (41592ccf). kconfig master now
+            # requires ECM >= 6.29 but Fedora 44 ships ECM 6.28, so a blind
+            # '--depth 1' clone of master fails to configure. Clone with enough
+            # history to reach the fix and check it out explicitly.
+            git clone --filter=blob:none https://invent.kde.org/frameworks/kconfig "\$KCFG_FIX/src"
+            git -C "\$KCFG_FIX/src" checkout 41592ccf
             cmake -B "\$KCFG_FIX/build" -S "\$KCFG_FIX/src" \\
                 -DCMAKE_BUILD_TYPE=Release \\
                 -DBUILD_TESTING=OFF

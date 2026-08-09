@@ -192,6 +192,10 @@ private Q_SLOTS:
     void onWindowMinimizedChanged(Window *window);
     void onWindowMaximizedChanged(Window *window);
     void onWindowFullScreenChanged(Window *window);
+    // Re-evaluate ignore/float rules when a window's WM_CLASS arrives
+    // late (XWayland clients set WM_CLASS asynchronously after map), so
+    // a window tiled before its class was known can still be floated.
+    void onWindowClassChanged(Window *window);
     // Called when the noctalia colors file (or kdeglobals) reports a
     // change. Debounces the actual re-read so we only re-resolve colors
     // once per batch of file events.

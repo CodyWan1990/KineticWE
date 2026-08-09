@@ -749,6 +749,14 @@ void TilingController::onWindowAdded(Window *window)
         }
     });
 
+    // XWayland clients (and some native ones) set WM_CLASS asynchronously,
+    // AFTER the window is first mapped. initialMode() below runs once at
+    // map time when resourceClass() may still be empty, so an IgnoreClass
+    // rule (e.g. xwaylandvideobridge) can be missed and the window gets
+    // tiled anyway. Re-evaluate when the class actually arrives.
+    connect(window, &Window::windowClassChanged, this,
+            [this, window]() { onWindowClassChanged(window); });
+
     // Don't touch already-managed windows (e.g. on-all-desktops already handled).
     if (window->tilingState().mode != TilingState::Mode::Floating) {
         updateBorders();
@@ -925,6 +933,31 @@ void TilingController::removeWindowFromLayouts(Window *window)
 
     // Any active resize context for this window is now stale.
     m_activeResizes.remove(window);
+}
+
+void TilingController::onWindowClassChanged(Window *window)
+{
+    if (!m_enabled || !window) {
+        return;
+    }
+
+    // Only interested in windows that were tiled before their class was
+    // known. A window already Floating needs no correction; an ignored
+    // window that is somehow not yet tiled is handled by onWindowAdded.
+    if (window->tilingState().mode != TilingState::Mode::Tiled) {
+        return;
+    }
+
+    // Now that the class has arrived, re-run the ignore rules. If the
+    // window is ignored (e.g. xwaylandvideobridge), pull it out of every
+    // layout and float it so the layout reflows to fill the freed slot.
+    if (!m_rules->isIgnored(window)) {
+        return;
+    }
+
+    removeWindowFromLayouts(window);
+    window->tilingState().mode = TilingState::Mode::Floating;
+    updateBorders();
 }
 
 void TilingController::migrateWindow(Window *window, LogicalOutput *newOutput, VirtualDesktop *newDesktop)
