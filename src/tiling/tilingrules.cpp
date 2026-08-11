@@ -65,7 +65,30 @@ bool TilingRules::isIgnored(const Window *window) const
     if (matchTitle(window, m_ignoreTitles)) {
         return true;
     }
+    // The xwaylandvideobridge capture surface can additionally be identified
+    // by its window role ("ContentsWindow"), which is set even in cases where
+    // WM_CLASS arrives late. Belt-and-braces on top of the class match so it
+    // is never adopted into a tile and shown as a black box.
+    if (window->windowRole().toLower().contains(QLatin1StringView("contentswindow"))) {
+        return true;
+    }
     return false;
+}
+
+bool TilingRules::isVideoBridgeSurface(const Window *window) const
+{
+    if (!window || !window->isClient()) {
+        return false;
+    }
+    // Identified by its resource class; the window role ("ContentsWindow") is
+    // a fallback that is present even when WM_CLASS has not arrived yet. This
+    // matches isIgnored() above so that any window flagged here is also
+    // floated (never tiled), keeping tiling and the transparency sanitization
+    // in agreement about which surface they treat specially.
+    if (window->resourceClass().toLower().contains(QLatin1StringView("xwaylandvideobridge"))) {
+        return true;
+    }
+    return window->windowRole().toLower().contains(QLatin1StringView("contentswindow"));
 }
 
 bool TilingRules::isFloating(const Window *window) const

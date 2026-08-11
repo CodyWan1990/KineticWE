@@ -37,6 +37,17 @@ public:
     bool isIgnored(const Window *window) const;
 
     /**
+     * Returns true only for the xwaylandvideobridge capture surface — the one
+     * window that is documented to be fully transparent. This is deliberately
+     * separate from isIgnored(): isIgnored() also matches user-configured
+     * IgnoreClass rules and non-client windows, neither of which must ever be
+     * forced transparent/un-maximized. The opacity/maximize sanitization in
+     * TilingController keys off this narrow predicate so it can only ever
+     * touch the bridge surface.
+     */
+    bool isVideoBridgeSurface(const Window *window) const;
+
+    /**
      * Returns true if the window should be forced to float.
      */
     bool isFloating(const Window *window) const;

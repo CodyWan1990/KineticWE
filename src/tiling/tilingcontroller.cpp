@@ -757,6 +757,22 @@ void TilingController::onWindowAdded(Window *window)
     connect(window, &Window::windowClassChanged, this,
             [this, window]() { onWindowClassChanged(window); });
 
+    // The xwaylandvideobridge capture surface is documented to be fully
+    // transparent, but the boot-time _NET_WM_WINDOW_OPACITY race (and later
+    // maximize/active transitions) can leave Window::opacity() stuck at 1.0,
+    // presenting the surface as an opaque black box. The one-shot sanitize in
+    // onWindowAdded/onWindowClassChanged is not enough on its own because it
+    // can be undone after it runs, so re-sanitize whenever the opacity or
+    // maximize state changes. isVideoBridgeSurface() is evaluated at signal
+    // time (not connection time) so a late-arriving WM_CLASS is still honored,
+    // and the guards in sanitizeVideoBridgeSurface() make re-application
+    // idempotent. For any other window the predicate is false and this is a
+    // no-op, so it is safe to connect for every window.
+    connect(window, &Window::opacityChanged, this,
+            [this, window]() { sanitizeVideoBridgeSurface(window); });
+    connect(window, &Window::maximizedChanged, this,
+            [this, window]() { sanitizeVideoBridgeSurface(window); });
+
     // Don't touch already-managed windows (e.g. on-all-desktops already handled).
     if (window->tilingState().mode != TilingState::Mode::Floating) {
         updateBorders();
@@ -765,6 +781,16 @@ void TilingController::onWindowAdded(Window *window)
 
     TilingState::Mode mode = m_rules->initialMode(window);
     window->tilingState().mode = mode;
+
+    // The xwaylandvideobridge capture surface is documented to be fully
+    // transparent. When its class is known at map time it is floated right
+    // away (never reaching onWindowClassChanged), but the
+    // _NET_WM_WINDOW_OPACITY race can still leave it opaque. Enforce the
+    // intended transparency here too so it never presents as a black box.
+    // sanitizeVideoBridgeSurface() no-ops for any other window.
+    if (mode == TilingState::Mode::Floating) {
+        sanitizeVideoBridgeSurface(window);
+    }
 
     if (mode == TilingState::Mode::Tiled && !window->isMinimized()
         && window->maximizeMode() == MaximizeRestore) {
@@ -788,6 +814,7 @@ void TilingController::onWindowRemoved(Window *window)
     if (!window) {
         return;
     }
+    m_preTileGeometry.remove(window);
     removeWindowFromLayouts(window);
     updateBorders();
 }
@@ -891,6 +918,13 @@ void TilingController::addWindowToLayout(Window *window, LogicalOutput *output, 
         return;
     }
 
+    // Remember the window's geometry before the engine snaps it to its tile.
+    // If we later have to bail an ignored system surface (e.g.
+    // xwaylandvideobridge) out of tiling after its WM_CLASS arrives, this
+    // lets us restore the pre-snap geometry instead of leaving it stretched
+    // over the output as a black box.
+    m_preTileGeometry.insert(window, window->moveResizeGeometry());
+
     engine->addWindow(window);
 
     // If the window did not end up managed, surface the failure in logs but
@@ -957,7 +991,64 @@ void TilingController::onWindowClassChanged(Window *window)
 
     removeWindowFromLayouts(window);
     window->tilingState().mode = TilingState::Mode::Floating;
+
+    // Undo any maximized state and pin the documented-transparent surface to
+    // opacity 0. This must run BEFORE restoring the pre-snap geometry below:
+    // setMaximize(false, false) applies the geometry-restore rect itself, so
+    // the explicit moveResize() afterwards is what actually leaves the window
+    // at its intended pre-tile geometry.
+    sanitizeVideoBridgeSurface(window);
+
+    // If the window was adopted while its class was still unknown and snapped
+    // to a fullscreen tile, restore its pre-snap geometry now. Otherwise it
+    // is left floating but still stretched over the output as a black box.
+    auto it = m_preTileGeometry.find(window);
+    if (it != m_preTileGeometry.end()) {
+        const RectF preTileGeometry = it.value();
+        m_preTileGeometry.erase(it);
+        if (!preTileGeometry.isEmpty()) {
+            window->moveResize(preTileGeometry);
+        }
+    }
+
     updateBorders();
+}
+
+void TilingController::sanitizeVideoBridgeSurface(Window *window)
+{
+    if (!window) {
+        return;
+    }
+    // Only the xwaylandvideobridge capture surface is documented to be
+    // transparent and is touched here. This narrow predicate (NOT isIgnored(),
+    // which also matches user IgnoreClass rules and non-client windows) means
+    // any other window that lands here — this runs for every window's
+    // opacityChanged/maximizedChanged — is left completely untouched.
+    if (!m_rules->isVideoBridgeSurface(window)) {
+        return;
+    }
+
+    // A maximized window is eligible for direct scanout, which bypasses the
+    // compositor's opacity blending entirely: even an opacity-0 surface would
+    // then scan out as an opaque black box. Restore it to its normal
+    // (floating) state so the opacity pin below actually takes effect.
+    // setMaximize() is a no-op when the window is not maximized, and it applies
+    // the geometry-restore rect, so callers restore the intended geometry
+    // afterwards.
+    if (window->maximizeMode() != MaximizeRestore) {
+        window->setMaximize(false, false);
+    }
+
+    // KWin reads _NET_WM_WINDOW_OPACITY once at map time. If the bridge set
+    // the property after that read, Window::opacity() is stuck at 1.0 and the
+    // invisible-by-design surface is composited as an opaque black box. Force
+    // the intended transparency. This is idempotent (Window::setOpacity()
+    // early-returns on no change, so calling this from opacityChanged cannot
+    // recurse) and safe for capture, because the surface content is read via
+    // X11, not via its on-screen pixels.
+    if (window->opacity() != 0.0) {
+        window->setOpacity(0.0);
+    }
 }
 
 void TilingController::migrateWindow(Window *window, LogicalOutput *newOutput, VirtualDesktop *newDesktop)

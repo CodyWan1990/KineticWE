@@ -203,6 +203,30 @@ private Q_SLOTS:
 
 private:
     bool shouldTile(const Window *window) const;
+    /**
+     * Sanitize the xwaylandvideobridge capture surface — the one window that
+     * is documented to be fully transparent (see TilingRules::isVideoBridgeSurface)
+     * — so it can never present as an opaque black box:
+     *  - undo any maximized state. A maximized window is a direct-scanout
+     *    candidate, and direct scanout bypasses the compositor's opacity
+     *    blending entirely, so even an opacity-0 window would scan out
+     *    opaque black; and
+     *  - pin it to opacity 0. KWin reads _NET_WM_WINDOW_OPACITY once at map
+     *    time; if the bridge sets the property after that initial read (a
+     *    race that does occur for the bridge at boot), the cached
+     *    Window::opacity() stays at 1.0 and the surface is composited opaque.
+     *
+     * This surface is invisible by design, so forcing the intended state is
+     * safe for capture (its content is read via X11, not via its on-screen
+     * pixels). The narrow predicate means no user-ignored or unmanaged window
+     * is ever touched.
+     *
+     * Idempotent: every guard early-returns when the window is already in the
+     * desired state (Window::setOpacity()/setMaximize() no-op on no change),
+     * so it is safe to call from the opacityChanged/maximizedChanged handlers
+     * without recursing.
+     */
+    void sanitizeVideoBridgeSurface(Window *window);
     void onWindowMoveFinished(Window *window);
     void focusInDirection(LayoutEngine::FocusDirection direction);
     void swapInDirection(LayoutEngine::FocusDirection direction);
@@ -318,6 +342,15 @@ private:
         Qt::Edge edge = Qt::RightEdge;
     };
     QHash<Window *, ResizeContext> m_activeResizes;
+
+    // The geometry a window had immediately before the tiling engine snapped
+    // it into a tile. Used to restore an ignored system surface (e.g. the
+    // xwaylandvideobridge capture surface, whose WM_CLASS can arrive after
+    // it was already adopted) back to its intended geometry instead of
+    // leaving it stuck at the fullscreen tile geometry — a giant black box
+    // covering the output. Populated in addWindowToLayout(), consumed (and
+    // cleared) in onWindowClassChanged(), and cleaned up in onWindowRemoved().
+    QHash<Window *, RectF> m_preTileGeometry;
 };
 
 } // namespace KWin
