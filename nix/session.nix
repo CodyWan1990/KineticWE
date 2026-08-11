@@ -102,12 +102,6 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd --all 2>/dev/null || true
 fi
 
-# KDE session daemons: kded6 loads plasma-pa's audioshortcutsservice module
-# (volume/mute keys via the "kmix" kglobalaccel component); ksmserver provides
-# session management. Best-effort on systems without plasma-workspace units.
-systemctl --user start plasma-kded6.service 2>/dev/null || true
-systemctl --user start plasma-ksmserver.service 2>/dev/null || true
-
 # Pull the curated session target up: activates graphical-session.target via
 # dependency (despite RefuseManualStart) so user services with
 # WantedBy=graphical-session.target (e.g. Home Manager units) and XDG

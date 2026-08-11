@@ -63,6 +63,13 @@ SPEC_VERSION=$(awk '/^Version:/ {print $2; exit}' "$SPEC_FILE")
 SPEC_RELEASE=$(awk '/^Release:/ {print $2; exit}' "$SPEC_FILE" | sed 's/%{?dist}//')
 PACKAGE=$(awk '/^Name:/ {print $2; exit}' "$SPEC_FILE")
 
+# Pinned KDE-source refs — the spec is the single source of truth. The quick
+# build downloads these exact commits instead of cloning KDE master, whose
+# ECM/KF6 requirements drift ahead of the Fedora container (KConfig master
+# now requires ECM 6.29.0 while Fedora 44 ships ECM 6.28.0).
+SPEC_KGA_REF=$(sed -n 's/.*%global kglobalacceld_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
+SPEC_KCONFIG_REF=$(sed -n 's/.*%global kconfig_compiler_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
+
 NEXT_DEV=1
 if [[ -d "$RESULTS_DIR" ]]; then
     EXISTING_DEVS=$(find "$RESULTS_DIR" -type f -name "*.rpm" -printf '%f\n' 2>/dev/null | grep -oP "\.dev\d+" | grep -oP "\d+" || true)
@@ -235,12 +242,16 @@ quick_build() {
 
         cd '$SCRIPT_DIR'
 
-        # Build kglobalacceld if not already installed
+        # Build kglobalacceld if not already installed. Pinned to the spec's
+        # kglobalacceld_ref: a floating master clone is not reproducible and
+        # breaks when master starts requiring a newer ECM/KF6 than the
+        # container provides.
         if ! pkg-config --exists KGlobalAccelD 2>/dev/null; then
             echo '[STEP] Building kglobalacceld first...'
             KGA_BUILD=\$(mktemp -d /tmp/kga-build.XXXXXX)
-            git clone --depth 1 https://invent.kde.org/plasma/kglobalacceld '\$KGA_BUILD'
-            cd '\$KGA_BUILD'
+            curl -fsSL https://invent.kde.org/plasma/kglobalacceld/-/archive/${SPEC_KGA_REF}/kglobalacceld-${SPEC_KGA_REF}.tar.gz \
+                | tar xz -C \"\$KGA_BUILD\" --strip-components=1
+            cd \"\$KGA_BUILD\"
             cmake -B build -S . \\
                 -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
                 -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
@@ -248,7 +259,7 @@ quick_build() {
             cmake --build build --parallel \$(nproc)
             cmake --install build
             cd '$SCRIPT_DIR'
-            rm -rf '\$KGA_BUILD'
+            rm -rf \"\$KGA_BUILD\"
         fi
 
         # kconfig_compiler from KConfig < 6.30 generates uncompilable setters
@@ -262,12 +273,12 @@ quick_build() {
         if ! grep -q 'mDecorationpolicy = int(v)' "\$KCFG_TEST/rulesettings.h" 2>/dev/null; then
             echo '[STEP] System kconfig_compiler is broken (KConfig <6.30); building fixed one...'
             KCFG_FIX=\$(mktemp -d /tmp/kconfig-fix.XXXXXX)
-            # Pin to the enum-setter fix commit (41592ccf). kconfig master now
-            # requires ECM >= 6.29 but Fedora 44 ships ECM 6.28, so a blind
-            # '--depth 1' clone of master fails to configure. Clone with enough
-            # history to reach the fix and check it out explicitly.
-            git clone --filter=blob:none https://invent.kde.org/frameworks/kconfig "\$KCFG_FIX/src"
-            git -C "\$KCFG_FIX/src" checkout 41592ccf
+            # Pinned to the spec's kconfig_compiler_ref: the commit with the
+            # enum-class setter fix. KConfig master now requires ECM 6.29.0,
+            # newer than the container's ECM 6.28.0 — hence no master clone.
+            mkdir -p \"\$KCFG_FIX/src\"
+            curl -fsSL https://invent.kde.org/frameworks/kconfig/-/archive/${SPEC_KCONFIG_REF}/kconfig-${SPEC_KCONFIG_REF}.tar.gz \
+                | tar xz -C \"\$KCFG_FIX/src\" --strip-components=1
             cmake -B "\$KCFG_FIX/build" -S "\$KCFG_FIX/src" \\
                 -DCMAKE_BUILD_TYPE=Release \\
                 -DBUILD_TESTING=OFF
