@@ -354,7 +354,7 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 | Shell identity | Hard cut to `XDG_CURRENT_DESKTOP=KineticWE` |
 | Compositor binary name | Already `kinetic-we`; leftover `kwin-we_wayland_wrapper` wrapper + nix/package identity renamed in Phase 5 (`kwin_wayland*` KDE-compat symlinks kept) |
 | Compositor repo strategy | New `kineticwe-2.0` branch in this repo; `master` untouched |
-| Shell repo strategy | New fork repo `kineticwe/noctalia` |
+| Shell repo strategy | Iteration 1: Noctalia vendored in this repo as a `shell/noctalia` git subtree (upstream-pullable); standalone `kineticwe/noctalia` fork repo deferred — split back out via `git subtree split` if wanted |
 | kglobalacceld | Keep embedded (library-level service inside the compositor) |
 | Portal backend | Our own `xdg-desktop-portal-kwe` backend, hosted by the Noctalia fork |
 | Power management | In-shell power service; PowerDevil/upower removed from session |
