@@ -3,4 +3,4 @@ Name=KineticWE-Dev
 Comment=KineticWE Wayland session (dev build)
 Exec=@INSTALL_PREFIX@/bin/start-kineticwe
 Type=Application
-DesktopNames=KDE
+DesktopNames=KineticWE

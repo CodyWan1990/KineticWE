@@ -3,4 +3,4 @@ Name=KineticWE
 Comment=A Kwin Window Environment
 Exec=@INSTALL_PREFIX@/bin/start-kineticwe
 Type=Application
-DesktopNames=KDE
+DesktopNames=KineticWE
