@@ -1,7 +1,7 @@
-# KineticWE 2.0 — Plan: No KDE Services, Full Control via the Noctalia Settings App
+# KineticWE 2.0 — Plan: No KDE Services, Full Control via the Kinetic Settings App
 
 Status: Approved plan. Not yet implemented.
-Scope: A fork of the Noctalia v5 shell + targeted patches to this compositor (KWin fork), producing a desktop environment that runs with zero KDE helper programs and manages all desktop settings from one app and one config folder.
+Scope: A fork of the Noctalia v5 shell (with the Kinetic Settings UI built in) + targeted patches to this compositor (KWin fork), producing a desktop environment that runs with zero KDE helper programs and manages all desktop settings from one settings UI (Kinetic Settings) and one config folder. Iteration 1 ships Kinetic Settings as a self-contained module inside the Noctalia fork that opens a full window; a standalone `kinetic-settings` app is the (deferred) iteration-2 extraction.
 
 ---
 
@@ -12,7 +12,8 @@ Scope: A fork of the Noctalia v5 shell + targeted patches to this compositor (KW
 Right now, KineticWE is two pieces of software working together:
 
 1. **KineticWE (the compositor)** — the engine that draws windows on your screen, handles tiling, moves and resizes things, and manages your displays, keyboard shortcuts, mouse, and workspaces.
-2. **Noctalia (the shell)** — everything you see on top of that: the bar, app launcher, dock, notifications, lock screen, wallpapers, and its own settings app where you change how it looks and behaves.
+2. **Noctalia (the shell)** — everything you see on top of that: the bar, app launcher, dock, notifications, lock screen, wallpapers, and its own settings app for shell appearance and behavior.
+3. **Kinetic Settings (the settings UI)** — the settings for compositor/desktop options: displays, keyboard shortcuts, mouse and pointer, cursor, icons, effects, tiling, and more. In iteration 1 it is a module inside the Noctalia shell that opens a full window — the same way Noctalia's own settings does — so there is no separate app or launcher entry to maintain yet.
 
 The catch: like most modern desktop environments, the current version quietly hires a few outside helpers that belong to the KDE project. Today there are exactly two *separate* helpers, plus one that is already built in:
 
@@ -25,16 +26,16 @@ The helpers work fine, but they come from KDE, and that means KineticWE is perma
 ### What KineticWE 2.0 does about it
 
 1. **We keep the compositor** (it already does the heavy lifting), but we stop using KDE's helper programs.
-2. **We fork Noctalia** — we make our own copy of the shell — and move all the desktop settings into Noctalia's own settings app: displays, keyboard shortcuts, mouse, cursor, icons, lock screen, effects, tiling, and more. No more needing KDE's "System Settings" for any of it.
+2. **We fork Noctalia** — we make our own copy of the shell — and build a **Kinetic Settings** module into it for all compositor/desktop settings: displays, keyboard shortcuts, mouse and pointer, cursor, icons, effects, tiling, and more. Noctalia's own settings app keeps only shell-level look-and-feel options, which keeps upstream merges clean. No more needing KDE's "System Settings" for any of it.
 3. **We replace the two outside helpers with our own small pieces** built right into our own code:
-   - The "translator" app (portal) gets replaced with a version we write ourselves, using Noctalia's own notification system and the compositor's built-in screen-recording and screenshot features.
+   - The "translator" app (portal) gets replaced with our own **`xdg-desktop-portal-kwe`**, using Noctalia's own notification system and the compositor's built-in screen-recording and screenshot features.
    - PowerDevil gets replaced with a tiny power module inside our shell that does the same things (sleep, screen-off, brightness) by talking directly to the system.
-4. **We give the desktop one proper config folder.** All desktop settings live in `~/.config/kineticwe/` with sane defaults that are installed with the system. No more KDE scattering settings across a dozen different files. (KDE apps still get a small "compat" file so they keep working, but it's just an output of our settings app, not something you manage.)
+4. **We give the desktop one proper config folder.** All desktop settings live in `~/.config/kineticwe/` with sane defaults that are installed with the system. No more KDE scattering settings across a dozen different files. (KDE apps still get a small "compat" file so they keep working, but it's just an output of the Kinetic Settings app, not something you manage.)
 5. **We cut the cord to KDE.** The session declares itself as "KineticWE" instead of pretending to be KDE/Plasma. Anything KDE-specific that has no replacement gets removed (for example, the rarely-used "Activities" feature).
 
 ### What you get
 
-- **Full control.** Every setting for your desktop lives in one app — Noctalia's settings — and one config folder. You decide what it does and how it looks, no KDE "System Settings" needed.
+- **Full control.** Every setting for your desktop lives in one app — Kinetic Settings — and one config folder. You decide what it does and how it looks, no KDE "System Settings" needed.
 - **No KDE helper software running.** A KineticWE session ends up with only: the compositor, the shell, and a generic freedesktop "portal" frontend (which is not KDE — it's the Linux-wide standard). The only KDE things that remain are *libraries* (like spare parts embedded inside the compositor, similar to how every program uses standard code libraries) — no KDE *programs* running in the background.
 - **A clean first-run experience.** The first time a user logs in, the session seeds `~/.config/kineticwe/` from sane, documented defaults.
 - **Lock screen included, for free.** Noctalia already has its own lock screen and idle settings in its own config. We use those; the compositor doesn't need any lock-screen settings of its own.
@@ -45,9 +46,9 @@ The helpers work fine, but they come from KDE, and that means KineticWE is perma
 - It does not mean rewriting the window engine from scratch (that would take years).
 - It does not mean KDE apps stop working — most KDE apps (Dolphin, Kate, etc.) work fine without KDE helpers; they're just apps.
 - It does not mean you can't install KDE's System Settings anymore — you just won't need it for anything desktop-related.
-- It does not affect people still using the current KineticWE. The 2.0 work happens on a separate branch and a separate shell repo; the current release keeps working untouched.
+- It does not affect people still using the current KineticWE. The 2.0 work happens on a separate branch and a separate shell repo (with Kinetic Settings built in); the current release keeps working untouched.
 
-**Bottom line:** KineticWE 2.0 = our compositor + our fork of Noctalia with all settings built in, all desktop config in one folder with sane defaults, running with zero KDE helper programs. You own the whole desktop.
+**Bottom line:** KineticWE 2.0 = our compositor + our fork of Noctalia with Kinetic Settings built in, all desktop config in one folder with sane defaults, running with zero KDE helper programs. You own the whole desktop.
 
 ---
 
@@ -87,7 +88,7 @@ All of the following are owned by the `kinetic-we` process itself; a settings ap
 - Config: `~/.config/noctalia/config.toml`, hot-reloaded via inotify. Upstream already ships `[lockscreen]`, `[idle.behavior.lock]` / `[idle.behavior.screen-off]` (timeout + action), `[nightlight]`, `[brightness]` (sysfs backlight + optional ddcutil), `[audio]`, power-profile hooks, and `[hooks]` for `session_locked`/`session_unlocked` etc.
 - Compositor backends in `src/compositors/`: niri, hyprland, sway, dwl, labwc, mango, triad, ext_workspace, **kde** (`kwin_workspace_backend.cpp` via the `org_kde_plasma_virtual_desktop` protocol; `kwin_active_window.cpp`).
   - **Gap:** the `kde/` backend has **no output backend** and no session-lock path.
-- Existing kineticwe↔noctalia bridge: `src/noctaliasettings.cpp` registers shell shortcuts through the embedded KGlobalAccel and executes `noctalia msg <args>`; the compositor reads `color-schemes/noctalia.colors` for tiling accent colors (`src/tiling/tilingcontroller.cpp`).
+- Existing kineticwe↔noctalia bridge: `src/noctaliasettings.cpp` registers shell shortcuts through the embedded KGlobalAccel and executes `noctalia msg <args>`; the compositor reads `color-schemes/noctalia.colors` for tiling accent colors (`src/tiling/tilingcontroller.cpp`). In 2.0 the shortcut/settings part of this bridge moves into the Kinetic Settings module (Phase 4); the `noctalia msg` IPC path stays for compositor-triggered shell actions.
 
 ### 2.4 Config file wiring in the compositor
 
@@ -103,7 +104,7 @@ All of the following are owned by the `kinetic-we` process itself; a settings ap
 | KDE service | Today | 2.0 disposition |
 |---|---|---|
 | `kglobalacceld` (daemon) | Already embedded (`KGlobalAccelD::init`, `src/globalshortcuts.cpp:97`) | **Keep embedded.** Provides the `org.kde.kglobalaccel` D-Bus API for KDE app compatibility (Spectacle etc.). No daemon process. |
-| `xdg-desktop-portal-kde` | External daemon | **Replace** with a custom portal backend inside the Noctalia fork (Phase 2). |
+| `xdg-desktop-portal-kde` | External daemon | **Replace** with our own `xdg-desktop-portal-kwe` backend (hosted by the Noctalia fork) (Phase 2). |
 | `org_kde_powerdevil` + `upowerd` | External daemons | **Replace** with an in-shell power service (Phase 3). upower remains optional for the shell's battery widgets. |
 | `kactivitymanagerd` | Needed only by `src/activities.cpp` | **Patch out** activities support in the compositor (Phase 6). |
 | `org.kde.kappmenu` | Optional plugin (`src/appmenu.cpp`) | Left dormant; only needed for a global menu. |
@@ -116,10 +117,12 @@ All of the following are owned by the `kinetic-we` process itself; a settings ap
 
 ## Part 4 — Repo & Packaging Layout
 
-- **New fork repo: `kineticwe/noctalia`** — fork of `noctalia-dev/noctalia`. Home of the shell, the extended settings app, the custom portal backend, and the power service. (Must be its own repo — it is a fork of a different upstream project and cannot live on a branch of the KWin fork.)
+- **New fork repo: `kineticwe/noctalia`** — fork of `noctalia-dev/noctalia`. Home of the shell, the `xdg-desktop-portal-kwe` portal backend, and the power service. Noctalia's own settings app is left untouched so upstream merges stay clean. (Must be its own repo — it is a fork of a different upstream project and cannot live on a branch of the KWin fork.)
+- **Iteration 1 — Kinetic Settings lives inside the Noctalia fork** as a self-contained, additive-only module (a `kinetic-settings/` subtree): display, keybinds/shortcuts, icons, mouse & pointer, cursor, touchpad, keyboard layouts, fonts, effects, tiling & window rules, workspaces, tabbox & screen edges. It opens a full window the same way Noctalia's own settings surface does — no separate binary, no `.desktop` entry, no launcher presence in iteration 1. It is reached from the shell (bar/control-center button, or `noctalia msg`), reuses the shell's window/chrome infrastructure, and writes `~/.config/kineticwe/` directly. It stays one new subtree + registration points and never touches Noctalia's own settings code, so upstream merges stay clean.
+- **Iteration 2 (deferred): `kineticwe/kinetic-settings`** — extract the module into a standalone app repo with its own binary and `.desktop` entry when launcher-app presence, native performance, or independent packaging is wanted. Keeping the module self-contained from day one makes extraction a cut-and-paste job.
 - **This repo: new branch `kineticwe-2.0`** — compositor-only changes (config relocation, activities removal, session identity, optional ext-session-lock-v1). `master` stays untouched so current users are unaffected. COPR/AUR/Nix build from the branch when ready.
 - **`docs/kineticwe-2.0.md`** — this document.
-- Packaging: session packages now depend on the `noctalia` fork instead of `noctalia-git`; spec/PKGBUILD/`.SRCINFO`/nix inputs updated accordingly; `kglobalacceld`/`powerdevil`/portal-kde runtime coupling removed where applicable.
+- Packaging: session packages now depend on the `noctalia` fork instead of `noctalia-git`; spec/PKGBUILD/`.SRCINFO`/nix inputs updated accordingly; `kglobalacceld`/`powerdevil`/portal-kde runtime coupling removed where applicable. Iteration 1 adds no extra package — Kinetic Settings ships inside the fork; a separate `kinetic-settings` package only appears with the standalone app in iteration 2.
 
 ---
 
@@ -180,8 +183,8 @@ All desktop-environment settings live in one folder with sane defaults. No scatt
 |---|---|---|
 | `~/.config/kineticwe/kineticwe.kwe` | `kwinrc` | All compositor settings: `[Shortcuts]`, `[Mouse]`, `[Libinput]`, `[Keyboard]`, `[TabBox]`, `[ScreenEdges]`, `[Plugins]`, `[Effect-*]`, `[Desktop]`, `[Tiling]`, `[Xwayland]`, ... |
 | `~/.config/kineticwe/rules.kwe` | `kwinrulesrc` | Window rules (numbered rule groups + force/apply/forbid keys) |
-| `~/.config/kglobalaccelrc` | (unchanged, compat) | App global-shortcut storage; filename hardcoded in the KGlobalAccel library. Kept as a library-level compat shim, edited transparently by the settings app. |
-| `~/.config/kdeglobals` | (kept, compat shim) | KDE apps read this for icons/colors/fonts. The settings app writes canonical values to `kineticwe.kwe` and mirrors the handful of KDE-app-relevant keys here. A config file, not a service. |
+| `~/.config/kglobalaccelrc` | (unchanged, compat) | App global-shortcut storage; filename hardcoded in the KGlobalAccel library. Kept as a library-level compat shim, edited transparently by the Kinetic Settings app. |
+| `~/.config/kdeglobals` | (kept, compat shim) | KDE apps read this for icons/colors/fonts. Kinetic Settings writes canonical values to `kineticwe.kwe` and mirrors the handful of KDE-app-relevant keys here. A config file, not a service. |
 | `~/.config/noctalia/config.toml` | (unchanged) | Shell-owned UI: bars, dock, launcher, notifications, wallpaper, **lock screen**, idle actions, brightness, nightlight UI, power-profile hooks. Already hot-reloaded. |
 
 ### 5.3 Syntax — KConfig INI
@@ -228,7 +231,7 @@ rules=1,2
 
 Notes:
 
-- Shortcut lists use `;` as the separator; some enum values are stored as numbers. Users never see these quirks — the settings app is the editor.
+- Shortcut lists use `;` as the separator; some enum values are stored as numbers. Users never see these quirks — Kinetic Settings is the editor.
 - The `.kwe` extension is unknown to the KDE ecosystem, so nothing else auto-discovers or clobbers these files — intentional isolation.
 - kcfg codegen, `KConfigWatcher` hot-reload, and migrations all keep working unchanged.
 
@@ -241,7 +244,7 @@ Notes:
 ### 5.5 Hot reload
 
 - The compositor already reloads config on change (`KConfigWatcher` + `slotReconfigured` paths).
-- The Noctalia settings app writes the `.kwe` files and triggers a reparse via the compositor's D-Bus where a setting is runtime-only (e.g., cursor: emit the `org.kde.KGlobalSettings` `notifyChange` type 5 signal — `src/cursor.cpp` applies it live).
+- Kinetic Settings writes the `.kwe` files and triggers a reparse via the compositor's D-Bus where a setting is runtime-only (e.g., cursor: emit the `org.kde.KGlobalSettings` `notifyChange` type 5 signal — `src/cursor.cpp` applies it live).
 
 ---
 
@@ -254,9 +257,9 @@ Notes:
 3. Keep/verify `kwin_workspace_backend` (already uses `org_kde_plasma_virtual_desktop`).
 4. Ensure the shell behaves correctly with `XDG_CURRENT_DESKTOP=KineticWE` (must not assume Plasma).
 
-### Phase 2 — Replace `xdg-desktop-portal-kde` with a custom backend (in the Noctalia fork)
+### Phase 2 — Replace `xdg-desktop-portal-kde` with `xdg-desktop-portal-kwe` (hosted by the Noctalia fork)
 
-Implement a D-Bus service for `org.freedesktop.impl.portal.*` and register it via a `.portal` file keyed to the new desktop name (`KineticWE`):
+Implement **`xdg-desktop-portal-kwe`**: a D-Bus service for `org.freedesktop.impl.portal.*` (the name we give our custom backend), registered via a `.portal` file keyed to the new desktop name (`KineticWE`):
 
 - **Screenshot / ScreenCast** → `org.kde.KWin.Screenshot` / `org.kde.KWin.ScreenCast` (PipeWire; Noctalia already has a pipewire module and capture code)
 - **Notification** → Noctalia's own notification daemon (portal notifications get shell styling for free)
@@ -266,7 +269,7 @@ Implement a D-Bus service for `org.freedesktop.impl.portal.*` and register it vi
 - **PowerProfileMonitor** → `power-profiles-daemon` D-Bus (not KDE)
 - **Settings / Wallpaper** → shell-owned config
 
-Drop-in: stop launching `xdg-desktop-portal-kde`; the freedesktop frontend auto-selects our backend by desktop name. Reference implementations: `xdg-desktop-portal-wlr`, `xdg-desktop-portal-hyprland`.
+Drop-in: stop launching `xdg-desktop-portal-kde`; the freedesktop frontend auto-selects our `xdg-desktop-portal-kwe` backend by desktop name. Reference implementations: `xdg-desktop-portal-wlr`, `xdg-desktop-portal-hyprland`.
 
 ### Phase 3 — Replace PowerDevil with an in-shell power service
 
@@ -281,9 +284,9 @@ New Noctalia background service ("power manager" module — Noctalia supports ba
 
 Remove `org_kde_powerdevil` / `upowerd` from the session script (keep upower only if the shell's battery widget needs it).
 
-### Phase 4 — Noctalia settings app: desktop modules
+### Phase 4 — Kinetic Settings module: desktop modules
 
-Each module = write `.kwe`/config + call compositor-owned D-Bus + emit change signals. The fork's KCM sources in `src/kcms/` are the reference for exact key names and semantics (`options`, `tiling`, `effects`, `mouse`, `rules`, `screenedges`, `tabbox`, `virtualkeyboard`, `desktop`, `decoration`, `animations`, `xwayland`).
+Each module = write `.kwe`/config + call compositor-owned D-Bus + emit change signals. The compositor's KCM sources in `src/kcms/` are the reference for exact key names and semantics (`options`, `tiling`, `effects`, `mouse`, `rules`, `screenedges`, `tabbox`, `virtualkeyboard`, `desktop`, `decoration`, `animations`, `xwayland`). Iteration 1 ships this as a self-contained `kinetic-settings` module inside the Noctalia fork (`kinetic-settings/` subtree) opening a full window like the shell's settings surface — it never touches Noctalia's own settings code, so upstream merges stay clean.
 
 | Module | Config target | Runtime apply mechanism |
 |---|---|---|
@@ -303,15 +306,19 @@ Each module = write `.kwe`/config + call compositor-owned D-Bus + emit change si
 | Sounds | Noctalia TOML `[audio]` (libsndfile) | shell-owned |
 | XWayland | `kineticwe.kwe` xwayland group | restart only (documented) |
 
-Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge into the full settings surface (keep the `noctalia msg` IPC for compositor-triggered actions).
+Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge into the Kinetic Settings module (keep the `noctalia msg` IPC for compositor-triggered shell actions).
 
 ### Phase 5 — Session identity & start script (hard cut)
 
-- `XDG_CURRENT_DESKTOP=KineticWE`, `XDG_SESSION_DESKTOP=KineticWE`, matching `.portal` file so the freedesktop portal frontend loads our backend and can never pick a KDE one.
+- `XDG_CURRENT_DESKTOP=KineticWE`, `XDG_SESSION_DESKTOP=KineticWE`, matching `.portal` file so the freedesktop portal frontend loads `xdg-desktop-portal-kwe` and can never pick a KDE one.
 - Remove `KDE_SESSION_VERSION`, `KDE_FULL_SESSION`, `XDG_MENU_PREFIX=plasma-` exports; audit fallout (kbuildsycoca menus, `kde-open`, desktop-file identity).
 - Provide own `xdg-open` behavior via the OpenURI portal in the shell.
-- Rewrite `scripts/start-kineticwe.sh`: drop portal-kde / powerdevil / upowerd / kbuildsycoca; keep the dbus activation-environment update; start the Noctalia fork (embedded portal backend + power service); keep the supervised shell loop and the logind teardown model; add first-run config seeding (Part 6.4).
+- Rewrite `scripts/start-kineticwe.sh`: drop portal-kde / powerdevil / upowerd / kbuildsycoca; keep the dbus activation-environment update; start the Noctalia fork (hosting the `xdg-desktop-portal-kwe` backend + power service + the Kinetic Settings module); keep the supervised shell loop and the logind teardown model; add first-run config seeding (Part 6.4).
 - Update COPR / AUR / spec / nix packaging for the new desktop identity and the fork dependency.
+- **Finish the `kwin-we` → `kinetic-we` re-brand** (the main compositor binary is already `kinetic-we`; AUR `pkgname` and RPM `Name` are already `kineticwe` — what's left is leftover naming):
+  - Rename the last remaining old-named binary, `kwin-we_wayland_wrapper` → `kinetic-we_wayland_wrapper`: CMake target + logging category in `src/helpers/wayland_wrapper/`, `%files` + symlink sources in `kwin-we.spec` and `lgl-kineticwe-copr/kineticwe.spec`, symlink source in `PKGBUILD`, cleanup paths in `build-rpm-dev.sh`. Keep the KDE-compat `kwin_wayland` / `kwin_wayland_wrapper` symlinks — upstream code and Plasma tooling reference them.
+  - Clean stale `kwin-we` labels in comments/docs/scripts (`start-kineticwe.sh`, `nix/`, `README.md`, `PACKAGING-COPR.md`, `PKGBUILD` comments).
+  - Package-identity rename — breaking, coordinate at the 2.0 branch cut: nix `pname` and flake/overlay attrs `kwin-we` → `kinetic-we`, rename `nix/kwin-we.nix` → `nix/kinetic-we.nix` and `kwin-we.spec` → `kineticwe.spec`.
 
 ### Phase 6 — Cleanup & optional work
 
@@ -319,7 +326,7 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 2. Leave `org.kde.kappmenu` optional/dormant.
 3. Stretch: add `ext-session-lock-v1` to the compositor for standards-based locking.
 4. Stretch: evaluate replacing the `kglobalaccelrc` storage with shell-owned config while keeping the `org.kde.kglobalaccel` D-Bus API for app compatibility.
-5. Testing: extend `autotests/`; extend `ci/smoke.sh` to assert: no `kglobalacceld` process, no `xdg-desktop-portal-kde` process, our portal backend registered (`busctl --user list | grep impl.portal`), power module responsive, `~/.config/kineticwe/` seeded.
+5. Testing: extend `autotests/`; extend `ci/smoke.sh` to assert: no `kglobalacceld` process, no `xdg-desktop-portal-kde` process, `xdg-desktop-portal-kwe` registered (`busctl --user list | grep impl.portal`), power module responsive, the Kinetic Settings full-window UI opens from the shell, `~/.config/kineticwe/` seeded.
 
 ---
 
@@ -327,7 +334,7 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 
 1. `org.kde.kglobalaccel` D-Bus API remains (embedded) — required by KDE apps for global shortcuts.
 2. KDE Frameworks libraries remain in the compositor — removing them is a from-scratch rewrite, out of scope.
-3. The `xdg-desktop-portal` frontend stays (freedesktop standard); only the KDE *backend* is removed.
+3. The `xdg-desktop-portal` frontend stays (freedesktop standard); only the KDE *backend* is removed (replaced by our `xdg-desktop-portal-kwe`).
 4. Activities (kactivitymanagerd) and KDE global-menu (kappmenu) lose their backing services — accepted drops.
 5. KWallet: the shell uses libsecret; the secret-service provider becomes GNOME Keyring or KeePassXC (neither is KDE). KWallet remains an optional install.
 6. Electron/X11 apps: unchanged behavior (XWayland + portals).
@@ -345,11 +352,13 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 | Config syntax | KConfig INI (native; no new parser) |
 | Lock screen | Noctalia's own (its TOML `[lockscreen]` / `[idle.behavior.lock]`); no compositor lock config needed |
 | Shell identity | Hard cut to `XDG_CURRENT_DESKTOP=KineticWE` |
+| Compositor binary name | Already `kinetic-we`; leftover `kwin-we_wayland_wrapper` wrapper + nix/package identity renamed in Phase 5 (`kwin_wayland*` KDE-compat symlinks kept) |
 | Compositor repo strategy | New `kineticwe-2.0` branch in this repo; `master` untouched |
 | Shell repo strategy | New fork repo `kineticwe/noctalia` |
 | kglobalacceld | Keep embedded (library-level service inside the compositor) |
-| Portal backend | Custom implementation inside the Noctalia fork |
+| Portal backend | Our own `xdg-desktop-portal-kwe` backend, hosted by the Noctalia fork |
 | Power management | In-shell power service; PowerDevil/upower removed from session |
+| Settings app | Iteration 1: in-fork `kinetic-settings` module (additive subtree, full-window UI like the shell's settings, no separate binary/desktop entry); Iteration 2: extract to standalone `kineticwe/kinetic-settings` app |
 | Activities | Patched out of the compositor |
 | Docs | `docs/kineticwe-2.0.md` (this file) |
 | Plugins | Keep upstream plugin system; IPC / runtime-API / TOML additive-only |
@@ -370,10 +379,10 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 
 | Legacy file | 2.0 location | Owner |
 |---|---|---|
-| `~/.config/kwinrc` | `~/.config/kineticwe/kineticwe.kwe` | compositor / settings app |
-| `~/.config/kwinrulesrc` | `~/.config/kineticwe/rules.kwe` | compositor / settings app |
-| `~/.config/kaccessrc`, `kcminputrc`, `kxkbrc`, `klaunchrc`, `plasmarc` (kwin-read bits) | merged into `kineticwe.kwe` | compositor / settings app |
-| `~/.config/kglobalaccelrc` | unchanged (compat shim) | KGlobalAccel library / settings app |
-| `~/.config/kdeglobals` | unchanged (compat shim for KDE apps) | settings app (mirror) |
+| `~/.config/kwinrc` | `~/.config/kineticwe/kineticwe.kwe` | compositor / Kinetic Settings |
+| `~/.config/kwinrulesrc` | `~/.config/kineticwe/rules.kwe` | compositor / Kinetic Settings |
+| `~/.config/kaccessrc`, `kcminputrc`, `kxkbrc`, `klaunchrc`, `plasmarc` (kwin-read bits) | merged into `kineticwe.kwe` | compositor / Kinetic Settings |
+| `~/.config/kglobalaccelrc` | unchanged (compat shim) | KGlobalAccel library / Kinetic Settings |
+| `~/.config/kdeglobals` | unchanged (compat shim for KDE apps) | Kinetic Settings (mirror) |
 | `~/.config/noctalia/config.toml` | unchanged | shell |
-| `~/.config/fontconfig/fonts.conf` | unchanged | fontconfig / settings app |
+| `~/.config/fontconfig/fonts.conf` | unchanged | fontconfig / Kinetic Settings |
