@@ -23,11 +23,6 @@ Files: flake.nix nix/*.nix
 Copyright: 2024-2026, The KineticWE Developers
 License: GPL-2.0-or-later
 
-# Install and build helper scripts
-Files: install-*.sh build-kwin-we.sh
-Copyright: 2025-2026, The KineticWE Developers
-License: GPL-2.0-or-later
-
 # Arch Linux packaging
 Files: PKGBUILD .SRCINFO
 Copyright: 2025-2026, The KineticWE Developers

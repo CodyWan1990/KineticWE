@@ -2,7 +2,7 @@
 #
 # Both the NixOS module and the Home Manager module import this so the option
 # surface is defined exactly once — `programs.kineticwe.enable` is the single
-# switch that installs everything (kwin-we + session + decorations).
+# switch that installs everything (kinetic-we + session + decorations).
 #
 # Usage (either context):
 #   programs.kineticwe.enable = true;

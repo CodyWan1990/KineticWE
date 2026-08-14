@@ -18,7 +18,7 @@ stdenv.mkDerivation rec {
   version = "git-master";
 
   # Pinned to the same KDE master commit the AUR PKGBUILD and COPR spec use
-  # (_kdecoration_commit=d13049250c0ea1afc279aa8dc99243565c0d83e8). kwin-we
+  # (_kdecoration_commit=d13049250c0ea1afc279aa8dc99243565c0d83e8). kinetic-we
   # uses KDecoration3::Style (server-side drop shadows for CSD windows), which
   # only exists on kdecoration master — the released 6.7.x lacks it.
   src = fetchFromGitLab {

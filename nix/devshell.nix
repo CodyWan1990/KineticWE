@@ -30,14 +30,14 @@ stdenv.mkDerivation {
     kdePackages.extra-cmake-modules
   ];
 
-  # Build env: kwin-we + every KDE/Plasma dep it needs at build time,
+  # Build env: kinetic-we + every KDE/Plasma dep it needs at build time,
   # plus the noctalia binary so `just configure && just build` works.
   buildInputs = kdePackages.kwin.buildInputs or [];
 
   shellHook = ''
     echo "KineticWE development shell"
-    echo "  kwin-we source: $(pwd)"
-    echo "  kwin-we:       ${kwinWe}/bin/kinetic-we"
+    echo "  kinetic-we source: $(pwd)"
+    echo "  kinetic-we:    ${kwinWe}/bin/kinetic-we"
     echo "  noctalia:      ${noctalia}/bin/noctalia"
     echo
     echo "Build & install into a custom prefix:"

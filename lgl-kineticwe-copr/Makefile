@@ -21,7 +21,7 @@ KGLOBALACCELD_REF ?= 5cc88399d8e2a7951798f85127e23f73f1fa0889
 KGLOBALACCELD_SRC := kglobalacceld-$(KGLOBALACCELD_REF).tar.gz
 KGLOBALACCELD_URL := https://invent.kde.org/plasma/kglobalacceld/-/archive/$(KGLOBALACCELD_REF)/$(KGLOBALACCELD_SRC)
 
-# Pinned kdecoration master commit: kwin-we needs KDecoration3::Style
+# Pinned kdecoration master commit: kinetic-we needs KDecoration3::Style
 # (server-side drop shadows for CSD windows), not yet in a released version.
 KDECORATION_REF ?= d13049250c0ea1afc279aa8dc99243565c0d83e8
 KDECORATION_SRC := kdecoration-$(KDECORATION_REF).tar.gz

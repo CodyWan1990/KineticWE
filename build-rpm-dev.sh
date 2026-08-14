@@ -509,8 +509,8 @@ reset_local() {
         "$TEST_PREFIX/bin/kinetic-we"
         "$TEST_PREFIX/bin/kwin_wayland"
         "$TEST_PREFIX/bin/kwin_wayland_wrapper"
-        "$TEST_PREFIX/bin/kwin-we_wayland"
-        "$TEST_PREFIX/bin/kwin-we_wayland_wrapper"
+        "$TEST_PREFIX/bin/kinetic-we_wayland"
+        "$TEST_PREFIX/bin/kinetic-we_wayland_wrapper"
         "$TEST_PREFIX/bin/kwindowprop"
         "$TEST_PREFIX/bin/start-kineticwe"
         "$TEST_PREFIX/lib64/libKGlobalAccelD.so"*

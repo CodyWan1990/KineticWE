@@ -117,7 +117,7 @@ yay -S kineticwe
 
 > **⚠ Work in progress:** The Nix flake is experimental — it is not fully tested or complete. **Use at your own risk**; things may be broken or change without notice.
 
-A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kwin-we, the full KineticWE session (kwin-we + noctalia), and Home Manager / NixOS modules. Like the AUR and COPR packages, it builds `kdecoration` and `kglobalacceld` from pinned KDE master commits (kwin-we needs `KDecoration3::Style`, which only exists in kdecoration master) and bundles the runtime library in the kwin-we closure.
+A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kinetic-we, the full KineticWE session (kinetic-we + noctalia), and Home Manager / NixOS modules. Like the AUR and COPR packages, it builds `kdecoration` and `kglobalacceld` from pinned KDE master commits (kinetic-we needs `KDecoration3::Style`, which only exists in kdecoration master) and bundles the runtime library in the kinetic-we closure.
 
 **Add to your flake.nix inputs:**
 ```nix
@@ -150,7 +150,7 @@ A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of k
 }
 ```
 
-Both modules share a single option surface: `programs.kineticwe.enable` installs everything (kwin-we + session + decorations), with optional `programs.kineticwe.package` and `programs.kineticwe.autostart`.
+Both modules share a single option surface: `programs.kineticwe.enable` installs everything (kinetic-we + session + decorations), with optional `programs.kineticwe.package` and `programs.kineticwe.autostart`.
 
 > **Note:** On the first build, Nix may error with a hash mismatch for the pinned `kdecoration` or `kglobalacceld` sources. Copy the expected hash from the error into `nix/kdecoration-git.nix` / `nix/kglobalacceld-git.nix` and rebuild.
 

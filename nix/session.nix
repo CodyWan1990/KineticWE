@@ -62,7 +62,7 @@ export KDE_FULL_SESSION=true
 # Without this, kbuildsycoca6 fails on minimal installs (Arch, Nix, etc.).
 export XDG_MENU_PREFIX=plasma-
 
-# Prefer kwin-we data (effects, scripts, configs) over anything else.
+# Prefer kinetic-we data (effects, scripts, configs) over anything else.
 export XDG_DATA_DIRS="${kwinWe}/share:${dl}{XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
 SESSION_LOG_DIR="${dl}{XDG_RUNTIME_DIR:-/tmp}/kineticwe-${dl}USER"
@@ -166,7 +166,7 @@ PAYLOADEOF
 
 chmod +x "${dl}STARTUP_PAYLOAD"
 
-# Stop any competing global-shortcuts daemon so kwin-we can own the D-Bus name.
+# Stop any competing global-shortcuts daemon so kinetic-we can own the D-Bus name.
 systemctl --user stop plasma-kglobalaccel.service 2>/dev/null || true
 pkill -x kglobalacceld 2>/dev/null || true
 

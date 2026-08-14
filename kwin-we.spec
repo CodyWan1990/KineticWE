@@ -8,9 +8,9 @@
 # for manual builds only.
 #
 # This spec builds kglobalacceld and kdecoration from pinned KDE master
-# commits first, then builds kwin-we against them. The system kglobalacceld
+# commits first, then builds kinetic-we against them. The system kglobalacceld
 # package is too old (6.7.0) and lacks the direct KGlobalAccelD API that
-# kwin-we requires; the system kdecoration (6.7.x) lacks KDecoration3::Style
+# kinetic-we requires; the system kdecoration (6.7.x) lacks KDecoration3::Style
 # (server-side drop shadows for CSD windows).
 #
 # To trigger a build in COPR:
@@ -190,7 +190,7 @@ License:        LGPL-2.0-or-later
 
 %description -n kineticwe-kglobalacceld
 A newer build of kglobalacceld from git master, required by KineticWE.
-This provides the in-process global shortcuts daemon that kwin-we
+This provides the in-process global shortcuts daemon that kinetic-we
 links against directly via the KGlobalAccelD API (keyEvent, pointerPressed,
 axisTriggered, resetModifierOnlyState) which is not available in the
 system kglobalacceld package (6.7.0 or older).
@@ -249,7 +249,7 @@ pushd ../kconfig/build
 popd
 
 # --- Phase 2b: Build and stage kdecoration (pinned KDE master commit) ---
-# kwin-we uses KDecoration3::Style (server-side drop shadows for CSD
+# kinetic-we uses KDecoration3::Style (server-side drop shadows for CSD
 # windows), which is not present in the buildroot's kdecoration 6.7.x.
 mkdir -p ../kdecoration/build
 pushd ../kdecoration/build
@@ -261,8 +261,8 @@ pushd ../kdecoration/build
 %cmake_build
 popd
 
-# --- Phase 3: Build kwin-we against the kglobalacceld we just built ---
-# We install kglobalacceld into a temp dir so kwin-we's CMake can find it
+# --- Phase 3: Build kinetic-we against the kglobalacceld we just built ---
+# We install kglobalacceld into a temp dir so kinetic-we's CMake can find it
 mkdir -p ${KGA_TMP_PREFIX}
 DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kdecoration/build --prefix %{_prefix}
@@ -288,7 +288,7 @@ DESTDIR=%{buildroot} cmake --install ../kglobalacceld/build --prefix %{_prefix}
 # Install kdecoration to the buildroot
 DESTDIR=%{buildroot} cmake --install ../kdecoration/build --prefix %{_prefix}
 
-# Install kwin-we to the buildroot
+# Install kinetic-we to the buildroot
 %cmake_install
 
 # Remove unnecessary devel files from main package (they go in -devel if needed)
@@ -300,7 +300,7 @@ rm -f %{buildroot}%{_libdir}/libKGlobalAccelD.so 2>/dev/null || true
 rm -f %{buildroot}%{_libdir}/libkdecorations3.so 2>/dev/null || true
 rm -f %{buildroot}%{_libdir}/libkdecorations3private.so 2>/dev/null || true
 
-# Remove header files installed by kglobalacceld, kdecoration and kwin-we (devel content)
+# Remove header files installed by kglobalacceld, kdecoration and kinetic-we (devel content)
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD/ 2>/dev/null || true
 rm -rf %{buildroot}%{_includedir}/KDecoration3/ 2>/dev/null || true
 rm -f %{buildroot}%{_includedir}/KF6/kdecoration3_version.h 2>/dev/null || true
@@ -323,7 +323,7 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
 %{_bindir}/kwindowprop
-%{_bindir}/kwin-we_wayland_wrapper
+%{_bindir}/kinetic-we_wayland_wrapper
 %{_libdir}/libkwin.so.*
 %{_libdir}/libkcmkwincommon.so.*
 %{_libdir}/libkdecorations3.so.*

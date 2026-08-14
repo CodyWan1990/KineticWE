@@ -149,11 +149,11 @@ provides=('kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'kwin' 'kwin-commo
 conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel' 'kdecoration')
 
 
-# Source: kwin-we from GitLab + kglobalacceld/kdecoration from KDE invent
-# kwin-we is pinned to a commit (not a tag) to match the COPR 6.7.80-N
+# Source: kinetic-we from GitLab + kglobalacceld/kdecoration from KDE invent
+# kinetic-we is pinned to a commit (not a tag) to match the COPR 6.7.80-N
 # releases, which package master HEAD via `git archive`. Bump _commit and
 # reset pkgrel together on each upstream sync.
-# kglobalacceld and kdecoration are pinned to KDE master commits: kwin-we
+# kglobalacceld and kdecoration are pinned to KDE master commits: kinetic-we
 # needs the post-6.7 KGlobalAccelD API and the KDecoration3::Style enum
 # (server-side drop shadows for CSD windows), neither of which is in a
 # released version yet. Bump both pins together with _commit on each sync.
@@ -171,7 +171,7 @@ sha256sums=('SKIP' 'SKIP' 'SKIP')
 prepare() {
     cd "$srcdir"
 
-    echo "==> Extracting kwin-we source..."
+    echo "==> Extracting kinetic-we source..."
     # GitLab commit archive extracts to 'kineticwe-$_commit', rename to $_sourcebase
     local extract_dir="$pkgname-$_commit"
     if [[ -d "$extract_dir" && ! -d $_sourcebase ]]; then
@@ -206,12 +206,12 @@ build() {
     cmake --build . --parallel "$(nproc)"
     popd
 
-    # Install kglobalacceld to a temp staging dir so kwin-we CMake finds it
+    # Install kglobalacceld to a temp staging dir so kinetic-we CMake finds it
     mkdir -p "$srcdir/kga-staging"
     DESTDIR="$srcdir/kga-staging" cmake --install kglobalacceld/build
 
     # --- Phase 2: Build kdecoration (pinned KDE master commit) ---
-    # kwin-we uses KDecoration3::Style (server-side drop shadows for CSD
+    # kinetic-we uses KDecoration3::Style (server-side drop shadows for CSD
     # windows), which only exists in kdecoration master — the released 6.7.x
     # in the repos is too old. Build it and stage it next to kglobalacceld.
     echo "==> Building kdecoration (pinned KDE master commit)..."
@@ -230,8 +230,8 @@ build() {
 
     DESTDIR="$srcdir/kga-staging" cmake --install kdecoration/build
 
-    # --- Phase 3: Build kwin-we ---
-    echo "==> Building kwin-we..."
+    # --- Phase 3: Build kinetic-we ---
+    echo "==> Building kinetic-we..."
 
     mkdir -p "$_sourcebase/build"
     cd "$_sourcebase/build"
@@ -256,7 +256,7 @@ package() {
     echo "==> Installing kdecoration..."
     DESTDIR="$pkgdir" cmake --install kdecoration/build
 
-    echo "==> Installing kwin-we..."
+    echo "==> Installing kinetic-we..."
     cd "$_sourcebase/build"
     DESTDIR="$pkgdir" cmake --install .
 
@@ -277,7 +277,7 @@ package() {
 
     # Compatibility symlinks so Plasma can find the compositor (like COPR does)
     ln -s kinetic-we "$pkgdir/usr/bin/kwin_wayland"
-    ln -s kwin-we_wayland_wrapper "$pkgdir/usr/bin/kwin_wayland_wrapper"
+    ln -s kinetic-we_wayland_wrapper "$pkgdir/usr/bin/kwin_wayland_wrapper"
 
     # Install license
     install -Dm644 "$srcdir/$_sourcebase/LICENSES/"* \

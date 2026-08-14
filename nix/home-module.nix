@@ -37,7 +37,7 @@
       text = ''
         [Desktop Entry]
         Name=KineticWE
-        Comment=Start KineticWE (kwin-we + noctalia)
+        Comment=Start KineticWE (kinetic-we + noctalia)
         Type=Application
         Exec=${config.programs.kineticwe.package}/bin/start-kineticwe
         Terminal=false

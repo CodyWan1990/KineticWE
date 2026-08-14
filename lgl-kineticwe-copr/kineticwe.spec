@@ -1,5 +1,5 @@
 %global __cmake_in_source_build 0
-# Pinned KDE master commits. kwin-we needs the post-6.7 KGlobalAccelD API and
+# Pinned KDE master commits. kinetic-we needs the post-6.7 KGlobalAccelD API and
 # the KDecoration3::Style enum (server-side drop shadows for CSD windows);
 # neither is in a released version yet. Bump both pins on each upstream sync.
 %{!?kglobalacceld_ref:%global kglobalacceld_ref 5cc88399d8e2a7951798f85127e23f73f1fa0889}
@@ -191,7 +191,7 @@ mkdir -p "${KGA_TMP_PREFIX}"
 DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 
 # Build kdecoration (pinned KDE master commit) and stage it next to
-# kglobalacceld. kwin-we uses KDecoration3::Style (server-side drop shadows
+# kglobalacceld. kinetic-we uses KDecoration3::Style (server-side drop shadows
 # for CSD windows), which does not exist in the buildroot's kdecoration 6.7.x.
 KDECO_SRC=%{_builddir}/kdecoration
 KDECO_BUILD=%{_builddir}/kdecoration-build
@@ -244,7 +244,7 @@ install -Dpm 0644 %{_builddir}/%{name}-%{version}/scripts/kineticwe-workspace.ta
 
 # Compatibility symlinks so the Plasma session can find its compositor
 ln -s kinetic-we %{buildroot}%{_bindir}/kwin_wayland
-ln -s kwin-we_wayland_wrapper %{buildroot}%{_bindir}/kwin_wayland_wrapper
+ln -s kinetic-we_wayland_wrapper %{buildroot}%{_bindir}/kwin_wayland_wrapper
 
 # Drop development files. This COPR package intentionally ships runtime only.
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD
@@ -278,7 +278,7 @@ systemctl daemon-reload 2>/dev/null || true
 %{_bindir}/kwin_wayland
 %{_bindir}/kwin_wayland_wrapper
 %{_bindir}/kwindowprop
-%{_bindir}/kwin-we_wayland_wrapper
+%{_bindir}/kinetic-we_wayland_wrapper
 %{_bindir}/start-kineticwe
 %{_userunitdir}/kineticwe-workspace.target
 %{_libdir}/libKGlobalAccelD.so.*
