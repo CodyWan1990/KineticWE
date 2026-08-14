@@ -29,7 +29,7 @@ Copyright: 2025-2026, The KineticWE Developers
 License: GPL-2.0-or-later
 
 # RPM packaging
-Files: kwin-we.spec
+Files: kineticwe.spec
 Copyright: 2025-2026, The KineticWE Developers
 License: GPL-2.0-or-later
 

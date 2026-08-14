@@ -33,7 +33,7 @@
       overlays.default = final: prev: {
         kineticwe = self.packages.${prev.stdenv.hostPlatform.system}.default
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
-        kwin-we = self.packages.${prev.stdenv.hostPlatform.system}.kwin-we
+        kinetic-we = self.packages.${prev.stdenv.hostPlatform.system}.kinetic-we
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
         kdecoration = self.packages.${prev.stdenv.hostPlatform.system}.kdecoration
           or (throw "kineticwe flake does not support ${prev.stdenv.hostPlatform.system}");
@@ -56,14 +56,14 @@
         kglobalacceldGit = pkgs.callPackage ./nix/kglobalacceld-git.nix { };
         kdecorationGit = pkgs.callPackage ./nix/kdecoration-git.nix { };
 
-        kwinWe = pkgs.callPackage ./nix/kwin-we.nix {
+        kineticWe = pkgs.callPackage ./nix/kinetic-we.nix {
           inherit kglobalacceldGit kdecorationGit;
         };
 
-        # The session package wires kwin-we + noctalia + xdg-desktop-portal
+        # The session package wires kinetic-we + noctalia + xdg-desktop-portal
         # together and produces `bin/start-kineticwe`.
         session = pkgs.callPackage ./nix/session.nix {
-          inherit kwinWe;
+          inherit kineticWe;
           noctalia = noctalia.packages.${system}.default;
           xwayland = pkgs.xwayland;
         };
@@ -72,7 +72,7 @@
         # ---- packages ---------------------------------------------------------
         packages = {
           default = session;
-          kwin-we = kwinWe;
+          kinetic-we = kineticWe;
           session = session;
           kdecoration = kdecorationGit;
           kglobalacceld = kglobalacceldGit;
@@ -84,19 +84,19 @@
           default = {
             type = "app";
             program = "${session}/bin/start-kineticwe";
-            meta.description = "Start a KineticWE Wayland session (kwin-we + noctalia)";
+            meta.description = "Start a KineticWE Wayland session (kinetic-we + noctalia)";
           };
-          kwin-we = {
+          kinetic-we = {
             type = "app";
-            program = "${kwinWe}/bin/kinetic-we";
-            meta.description = "Run the kwin-we Wayland compositor directly";
+            program = "${kineticWe}/bin/kinetic-we";
+            meta.description = "Run the kinetic-we Wayland compositor directly";
           };
         };
 
         # ---- dev shell -------------------------------------------------------
         devShells = {
           default = pkgs.callPackage ./nix/devshell.nix {
-            inherit kwinWe;
+            inherit kineticWe;
             noctalia = noctalia.packages.${system}.default;
           };
         };

@@ -5,7 +5,7 @@
 #   programs.kineticwe.enable = true;
 #
 # The flake's nixosModules.default also applies the kineticwe overlay so
-# pkgs.kineticwe / pkgs.kwin-we / pkgs.noctalia resolve automatically.
+# pkgs.kineticwe / pkgs.kinetic-we / pkgs.noctalia resolve automatically.
 #
 # This installs the session package system-wide and registers it with
 # services.displayManager.sessionPackages so SDDM / greetd offer a real
@@ -19,7 +19,7 @@
   config = lib.mkIf config.programs.kineticwe.enable {
     environment.systemPackages = [
       config.programs.kineticwe.package
-      pkgs.kwin-we
+      pkgs.kinetic-we
       pkgs.noctalia
       pkgs.kdecoration
       pkgs.kglobalacceld

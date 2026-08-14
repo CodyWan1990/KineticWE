@@ -53,7 +53,7 @@ let
     ;
 in
 stdenv.mkDerivation {
-  pname = "kwin-we";
+  pname = "kinetic-we";
   inherit version;
 
   src = lib.cleanSource ../.;
@@ -61,7 +61,7 @@ stdenv.mkDerivation {
   patches = [
     # Allow the KWin QPA plugin to recognise the binary when wrapped
     # by Nix's wrapQtAppsHook (which renames it to .kinetic-we-wrapped).
-    ./patches/kwin-we-qpa-nixos-wrapper.patch
+    ./patches/kinetic-we-qpa-nixos-wrapper.patch
   ];
 
   # Scripts in the KWin source use #!/usr/bin/env python3; patchShebangs

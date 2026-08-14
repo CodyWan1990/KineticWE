@@ -7,7 +7,7 @@
   meson,
   pkg-config,
   kdePackages,
-  kwinWe,
+  kineticWe,
   noctalia,
 }:
 
@@ -37,7 +37,7 @@ stdenv.mkDerivation {
   shellHook = ''
     echo "KineticWE development shell"
     echo "  kinetic-we source: $(pwd)"
-    echo "  kinetic-we:    ${kwinWe}/bin/kinetic-we"
+    echo "  kinetic-we:    ${kineticWe}/bin/kinetic-we"
     echo "  noctalia:      ${noctalia}/bin/noctalia"
     echo
     echo "Build & install into a custom prefix:"
@@ -46,7 +46,7 @@ stdenv.mkDerivation {
     echo "  just install release"
     echo
     echo "Or build via the Nix flake:"
-    echo "  nix build .#kwin-we"
+    echo "  nix build .#kinetic-we"
     echo "  nix build .#session"
   '';
 }

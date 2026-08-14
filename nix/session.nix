@@ -2,7 +2,7 @@
   lib,
   stdenv,
   makeWrapper,
-  kwinWe,
+  kineticWe,
   noctalia,
   xdg-desktop-portal,
   xwayland,
@@ -48,7 +48,7 @@ DESKTOPEOF
 # Mirrors scripts/start-kineticwe.sh / the COPR RPM launcher.
 set -e
 
-KINETIC_WE="${kwinWe}/bin/kinetic-we"
+KINETIC_WE="${kineticWe}/bin/kinetic-we"
 
 export XDG_CURRENT_DESKTOP=KDE
 export XDG_SESSION_TYPE=wayland
@@ -63,7 +63,7 @@ export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
 
 # Prefer kinetic-we data (effects, scripts, configs) over anything else.
-export XDG_DATA_DIRS="${kwinWe}/share:${dl}{XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export XDG_DATA_DIRS="${kineticWe}/share:${dl}{XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 
 SESSION_LOG_DIR="${dl}{XDG_RUNTIME_DIR:-/tmp}/kineticwe-${dl}USER"
 mkdir -p "${dl}SESSION_LOG_DIR" 2>/dev/null || true
@@ -187,7 +187,7 @@ SCRIPTEOF
     # find the binaries without relying on PATH propagation).
     substituteInPlace "$out/bin/start-kineticwe" \
       --replace-fail "@noctalia@" "${noctalia}/bin/noctalia" \
-      --replace-fail "@kwin_share@" "${kwinWe}/share" \
+      --replace-fail "@kwin_share@" "${kineticWe}/share" \
       --replace-fail "@xdg_desktop_portal@" "${xdg-desktop-portal}/libexec/xdg-desktop-portal" \
       --replace-fail "@xdg_desktop_portal_kde@" "${kdePackages.xdg-desktop-portal-kde}/libexec/xdg-desktop-portal-kde" \
       --replace-fail "@upowerd@" "${upower}/libexec/upowerd" \

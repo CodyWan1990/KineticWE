@@ -43,7 +43,7 @@ The repository already contains:
 
 - `lgl-kineticwe-copr/`, a standalone COPR packaging payload that builds an
   SRPM and binary RPMs without Noctalia.
-- `kwin-we.spec`, which builds KineticWE and also builds kglobalacceld first.
+- `kineticwe.spec`, which builds KineticWE and also builds kglobalacceld first.
 - `copr/Makefile`, which creates an SRPM for COPR SCM builds.
 - `scripts/start-kineticwe.sh` and `scripts/kineticwe.desktop.in`, which are
   installed by the RPM/AUR packages as the session launcher and Wayland
@@ -61,7 +61,7 @@ archive that contains the required `KGlobalAccelD` methods:
 - `axisTriggered()`
 - `resetModifierOnlyState()`
 
-Update both `kwin-we.spec` and `copr/Makefile` so the SRPM is reproducible.
+Update both `kineticwe.spec` and `copr/Makefile` so the SRPM is reproducible.
 Use a source name that includes the pinned ref, for example:
 
 ```spec
