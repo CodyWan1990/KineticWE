@@ -1,0 +1,11 @@
+[Unit]
+Description=Xdg Desktop Portal For KineticWE
+PartOf=graphical-session.target
+After=plasma-core.target
+
+[Service]
+ExecStart=@CMAKE_INSTALL_FULL_LIBEXECDIR@/xdg-desktop-portal-kwe
+BusName=org.freedesktop.impl.portal.desktop.kwe
+Slice=session.slice
+# Auto restart is off as we are DBus activated
+Restart=no

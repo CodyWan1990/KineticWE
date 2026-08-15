@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.kwe
+Exec=@CMAKE_INSTALL_FULL_LIBEXECDIR@/xdg-desktop-portal-kwe
+SystemdService=plasma-xdg-desktop-portal-kwe.service

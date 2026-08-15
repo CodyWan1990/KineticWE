@@ -48,7 +48,7 @@ class OrgFreeDesktopAppearanceTests(unittest.TestCase):
         if not portal_launched:
             debug_environ = os.environ.copy()
             debug_environ["QT_LOGGING_RULES"] = "*.debug=true"
-            cls.portal_process = subprocess.Popen([os.path.join(CMAKE_RUNTIME_OUTPUT_DIRECTORY, "xdg-desktop-portal-kde")], env=debug_environ, stdout=sys.stderr, stderr=sys.stderr)
+            cls.portal_process = subprocess.Popen([os.path.join(CMAKE_RUNTIME_OUTPUT_DIRECTORY, "xdg-desktop-portal-kwe")], env=debug_environ, stdout=sys.stderr, stderr=sys.stderr)
             for _ in range(10):
                 if name_has_owner(session_bus, PORTAL_SERVICE_NAME):
                     portal_launched = True

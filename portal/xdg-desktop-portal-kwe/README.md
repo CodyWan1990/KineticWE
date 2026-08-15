@@ -1,9 +1,12 @@
-# xdg-desktop-portal-kde
+# xdg-desktop-portal-kwe
 
-A backend implementation for [xdg-desktop-portal](http://github.com/flatpak/xdg-desktop-portal)
-that is using Qt/KF6.
+A KineticWE backend implementation for [xdg-desktop-portal](http://github.com/flatpak/xdg-desktop-portal),
+forked from KDE's `xdg-desktop-portal-kde`. The only upstream changes are the
+rename (binary, D-Bus name `org.freedesktop.impl.portal.desktop.kwe`, `.portal`
+file with `UseIn=KineticWE`, and the `kineticwe-portals.conf` selection config);
+all portal interfaces and behavior are stock KDE 6.7.4.
 
-## Building xdg-desktop-portal-kde
+## Building xdg-desktop-portal-kwe
 
 ### Dependencies:
  - xdg-desktop-portal (runtime dependency)
@@ -18,6 +21,12 @@ $ make -j5
 $ make install
 ```
 
-## Testing xdg-desktop-portal-kde
+## Upstream
+
+Vendored from `https://github.com/KDE/xdg-desktop-portal-kde` tag `v6.7.4`
+(remote `portal-upstream`). Sync with
+`git subtree pull --prefix=portal/xdg-desktop-portal-kwe portal-upstream <tag> --squash`.
+
+## Testing xdg-desktop-portal-kwe
 
 The repository [xdg-portal-test-kde](https://invent.kde.org/libraries/xdg-portal-test-kde) contains a simple test application.

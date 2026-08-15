@@ -158,7 +158,7 @@ OutputsModel::OutputsModel(Options o, QObject *parent)
         const QString uniqueId = QStringLiteral("%1x%2").arg(pos.x()).arg(pos.y());
 
         // set up an async wallpaper grab
-        QString dirPath = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation) + u"/xdg-desktop-portal-kde/screen-grabs";
+        QString dirPath = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation) + u"/xdg-desktop-portal-kwe/screen-grabs";
         QDir().mkpath(dirPath);
         QString path = dirPath + u"/%1.XXXXXX.webp"_s.arg(uniqueId);
         auto temporaryFile = std::make_shared<QTemporaryFile>(path);

@@ -3,12 +3,12 @@ add_definitions(-DTRANSLATION_DOMAIN="xdg-desktop-portal-kde")
 
 add_subdirectory(kirigami-filepicker)
 
-add_executable(xdg-desktop-portal-kde)
-ecm_add_qml_module(xdg-desktop-portal-kde
+add_executable(xdg-desktop-portal-kwe)
+ecm_add_qml_module(xdg-desktop-portal-kwe
     URI org.kde.xdgdesktopportal
     VERSION 1.0
     GENERATE_PLUGIN_SOURCE)
-ecm_target_qml_sources(xdg-desktop-portal-kde
+ecm_target_qml_sources(xdg-desktop-portal-kwe
     SOURCES
         ScreenChooserDialog.qml
         UserInfoDialog.qml
@@ -92,7 +92,7 @@ set(xdg_desktop_portal_kde_SRCS
     waylandintegration.cpp
     waylandintegration.h
     waylandintegration_p.h
-    xdg-desktop-portal-kde.cpp
+    xdg-desktop-portal-kwe.cpp
     portalicon.cpp portalicon.h
     dynamiclauncher.cpp dynamiclauncher.h
     dynamiclauncherdialog.cpp dynamiclauncherdialog.h
@@ -301,7 +301,7 @@ qt_add_dbus_interface(xdg_desktop_portal_kde_SRCS org.kde.KWin.VirtualKeyboard.x
 
 qt_add_dbus_adaptor(xdg_desktop_portal_kde_SRCS org.freedesktop.impl.portal.Session.xml session.h Session)
 
-qt6_generate_wayland_protocol_client_sources(xdg-desktop-portal-kde
+qt6_generate_wayland_protocol_client_sources(xdg-desktop-portal-kwe
     PRIVATE_CODE
     FILES
         ${PLASMA_WAYLAND_PROTOCOLS_DIR}/zkde-screencast-unstable-v1.xml
@@ -326,9 +326,9 @@ qt_add_dbus_interface(xdg_desktop_portal_kde_SRCS ../data/org.freedesktop.Applic
 set_source_files_properties(../data/org.freedesktop.impl.portal.PermissionStore.xml PROPERTIES NO_NAMESPACE TRUE INCLUDE "dbushelpers.h")
 qt_add_dbus_interface(xdg_desktop_portal_kde_SRCS ../data/org.freedesktop.impl.portal.PermissionStore.xml permission_store)
 
-target_sources(xdg-desktop-portal-kde PRIVATE ${xdg_desktop_portal_kde_SRCS})
+target_sources(xdg-desktop-portal-kwe PRIVATE ${xdg_desktop_portal_kde_SRCS})
 
-target_link_libraries(xdg-desktop-portal-kde
+target_link_libraries(xdg-desktop-portal-kwe
 PRIVATE
     Qt::Core
     Qt::GuiPrivate
@@ -357,12 +357,12 @@ PRIVATE
     Wayland::Client
     PkgConfig::XKB
 )
-target_link_libraries(xdg-desktop-portal-kde PRIVATE Qt::PrintSupportPrivate Qt::GuiPrivate)
+target_link_libraries(xdg-desktop-portal-kwe PRIVATE Qt::PrintSupportPrivate Qt::GuiPrivate)
 
-install(TARGETS xdg-desktop-portal-kde DESTINATION ${KDE_INSTALL_LIBEXECDIR})
+install(TARGETS xdg-desktop-portal-kwe DESTINATION ${KDE_INSTALL_LIBEXECDIR})
 
 install(FILES
-    xdg-desktop-portal-kde.notifyrc
+    xdg-desktop-portal-kwe.notifyrc
     DESTINATION ${KDE_INSTALL_KNOTIFYRCDIR})
 
 ecm_qt_install_logging_categories(EXPORT XDPKDE FILE xdp-kde.categories DESTINATION ${KDE_INSTALL_LOGGINGCATEGORIESDIR})
