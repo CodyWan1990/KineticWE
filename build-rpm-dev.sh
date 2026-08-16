@@ -302,10 +302,42 @@ quick_build() {
 
         echo '[STEP] Installing to ${TEST_PREFIX}...'
         cmake --install '$build_dir'
+
+        # --- Phase 4: Build and install the KineticWE portal backend
+        # (rebranded xdg-desktop-portal-kde) into the same prefix. Requires
+        # kf6-kiconthemes/kf6-kitemviews/kf6-kstatusnotifieritem/kf6-kio-filewidgets
+        # devel packages in the distrobox (install them via the spec's
+        # BuildRequires).
+        echo '[STEP] Building xdg-desktop-portal-kwe...'
+        PORTAL_BUILD=\$(mktemp -d /tmp/portal-build.XXXXXX)
+        cmake -B \"\$PORTAL_BUILD\" -S 'portal/xdg-desktop-portal-kwe' \\
+            -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
+            -DBUILD_TESTING=OFF
+        cmake --build \"\$PORTAL_BUILD\" --parallel \$(nproc)
+        cmake --install \"\$PORTAL_BUILD\"
+        rm -rf \"\$PORTAL_BUILD\"
+
+        # --- Phase 5: Build and install the Noctalia fork shell (noctalia-kwe)
+        # (vendored at shell/noctalia) into the same prefix. The binary is
+        # renamed to noctalia-kwe so the upstream noctalia package can coexist.
+        echo '[STEP] Building noctalia-kwe (Noctalia fork shell)...'
+        SHELL_BUILD='${SCRIPT_DIR}/build.rpm-quick-noctalia'
+        rm -rf \"\$SHELL_BUILD\"
+        meson setup \"\$SHELL_BUILD\" 'shell/noctalia' \\
+            --prefix='${TEST_PREFIX}' \\
+            --buildtype=debugoptimized \\
+            -Dtests=disabled
+        meson compile -C \"\$SHELL_BUILD\" --jobs \$(nproc)
+        meson install -C \"\$SHELL_BUILD\"
     "
 
     if [[ ! -x "$TEST_PREFIX/bin/kinetic-we" ]]; then
         error "Quick build did not produce $TEST_PREFIX/bin/kinetic-we"
+        exit 1
+    fi
+    if [[ ! -x "$TEST_PREFIX/bin/noctalia-kwe" ]]; then
+        error "Quick build did not produce $TEST_PREFIX/bin/noctalia-kwe"
         exit 1
     fi
     info "Quick build installed to $TEST_PREFIX"
@@ -333,6 +365,37 @@ extract_for_testing() {
     local tmpdir
     tmpdir=$(mktemp -d /tmp/kineticwe-rpm-extract.XXXXXX)
     rpm2cpio "$rpm_file" | cpio -idm -D "$tmpdir" 2>/dev/null
+
+    # The xdg-desktop-portal-kwe subpackage is a separate RPM; extract it into
+    # the same prefix so the session's portal frontend finds the backend
+    # (kwe.portal + kineticwe-portals.conf land under $TEST_PREFIX/share, which
+    # start-kineticwe.sh adds to XDG_DATA_DIRS).
+    local portal_rpm
+    portal_rpm=$(find "$RESULTS_DIR" -type f -name "xdg-desktop-portal-kwe-*.rpm" \
+        ! -name '*.src.rpm' \
+        -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -1 | awk '{print $2}')
+    if [[ -n "$portal_rpm" ]]; then
+        rpm2cpio "$portal_rpm" | cpio -idm -D "$tmpdir" 2>/dev/null
+        info "  Portal backend: $TEST_PREFIX/libexec/xdg-desktop-portal-kwe"
+    else
+        warn "No xdg-desktop-portal-kwe RPM found; the session will run without a portal backend."
+    fi
+
+    # The kineticwe-noctalia subpackage is a separate RPM; extract it into the
+    # same prefix so the session's start script finds the noctalia-kwe shell
+    # binary (it lands in $TEST_PREFIX/bin, already first in the session PATH).
+    local shell_rpm
+    shell_rpm=$(find "$RESULTS_DIR" -type f -name "kineticwe-noctalia-*.rpm" \
+        ! -name '*.src.rpm' \
+        -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -1 | awk '{print $2}')
+    if [[ -n "$shell_rpm" ]]; then
+        rpm2cpio "$shell_rpm" | cpio -idm -D "$tmpdir" 2>/dev/null
+        info "  Shell: $TEST_PREFIX/bin/noctalia-kwe"
+    else
+        warn "No kineticwe-noctalia RPM found; the session will run without the shell."
+    fi
 
     if [[ ! -x "$tmpdir/usr/bin/kinetic-we" ]]; then
         warn "Extraction produced no kinetic-we binary at expected path."
@@ -370,6 +433,14 @@ install_startup_script() {
         > "$TEST_PREFIX/bin/start-kineticwe"
     chmod +x "$TEST_PREFIX/bin/start-kineticwe"
     info "  $TEST_PREFIX/bin/start-kineticwe"
+
+    # The 2.0 session target (pulls graphical-session.target up for the
+    # portal frontend). The launcher installs it into the user unit dir on
+    # first start; this keeps packaged and dev flows identical.
+    mkdir -p "$TEST_PREFIX/share/kineticwe"
+    install -m 0644 "$SCRIPT_DIR/scripts/kineticwe-session.target" \
+        "$TEST_PREFIX/share/kineticwe/kineticwe-session.target"
+    info "  $TEST_PREFIX/share/kineticwe/kineticwe-session.target"
 }
 
 # ---------------------------------------------------------------------------
@@ -529,6 +600,21 @@ reset_local() {
         "$TEST_PREFIX/share/qlogging-categories6"
         "$TEST_PREFIX/share/krunner"
         "$TEST_PREFIX/share/wayland-sessions/kineticwe.desktop"
+        # xdg-desktop-portal-kwe (portal backend subpackage)
+        "$TEST_PREFIX/libexec/xdg-desktop-portal-kwe"
+        "$TEST_PREFIX/share/xdg-desktop-portal"
+        "$TEST_PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.kwe.service"
+        "$TEST_PREFIX/share/applications/org.freedesktop.impl.portal.desktop.kwe.desktop"
+        "$TEST_PREFIX/lib64/systemd/user/plasma-xdg-desktop-portal-kwe.service"
+        "$TEST_PREFIX/lib64/qt6/qml/org/kde/xdgdesktopportal"
+        "$TEST_PREFIX/lib/qt6/qml/org/kde/xdgdesktopportal"
+        # kineticwe-noctalia (Noctalia fork shell, noctalia-kwe)
+        "$TEST_PREFIX/bin/noctalia-kwe"
+        "$TEST_PREFIX/share/noctalia"
+        "$TEST_PREFIX/share/applications/dev.noctalia.Noctalia.desktop"
+        "$TEST_PREFIX/share/icons/hicolor/scalable/apps/noctalia.svg"
+        "$TEST_PREFIX/share/applications/kineticwe-settings.desktop"
+        "$TEST_PREFIX/share/icons/hicolor/scalable/apps/kineticwe.svg"
     )
 
     for pattern in "${known_paths[@]}"; do

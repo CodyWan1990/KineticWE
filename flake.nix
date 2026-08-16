@@ -60,6 +60,9 @@
           inherit kglobalacceldGit kdecorationGit;
         };
 
+        # The KineticWE portal backend (rebranded xdg-desktop-portal-kde).
+        xdg-desktop-portal-kwe = pkgs.callPackage ./nix/portal-kwe.nix { };
+
         # The session package wires kinetic-we + noctalia + xdg-desktop-portal
         # together and produces `bin/start-kineticwe`.
         session = pkgs.callPackage ./nix/session.nix {
@@ -77,6 +80,7 @@
           kdecoration = kdecorationGit;
           kglobalacceld = kglobalacceldGit;
           noctalia = noctalia.packages.${system}.default;
+          inherit xdg-desktop-portal-kwe;
         };
 
         # ---- apps ------------------------------------------------------------

@@ -1,0 +1,24 @@
+# KineticWE 2.0 session target — minimal, no Plasma services.
+#
+# Starting this target pulls graphical-session.target in as a dependency —
+# the only way a target with RefuseManualStart=yes (graphical-session.target,
+# xdg-desktop-autostart.target) becomes active. This mirrors the mechanism
+# startplasma uses via plasma-workspace.target, which KineticWE 2.0 cannot use
+# because it also pulls in plasmashell/kded6/powerdevil etc. (dropped: zero
+# KDE helper programs).
+#
+# Reaching graphical-session.target activates every user unit wired to it,
+# including the xdg-desktop-portal frontend unit (which has
+# Requisite=graphical-session.target) and any user/Home Manager service with:
+#   [Install] WantedBy=graphical-session.target
+#
+# Future 2.0 session services (in-shell power service, first-run seeding,
+# autostart) attach here as Wants= — never via plasma-workspace.target.
+
+[Unit]
+Description=KineticWE Session
+Requires=graphical-session.target
+BindsTo=graphical-session.target
+Before=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target

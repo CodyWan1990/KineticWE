@@ -9,7 +9,9 @@
 #     - plasma-workspace.target / plasma-* services (kded6, ksmserver,
 #       kwallet-pam, polkit-agent, kcminit, restoresession, baloo, ...)
 #     - kbuildsycoca6
-#     - xdg-desktop-portal-kde           (replaced by xdg-desktop-portal-kwe)
+#     - xdg-desktop-portal-kde           (replaced by the xdg-desktop-portal-kwe
+#                                         fork; the freedesktop frontend
+#                                         D-Bus-activates it on demand)
 #     - PowerDevil (org_kde_powerdevil)  (replaced by in-shell power service)
 #     - upowerd                          (replaced by in-shell power service)
 #     - standalone kglobalacceld daemon  (kinetic-we embeds KGlobalAccelD)
@@ -84,6 +86,29 @@ dbus-update-activation-environment --systemd \
     2>/dev/null || true
 
 # ---------------------------------------------------------------------------
+# 4b. First-run config seeding: 2.0 relocated all compositor settings into
+#     ~/.config/kineticwe/ (kineticwe.kwe + rules.kwe — Part 6 of the plan).
+#     On first run after the 2.0 upgrade, move the legacy KDE rc files over so
+#     existing settings keep applying. Full defaults seeding ships later.
+# ---------------------------------------------------------------------------
+if [[ ! -e "$HOME/.config/kineticwe/kineticwe.kwe" ]]; then
+    mkdir -p "$HOME/.config/kineticwe"
+    if [[ -e "$HOME/.config/kwinrc" ]]; then
+        cp "$HOME/.config/kwinrc" "$HOME/.config/kineticwe/kineticwe.kwe"
+    fi
+    if [[ -e "$HOME/.config/kwinrulesrc" ]]; then
+        cp "$HOME/.config/kwinrulesrc" "$HOME/.config/kineticwe/rules.kwe"
+    fi
+    # 2.0 merged the small kwin-read rc files into kineticwe.kwe; append their
+    # settings (KConfig merges duplicate group sections).
+    for _legacy in kaccessrc kcminputrc kxkbrc klaunchrc plasmarc; do
+        if [[ -e "$HOME/.config/$_legacy" ]]; then
+            cat "$HOME/.config/$_legacy" >> "$HOME/.config/kineticwe/kineticwe.kwe"
+        fi
+    done
+fi
+
+# ---------------------------------------------------------------------------
 # 5. Start kinetic-we (the compositor) and wait for its Wayland socket
 # ---------------------------------------------------------------------------
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -137,19 +162,38 @@ done
 mkdir -p "$HOME/.local/share"
 dbus-update-activation-environment --systemd --all 2>/dev/null || true
 
+# ---------------------------------------------------------------------------
+# 6b. Session target: pull graphical-session.target up (RefuseManualStart=yes,
+#     so it can only be started by a dependency). The portal frontend unit
+#     has Requisite=graphical-session.target and fails to start without it.
+# ---------------------------------------------------------------------------
+if ! systemctl --user cat kineticwe-session.target >/dev/null 2>&1; then
+    # Dev/raw-checkout fallback: install the unit into the user unit dir.
+    mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/systemd/user"
+    install -m 0644 "$INSTALL_PREFIX/share/kineticwe/kineticwe-session.target" \
+        "${XDG_DATA_HOME:-$HOME/.local/share}/systemd/user/" 2>/dev/null \
+        || true
+fi
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user start kineticwe-session.target 2>/dev/null || true
+
+# 6c. Portals: start the freedesktop frontend so the KineticWE backend is
+#     selected and D-Bus-activated under our identity. The frontend matches
+#     XDG_CURRENT_DESKTOP=KineticWE against kineticwe-portals.conf
+#     ([preferred] default=kwe), which resolves to the xdg-desktop-portal-kwe
+#     backend (org.freedesktop.impl.portal.desktop.kwe) — never the KDE one.
+systemctl --user start xdg-desktop-portal.service 2>/dev/null || true
+
 # 2.0 deferred hooks (add here as they land, no KDE deps):
-#   - xdg-desktop-portal-kwe backend + freedesktop xdg-desktop-portal frontend
-#     (screen share / screenshot). No KDE portal is started.
 #   - In-shell power service (replaces PowerDevil / upowerd).
-#   - First-run config seeding of ~/.config/kineticwe/ (Part 6.4 of the plan).
 
 # ---------------------------------------------------------------------------
-# 7. Start the shell (Noctalia) — supervised, in the background
+# 7. Start the shell (Noctalia fork, noctalia-kwe) — supervised, in the background
 # ---------------------------------------------------------------------------
 (
     while true; do
-        noctalia >>"$HOME/.local/share/noctalia.log" 2>&1
-        echo "noctalia exited (code $?), restarting in 2s..." >&2
+        noctalia-kwe >>"$HOME/.local/share/noctalia.log" 2>&1
+        echo "noctalia-kwe exited (code $?), restarting in 2s..." >&2
         sleep 2
     done
 ) &
@@ -163,6 +207,6 @@ wait "$KWIN_PID" || true
 # Compositor exited — take the session down. (No plasma-workspace.target to stop
 # in 2.0; just stop the supervised shell and let the greeter return.)
 kill "$SHELL_PID" 2>/dev/null || true
-pkill -x noctalia 2>/dev/null || true
+pkill -x noctalia-kwe 2>/dev/null || true
 trap - EXIT
 

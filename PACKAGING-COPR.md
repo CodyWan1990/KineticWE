@@ -5,6 +5,12 @@ as a COPR-built RPM. The COPR package should install a working KineticWE session
 with the kglobalacceld fix included. It should not install Noctalia and should
 not pull development packages onto user systems.
 
+> **2.0 update:** the "no Noctalia" scope below applies to the 1.x line. On
+> `kineticwe-2.0` the Noctalia fork is built in-tree from `shell/noctalia` and
+> ships as the `kineticwe-noctalia` subpackage (`noctalia-kwe` binary); the main
+> package `Requires: kineticwe-noctalia` instead of `Recommends: noctalia-git`.
+> Sections marked 1.x-only are superseded by `docs/kineticwe-2.0.md`.
+
 ## Target Package Shape
 
 Build one source RPM that produces these binary RPMs:
@@ -24,7 +30,7 @@ Any headers, cmake package files, pkgconfig files, and unversioned `.so` symlink
 installed by KWin or kglobalacceld should be removed from `%{buildroot}` during
 `%install`.
 
-## Scope Exclusions
+## Scope Exclusions (1.x)
 
 Noctalia is not part of the COPR package scope.
 
@@ -91,7 +97,7 @@ Likely explicit runtime dependencies:
 - `plasma-workspace`
 - `xorg-x11-server-Xwayland`
 - `xdg-desktop-portal`
-- `xdg-desktop-portal-kde`
+- `xdg-desktop-portal-kwe`
 - `hwdata`
 - `kscreen`
 - `aurorae`
@@ -130,13 +136,17 @@ For the COPR package, `scripts/start-kineticwe.sh` needs an RPM-safe variant or
 a conditional template mode that does not run:
 
 ```bash
-noctalia &
+noctalia-kwe &
 ```
 
 The startup payload should still:
 
 - Set KDE/Wayland session environment.
-- Start the KDE portal backend and generic portal frontend if needed.
+- Start the generic portal frontend (`xdg-desktop-portal.service`) and, when the
+  desktop identity is `KineticWE`, the `xdg-desktop-portal-kwe` backend (see the
+  portal subpackage in the spec; the frontend selects it via
+  `kineticwe-portals.conf`). The KDE backend is never started in a KineticWE
+  session.
 - Stop a competing user `plasma-kglobalaccel.service` before launching
   `kinetic-we`.
 - Execute `kinetic-we --xwayland "$STARTUP_PAYLOAD"`.
@@ -214,13 +224,24 @@ Then validate:
 - Keyboard shortcuts work, proving the embedded kglobalacceld path is active.
 - Xwayland clients start.
 - Screenshot/screencast portal behavior works through
-  `xdg-desktop-portal-kde`.
+  `xdg-desktop-portal-kwe` (the rebranded fork of the KDE backend; no
+  `xdg-desktop-portal-kde` process runs in a KineticWE session).
 
 ## Spec Change Checklist
 
 - Replace `Source1` `master` tarball with a pinned kglobalacceld source.
 - Add `Requires: kineticwe-kglobalacceld%{?_isa} = %{version}-%{release}`.
-- Remove `Recommends: noctalia-git`.
+- Add the `xdg-desktop-portal-kwe` subpackage (Phase 4 build of
+  `portal/xdg-desktop-portal-kwe`, `%package -n` + `%files -n`; new
+  BuildRequires: `kf6-kiconthemes-devel`, `kf6-kitemviews-devel`,
+  `kf6-kstatusnotifieritem-devel`, `kf6-kio-filewidgets-devel`); main package
+  `Requires: xdg-desktop-portal-kwe` (not `xdg-desktop-portal-kde`).
+- Replace `Recommends: noctalia-git` with the in-tree shell build: the
+  `kineticwe-noctalia` subpackage (`%package -n` + `%files -n`; Phase 5 meson
+  build of `shell/noctalia` with `-Dtests=disabled`; ships `%{_bindir}/noctalia-kwe`
+  plus the shell's `%{_datadir}/noctalia/` assets, desktop file, and icon) and a
+  main-package `Requires: kineticwe-noctalia`. New BuildRequires for the shell
+  deps (see the spec; fzy/luau/mcu/wuffs are vendored in `third_party/`).
 - Remove Noctalia references from package descriptions.
 - Install `/usr/bin/start-kineticwe`.
 - Install `/usr/share/wayland-sessions/kineticwe.desktop`.

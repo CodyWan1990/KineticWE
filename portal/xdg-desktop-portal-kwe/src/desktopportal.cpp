@@ -44,7 +44,8 @@ DesktopPortal::DesktopPortal(QObject *parent)
     , m_dynamicLauncher(new DynamicLauncherPortal(this))
 {
     const QByteArray xdgCurrentDesktop = qgetenv("XDG_CURRENT_DESKTOP");
-    if (xdgCurrentDesktop.compare("KDE", Qt::CaseInsensitive) == 0) {
+    if (xdgCurrentDesktop.compare("KDE", Qt::CaseInsensitive) == 0
+        || xdgCurrentDesktop.compare("KineticWE", Qt::CaseInsensitive) == 0) {
         new GlobalShortcutsPortal(this);
 
         if (!KWindowSystem::isPlatformX11()) {

@@ -32,7 +32,11 @@ depends=(
     'systemsettings'
     'plasma-desktop'
     'xdg-desktop-portal'
-    'xdg-desktop-portal-kde'
+    # KineticWE's own portal backend (rebranded xdg-desktop-portal-kde) is
+    # built and installed from this package; the KDE backend conflicts.
+    'kiconthemes'
+    'kitemviews'
+    'kstatusnotifieritem'
     'libqaccessibilityclient-qt6'
     'pipewire'
     'libevdev'
@@ -82,6 +86,10 @@ makedepends=(
     'krunner'
     'knotifications'
     'kirigami'
+    # Portal backend (xdg-desktop-portal-kwe)
+    'kiconthemes'
+    'kitemviews'
+    'kstatusnotifieritem'
     # Plasma / KDE
     'kwayland'
     'kscreenlocker'
@@ -145,8 +153,8 @@ optdepends=(
 # On Arch, kwin-common/kwin-libs/kwin-wayland are bundled in 'kwin', but we
 # provide them virtually so packages that reference them see them satisfied.
 replaces=('kwin' 'kglobalacceld' 'kdecoration')
-provides=('kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'kwin' 'kwin-common' 'kwin-libs' 'kwin-wayland')
-conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel' 'kdecoration')
+provides=('kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'kwin' 'kwin-common' 'kwin-libs' 'kwin-wayland' 'xdg-desktop-portal-kwe')
+conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'xdg-desktop-portal-kde')
 
 
 # Source: kinetic-we from GitLab + kglobalacceld/kdecoration from KDE invent
@@ -245,6 +253,20 @@ build() {
         -Wno-dev
 
     cmake --build . --parallel "$(nproc)"
+
+    # --- Phase 4: Build the KineticWE portal backend (rebranded xdg-desktop-portal-kde) ---
+    echo "==> Building xdg-desktop-portal-kwe..."
+
+    mkdir -p "$_sourcebase/portal/xdg-desktop-portal-kwe/build"
+    cd "$_sourcebase/portal/xdg-desktop-portal-kwe/build"
+
+    cmake .. \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTING=OFF \
+        -Wno-dev
+
+    cmake --build . --parallel "$(nproc)"
 }
 
 package() {
@@ -258,6 +280,10 @@ package() {
 
     echo "==> Installing kinetic-we..."
     cd "$_sourcebase/build"
+    DESTDIR="$pkgdir" cmake --install .
+
+    echo "==> Installing xdg-desktop-portal-kwe..."
+    cd "$_sourcebase/portal/xdg-desktop-portal-kwe/build"
     DESTDIR="$pkgdir" cmake --install .
 
     # Remove static libs and cmake files from main package
@@ -293,6 +319,12 @@ package() {
     if [[ -d "$srcdir/kdecoration/LICENSES" ]]; then
         install -Dm644 "$srcdir/kdecoration/LICENSES/"* \
             -t "$pkgdir/usr/share/licenses/$pkgname-kdecoration/" 2>/dev/null || true
+    fi
+
+    # Install the portal backend license
+    if [[ -d "$srcdir/$_sourcebase/portal/xdg-desktop-portal-kwe/LICENSES" ]]; then
+        install -Dm644 "$srcdir/$_sourcebase/portal/xdg-desktop-portal-kwe/LICENSES/"* \
+            -t "$pkgdir/usr/share/licenses/$pkgname-xdg-desktop-portal-kwe/" 2>/dev/null || true
     fi
 
     # Install Wayland session launcher (start-kineticwe) from the source tree
@@ -336,6 +368,11 @@ MASKEOF
     # polkit agent, kcminit, session restore, XDG autostart, ...).
     echo "==> Installing kineticwe-workspace.target systemd unit..."
     install -Dm644 "$srcdir/$_sourcebase/scripts/kineticwe-workspace.target" "$pkgdir/usr/lib/systemd/user/kineticwe-workspace.target"
+
+    # Install the 2.0 session target: pulls graphical-session.target up so the
+    # portal frontend unit (Requisite=graphical-session.target) can start.
+    echo "==> Installing kineticwe-session.target systemd unit..."
+    install -Dm644 "$srcdir/$_sourcebase/scripts/kineticwe-session.target" "$pkgdir/usr/lib/systemd/user/kineticwe-session.target"
 
     # Install D-Bus service activation file for org.kde.kglobalaccel
     # The original kglobalacceld package provides this file, but since kineticwe

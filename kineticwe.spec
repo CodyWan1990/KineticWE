@@ -83,6 +83,11 @@ BuildRequires:  kf6-kxmlgui-devel
 BuildRequires:  kf6-krunner-devel
 BuildRequires:  kf6-knotifications-devel
 BuildRequires:  kf6-kirigami-devel
+# xdg-desktop-portal-kwe subpackage (rebranded xdg-desktop-portal-kde)
+BuildRequires:  kf6-kiconthemes-devel
+BuildRequires:  kf6-kitemviews-devel
+BuildRequires:  kf6-kstatusnotifieritem-devel
+BuildRequires:  kf6-kio-filewidgets-devel
 
 # Plasma / KDE
 BuildRequires:  kwayland-devel
@@ -140,6 +145,21 @@ BuildRequires:  libqalculate-devel
 BuildRequires:  libxml2-devel
 BuildRequires:  jemalloc-devel
 
+# Noctalia fork shell (kineticwe-noctalia / noctalia-kwe; vendored at shell/noctalia)
+BuildRequires:  meson
+BuildRequires:  libsodium-devel
+BuildRequires:  libsecret-devel
+BuildRequires:  sdbus-cpp-devel
+BuildRequires:  wireplumber-devel
+BuildRequires:  libsndfile-devel
+BuildRequires:  libjxl-devel
+BuildRequires:  md4c-devel
+BuildRequires:  tomlplusplus-devel
+BuildRequires:  libical-devel
+BuildRequires:  nlohmann-json-devel
+BuildRequires:  stb_image_resize2-devel
+BuildRequires:  stb_image_write-devel
+
 # Runtime dependencies (for the installed package)
 Requires:       qt6-qtbase
 Requires:       qt6-qtdeclarative
@@ -164,7 +184,8 @@ Requires:       qaccessibilityclient-qt6
 Requires:       xorg-x11-server-Xwayland
 Requires:       hwdata
 Requires:       xdg-desktop-portal
-Requires:       xdg-desktop-portal-kde
+Requires:       xdg-desktop-portal-kwe
+Requires:       kineticwe-noctalia
 
 # Bundled kdecoration runtime (pinned KDE master) replaces the system package
 Provides:       kdecoration = %{version}-%{release}
@@ -173,12 +194,14 @@ Obsoletes:      kdecoration < %{version}-%{release}
 Obsoletes:      kdecoration-devel < %{version}-%{release}
 
 # Soft deps — nice to have for full experience
-Recommends:     noctalia-git
+# (2.0: the Noctalia fork shell ships in-tree as the kineticwe-noctalia subpackage;
+# the 1.x Recommends: noctalia-git is gone.)
 
 %description
 KineticWE is a fork of KWin that adds native tiling support for Wayland.
-It is designed to pair with the Noctalia shell to form a complete desktop
-experience called "KineticWE — A Kwin Window Environment."
+It is designed to pair with the Noctalia fork shell, which ships in-tree as
+the kineticwe-noctalia subpackage (noctalia-kwe binary), to form a complete
+desktop experience called "KineticWE — A Kwin Window Environment."
 
 KineticWE bundles an in-process global shortcuts daemon (kglobalacceld)
 and the kdecoration runtime libraries, both built from pinned KDE master
@@ -194,6 +217,32 @@ This provides the in-process global shortcuts daemon that kinetic-we
 links against directly via the KGlobalAccelD API (keyEvent, pointerPressed,
 axisTriggered, resetModifierOnlyState) which is not available in the
 system kglobalacceld package (6.7.0 or older).
+
+%package -n xdg-desktop-portal-kwe
+Summary:        KineticWE portal backend (rebranded xdg-desktop-portal-kde)
+License:        LGPL-2.0-or-later
+
+%description -n xdg-desktop-portal-kwe
+The xdg-desktop-portal backend for KineticWE sessions: a fork of KDE's
+xdg-desktop-portal-kde (v6.7.4) rebranded to export the desktop as KineticWE.
+Registers the org.freedesktop.impl.portal.desktop.kwe D-Bus service and is
+selected by the freedesktop frontend via kineticwe-portals.conf
+([preferred] default=kwe) when XDG_CURRENT_DESKTOP=KineticWE. All stock
+interfaces are kept — FileChooser (KDE file dialog), Screenshot, ScreenCast,
+Notification, Settings, GlobalShortcuts, etc. The KDE backend is never
+started in a KineticWE session.
+
+%package -n kineticwe-noctalia
+Summary:        Noctalia fork shell for KineticWE (noctalia-kwe)
+License:        MIT AND BSD-3-Clause AND CC0-1.0
+
+%description -n kineticwe-noctalia
+The Noctalia v5 shell fork for KineticWE, vendored at shell/noctalia and
+built in-tree. The binary is renamed to noctalia-kwe so it can coexist with
+an upstream noctalia install. Provides the bar, dock, launcher, control
+center, notification daemon, lock screen, and settings UI; paired with the
+compositor it renders the KineticWE desktop. Session identity is KineticWE
+(the shell treats it like KDE for its compositor backends).
 
 # =============================================================================
 # Prep
@@ -277,6 +326,28 @@ DESTDIR=${KGA_TMP_PREFIX} cmake --install ../kdecoration/build --prefix %{_prefi
     -DKWIN_BUILD_GLOBALSHORTCUTS=ON
 %cmake_build
 
+# --- Phase 4: Build the KineticWE portal backend (rebranded xdg-desktop-portal-kde) ---
+PORTAL_SRC=%{_builddir}/kineticwe/portal/xdg-desktop-portal-kwe
+PORTAL_BUILD=%{_builddir}/portal-build
+
+cmake -S "${PORTAL_SRC}" \
+    -B "${PORTAL_BUILD}" \
+    -GNinja \
+    -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=OFF
+cmake --build "${PORTAL_BUILD}"
+
+# --- Phase 5: Build the Noctalia fork shell (noctalia-kwe) ---
+SHELL_SRC=%{_builddir}/kineticwe/shell/noctalia
+SHELL_BUILD=%{_builddir}/shell-build
+
+meson setup "${SHELL_BUILD}" "${SHELL_SRC}" \
+    --prefix %{_prefix} \
+    --buildtype=release \
+    -Dtests=disabled
+meson compile -C "${SHELL_BUILD}"
+
 # =============================================================================
 # Install
 # =============================================================================
@@ -290,6 +361,16 @@ DESTDIR=%{buildroot} cmake --install ../kdecoration/build --prefix %{_prefix}
 
 # Install kinetic-we to the buildroot
 %cmake_install
+
+# Install the KineticWE portal backend to the buildroot
+DESTDIR=%{buildroot} cmake --install %{_builddir}/portal-build --prefix %{_prefix}
+
+# Install the Noctalia fork shell to the buildroot
+DESTDIR=%{buildroot} meson install -C %{_builddir}/shell-build
+
+# Install the 2.0 session target (pulls graphical-session.target up so the
+# portal frontend unit can start; see scripts/kineticwe-session.target)
+install -Dpm 0644 %{_builddir}/kineticwe/scripts/kineticwe-session.target %{buildroot}%{_userunitdir}/kineticwe-session.target
 
 # Remove unnecessary devel files from main package (they go in -devel if needed)
 rm -f %{buildroot}%{_libdir}/cmake/KGlobalAccelD/*.cmake 2>/dev/null || true
@@ -342,17 +423,55 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 %{_datadir}/krunner/
 %{_datadir}/locale/
 %{_userunitdir}/plasma-kwin_wayland.service
+%{_userunitdir}/kineticwe-session.target
 %{_datadir}/dbus-1/interfaces/
 
 %files -n kineticwe-kglobalacceld
 %license ../kglobalacceld/LICENSES/*
 %{_libdir}/libKGlobalAccelD.so.*
 
+%files -n xdg-desktop-portal-kwe
+%license portal/xdg-desktop-portal-kwe/LICENSES/*
+%{_libexecdir}/xdg-desktop-portal-kwe
+%{_datadir}/xdg-desktop-portal/portals/kwe.portal
+%{_datadir}/xdg-desktop-portal/kineticwe-portals.conf
+%{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.kwe.service
+%{_datadir}/applications/org.freedesktop.impl.portal.desktop.kwe.desktop
+%{_userunitdir}/plasma-xdg-desktop-portal-kwe.service
+%{_qt6_qmldir}/org/kde/xdgdesktopportal/
+%{_datadir}/locale/
+
+%files -n kineticwe-noctalia
+%license shell/noctalia/LICENSE
+%{_bindir}/noctalia-kwe
+%{_datadir}/noctalia/
+%{_datadir}/applications/dev.noctalia.Noctalia.desktop
+%{_datadir}/applications/kineticwe-settings.desktop
+%{_datadir}/icons/hicolor/scalable/apps/noctalia.svg
+%{_datadir}/icons/hicolor/scalable/apps/kineticwe.svg
+
 # =============================================================================
 # Changelog
 # =============================================================================
 
 %changelog
+* Sat Aug 15 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-12
+- New subpackage: kineticwe-noctalia — the Noctalia fork shell, built
+  in-tree from shell/noctalia (Phase 5 meson build, -Dtests=disabled) and
+  shipped as the noctalia-kwe binary so it can coexist with an upstream
+  noctalia install. Main package now Requires kineticwe-noctalia instead of
+  Recommending noctalia-git.
+- Shell compositor detection treats the KineticWE desktop identity as KDE,
+  so the workspace backend (org_kde_plasma_virtual_desktop) activates and
+  the bar shows the virtual desktops.
+
+* Sat Aug 15 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-11
+- New subpackage: xdg-desktop-portal-kwe — rebranded fork of
+  xdg-desktop-portal-kde (v6.7.4) exporting the session as KineticWE
+  (org.freedesktop.impl.portal.desktop.kwe, UseIn=KineticWE,
+  kineticwe-portals.conf [preferred] default=kwe). Main package now
+  Requires xdg-desktop-portal-kwe instead of xdg-desktop-portal-kde.
+
 * Tue Jul 28 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-10
 - Bundle kdecoration built from pinned KDE master commit d1304925
   (KDecoration3::Style for server-side CSD drop shadows; not in 6.7.x);
