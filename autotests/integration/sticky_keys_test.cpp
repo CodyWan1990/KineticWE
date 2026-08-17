@@ -39,13 +39,13 @@ private Q_SLOTS:
 
 void StickyKeysTest::initTestCase()
 {
-    KConfig kaccessConfig("kaccessrc");
+    KConfig kaccessConfig("kineticwe.kwe");
     kaccessConfig.group(QStringLiteral("Keyboard")).writeEntry("StickyKeys", true);
     kaccessConfig.group(QStringLiteral("Keyboard")).writeEntry("StickyKeysAutoOff", true);
     kaccessConfig.sync();
 
     // Use a keyboard layout where right alt triggers Mod5/AltGr
-    KConfig kxkbrc("kxkbrc");
+    KConfig kxkbrc("kineticwe.kwe");
     kxkbrc.group(QStringLiteral("Layout")).writeEntry("LayoutList", "us");
     kxkbrc.group(QStringLiteral("Layout")).writeEntry("VariantList", "altgr-intl");
     kxkbrc.sync();
@@ -155,7 +155,7 @@ void StickyKeysTest::testLock()
     QFETCH(int, expectedMods);
     QFETCH(Test::KeyStateV1::key, keyStateKey);
 
-    KConfig kaccessConfig("kaccessrc");
+    KConfig kaccessConfig("kineticwe.kwe");
     kaccessConfig.group(QStringLiteral("Keyboard")).writeEntry("StickyKeysLatch", true);
     kaccessConfig.sync();
 

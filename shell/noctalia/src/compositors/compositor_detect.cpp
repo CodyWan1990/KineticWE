@@ -72,7 +72,8 @@ namespace compositors {
       if (StringUtils::containsInsensitive(hint, "labwc")) {
         return CompositorKind::Labwc;
       }
-      if (StringUtils::containsInsensitive(hint, "kde") || StringUtils::containsInsensitive(hint, "plasma")) {
+      if (StringUtils::containsInsensitive(hint, "kde") || StringUtils::containsInsensitive(hint, "plasma")
+          || StringUtils::containsInsensitive(hint, "kinetic")) {
         return CompositorKind::Kde;
       }
       return CompositorKind::Unknown;

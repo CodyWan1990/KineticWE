@@ -129,7 +129,7 @@ void KeyboardLayoutTest::initTestCase()
     qRegisterMetaType<KWin::Window *>();
     QVERIFY(waylandServer()->init(qAppName()));
 
-    kwinApp()->setKxkbConfig(KSharedConfig::openConfig(QStringLiteral("kxkbrc"), KConfig::NoGlobals));
+    kwinApp()->setKxkbConfig(KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"), KConfig::NoGlobals));
 
     layoutGroup = kwinApp()->kxkbConfig()->group(QStringLiteral("Layout"));
     layoutGroup.deleteGroup();

@@ -20,6 +20,7 @@
 #include "idle/idle_manager.h"
 #include "ipc/ipc_poll_source.h"
 #include "ipc/ipc_service.h"
+#include "kinetic-settings/src/kinetic_settings_module.h"
 #include "launcher/dmenu_ipc.h"
 #include "net/http_client.h"
 #include "net/http_client_poll_source.h"
@@ -339,6 +340,7 @@ private:
   Wallpaper m_wallpaper;
   Backdrop m_backdrop;
   SettingsWindow m_settingsWindow;
+  KineticSettingsModule m_kineticSettings;
   LayerPopupHostRegistry m_layerPopupHosts;
   ColorPickerDialogPopup m_colorPickerDialogPopup;
   GlyphPickerDialogPopup m_glyphPickerDialogPopup;

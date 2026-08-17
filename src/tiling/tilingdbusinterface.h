@@ -64,6 +64,13 @@ public Q_SLOTS:
      */
     Q_SCRIPTABLE void cycleLayout();
 
+    /**
+     * Flip the active output's outer (left/right) gaps between the
+     * [Tiling] GapToggleWide / GapToggleCentered presets and apply them
+     * live (same action as the "Tiling Toggle Outer Gaps" shortcut).
+     */
+    Q_SCRIPTABLE void toggleOuterGaps();
+
 Q_SIGNALS:
     /**
      * Emitted whenever any (output, desktop) layout engine changes kind,

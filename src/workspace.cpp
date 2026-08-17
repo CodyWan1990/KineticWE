@@ -175,7 +175,7 @@ Workspace::Workspace()
         // to delay sleep until the screens are actually turned off.
         m_dpms = DpmsState::TurningOff;
         // See kscreen.kcfg
-        const auto animationTime = std::chrono::milliseconds(KSharedConfig::openConfig()->group(QStringLiteral("Effect-Kscreen")).readEntry("Duration", 250));
+        const auto animationTime = std::chrono::milliseconds(KSharedConfig::openConfig(kineticweKdeGlobalsPath())->group(QStringLiteral("Effect-Kscreen")).readEntry("Duration", 250));
         Q_EMIT dpmsStateChanged(animationTime);
         // applyOutputConfiguration sets the correct value
         OutputConfiguration cfg;
@@ -360,6 +360,24 @@ void Workspace::init()
         if (group.name() == "KScreen" && names.contains(QByteArrayLiteral("XwaylandClientsScale"))) {
             updateXwaylandScale();
         }
+    });
+
+    // Live-reload the rest of the compositor config. Per-subsystem watchers
+    // (effects, screen edges, tiling, keyboard layouts, night light, ...)
+    // already react to their own groups; any other change to kineticwe.kwe
+    // nudges the debounced full reconfigure so [Shortcuts], [Mouse],
+    // [Libinput], [TabBox], [Desktop], focus/placement, decorations, ... apply
+    // on save without a D-Bus call.
+    m_kwinConfigWatcher = KConfigWatcher::create(kwinApp()->config());
+    connect(m_kwinConfigWatcher.get(), &KConfigWatcher::configChanged, this, [this](const KConfigGroup &, const QByteArrayList &) {
+        reconfigure();
+    });
+
+    // Same for window rules: reparse rules.kwe and re-evaluate windows when it
+    // changes on disk (slotReconfigure does the actual load + re-apply).
+    m_rulesConfigWatcher = KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("rules.kwe"), KConfig::NoGlobals));
+    connect(m_rulesConfigWatcher.get(), &KConfigWatcher::configChanged, this, [this](const KConfigGroup &, const QByteArrayList &) {
+        reconfigure();
     });
 
 #if KWIN_BUILD_SCREENLOCKER
@@ -571,7 +589,7 @@ void Workspace::requestDpmsState(DpmsState state)
     m_dpms = state;
 
     // See kscreen.kcfg
-    const auto animationTime = std::chrono::milliseconds(KSharedConfig::openConfig()->group(QStringLiteral("Effect-Kscreen")).readEntry("Duration", 250));
+    const auto animationTime = std::chrono::milliseconds(KSharedConfig::openConfig(kineticweKdeGlobalsPath())->group(QStringLiteral("Effect-Kscreen")).readEntry("Duration", 250));
 
     // the config can be empty, it gets adjusted in applyOutputConfiguration
     OutputConfiguration cfg;
@@ -607,7 +625,7 @@ void Workspace::maybeUpdateDpmsState()
     m_dpms = DpmsState::Off;
     m_sleepInhibitor.reset();
     // See kscreen.kcfg
-    const auto animationTime = std::chrono::milliseconds(KSharedConfig::openConfig()->group(QStringLiteral("Effect-Kscreen")).readEntry("Duration", 250));
+    const auto animationTime = std::chrono::milliseconds(KSharedConfig::openConfig(kineticweKdeGlobalsPath())->group(QStringLiteral("Effect-Kscreen")).readEntry("Duration", 250));
     Q_EMIT dpmsStateChanged(animationTime);
 }
 

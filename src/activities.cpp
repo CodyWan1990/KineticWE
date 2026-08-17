@@ -8,6 +8,7 @@
 */
 #include "activities.h"
 // KWin
+#include "config-kwin.h"
 #include "virtualdesktops.h"
 #include "window.h"
 #include "workspace.h"
@@ -53,7 +54,7 @@ Activities::Activities()
     }
 
     // Clean up no longer used subsession data
-    const auto sessionsConfig = KSharedConfig::openConfig();
+    const auto sessionsConfig = KSharedConfig::openConfig(kineticweKdeGlobalsPath());
     const auto groups = sessionsConfig->groupList();
     for (const QString &groupName : groups) {
         if (groupName.startsWith(QLatin1StringView("SubSession: "))) {

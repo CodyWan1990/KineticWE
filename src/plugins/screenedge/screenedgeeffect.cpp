@@ -50,7 +50,7 @@ void ScreenEdgeEffect::ensureGlowSvg()
         m_glow->imageSet()->setBasePath(QStringLiteral("plasma/desktoptheme"));
 
         const QString groupName = QStringLiteral("Theme");
-        KSharedConfig::Ptr config = KSharedConfig::openConfig(QStringLiteral("plasmarc"));
+        KSharedConfig::Ptr config = KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"));
         KConfigGroup cg = KConfigGroup(config, groupName);
         m_glow->imageSet()->setImageSetName(cg.readEntry("name", QStringLiteral("default")));
 

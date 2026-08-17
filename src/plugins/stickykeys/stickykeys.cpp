@@ -32,7 +32,7 @@ static const std::array<Modifier, 5> modifiers = {
 
 StickyKeysFilter::StickyKeysFilter()
     : KWin::InputEventFilter(KWin::InputFilterOrder::StickyKeys)
-    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig("kaccessrc")))
+    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"))))
 {
     const QLatin1StringView groupName("Keyboard");
     connect(m_configWatcher.get(), &KConfigWatcher::configChanged, this, [this, groupName](const KConfigGroup &group) {

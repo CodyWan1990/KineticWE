@@ -34,7 +34,7 @@ void SlowKeysTest::initTestCase()
 {
     QStandardPaths::setTestModeEnabled(true);
 
-    KConfig kaccessConfig("kaccessrc");
+    KConfig kaccessConfig("kineticwe.kwe");
     kaccessConfig.group(QStringLiteral("Keyboard")).writeEntry("SlowKeys", true);
     kaccessConfig.group(QStringLiteral("Keyboard")).writeEntry("SlowKeysDelay", 500);
     kaccessConfig.sync();

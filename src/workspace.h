@@ -754,6 +754,8 @@ private:
     std::optional<double> m_luxAtLastBrightnessAdjust;
     std::unique_ptr<DpmsInputEventFilter> m_dpmsFilter;
     KConfigWatcher::Ptr m_kdeglobalsWatcher;
+    KConfigWatcher::Ptr m_kwinConfigWatcher;
+    KConfigWatcher::Ptr m_rulesConfigWatcher;
 
     QString m_activationToken;
     QString m_activationTokenAppId;

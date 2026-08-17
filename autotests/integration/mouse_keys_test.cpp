@@ -32,7 +32,7 @@ private Q_SLOTS:
 
 void MouseKeysTest::initTestCase()
 {
-    KConfig kaccessConfig("kaccessrc");
+    KConfig kaccessConfig("kineticwe.kwe");
     kaccessConfig.group(QStringLiteral("Mouse")).writeEntry("MouseKeys", true);
     kaccessConfig.sync();
 

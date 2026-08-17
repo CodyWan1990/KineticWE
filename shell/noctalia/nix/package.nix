@@ -67,7 +67,7 @@ lib.warnIf cudaSupport
   src = lib.cleanSource ./..;
 
   postFixup = ''
-    wrapProgram $out/bin/noctalia \
+    wrapProgram $out/bin/noctalia-kwe \
       --prefix PATH : ${lib.makeBinPath [ git ]}
   '';
 
@@ -124,6 +124,6 @@ lib.warnIf cudaSupport
     homepage = "https://github.com/noctalia-dev/noctalia";
     license = licenses.mit;
     platforms = platforms.linux;
-    mainProgram = "noctalia";
+    mainProgram = "noctalia-kwe";
   };
 }

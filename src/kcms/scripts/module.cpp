@@ -35,7 +35,7 @@ Module::Module(QObject *parent, const KPluginMetaData &data)
     connect(m_model, &KPluginModel::defaulted, this, [this](bool defaulted) {
         setRepresentsDefaults(defaulted);
     });
-    m_model->setConfig(KSharedConfig::openConfig("kwinrc")->group(QStringLiteral("Plugins")));
+    m_model->setConfig(KSharedConfig::openConfig("kineticwe.kwe")->group(QStringLiteral("Plugins")));
 }
 
 void Module::onGHNSEntriesChanged()
@@ -131,10 +131,10 @@ void Module::save()
                 setErrorMessage(i18n("Error when uninstalling KWin Script: %1", uninstallJob->errorString()));
             } else {
                 // Clean up kwinrc
-                KConfigGroup kwinConfig(KSharedConfig::openConfig("kwinrc", KConfig::SimpleConfig), QStringLiteral("Plugins"));
+                KConfigGroup kwinConfig(KSharedConfig::openConfig("kineticwe.kwe", KConfig::SimpleConfig), QStringLiteral("Plugins"));
                 kwinConfig.deleteEntry(info.pluginId() + QStringLiteral("Enabled"));
                 kwinConfig.sync();
-                KConfigGroup scriptGroup(KSharedConfig::openConfig("kwinrc", KConfig::SimpleConfig), QStringLiteral("Script-") + info.pluginId());
+                KConfigGroup scriptGroup(KSharedConfig::openConfig("kineticwe.kwe", KConfig::SimpleConfig), QStringLiteral("Script-") + info.pluginId());
                 scriptGroup.deleteGroup();
                 scriptGroup.sync();
 

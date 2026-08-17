@@ -309,7 +309,7 @@ void OutputGapOverridesModel::syncFromScreens()
         // (e.g. for a monitor that was disconnected and is now back), honor
         // those stored values over the current global default.
         if (settings) {
-            KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+            KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"));
             KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
             KConfigGroup outputGroup(&tilingGroup, QStringLiteral("Output %1").arg(name));
             if (outputGroup.hasKey("GapLeft")) {
@@ -682,7 +682,7 @@ void DesktopOutputLayoutOverridesModel::rebuildModel(const TilingSettings *setti
     const QString defaultLayout = settings ? settings->defaultLayout() : QStringLiteral("MasterStack");
 
     // Read desktop list from kwinrc
-    KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+    KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"));
     KConfigGroup dtopGroup(config, QStringLiteral("Desktops"));
     const int n = dtopGroup.readEntry("Number", 1);
 
@@ -903,7 +903,7 @@ void TilingKCM::load()
 {
     KQuickManagedConfigModule::load();
 
-    KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+    KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"));
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
     m_gapOverridesModel->load(tilingGroup, m_settings);
     m_desktopLayoutOverridesModel->load(tilingGroup, m_settings);
@@ -913,7 +913,7 @@ void TilingKCM::save()
 {
     KQuickManagedConfigModule::save();
 
-    KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kwinrc"));
+    KSharedConfigPtr config = KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"));
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
     m_gapOverridesModel->save(tilingGroup, m_settings);
     m_desktopLayoutOverridesModel->save(tilingGroup, m_settings);

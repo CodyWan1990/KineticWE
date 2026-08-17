@@ -292,7 +292,7 @@ std::string IpcService::buildHelp() const {
     maxSignature = std::max(maxSignature, signatures.back().size());
   }
 
-  std::string out = "Usage: noctalia msg <command> [args]\n\nCommands:\n";
+  std::string out = "Usage: noctalia-kwe msg <command> [args]\n\nCommands:\n";
   for (std::size_t i = 0; i < infos.size(); ++i) {
     out += "  ";
     out += signatures[i];

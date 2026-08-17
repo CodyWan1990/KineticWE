@@ -44,6 +44,35 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 1b. Config root: the compositor's settings live in ~/.config/kineticwe
+#     (kineticwe.kwe, rules.kwe, kglobalaccelrc, kwinoutputconfig.json, ...).
+#     We do NOT redirect the session's XDG_CONFIG_HOME globally: doing so
+#     leaked into every user application (yazi, zed, fish, kitty, ...), forcing
+#     them to read/write configs inside the kineticwe root instead of the real
+#     ~/.config. Only the compositor process (launched in step 5) gets the
+#     redirect via a per-command env prefix; the shell, kinetic-settings,
+#     D-Bus-activated services and user apps all keep the real config home.
+#     The compositor natively resolves KWIN_CONFIG ("kineticwe.kwe"), rules.kwe,
+#     kglobalaccelrc and kwinoutputconfig.json inside the root, and every
+#     KConfigWatcher hot-reload path keeps working. KWE_REAL_CONFIG_HOME lets
+#     the compositor reach the user's real config home for shared files
+#     (kdeglobals) without hardcoding ~/.config.
+# ---------------------------------------------------------------------------
+KWE_CONFIG_HOME="$HOME/.config/kineticwe"
+export KWE_CONFIG_HOME
+# Defensive: if the launcher inherited a stale XDG_CONFIG_HOME pointing at the
+# kineticwe root (e.g. exported in a shell profile during earlier testing),
+# treat the real config home as ~/.config, not the root.
+if [[ "${XDG_CONFIG_HOME:-}" == "$KWE_CONFIG_HOME" ]]; then
+    export KWE_REAL_CONFIG_HOME="$HOME/.config"
+else
+    export KWE_REAL_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+fi
+mkdir -p "$KWE_CONFIG_HOME"
+
+# ---------------------------------------------------------------------------
+# 2. Session / desktop identity (2.0: hard cut to KineticWE)
+# ---------------------------------------------------------------------------
 # 1. Locate KineticWE binaries / libraries / plugins / data
 # ---------------------------------------------------------------------------
 export PATH="$INSTALL_PREFIX/bin:$PATH"
@@ -80,36 +109,91 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
 fi
 
 # Publish the pre-compositor session environment to D-Bus/systemd NOW so
-# D-Bus-activated services at startup see the KineticWE identity.
+# D-Bus-activated services at startup see the KineticWE identity. XDG_CONFIG_HOME
+# is deliberately NOT published: services must keep the real config home.
 dbus-update-activation-environment --systemd \
     XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_DATA_DIRS \
     2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 4b. First-run config seeding: 2.0 relocated all compositor settings into
-#     ~/.config/kineticwe/ (kineticwe.kwe + rules.kwe — Part 6 of the plan).
-#     On first run after the 2.0 upgrade, move the legacy KDE rc files over so
-#     existing settings keep applying. Full defaults seeding ships later.
+#     the config root ($KWE_CONFIG_HOME = ~/.config/kineticwe/;
+#     kineticwe.kwe + rules.kwe — Part 6 of the plan). On first run after the
+#     2.0 upgrade, move the legacy KDE rc files over so existing settings keep
+#     applying. Full defaults seeding ships later.
 # ---------------------------------------------------------------------------
-if [[ ! -e "$HOME/.config/kineticwe/kineticwe.kwe" ]]; then
-    mkdir -p "$HOME/.config/kineticwe"
+if [[ ! -e "$KWE_CONFIG_HOME/kineticwe.kwe" ]]; then
     if [[ -e "$HOME/.config/kwinrc" ]]; then
-        cp "$HOME/.config/kwinrc" "$HOME/.config/kineticwe/kineticwe.kwe"
+        cp "$HOME/.config/kwinrc" "$KWE_CONFIG_HOME/kineticwe.kwe"
     fi
     if [[ -e "$HOME/.config/kwinrulesrc" ]]; then
-        cp "$HOME/.config/kwinrulesrc" "$HOME/.config/kineticwe/rules.kwe"
+        cp "$HOME/.config/kwinrulesrc" "$KWE_CONFIG_HOME/rules.kwe"
     fi
     # 2.0 merged the small kwin-read rc files into kineticwe.kwe; append their
     # settings (KConfig merges duplicate group sections).
     for _legacy in kaccessrc kcminputrc kxkbrc klaunchrc plasmarc; do
         if [[ -e "$HOME/.config/$_legacy" ]]; then
-            cat "$HOME/.config/$_legacy" >> "$HOME/.config/kineticwe/kineticwe.kwe"
+            cat "$HOME/.config/$_legacy" >> "$KWE_CONFIG_HOME/kineticwe.kwe"
         fi
     done
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Start kinetic-we (the compositor) and wait for its Wayland socket
+# 4c. One-time migration: earlier 2.0 builds resolved KWIN_CONFIG against the
+#     unredirected ~/.config, leaving compositor runtime state in FLAT
+#     ~/.config/kineticwe.kwe + rules.kwe that the redirected compositor would
+#     no longer see. Fold those files into the new root (appending only groups
+#     the canonical file lacks), then retire the flat leftovers. Idempotent:
+#     the flat files are gone after the first run.
+# ---------------------------------------------------------------------------
+if [[ -e "$HOME/.config/kineticwe.kwe" ]]; then
+    if [[ ! -e "$KWE_CONFIG_HOME/kineticwe.kwe" ]]; then
+        cp "$HOME/.config/kineticwe.kwe" "$KWE_CONFIG_HOME/kineticwe.kwe"
+    else
+        { printf '\n'; awk '
+            FNR == NR { if ($0 ~ /^\[/) have[$0] = 1; next }
+            /^\[/     { keep = !($0 in have); if (keep) print; next }
+                      { if (keep) print }
+        ' "$KWE_CONFIG_HOME/kineticwe.kwe" "$HOME/.config/kineticwe.kwe"; } \
+            >> "$KWE_CONFIG_HOME/kineticwe.kwe"
+    fi
+    rm -f "$HOME/.config/kineticwe.kwe"
+fi
+if [[ -e "$HOME/.config/rules.kwe" && ! -e "$KWE_CONFIG_HOME/rules.kwe" ]]; then
+    cp "$HOME/.config/rules.kwe" "$KWE_CONFIG_HOME/rules.kwe"
+fi
+rm -f "$HOME/.config/rules.kwe"
+for _shared in kglobalaccelrc kwinoutputconfig.json; do
+    if [[ -e "$HOME/.config/$_shared" && ! -e "$KWE_CONFIG_HOME/$_shared" ]]; then
+        cp "$HOME/.config/$_shared" "$KWE_CONFIG_HOME/$_shared"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# 4d. Prune stale user-app state from the config root. Earlier 2.0 builds
+#     redirected XDG_CONFIG_HOME for the whole session, so user applications
+#     (yazi, zed, fish, kitty, ...) wrote their configs inside the root. With
+#     the compositor-only redirect those entries are dead weight — apps now
+#     read the real $KWE_REAL_CONFIG_HOME, so the copies would silently drift.
+#     Keep only compositor-owned files; delete the rest. The real configs in
+#     $KWE_REAL_CONFIG_HOME are untouched. Idempotent.
+# ---------------------------------------------------------------------------
+_KWE_KEEP=(kineticwe.kwe rules.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
+for _entry in "$KWE_CONFIG_HOME"/* "$KWE_CONFIG_HOME"/.[!.]*; do
+    [[ -e "$_entry" ]] || continue
+    _name="${_entry##*/}"
+    for _keep in "${_KWE_KEEP[@]}"; do
+        [[ "$_name" == "$_keep" ]] && continue 2
+    done
+    echo "kineticwe: pruning stale user-app config from root: $_entry"
+    rm -rf "$_entry"
+done
+
+# ---------------------------------------------------------------------------
+# 5. Start kinetic-we (the compositor) and wait for its Wayland socket.
+#    Only the compositor process gets XDG_CONFIG_HOME pointed at the kineticwe
+#    root (per-command env prefix); everything else in the session keeps the
+#    real config home so user apps read/write ~/.config as usual.
 # ---------------------------------------------------------------------------
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
@@ -118,7 +202,7 @@ RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 _before_wayland="$(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep '^wayland-' || true)"
 _before_x11="$(ls -1 /tmp/.X11-unix 2>/dev/null | grep '^X[0-9]' || true)"
 
-"$INSTALL_PREFIX/bin/kinetic-we" --xwayland &
+XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland &
 KWIN_PID=$!
 
 # If this script dies (logout, Ctrl-C, logind teardown), take the compositor down.

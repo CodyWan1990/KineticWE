@@ -5,6 +5,7 @@
 */
 
 #include "tilingcontroller.h"
+#include "config-kwin.h"
 
 #include "tilingdbusinterface.h"
 
@@ -121,9 +122,21 @@ TilingController::TilingController(Workspace *workspace)
             onColorSourcesChanged();
         });
     }
-    m_kdeglobalsConfig = KSharedConfig::openConfig(QStringLiteral("kdeglobals"), KConfig::FullConfig);
+    m_kdeglobalsConfig = KSharedConfig::openConfig(kineticweKdeGlobalsPath(), KConfig::FullConfig);
     m_kdeglobalsWatcher = KConfigWatcher::create(m_kdeglobalsConfig);
     connect(m_kdeglobalsWatcher.data(), &KConfigWatcher::configChanged, this, [this]() {
+        onColorSourcesChanged();
+    });
+    // kdeglobals is opened by absolute path (it lives in the user's real
+    // config home, outside the compositor's redirected config root), so the
+    // kconfig D-Bus notify interface does not cover it — the same QFileSystemWatcher
+    // fallback as noctalia.colors above is needed for live theme changes.
+    m_kdeglobalsFsWatcher = new QFileSystemWatcher(this);
+    m_kdeglobalsFsWatcher->addPath(kineticweKdeGlobalsPath());
+    connect(m_kdeglobalsFsWatcher, &QFileSystemWatcher::fileChanged, this, [this]() {
+        // Re-arm the watcher: many writers use atomic-rename semantics which
+        // invalidate the inotify watch on the original inode.
+        m_kdeglobalsFsWatcher->addPath(kineticweKdeGlobalsPath());
         onColorSourcesChanged();
     });
 
@@ -569,7 +582,7 @@ void TilingController::readNoctaliaColors()
 void TilingController::readSystemAccent()
 {
     if (!m_kdeglobalsConfig) {
-        m_kdeglobalsConfig = KSharedConfig::openConfig(QStringLiteral("kdeglobals"), KConfig::FullConfig);
+        m_kdeglobalsConfig = KSharedConfig::openConfig(kineticweKdeGlobalsPath(), KConfig::FullConfig);
     }
     // Same staleness pitfall as readNoctaliaColors().
     m_kdeglobalsConfig->reparseConfiguration();
@@ -1727,6 +1740,37 @@ void TilingController::cycleLayout()
     }
     const int nextIndex = (currentIndex + 1) % enabled.size();
     setLayout(enabled.at(nextIndex));
+}
+
+void TilingController::toggleOuterGaps()
+{
+    if (!m_workspace) {
+        return;
+    }
+    LogicalOutput *output = m_workspace->activeOutput();
+    if (!output) {
+        return;
+    }
+
+    KSharedConfigPtr config = KSharedConfig::openConfig(KWIN_CONFIG);
+    // Reparse so edits made from outside the compositor (e.g. the settings
+    // page writing the file) are picked up before the presets are read.
+    config->reparseConfiguration();
+    KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
+    const int wideGap = tilingGroup.readEntry("GapToggleWide", 15);
+    const int centeredGap = tilingGroup.readEntry("GapToggleCentered", 390);
+
+    // Two-state flip on the active monitor's outer (left/right) gaps: the
+    // per-output override, falling back to the "wide" preset when none is
+    // present. Top/bottom gaps are deliberately left untouched.
+    KConfigGroup outputGroup(&tilingGroup, QStringLiteral("Output %1").arg(output->name()));
+    const int currentGap = outputGroup.readEntry("GapLeft", wideGap);
+    const int targetGap = (currentGap == centeredGap) ? wideGap : centeredGap;
+    outputGroup.writeEntry("GapLeft", targetGap);
+    outputGroup.writeEntry("GapRight", targetGap);
+    config->sync();
+
+    applyGapSettingsToOutput(output);
 }
 
 void TilingController::showLayoutNotification(LayoutEngine::LayoutKind kind)

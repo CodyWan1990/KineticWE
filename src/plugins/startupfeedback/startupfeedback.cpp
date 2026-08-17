@@ -65,7 +65,7 @@ StartupFeedbackEffect::StartupFeedbackEffect()
     , m_progress(0)
     , m_type(BouncingFeedback)
     , m_cursorSize(24)
-    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig("klaunchrc", KConfig::NoGlobals)))
+    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"), KConfig::NoGlobals)))
     , m_splashVisible(false)
 {
 #if KWIN_BUILD_X11

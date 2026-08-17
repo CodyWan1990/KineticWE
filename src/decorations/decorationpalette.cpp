@@ -11,6 +11,7 @@
 */
 
 #include "decorationpalette.h"
+#include "config-kwin.h"
 
 #include <KConfigGroup>
 
@@ -26,7 +27,7 @@ DecorationPalette::DecorationPalette(const QString &colorScheme)
     : m_colorScheme(colorScheme != QStringLiteral("kdeglobals") ? colorScheme : QString())
 {
     if (m_colorScheme.isEmpty()) {
-        m_colorSchemeConfig = KSharedConfig::openConfig(m_colorScheme, KConfig::FullConfig);
+        m_colorSchemeConfig = KSharedConfig::openConfig(kineticweKdeGlobalsPath(), KConfig::FullConfig);
     } else {
         m_colorSchemeConfig = KSharedConfig::openConfig(m_colorScheme, KConfig::SimpleConfig);
     }

@@ -80,9 +80,9 @@ Atoms *atoms;
 Application::Application(int &argc, char **argv)
     : QApplication(argc, argv)
     , m_configLock(false)
-    , m_config(KSharedConfig::openConfig(QStringLiteral("kwinrc")))
+    , m_config(KSharedConfig::openConfig(KWIN_CONFIG))
     , m_kxkbConfig()
-    , m_kdeglobals(KSharedConfig::openConfig(QStringLiteral("kdeglobals")))
+    , m_kdeglobals(KSharedConfig::openConfig(kineticweKdeGlobalsPath()))
 {
     qRegisterMetaType<Options::WindowOperation>("Options::WindowOperation");
     qRegisterMetaType<KWin::EffectWindow *>();
@@ -113,10 +113,10 @@ void Application::start()
         m_config->reparseConfiguration();
     }
     if (!m_kxkbConfig) {
-        m_kxkbConfig = KSharedConfig::openConfig(QStringLiteral("kxkbrc"), KConfig::NoGlobals);
+        m_kxkbConfig = KSharedConfig::openConfig(KWIN_CONFIG, KConfig::NoGlobals);
     }
     if (!m_inputConfig) {
-        m_inputConfig = KSharedConfig::openConfig(QStringLiteral("kcminputrc"), KConfig::NoGlobals);
+        m_inputConfig = KSharedConfig::openConfig(KWIN_CONFIG, KConfig::NoGlobals);
     }
 
     performStartup();
@@ -296,7 +296,7 @@ void Application::setXwaylandScale(qreal scale)
 
 void Application::applyXwaylandScale()
 {
-    const bool xwaylandClientsScale = KConfig(QStringLiteral("kdeglobals"))
+    const bool xwaylandClientsScale = KConfig(kineticweKdeGlobalsPath())
                                           .group(QStringLiteral("KScreen"))
                                           .readEntry("XwaylandClientsScale", true);
 

@@ -17,7 +17,7 @@ namespace KWin
 
 SlowKeysFilter::SlowKeysFilter()
     : InputEventFilter(InputFilterOrder::SlowKeys)
-    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig("kaccessrc")))
+    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"))))
 {
     const QLatin1StringView groupName("Keyboard");
     connect(m_configWatcher.get(), &KConfigWatcher::configChanged, this, [this, groupName](const KConfigGroup &group) {

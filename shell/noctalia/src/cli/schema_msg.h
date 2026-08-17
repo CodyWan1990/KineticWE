@@ -456,6 +456,15 @@ namespace noctalia::cli {
     inline constexpr Command keyboardLayoutCycle{
         "keyboard-layout-cycle", "Switch to the next keyboard layout", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command kineticSettingsClose{
+        "kinetic-settings-close", "Close the kinetic settings window", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command kineticSettingsOpen{
+        "kinetic-settings-open", "Open the kinetic settings window", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command kineticSettingsToggle{
+        "kinetic-settings-toggle", "Toggle the kinetic settings window", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command lockscreenWidgetsEdit{
         "lockscreen-widgets-edit", "Open the lockscreen widgets editor", {}, {}, {}, {}, {}, false
     };
@@ -853,6 +862,9 @@ namespace noctalia::cli {
       msg::keyboardBacklightToggle,
       msg::keyboardBacklightUp,
       msg::keyboardLayoutCycle,
+      msg::kineticSettingsClose,
+      msg::kineticSettingsOpen,
+      msg::kineticSettingsToggle,
       msg::lockscreenWidgetsEdit,
       msg::lockscreenWidgetsExit,
       msg::lockscreenWidgetsToggleEdit,

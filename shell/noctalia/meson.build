@@ -968,6 +968,12 @@ _noctalia_sources = files(
   'src/cli/help.cpp',
   'src/theme/cli.cpp',
   'src/ipc/cli.cpp',
+  'kinetic-settings/src/kineticwe_kwe.cpp',
+  'kinetic-settings/src/compositor_dbus.cpp',
+  'kinetic-settings/src/kinetic_settings_window.cpp',
+  'kinetic-settings/src/tiling_page.cpp',
+  'kinetic-settings/src/workspaces_page.cpp',
+  'kinetic-settings/src/kinetic_settings_module.cpp',
 )
 
 if sanitize
@@ -1082,7 +1088,7 @@ noctalia_core_dep = declare_dependency(
   sources: _protocol_headers,
 )
 
-noctalia_exe = executable('noctalia',
+noctalia_exe = executable('noctalia-kwe',
   sources: files('src/main.cpp') + _protocol_headers,
   dependencies: _noctalia_dependencies,
   include_directories: _noctalia_inc,
@@ -1103,6 +1109,16 @@ install_data(
 
 install_data(
   'assets/noctalia.svg',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
+)
+
+install_data(
+  'kinetic-settings/assets/kineticwe-settings.desktop',
+  install_dir: get_option('datadir') / 'applications',
+)
+
+install_data(
+  'kinetic-settings/assets/kineticwe.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
 )
 

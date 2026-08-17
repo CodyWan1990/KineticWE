@@ -210,7 +210,7 @@ void TestXdgShellWindowRules::initTestCase()
     QCOMPARE(outputs[0]->geometry(), Rect(0, 0, 1280, 1024));
     QCOMPARE(outputs[1]->geometry(), Rect(1280, 0, 1280, 1024));
 
-    m_config = KSharedConfig::openConfig(QStringLiteral("kwinrulesrc"), KConfig::SimpleConfig);
+    m_config = KSharedConfig::openConfig(QStringLiteral("rules.kwe"), KConfig::SimpleConfig);
     workspace()->rulebook()->setConfig(m_config);
 }
 

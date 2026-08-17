@@ -181,13 +181,20 @@ All desktop-environment settings live in one folder with sane defaults. No scatt
 
 ### 5.2 Layout
 
+Compositor-owned settings live in `~/.config/kineticwe`. The session script (`scripts/start-kineticwe.sh`, step 1b) redirects `XDG_CONFIG_HOME` **only for the compositor process** (per-command env prefix), so the compositor natively resolves `kineticwe.kwe` / `rules.kwe` / `kglobalaccelrc` / `kwinoutputconfig.json` inside that root — no compositor source changes for those, and every `KConfigWatcher` hot-reload path keeps working. The shell, kinetic-settings, D-Bus-activated services, and **all user applications keep the real `~/.config`** — user apps never have to duplicate or relocate their dotfiles. The script publishes the real config home to the compositor as `KWE_REAL_CONFIG_HOME` so shared state (`kdeglobals`) stays a single source of truth.
+
 | File | Replaces | Contents |
 |---|---|---|
 | `~/.config/kineticwe/kineticwe.kwe` | `kwinrc` | All compositor settings: `[Shortcuts]`, `[Mouse]`, `[Libinput]`, `[Keyboard]`, `[TabBox]`, `[ScreenEdges]`, `[Plugins]`, `[Effect-*]`, `[Desktop]`, `[Tiling]`, `[Xwayland]`, ... |
 | `~/.config/kineticwe/rules.kwe` | `kwinrulesrc` | Window rules (numbered rule groups + force/apply/forbid keys) |
-| `~/.config/kglobalaccelrc` | (unchanged, compat) | App global-shortcut storage; filename hardcoded in the KGlobalAccel library. Kept as a library-level compat shim, edited transparently by the Kinetic Settings app. |
-| `~/.config/kdeglobals` | (kept, compat shim) | KDE apps read this for icons/colors/fonts. Kinetic Settings writes canonical values to `kineticwe.kwe` and mirrors the handful of KDE-app-relevant keys here. A config file, not a service. |
+| `~/.config/kineticwe/kglobalaccelrc` | `~/.config/kglobalaccelrc` | App global-shortcut storage; filename hardcoded in the KGlobalAccel library, resolved under the compositor's redirected config root. Migrated by the session script. |
+| `~/.config/kineticwe/kglobalshortcutsrc` | `~/.config/kglobalshortcutsrc` | Shortcut storage of the embedded KGlobalAccelD (runs inside the compositor process, so its state follows the compositor's config root). |
+| `~/.config/kineticwe/kwinoutputconfig.json` | `kwinoutputconfig.json` | Compositor output layout/scale state (regenerated on change). |
+| `~/.config/kineticwe/session/` | `~/.config/session/` | Compositor session-restore state. |
+| `~/.config/kdeglobals` | (unchanged) | **Shared** theme state. One copy, in the user's real config home: the shell's theme service writes it, KDE apps read it, and the compositor opens it by absolute path (`kineticweKdeGlobalsPath()`, `src/config-kwin.h.cmake`) via `KWE_REAL_CONFIG_HOME`. No mirror. |
 | `~/.config/noctalia/config.toml` | (unchanged) | Shell-owned UI: bars, dock, launcher, notifications, wallpaper, **lock screen**, idle actions, brightness, nightlight UI, power-profile hooks. Already hot-reloaded. |
+
+The session script also **prunes stale user-app entries** from the config root on startup (step 4d): earlier builds redirected the whole session's `XDG_CONFIG_HOME`, so user applications (yazi, zed, fish, kitty, ...) wrote configs inside the root; only compositor-owned files are kept now. The real configs in `~/.config` are untouched duplicates.
 
 ### 5.3 Syntax — KConfig INI
 
@@ -245,7 +252,7 @@ Notes:
 
 ### 5.5 Hot reload
 
-- The compositor already reloads config on change (`KConfigWatcher` + `slotReconfigured` paths).
+- The compositor reloads config on change: per-subsystem `KConfigWatcher`s (effects, screen edges, tiling, keyboard layouts, night light, accessibility plugins) plus a general watcher on `kineticwe.kwe` and one on `rules.kwe` that nudge the debounced full reconfigure (`slotReconfigure`). Editing the files applies live within ~200 ms.
 - Kinetic Settings writes the `.kwe` files and triggers a reparse via the compositor's D-Bus where a setting is runtime-only (e.g., cursor: emit the `org.kde.KGlobalSettings` `notifyChange` type 5 signal — `src/cursor.cpp` applies it live).
 
 ---
@@ -311,7 +318,7 @@ Each module = write `.kwe`/config + call compositor-owned D-Bus + emit change si
 | Display (res/refresh/rotation/arrangement/scale/brightness) | kde-output-device-v2 management (Phase 1 backend) | compositor applies immediately |
 | Shortcuts (compositor + global app) | `kineticwe.kwe` `[Shortcuts]`; `kglobalaccelrc` (component `noctalia`/`kwin`) | config reload + embedded kglobalaccel re-read |
 | Cursor | `kineticwe.kwe` `[Mouse]` + `org.kde.KGlobalSettings` notifyChange(5) | runtime (`src/cursor.cpp:140`) |
-| Icons | `kineticwe.kwe` + `kdeglobals` mirror for KDE apps | app-level; shell own |
+| Icons | `kineticwe.kwe` + real `~/.config/kdeglobals` (shared, one copy) | app-level; shell own |
 | Mouse/Touchpad | `kineticwe.kwe` `[Libinput]` | compositor reparse; `InputDevice` D-Bus for live tweaks |
 | Keyboard layouts | `kineticwe.kwe` `[Keyboard]` + `org.kde.KWin` Layouts D-Bus | immediate + config |
 | Fonts | `~/.config/fontconfig/fonts.conf` | fontconfig (non-KDE) |
@@ -397,10 +404,13 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 
 | Legacy file | 2.0 location | Owner |
 |---|---|---|
-| `~/.config/kwinrc` | `~/.config/kineticwe/kineticwe.kwe` | compositor / Kinetic Settings |
-| `~/.config/kwinrulesrc` | `~/.config/kineticwe/rules.kwe` | compositor / Kinetic Settings |
+| `~/.config/kwinrc` | `~/.config/kineticwe/kineticwe.kwe` (compositor-only `XDG_CONFIG_HOME` redirect) | compositor / Kinetic Settings |
+| `~/.config/kwinrulesrc` | `~/.config/kineticwe/rules.kwe` (compositor-only `XDG_CONFIG_HOME` redirect) | compositor / Kinetic Settings |
 | `~/.config/kaccessrc`, `kcminputrc`, `kxkbrc`, `klaunchrc`, `plasmarc` (kwin-read bits) | merged into `kineticwe.kwe` | compositor / Kinetic Settings |
-| `~/.config/kglobalaccelrc` | unchanged (compat shim) | KGlobalAccel library / Kinetic Settings |
-| `~/.config/kdeglobals` | unchanged (compat shim for KDE apps) | Kinetic Settings (mirror) |
+| `~/.config/kglobalaccelrc` | `~/.config/kineticwe/kglobalaccelrc` (migrated by session script) | embedded KGlobalAccelD (in compositor) |
+| `~/.config/kglobalshortcutsrc` | `~/.config/kineticwe/kglobalshortcutsrc` | embedded KGlobalAccelD (in compositor) |
+| `~/.config/kdeglobals` | unchanged — one shared copy in the real config home; the compositor opens it via `KWE_REAL_CONFIG_HOME` (`kineticweKdeGlobalsPath()`) | shell theme service / KDE apps / compositor |
 | `~/.config/noctalia/config.toml` | unchanged | shell |
 | `~/.config/fontconfig/fonts.conf` | unchanged | fontconfig / Kinetic Settings |
+
+User applications (yazi, zed, kitty, ...) are **not** affected: they keep reading/writing `~/.config` exactly as outside the KineticWE session.

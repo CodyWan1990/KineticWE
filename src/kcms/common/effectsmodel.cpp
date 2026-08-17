@@ -71,7 +71,7 @@ static EffectsModel::Status effectStatus(bool enabled)
 
 EffectsModel::EffectsModel(QObject *parent)
     : QAbstractItemModel(parent)
-    , m_config(KSharedConfig::openConfig("kwinrc"))
+    , m_config(KSharedConfig::openConfig("kineticwe.kwe"))
 {
 }
 

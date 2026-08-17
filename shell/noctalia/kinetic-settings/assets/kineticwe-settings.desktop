@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kinetic Settings
+Comment=Configure KineticWE compositor and desktop settings.
+Exec=sh -c "noctalia-kwe msg kinetic-settings-open || { noctalia-kwe --daemon && noctalia-kwe msg kinetic-settings-open; }"
+Icon=kineticwe
+Terminal=false
+Categories=Settings;DesktopSettings;
+StartupNotify=false

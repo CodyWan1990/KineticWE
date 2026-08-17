@@ -152,6 +152,14 @@ public:
      */
     void cycleLayout();
 
+    /**
+     * Flip the active monitor's outer (left/right) gaps between the two
+     * [Tiling] GapToggleWide / GapToggleCentered presets by writing a
+     * [Tiling][Output <name>] override and applying it live. Bound to the
+     * "Tiling Toggle Outer Gaps" shortcut and exposed over D-Bus.
+     */
+    void toggleOuterGaps();
+
     TilingRules *rules() const { return m_rules.get(); }
 
     /** Whether native tiling is currently enabled (kwinrc [Tiling] Enabled). */
@@ -322,6 +330,10 @@ private:
     // QStandardPaths::locate() returns an absolute path.
     QFileSystemWatcher *m_noctaliaFsWatcher = nullptr;
     QString m_noctaliaPath;
+    // kdeglobals is opened by absolute path too (real config home, outside
+    // the compositor's redirected config root), so it needs the same
+    // QFileSystemWatcher fallback.
+    QFileSystemWatcher *m_kdeglobalsFsWatcher = nullptr;
     // Debounce the color re-reads: editors and shell-integration daemons
     // often rewrite the file in two steps (write tmp + rename), which
     // produces multiple fileChanged events in quick succession.

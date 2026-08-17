@@ -113,7 +113,9 @@ setup_distrobox() {
     step "Setting up distrobox container '${DISTROBOX_NAME}'..."
     # distrobox list prints "ID | NAME | STATUS | IMAGE", so the name is
     # never at line start — match it as a word anywhere in the line.
-    if distrobox list 2>/dev/null | grep -qw "$DISTROBOX_NAME"; then
+    # No grep -q: it exits on first match, distrobox list dies with SIGPIPE,
+    # and pipefail then reports the pipeline as failed even when it matched.
+    if distrobox list 2>/dev/null | grep -w "$DISTROBOX_NAME" > /dev/null; then
         info "Container '${DISTROBOX_NAME}' already exists."
     else
         info "Creating distrobox from ${DISTROBOX_IMAGE}..."

@@ -1024,7 +1024,7 @@ void Workspace::initShortcuts()
     // Noctalia shell commands
     initShortcut("Noctalia Launcher", i18n("Toggle Noctalia Launcher"),
                  Qt::META | Qt::Key_Space,
-                 std::bind(&Workspace::slotExecuteCommand, this, QStringLiteral("noctalia msg panel-toggle launcher")), false);
+                 std::bind(&Workspace::slotExecuteCommand, this, QStringLiteral("noctalia-kwe msg panel-toggle launcher")), false);
 
     // Native tiling shortcuts
     initShortcut("Tiling Focus Left", i18n("Tiling Focus Left"), Qt::META | Qt::Key_Left, [this]() {
@@ -1118,6 +1118,11 @@ void Workspace::initShortcuts()
     initShortcut("Tiling Cycle Layout", i18n("Tiling Cycle Layout"), QKeySequence(), [this]() {
         if (m_tilingController) {
             m_tilingController->cycleLayout();
+        }
+    }, true);
+    initShortcut("Tiling Toggle Outer Gaps", i18n("Tiling Toggle Outer Gaps"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->toggleOuterGaps();
         }
     }, true);
     initShortcut("Tiling Switch To MasterStack", i18n("Tiling Switch To MasterStack"), QKeySequence(), [this]() {

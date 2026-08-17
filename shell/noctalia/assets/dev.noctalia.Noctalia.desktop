@@ -2,7 +2,7 @@
 Type=Application
 Name=Noctalia
 Comment=A sleek, customizable desktop shell crafted for Wayland.
-Exec=noctalia --daemon
+Exec=noctalia-kwe --daemon
 Icon=noctalia
 Terminal=false
 Categories=Settings;DesktopSettings;
@@ -11,4 +11,4 @@ Actions=Settings;
 
 [Desktop Action Settings]
 Name=Open Settings
-Exec=sh -c "noctalia msg settings-open || { noctalia --daemon && noctalia msg settings-open; }"
+Exec=sh -c "noctalia-kwe msg settings-open || { noctalia-kwe --daemon && noctalia-kwe msg settings-open; }"

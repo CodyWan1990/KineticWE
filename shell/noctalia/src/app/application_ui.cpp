@@ -138,6 +138,9 @@ void Application::initUiRenderSurfacesAndSettings() {
   m_settingsWindow.setPluginManager(&m_pluginManager);
   m_settingsWindow.setIpcService(&m_ipcService);
   m_settingsWindow.setAsyncTextureCache(&m_asyncTextureCache);
+  m_kineticSettings.initialize(
+      m_wayland, m_renderContext, *m_bus, m_ipcService, m_configService.config().accessibility.uiScale
+  );
   m_settingsWindow.setOpenDesktopWidgetEditor([this]() {
     if (m_lockscreenWidgetsController.isEditing()) {
       m_lockscreenWidgetsController.exitEdit();
@@ -422,6 +425,8 @@ void Application::initInputDispatch() {
     }
     if (m_settingsWindow.onPointerEvent(event))
       return;
+    if (m_kineticSettings.onPointerEvent(event))
+      return;
     if (m_bar.onPointerEvent(event))
       return;
     if (m_dock.onPointerEvent(event))
@@ -476,6 +481,10 @@ void Application::initInputDispatch() {
     }
     if (m_settingsWindow.ownsKeyboardSurface(m_wayland.lastKeyboardSurface())) {
       m_settingsWindow.onKeyboardEvent(event);
+      return;
+    }
+    if (m_kineticSettings.ownsKeyboardSurface(m_wayland.lastKeyboardSurface())) {
+      m_kineticSettings.onKeyboardEvent(event);
       return;
     }
     if (m_overviewLauncherCapture.handleKeyboardEvent(event)) {

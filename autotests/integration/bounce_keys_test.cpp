@@ -40,7 +40,7 @@ private:
 
 void BounceKeysTest::initTestCase()
 {
-    KConfig kaccessConfig("kaccessrc");
+    KConfig kaccessConfig("kineticwe.kwe");
     kaccessConfig.group(QStringLiteral("Keyboard")).writeEntry("BounceKeys", true);
     kaccessConfig.group(QStringLiteral("Keyboard")).writeEntry("BounceKeysDelay", 200);
     kaccessConfig.sync();

@@ -8,6 +8,7 @@
 */
 
 #include "systembell.h"
+#include "config-kwin.h"
 
 #include "effect/effecthandler.h"
 #include "opengl/glshader.h"
@@ -43,8 +44,8 @@ QTimer *SystemBellEffect::s_systemBellRemoveTimer = nullptr;
 XdgSystemBellV1Interface *SystemBellEffect::s_systemBell = nullptr;
 
 SystemBellEffect::SystemBellEffect()
-    : m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig("kaccessrc")))
-    , m_kdeglobals(QStringLiteral("kdeglobals"))
+    : m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"))))
+    , m_kdeglobals(kineticweKdeGlobalsPath())
 {
     QDBusConnection::sessionBus().registerObject(QStringLiteral("/org/kde/KWin/Effect/SystemBell1"),
                                                  QStringLiteral("org.kde.KWin.Effect.SystemBell1"),

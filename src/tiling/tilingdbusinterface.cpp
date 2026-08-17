@@ -71,4 +71,11 @@ void TilingDBusInterface::cycleLayout()
     }
 }
 
+void TilingDBusInterface::toggleOuterGaps()
+{
+    if (m_controller) {
+        m_controller->toggleOuterGaps();
+    }
+}
+
 } // namespace KWin

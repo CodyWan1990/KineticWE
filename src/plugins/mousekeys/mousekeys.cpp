@@ -66,7 +66,7 @@ bool MouseKeysInputDevice::isTouchpad() const
 MouseKeysFilter::MouseKeysFilter()
     : KWin::Plugin()
     , KWin::InputEventFilter(KWin::InputFilterOrder::MouseKeys)
-    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig("kaccessrc")))
+    , m_configWatcher(KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("kineticwe.kwe"))))
 {
     const QLatin1StringView groupName("Mouse");
     connect(m_configWatcher.get(), &KConfigWatcher::configChanged, this, [this, groupName](const KConfigGroup &group) {

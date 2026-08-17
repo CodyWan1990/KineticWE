@@ -128,7 +128,7 @@ void NoctaliaSettings::registerShortcut(const QString &id, const QString &descri
     KGlobalAccel::setGlobalShortcut(action, shortcuts);
 
     connect(action, &QAction::triggered, this, [args]() {
-        QProcess::startDetached(QStringLiteral("noctalia"), args);
+        QProcess::startDetached(QStringLiteral("noctalia-kwe"), args);
     });
 
     m_actions.append(action);

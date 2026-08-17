@@ -36,7 +36,7 @@ namespace KWin
 KWinScreenEdgesConfig::KWinScreenEdgesConfig(QObject *parent, const KPluginMetaData &data)
     : KCModule(parent, data)
     , m_form(new KWinTouchScreenEdgeConfigForm(widget()))
-    , m_config(KSharedConfig::openConfig("kwinrc"))
+    , m_config(KSharedConfig::openConfig("kineticwe.kwe"))
     , m_data(new KWinTouchScreenData(this))
 {
     QVBoxLayout *layout = new QVBoxLayout(widget());
