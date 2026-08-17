@@ -145,9 +145,28 @@ setup_distrobox() {
     distrobox enter "$DISTROBOX_NAME" -- bash -c "
         # Ignore scriptlet failures; container cannot run systemd/udev scripts
         sudo dnf install -y --skip-unavailable $buildreqs || true
-        # Verify cmake at least made it
-        if ! command -v cmake &>/dev/null; then
-            echo 'ERROR: cmake failed to install' >&2
+
+        # Fail fast if key build tools are missing instead of dying mid-build
+        missing_tools=()
+        for tool in cmake meson ninja; do
+            command -v \$tool &>/dev/null || missing_tools+=(\$tool)
+        done
+        if [[ \${#missing_tools[@]} -gt 0 ]]; then
+            echo 'ERROR: build tools missing:' >&2
+            printf '  %s\n' \"\${missing_tools[@]}\" >&2
+            exit 1
+        fi
+
+        # Spot-check pkg-config modules for the main dep groups:
+        # Qt6 (qt6-qtbase-devel), KF6 (kf6-kconfig-devel), portal
+        # (pipewire-devel / wireplumber-devel), noctalia (sdbus-cpp-devel)
+        missing_mods=()
+        for mod in Qt6Core KF6Config libpipewire-0.3 wireplumber-0.5 sdbus-c++; do
+            pkg-config --exists \$mod 2>/dev/null || missing_mods+=(\$mod)
+        done
+        if [[ \${#missing_mods[@]} -gt 0 ]]; then
+            echo 'ERROR: pkg-config modules missing:' >&2
+            printf '  %s\n' \"\${missing_mods[@]}\" >&2
             exit 1
         fi
     "
