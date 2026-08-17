@@ -158,15 +158,23 @@ setup_distrobox() {
         fi
 
         # Spot-check pkg-config modules for the main dep groups:
-        # Qt6 (qt6-qtbase-devel), KF6 (kf6-kconfig-devel), portal
-        # (pipewire-devel / wireplumber-devel), noctalia (sdbus-cpp-devel)
+        # Qt6 (qt6-qtbase-devel), portal (pipewire-devel / wireplumber-devel),
+        # noctalia (sdbus-cpp-devel)
         missing_mods=()
-        for mod in Qt6Core KF6Config libpipewire-0.3 wireplumber-0.5 sdbus-c++; do
+        for mod in Qt6Core libpipewire-0.3 wireplumber-0.5 sdbus-c++; do
             pkg-config --exists \$mod 2>/dev/null || missing_mods+=(\$mod)
         done
         if [[ \${#missing_mods[@]} -gt 0 ]]; then
             echo 'ERROR: pkg-config modules missing:' >&2
             printf '  %s\n' \"\${missing_mods[@]}\" >&2
+            exit 1
+        fi
+
+        # KF6 ships CMake config files, not pkg-config .pc files, so verify
+        # the kf6-kconfig-devel package directly (and its CMake config).
+        if ! rpm -q kf6-kconfig-devel &>/dev/null \
+            || ! ls /usr/lib64/cmake/KF6Config/KF6ConfigConfig.cmake &>/dev/null; then
+            echo 'ERROR: KF6 (kf6-kconfig-devel) not installed' >&2
             exit 1
         fi
     "

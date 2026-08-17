@@ -80,9 +80,9 @@ if [[ ${#missing_tools[@]} -gt 0 ]]; then
 fi
 
 echo
-info "Verifying pkg-config modules (Qt6 / KF6 / portal / noctalia groups)..."
+info "Verifying pkg-config modules (Qt6 / portal / noctalia groups)..."
 missing_mods=()
-for mod in Qt6Core KF6Config libpipewire-0.3 wireplumber-0.5 sdbus-c++; do
+for mod in Qt6Core libpipewire-0.3 wireplumber-0.5 sdbus-c++; do
     if ! pkg-config --exists "$mod" 2>/dev/null; then
         missing_mods+=("$mod")
     fi
@@ -90,6 +90,17 @@ done
 if [[ ${#missing_mods[@]} -gt 0 ]]; then
     error "pkg-config modules missing: ${missing_mods[*]}"
     error "Re-run with 'sudo dnf install -y --skip-unavailable $(printf '%s ' "${buildreqs[@]}")' and check for failures."
+    exit 1
+fi
+
+echo
+info "Verifying KF6 (kf6-kconfig-devel)..."
+# KF6 ships CMake config files, not pkg-config .pc files, so verify the
+# package directly (and its CMake config).
+if ! rpm -q kf6-kconfig-devel &>/dev/null \
+    || ! ls /usr/lib64/cmake/KF6Config/KF6ConfigConfig.cmake &>/dev/null; then
+    error "kf6-kconfig-devel not installed (its CMake config is missing)."
+    error "Re-run with 'sudo dnf install -y kf6-kconfig-devel' and check for failures."
     exit 1
 fi
 
