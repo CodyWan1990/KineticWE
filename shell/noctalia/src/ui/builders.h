@@ -555,6 +555,8 @@ namespace ui {
     std::optional<std::string> unsetPlaceholder = std::nullopt;
     std::optional<std::string> recordingPlaceholder = std::nullopt;
     std::optional<ModifierPolicy> modifierPolicy = std::nullopt;
+    std::optional<bool> allowSuper = std::nullopt;
+    std::optional<bool> escapeCancels = std::nullopt;
     std::optional<float> width = std::nullopt;
     std::optional<float> height = std::nullopt;
     std::optional<float> flexGrow = std::nullopt;
@@ -562,6 +564,7 @@ namespace ui {
     std::optional<bool> visible = std::nullopt;
     std::optional<bool> participatesInLayout = std::nullopt;
     std::function<void(KeyChord)> onCommit = nullptr;
+    std::function<void(bool)> onRecordingChanged = nullptr;
     std::function<void(KeybindRecorder&)> configure = nullptr;
   };
 

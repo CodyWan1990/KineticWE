@@ -146,8 +146,12 @@ void KineticSettingsWindow::open() {
   if (m_workspacesPage == nullptr) {
     m_workspacesPage = std::make_unique<WorkspacesPage>(*m_bus);
   }
+  if (m_keybindsPage == nullptr) {
+    m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus);
+  }
   m_tilingPage->reloadFromDisk();
   m_workspacesPage->reloadFromDisk();
+  m_keybindsPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
   m_surface->requestLayout();
@@ -341,6 +345,35 @@ WorkspacesPage::Callbacks KineticSettingsWindow::workspacesPageCallbacks() {
   };
 }
 
+KeybindsPage::Filter KineticSettingsWindow::keybindsFilter() const {
+  return KeybindsPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+KeybindsPage::Callbacks KineticSettingsWindow::keybindsPageCallbacks() {
+  return KeybindsPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_keybindsPage != nullptr) {
+              m_keybindsPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 void KineticSettingsWindow::confirmResetPage() {
   clearArmedResets();
   resetActivePage();
@@ -356,6 +389,9 @@ void KineticSettingsWindow::applyActivePage() {
     break;
   case ActivePage::Workspaces:
     applied = m_workspacesPage != nullptr && m_workspacesPage->applyAll();
+    break;
+  case ActivePage::Keybinds:
+    applied = m_keybindsPage != nullptr && m_keybindsPage->applyAll();
     break;
   }
   if (applied) {
@@ -376,6 +412,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_workspacesPage->resetAll();
     }
     break;
+  case ActivePage::Keybinds:
+    if (m_keybindsPage != nullptr) {
+      m_keybindsPage->resetAll();
+    }
+    break;
   }
 }
 
@@ -385,6 +426,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_tilingPage != nullptr && m_tilingPage->hasPending();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && m_workspacesPage->hasPending();
+  case ActivePage::Keybinds:
+    return m_keybindsPage != nullptr && m_keybindsPage->hasPending();
   }
   return false;
 }
@@ -395,6 +438,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_tilingPage != nullptr && !m_tilingPage->resettableKeyPaths().empty();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && !m_workspacesPage->resettableKeyPaths().empty();
+  case ActivePage::Keybinds:
+    return m_keybindsPage != nullptr && !m_keybindsPage->resettableKeyPaths().empty();
   }
   return false;
 }
@@ -550,67 +595,79 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   const auto selectPage = [this](ActivePage page) {
     m_activePage = page;
     clearArmedResets();
-    m_windowManagementExpanded = true;
     requestSceneRebuild();
   };
 
   // Primary nav row: collapsible category. The chevron doubles as the visual
   // affordance for the expand/collapse toggle.
-  nav->addChild(ui::button({
-      .text = "Window Management",
-      .glyph = m_windowManagementExpanded ? "chevron-down" : "chevron-right",
-      .fontSize = Style::fontSizeCaption * scale,
-      .glyphSize = kPrimaryNavGlyphSize * scale,
-      .contentAlign = ButtonContentAlign::Start,
-      .variant = ButtonVariant::Tab,
-      .minHeight = Style::controlHeightSm * scale,
-      .paddingV = Style::spaceXs * scale,
-      .paddingH = kPrimaryNavPaddingH * scale,
-      .gap = kPrimaryNavGap * scale,
-      .radius = Style::scaledRadiusMd(scale),
-      .onClick = [this]() {
-        m_windowManagementExpanded = !m_windowManagementExpanded;
-        clearArmedResets();
-        requestSceneRebuild();
-      },
-      .configure = [](Button& button) {
-        if (button.label() != nullptr) {
-          button.label()->setFontWeight(FontWeight::Bold);
-        }
-        button.setTabStop(false);
-      },
-  }));
+  const auto addCategory = [&](std::string_view title, bool expanded, std::function<void()> onToggle) {
+    nav->addChild(ui::button({
+        .text = std::string(title),
+        .glyph = expanded ? "chevron-down" : "chevron-right",
+        .fontSize = Style::fontSizeCaption * scale,
+        .glyphSize = kPrimaryNavGlyphSize * scale,
+        .contentAlign = ButtonContentAlign::Start,
+        .variant = ButtonVariant::Tab,
+        .minHeight = Style::controlHeightSm * scale,
+        .paddingV = Style::spaceXs * scale,
+        .paddingH = kPrimaryNavPaddingH * scale,
+        .gap = kPrimaryNavGap * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .onClick = [onToggle]() { onToggle(); },
+        .configure = [](Button& button) {
+          if (button.label() != nullptr) {
+            button.label()->setFontWeight(FontWeight::Bold);
+          }
+          button.setTabStop(false);
+        },
+    }));
+  };
 
   // Secondary nav rows: indented, compact, one per sub-page. Mirrors Noctalia's
   // settings_sidebar secondary nav ("paddingLeft = spaceLg").
+  const auto addSubNav = [&](ActivePage page, std::string_view glyph, std::string_view text) {
+    const bool selected = m_activePage == page;
+    nav->addChild(ui::button({
+        .text = std::string(text),
+        .glyph = std::string(glyph),
+        .fontSize = Style::fontSizeCaption * scale,
+        .glyphSize = Style::fontSizeCaption * scale,
+        .contentAlign = ButtonContentAlign::Start,
+        .variant = selected ? ButtonVariant::TabActive : ButtonVariant::Tab,
+        .minHeight = Style::controlHeightSm * scale,
+        .paddingTop = Style::spaceXs * scale,
+        .paddingRight = Style::spaceMd * scale,
+        .paddingBottom = Style::spaceXs * scale,
+        .paddingLeft = Style::spaceLg * scale,
+        .gap = Style::spaceXs * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .onClick = [page, selectPage]() { selectPage(page); },
+        .configure = [selected](Button& button) {
+          if (selected && button.label() != nullptr) {
+            button.label()->setFontWeight(FontWeight::Bold);
+          }
+          button.setTabStop(false);
+        },
+    }));
+  };
+
+  addCategory("Window Management", m_windowManagementExpanded, [this]() {
+    m_windowManagementExpanded = !m_windowManagementExpanded;
+    clearArmedResets();
+    requestSceneRebuild();
+  });
   if (m_windowManagementExpanded) {
-    const auto addSubNav = [&](ActivePage page, std::string_view glyph, std::string_view text) {
-      const bool selected = m_activePage == page;
-      nav->addChild(ui::button({
-          .text = std::string(text),
-          .glyph = std::string(glyph),
-          .fontSize = Style::fontSizeCaption * scale,
-          .glyphSize = Style::fontSizeCaption * scale,
-          .contentAlign = ButtonContentAlign::Start,
-          .variant = selected ? ButtonVariant::TabActive : ButtonVariant::Tab,
-          .minHeight = Style::controlHeightSm * scale,
-          .paddingTop = Style::spaceXs * scale,
-          .paddingRight = Style::spaceMd * scale,
-          .paddingBottom = Style::spaceXs * scale,
-          .paddingLeft = Style::spaceLg * scale,
-          .gap = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [page, selectPage]() { selectPage(page); },
-          .configure = [selected](Button& button) {
-            if (selected && button.label() != nullptr) {
-              button.label()->setFontWeight(FontWeight::Bold);
-            }
-            button.setTabStop(false);
-          },
-      }));
-    };
     addSubNav(ActivePage::Workspaces, "device-desktop", "Workspaces");
     addSubNav(ActivePage::Tiling, "layout-grid", "Tiling");
+  }
+
+  addCategory("Input & Output", m_inputOutputExpanded, [this]() {
+    m_inputOutputExpanded = !m_inputOutputExpanded;
+    clearArmedResets();
+    requestSceneRebuild();
+  });
+  if (m_inputOutputExpanded) {
+    addSubNav(ActivePage::Keybinds, "keyboard", "Keybinds");
   }
 
   return sidebarScroll;
@@ -643,6 +700,13 @@ void KineticSettingsWindow::rebuildContent() {
     if (m_workspacesPage != nullptr) {
       m_pageContainer->addChild(
           m_workspacesPage->build(uiScale(), workspacesFilter(), m_armedResetKeyPath, workspacesPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::Keybinds:
+    if (m_keybindsPage != nullptr) {
+      m_pageContainer->addChild(
+          m_keybindsPage->build(uiScale(), keybindsFilter(), m_armedResetKeyPath, keybindsPageCallbacks())
       );
     }
     break;
@@ -785,8 +849,12 @@ void KineticSettingsWindow::onKeyboardEvent(const KeyboardEvent& event) {
     return;
   }
   if (event.pressed && KeySymbol::isEscape(event.sym)) {
-    close();
-    return;
+    // A recorder capture consumes Escape itself (escapeCancels); the window
+    // must not interpret it as a close gesture while one is recording.
+    if (m_keybindsPage == nullptr || !m_keybindsPage->isCapturing()) {
+      close();
+      return;
+    }
   }
   m_inputDispatcher.keyEvent(event.sym, event.utf32, event.modifiers, event.pressed, event.preedit);
 }

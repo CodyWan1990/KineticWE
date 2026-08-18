@@ -465,6 +465,9 @@ namespace noctalia::cli {
     inline constexpr Command kineticSettingsToggle{
         "kinetic-settings-toggle", "Toggle the kinetic settings window", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command keybindsImport{
+        "keybinds-import", "Re-apply keybinds.kwe to the compositor", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command lockscreenWidgetsEdit{
         "lockscreen-widgets-edit", "Open the lockscreen widgets editor", {}, {}, {}, {}, {}, false
     };

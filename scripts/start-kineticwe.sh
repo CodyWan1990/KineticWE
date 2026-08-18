@@ -178,7 +178,7 @@ done
 #     Keep only compositor-owned files; delete the rest. The real configs in
 #     $KWE_REAL_CONFIG_HOME are untouched. Idempotent.
 # ---------------------------------------------------------------------------
-_KWE_KEEP=(kineticwe.kwe rules.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
+_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
 for _entry in "$KWE_CONFIG_HOME"/* "$KWE_CONFIG_HOME"/.[!.]*; do
     [[ -e "$_entry" ]] || continue
     _name="${_entry##*/}"

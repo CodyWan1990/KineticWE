@@ -66,7 +66,9 @@ BuildRequires:  kf6-kirigami-devel
 BuildRequires:  kf6-kiconthemes-devel
 BuildRequires:  kf6-kitemviews-devel
 BuildRequires:  kf6-kstatusnotifieritem-devel
-BuildRequires:  kf6-kio-filewidgets-devel
+# KIOFileWidgets dev files come from kf6-kio-devel (above); this is the
+# runtime library the portal links against.
+BuildRequires:  kf6-kio-file-widgets
 
 BuildRequires:  kwayland-devel
 BuildRequires:  kscreenlocker-devel

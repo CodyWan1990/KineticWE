@@ -973,6 +973,10 @@ _noctalia_sources = files(
   'kinetic-settings/src/kinetic_settings_window.cpp',
   'kinetic-settings/src/tiling_page.cpp',
   'kinetic-settings/src/workspaces_page.cpp',
+  'kinetic-settings/src/keybind_codec.cpp',
+  'kinetic-settings/src/keybind_dbus.cpp',
+  'kinetic-settings/src/keybinds_kwe.cpp',
+  'kinetic-settings/src/keybinds_page.cpp',
   'kinetic-settings/src/kinetic_settings_module.cpp',
 )
 

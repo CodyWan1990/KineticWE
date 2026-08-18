@@ -1,11 +1,18 @@
 #include "kinetic_settings_module.h"
 
+#include "kinetic-settings/src/keybinds_kwe.h"
 #include "kinetic-settings/src/kinetic_settings_window.h"
 
 #include "cli/schema_msg.h"
+#include "core/input/key_chord.h"
+#include "core/log.h"
 #include "ipc/ipc_service.h"
 
 #include <string>
+
+namespace {
+  constexpr Logger kLog("kinetic-settings");
+} // namespace
 
 KineticSettingsModule::KineticSettingsModule() = default;
 
@@ -15,9 +22,25 @@ void KineticSettingsModule::initialize(
     WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, IpcService& ipcService,
     float uiScale
 ) {
+  m_bus = &bus;
   m_window = std::make_unique<KineticSettingsWindow>();
   m_window->initialize(wayland, renderContext, bus, uiScale);
   bindIpc(ipcService);
+  // The compositor is already up by the time the shell (and this module)
+  // initializes, so the persisted keybinds mirror can be replayed now. A
+  // failure is not fatal — the session keeps its live binds and the user can
+  // re-run the import (`noctalia-kwe msg keybinds-import`).
+  importKeybinds();
+}
+
+void KineticSettingsModule::importKeybinds() {
+  if (m_bus == nullptr) {
+    return;
+  }
+  const int applied = KeybindsKwe::applyToDaemon(*m_bus);
+  if (applied > 0) {
+    kLog.info("keybinds import applied {} shortcut(s)", applied);
+  }
 }
 
 void KineticSettingsModule::bindIpc(IpcService& ipcService) {
@@ -37,6 +60,10 @@ void KineticSettingsModule::bindIpc(IpcService& ipcService) {
     if (m_window != nullptr) {
       m_window->toggle();
     }
+    return "OK\n";
+  });
+  ipcService.bind(noctalia::cli::msg::keybindsImport, [this](const std::string& /*args*/) -> std::string {
+    importKeybinds();
     return "OK\n";
   });
 }

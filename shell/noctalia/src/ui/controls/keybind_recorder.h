@@ -34,6 +34,16 @@ public:
   void setOnCommit(std::function<void(KeyChord)> callback);
   void setModifierPolicy(ModifierPolicy policy);
   void setTabFocusKey(std::string key);
+  // By default Super/Windows keys are rejected (Noctalia's own keybinds never
+  // use them). Compositor global shortcuts are Meta-based, so hosts that edit
+  // those (Kinetic Settings) must opt in.
+  void setSuperAllowed(bool allowed);
+  // When enabled, Escape cancels an in-progress recording instead of being
+  // committed (and instead of propagating to the window as a close gesture).
+  void setEscapeCancels(bool enabled);
+  // Reports recording state transitions so hosts can suppress window-level
+  // key handling (e.g. Escape-to-close) during capture.
+  void setOnRecordingChanged(std::function<void(bool)> callback);
 
   [[nodiscard]] bool isRecording() const noexcept { return m_recording; }
 
@@ -65,5 +75,8 @@ private:
   bool m_recording = false;
   bool m_enabled = true;
   ModifierPolicy m_modifierPolicy = ModifierPolicy::Required;
+  bool m_superAllowed = false;
+  bool m_escapeCancels = false;
+  std::function<void(bool)> m_onRecordingChanged;
   VisualState m_visualState = VisualState::Idle;
 };

@@ -33,6 +33,11 @@ public:
 
 private:
   void bindIpc(IpcService& ipcService);
+  // Re-applies ~/.config/kineticwe/keybinds.kwe to the compositor's global
+  // shortcut daemon. Called at startup (initialize) and on demand through the
+  // `keybinds-import` IPC message.
+  void importKeybinds();
 
   std::unique_ptr<KineticSettingsWindow> m_window;
+  SessionBus* m_bus = nullptr;
 };

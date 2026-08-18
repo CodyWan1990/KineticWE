@@ -1026,11 +1026,20 @@ namespace ui {
     if (props.modifierPolicy.has_value()) {
       control->setModifierPolicy(*props.modifierPolicy);
     }
+    if (props.allowSuper.has_value()) {
+      control->setSuperAllowed(*props.allowSuper);
+    }
+    if (props.escapeCancels.has_value()) {
+      control->setEscapeCancels(*props.escapeCancels);
+    }
     if (props.enabled.has_value()) {
       control->setEnabled(*props.enabled);
     }
     if (props.onCommit) {
       control->setOnCommit(std::move(props.onCommit));
+    }
+    if (props.onRecordingChanged) {
+      control->setOnRecordingChanged(std::move(props.onRecordingChanged));
     }
     applyNodeProps(*control, props);
     if (props.configure) {

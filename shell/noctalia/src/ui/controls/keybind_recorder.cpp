@@ -147,6 +147,22 @@ void KeybindRecorder::setOnCommit(std::function<void(KeyChord)> callback) { m_on
 
 void KeybindRecorder::setModifierPolicy(ModifierPolicy policy) { m_modifierPolicy = policy; }
 
+void KeybindRecorder::setSuperAllowed(bool allowed) {
+  if (m_superAllowed == allowed) {
+    return;
+  }
+  m_superAllowed = allowed;
+  if (m_recording) {
+    refreshLabel();
+  }
+}
+
+void KeybindRecorder::setEscapeCancels(bool enabled) { m_escapeCancels = enabled; }
+
+void KeybindRecorder::setOnRecordingChanged(std::function<void(bool)> callback) {
+  m_onRecordingChanged = std::move(callback);
+}
+
 void KeybindRecorder::setTabFocusKey(std::string key) {
   if (m_inputArea != nullptr) {
     m_inputArea->setTabFocusKey(std::move(key));
@@ -178,8 +194,15 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
     return;
   }
 
+  // Escape aborts the capture instead of becoming part of the chord; with
+  // m_escapeCancels the key event is fully consumed here.
+  if (m_escapeCancels && KeySymbol::isEscape(sym)) {
+    exitRecording(false);
+    return;
+  }
+
   // Must run before the modifier-preview branch so a bare Super press is also caught.
-  if ((modifiers & KeyMod::Super) != 0 || KeySymbol::isSuperModifier(sym)) {
+  if (!m_superAllowed && ((modifiers & KeyMod::Super) != 0 || KeySymbol::isSuperModifier(sym))) {
     notify::error(
         i18n::tr("notifications.internal.keybind-app"), i18n::tr("notifications.internal.keybind-invalid-title"),
         i18n::tr("notifications.internal.keybind-invalid-super")
@@ -232,7 +255,7 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
     return;
   }
 
-  const std::uint32_t cleanModifiers = modifiers & ~KeyMod::Super;
+  const std::uint32_t cleanModifiers = m_superAllowed ? modifiers : (modifiers & ~KeyMod::Super);
   KeyChord chord{.sym = sym, .modifiers = cleanModifiers};
   m_chord = chord;
   if (m_onCommit) {
@@ -257,6 +280,9 @@ void KeybindRecorder::enterRecording() {
   }
   m_recording = true;
   m_pendingModifiers = 0;
+  if (m_onRecordingChanged) {
+    m_onRecordingChanged(true);
+  }
   applyVisualState(VisualState::Recording);
   refreshLabel();
 }
@@ -267,6 +293,9 @@ void KeybindRecorder::exitRecording(bool /*commit*/) {
   }
   m_recording = false;
   m_pendingModifiers = 0;
+  if (m_onRecordingChanged) {
+    m_onRecordingChanged(false);
+  }
   applyVisualState(VisualState::Idle);
   refreshLabel();
 }
@@ -280,6 +309,9 @@ void KeybindRecorder::refreshLabel() {
     if (m_pendingModifiers != 0) {
       const KeyChord preview{.sym = 0, .modifiers = m_pendingModifiers};
       std::string text;
+      if (m_superAllowed && (preview.modifiers & KeyMod::Super) != 0) {
+        text += "Meta + ";
+      }
       if ((preview.modifiers & KeyMod::Ctrl) != 0) {
         text += "Ctrl + ";
       }
