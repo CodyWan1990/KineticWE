@@ -68,6 +68,7 @@ PACKAGE=$(awk '/^Name:/ {print $2; exit}' "$SPEC_FILE")
 # ECM/KF6 requirements drift ahead of the Fedora container (KConfig master
 # now requires ECM 6.29.0 while Fedora 44 ships ECM 6.28.0).
 SPEC_KGA_REF=$(sed -n 's/.*%global kglobalacceld_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
+SPEC_KDECO_REF=$(sed -n 's/.*%global kdecoration_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
 SPEC_KCONFIG_REF=$(sed -n 's/.*%global kconfig_compiler_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
 
 NEXT_DEV=1
@@ -274,8 +275,11 @@ quick_build() {
         # Build kglobalacceld if not already installed. Pinned to the spec's
         # kglobalacceld_ref: a floating master clone is not reproducible and
         # breaks when master starts requiring a newer ECM/KF6 than the
-        # container provides.
-        if ! pkg-config --exists KGlobalAccelD 2>/dev/null; then
+        # container provides. A local build installs its CMake config as
+        # KGlobalAccelDConfig.cmake (no pkg-config file), so probe for that
+        # instead of pkg-config, which would never match.
+        if [[ ! -d '${TEST_PREFIX}/lib64/cmake/KGlobalAccelD' \
+              && ! -d '${TEST_PREFIX}/lib/cmake/KGlobalAccelD' ]]; then
             echo '[STEP] Building kglobalacceld first...'
             KGA_BUILD=\$(mktemp -d /tmp/kga-build.XXXXXX)
             curl -fsSL https://invent.kde.org/plasma/kglobalacceld/-/archive/${SPEC_KGA_REF}/kglobalacceld-${SPEC_KGA_REF}.tar.gz \
@@ -289,6 +293,26 @@ quick_build() {
             cmake --install build
             cd '$SCRIPT_DIR'
             rm -rf \"\$KGA_BUILD\"
+        fi
+
+        # Build kdecoration if not already installed. Pinned to the spec's
+        # kdecoration_ref: kinetic-we uses KDecoration3::Style (server-side
+        # drop shadows for CSD windows), which does not exist in the
+        # container's released kdecoration 6.7.x. Install it into TEST_PREFIX
+        # so the kinetic-we configure below picks it up via CMAKE_PREFIX_PATH.
+        if [[ ! -d '${TEST_PREFIX}/lib64/cmake/KDecoration3' \
+              && ! -d '${TEST_PREFIX}/lib/cmake/KDecoration3' ]]; then
+            echo '[STEP] Building kdecoration (pinned master for KDecoration3::Style)...'
+            KDECO_BUILD=\$(mktemp -d /tmp/kdeco-build.XXXXXX)
+            curl -fsSL https://invent.kde.org/plasma/kdecoration/-/archive/${SPEC_KDECO_REF}/kdecoration-${SPEC_KDECO_REF}.tar.gz \
+                | tar xz -C \"\$KDECO_BUILD\" --strip-components=1
+            cmake -B \"\$KDECO_BUILD/build\" -S \"\$KDECO_BUILD\" \\
+                -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
+                -DBUILD_TESTING=OFF
+            cmake --build \"\$KDECO_BUILD/build\" --parallel \$(nproc)
+            cmake --install \"\$KDECO_BUILD/build\"
+            rm -rf \"\$KDECO_BUILD\"
         fi
 
         # kconfig_compiler from KConfig < 6.30 generates uncompilable setters
