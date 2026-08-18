@@ -397,6 +397,74 @@ quick_build() {
 }
 
 # ---------------------------------------------------------------------------
+# Verify host runtime dependencies of the installed dev binaries
+# ---------------------------------------------------------------------------
+# The dev flow installs into TEST_PREFIX without RPM dependency resolution, so
+# a binary can link a library the host does not ship and only fail at login
+# with a cryptic loader error. ldd the installed binaries with the same
+# LD_LIBRARY_PATH the session launcher uses and fail fast, listing the missing
+# libraries and the packages that provide them.
+verify_host_deps() {
+    step "Verifying host runtime dependencies..."
+
+    local -a binaries=(
+        "$TEST_PREFIX/bin/kinetic-we"
+        "$TEST_PREFIX/bin/noctalia-kwe"
+        "$TEST_PREFIX/libexec/xdg-desktop-portal-kwe"
+    )
+
+    local -a missing_libs=()
+    local binary
+    for binary in "${binaries[@]}"; do
+        [[ -x "$binary" ]] || continue
+        local missing_in_binary
+        missing_in_binary=$(LD_LIBRARY_PATH="${TEST_PREFIX}/lib64:${TEST_PREFIX}/lib/x86_64-linux-gnu" \
+            ldd "$binary" 2>/dev/null | awk '/not found/ {print $1}' || true)
+        if [[ -n "$missing_in_binary" ]]; then
+            info "  $(basename "$binary") needs libraries the host does not have:"
+            while IFS= read -r lib; do
+                info "    $lib"
+                missing_libs+=("$lib")
+            done <<< "$missing_in_binary"
+        fi
+    done
+
+    if [[ ${#missing_libs[@]} -eq 0 ]]; then
+        info "All runtime libraries resolve on the host."
+        return 0
+    fi
+
+    echo
+    error "The host is missing runtime libraries needed by the dev session."
+    echo
+    echo "  Missing library -> providing package:"
+    local -a pkgs=()
+    local lib
+    for lib in $(printf '%s\n' "${missing_libs[@]}" | sort -u); do
+        local pkg
+        pkg=$(dnf repoquery --whatprovides "$lib" --queryformat '%{name}' 2>/dev/null | sort -u | head -1)
+        if [[ -n "$pkg" ]]; then
+            echo "    $lib -> $pkg"
+            pkgs+=("$pkg")
+        else
+            echo "    $lib -> (no package found; try: dnf repoquery --whatprovides $lib)"
+        fi
+    done
+    echo
+    if [[ ${#pkgs[@]} -gt 0 ]]; then
+        if command -v rpm-ostree &>/dev/null; then
+            echo "  Install with: sudo rpm-ostree install ${pkgs[*]}   (then reboot)"
+        else
+            echo "  Install with: sudo dnf install ${pkgs[*]}"
+        fi
+    fi
+    echo
+    warn "The build succeeded but the session will fail to start until these"
+    warn "libraries are installed on the host."
+    exit 1
+}
+
+# ---------------------------------------------------------------------------
 # Install quick-build startup script
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -855,6 +923,7 @@ main() {
         check_prereqs
         setup_distrobox
         quick_build
+        verify_host_deps
         install_startup_script
         if $do_session; then
             install_dev_session_entry
@@ -875,6 +944,7 @@ main() {
         setup_distrobox
         build_rpms
         extract_for_testing
+        verify_host_deps
         install_startup_script
         if $do_session; then
             install_dev_session_entry
@@ -913,6 +983,7 @@ main() {
     setup_distrobox
     build_rpms
     extract_for_testing
+    verify_host_deps
     install_startup_script
     if $do_session; then
         install_dev_session_entry
