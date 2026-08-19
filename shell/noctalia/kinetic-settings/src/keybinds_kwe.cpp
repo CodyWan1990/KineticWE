@@ -8,9 +8,13 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <map>
+#include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace {
 
@@ -183,7 +187,9 @@ void removeEntries(
   }
 }
 
-int applyToDaemon(SessionBus& bus) {
+int applyToDaemon(
+    SessionBus& bus, const std::unordered_map<std::string, FriendlyNameOverride>& friendlyNameOverrides
+) {
   std::vector<Entry> entries;
   if (!load(defaultPath(), entries)) {
     return 0;
@@ -191,23 +197,54 @@ int applyToDaemon(SessionBus& bus) {
   KeybindDbus dbus(bus);
   const auto components = dbus.components();
   std::unordered_map<std::string, std::string> friendlyNames;
+  std::unordered_set<std::string> registeredComponents;
+  registeredComponents.reserve(components.size());
   for (const auto& component : components) {
     friendlyNames.emplace(component.uniqueName, component.friendlyName);
+    registeredComponents.insert(component.uniqueName);
   }
+  kLog.info("keybinds import: replaying {} mirror entry(s) against {} daemon component(s)", entries.size(), components.size());
   int applied = 0;
+  // Entries whose component is not registered with the daemon at all (e.g. a
+  // user-added Applications/Custom Commands action whose definitions were
+  // dropped by the session script — see _KWE_KEEP in start-kineticwe.sh).
+  // setActionShortcuts() would fail with a D-Bus exception and produce one
+  // noisy "kglobalaccel setShortcutKeys failed" line per entry. Group them
+  // into a single aggregated warning so the regression is easy to grep for
+  // and the journal isn't drowned in per-entry errors.
+  std::map<std::string, std::size_t> missingByComponent;
   for (const auto& entry : entries) {
-    const auto it = friendlyNames.find(entry.component);
-    const std::string& componentFriendlyName = it == friendlyNames.end() ? entry.component : it->second;
-    const auto componentIt = std::ranges::find_if(
-        components, [&entry](const KeybindDbus::Component& c) { return c.uniqueName == entry.component; }
-    );
-    std::string actionFriendlyName = entry.action;
-    if (componentIt != components.end()) {
-      const auto actionIt = std::ranges::find_if(
-          componentIt->actions, [&entry](const KeybindDbus::Action& a) { return a.actionUnique == entry.action; }
+    kLog.info("keybinds import: entry {}.{} with {} chord(s)", entry.component, entry.action, entry.chords.size());
+    if (!registeredComponents.contains(entry.component)) {
+      missingByComponent[entry.component] += 1;
+      kLog.warn(
+          "keybinds import: component '{}' is not registered with the daemon; skipping {}.{}",
+          entry.component,
+          entry.component,
+          entry.action
       );
-      if (actionIt != componentIt->actions.end() && !actionIt->friendlyName.empty()) {
-        actionFriendlyName = actionIt->friendlyName;
+      continue;
+    }
+    const std::string overrideKey = entry.component + "." + entry.action;
+    std::string componentFriendlyName;
+    std::string actionFriendlyName;
+    if (auto ovIt = friendlyNameOverrides.find(overrideKey); ovIt != friendlyNameOverrides.end()) {
+      componentFriendlyName = ovIt->second.componentFriendlyName;
+      actionFriendlyName = ovIt->second.actionFriendlyName;
+      kLog.info("keybinds import: {}.{} using override friendly names '{}' / '{}'", entry.component, entry.action, componentFriendlyName, actionFriendlyName);
+    } else {
+      componentFriendlyName = friendlyNames.at(entry.component);
+      actionFriendlyName = entry.action;
+      const auto componentIt = std::ranges::find_if(
+          components, [&entry](const KeybindDbus::Component& c) { return c.uniqueName == entry.component; }
+      );
+      if (componentIt != components.end()) {
+        const auto actionIt = std::ranges::find_if(
+            componentIt->actions, [&entry](const KeybindDbus::Action& a) { return a.actionUnique == entry.action; }
+        );
+        if (actionIt != componentIt->actions.end() && !actionIt->friendlyName.empty()) {
+          actionFriendlyName = actionIt->friendlyName;
+        }
       }
     }
     if (!dbus.setActionShortcuts(
@@ -219,6 +256,25 @@ int applyToDaemon(SessionBus& bus) {
       continue;
     }
     ++applied;
+  }
+  if (!missingByComponent.empty()) {
+    std::size_t total = 0;
+    std::string detail;
+    for (const auto& [component, count] : missingByComponent) {
+      total += count;
+      if (!detail.empty()) {
+        detail += ", ";
+      }
+      detail += std::format("{} ({} skipped)", component, count);
+    }
+    kLog.warn(
+        "keybinds import skipped {} entries from {} component(s) not registered with the daemon: {}. "
+        "Custom keybinds definitions (custom-keybinds.kwe) may have been pruned — "
+        "check that scripts/start-kineticwe.sh's _KWE_KEEP includes custom-keybinds.kwe.",
+        total,
+        missingByComponent.size(),
+        detail
+    );
   }
   return applied;
 }

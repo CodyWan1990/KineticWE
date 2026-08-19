@@ -223,6 +223,7 @@ void CustomKeybinds::initialize() {
     return;
   }
   load();
+  kLog.info("custom keybinds: loaded {} definition(s) from custom-keybinds.kwe", m_definitions.size());
   for (const auto& definition : m_definitions) {
     if (!registerAction(definition)) {
       kLog.warn("custom keybind startup registration failed for {}.{}", definition.component, definition.action);

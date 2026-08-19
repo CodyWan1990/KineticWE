@@ -1162,7 +1162,10 @@
       "app-picker-title": "Pick an application to bind a shortcut to:",
       "cancel": "Cancel",
       "command-form-title": "Enter the shell command to run when the shortcut triggers:",
-      "command-placeholder": "e.g. switch-workspace next"
+      "command-placeholder": "e.g. switch-workspace next",
+      "conflict-cancel": "Cancel",
+      "conflict-prompt": "{keybind} is already bound to {action} in {component}. Replace the existing binding?",
+      "conflict-replace": "Replace"
     },
     "navigation": {
       "groups": {

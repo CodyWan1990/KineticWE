@@ -1,11 +1,13 @@
 #pragma once
 
+#include "core/input/key_chord.h"
 #include "kinetic-settings/src/custom_keybinds.h"
 #include "kinetic-settings/src/keybind_dbus.h"
 
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -13,7 +15,6 @@
 class Flex;
 class Node;
 class SessionBus;
-struct KeyChord;
 
 // The Keybinds settings page: edits global shortcuts of every component
 // registered in the embedded kglobalaccel daemon (kwin, noctalia, ...) live
@@ -68,6 +69,7 @@ public:
   void reloadFromDisk() noexcept {
     m_loaded = false;
     m_pending.clear();
+    m_pendingRebind.reset();
   }
 
   // True while any chord recorder on the page is capturing input; the window
@@ -79,6 +81,20 @@ private:
     std::string component;
     std::string action;
     std::string friendlyName;
+  };
+
+  // A chord the user recorded on an action while the chord was already bound
+  // to a different action. Armed by commitChord on conflict and held until the
+  // user picks Replace (confirmRebind) or Cancel (cancelRebind); the page
+  // renders the row at `index` as a Replace/Cancel prompt while armed.
+  struct PendingRebind {
+    std::string component;       // the action being edited
+    std::string action;
+    std::string ownerComponent;  // the action that currently owns the chord
+    std::string ownerAction;
+    KeyChord chord;              // the conflicting chord (canonical form)
+    std::vector<KeyChord> newChords;  // proposed chord list for `component.action`
+    std::size_t index;           // slot in `newChords` that got `chord`
   };
 
   [[nodiscard]] static std::string keyPath(std::string_view component, std::string_view action);
@@ -124,11 +140,17 @@ private:
   [[nodiscard]] static bool isCustomComponent(std::string_view component);
 
   // Replaces chord slot `index` (appending when index == size) after
-  // conflict-checking against every other action; notifies on conflict.
+  // conflict-checking against every other action. On conflict the edit is
+  // held in m_pendingRebind until the user picks Replace or Cancel.
   void commitChord(
       const std::string& component, const std::string& action, std::vector<KeyChord> chords, std::size_t index,
       KeyChord chord, const Callbacks& callbacks
   );
+  // User confirmed the armed conflict: stage the new chord list for the
+  // edited action and an empty list for the previous owner, then rebuild.
+  void confirmRebind(const Callbacks& callbacks);
+  // User declined the armed conflict: drop it and rebuild, no edits staged.
+  void cancelRebind(const Callbacks& callbacks);
   void removeChord(
       const std::string& component, const std::string& action, std::vector<KeyChord> chords, std::size_t index,
       const Callbacks& callbacks
@@ -143,6 +165,7 @@ private:
   std::string m_selectedComponent;
   // Chords staged for "component.action" paths; flushed by applyAll().
   std::map<std::string, std::vector<KeyChord>> m_pending;
+  std::optional<PendingRebind> m_pendingRebind;
   int m_recordingCount = 0;
 
   // Add-application / add-command flows and the "+" dropdown.

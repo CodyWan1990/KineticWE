@@ -331,6 +331,33 @@ NoctaliaToggleWallpaperPicker=
 NoctaliaWallpaperRandom=
 NoctaliaWindowSwitcher=Alt+Tab
 
+# KineticWE ships every Spectacle action unbound. Spectacle (a regular KDE
+# app, not part of KineticWE) registers its defaults with the embedded
+# kglobalaccel daemon: the "Start/Stop Screen Recording" shortcut (desktop
+# action id `RecordScreen`) defaults to Meta+Alt+R, which is the same chord
+# the compositor gives to NoctaliaRestartShell — the daemon drops the chord
+# on conflict, so neither action fires. The screenshot actions default to
+# Print-family chords and the launcher to Print/Meta+Shift+S, which we also
+# clear so KineticWE never overrides a user's preferred shortcuts. Making
+# every Spectacle bind empty by default keeps the install conflict-free;
+# users who want Spectacle's shortcuts can rebind them in Kinetic Settings →
+# Keybinds → Spectacle.
+#
+# Action ids below come from /usr/share/kglobalaccel/org.kde.spectacle.desktop
+# (`[Desktop Action ...]` headers), NOT from the localized `Name=...` strings.
+# `_launch` is the "Spectacle" launcher action.
+[org.kde.spectacle.desktop][Global Shortcuts]
+_launch=
+FullScreenScreenShot=
+CurrentMonitorScreenShot=
+ActiveWindowScreenShot=
+RectangularRegionScreenShot=
+WindowUnderCursorScreenShot=
+OpenWithoutScreenshot=
+RecordRegion=
+RecordScreen=
+RecordWindow=
+
 [org.kde.krunner.desktop][Global Shortcuts]
 RunClipboard=Alt+Shift+F2
 _launch=Alt+Space; Search

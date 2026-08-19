@@ -6,7 +6,6 @@
 #include "i18n/i18n.h"
 #include "keybind_codec.h"
 #include "keybinds_kwe.h"
-#include "notification/notifications.h"
 #include "system/desktop_entry.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -40,7 +39,14 @@ namespace {
   const std::vector<std::string>& hiddenComponents() {
     // uniqueName is the id the component registered with (dot-form for
     // desktop-file components); the daemon's dbusPath() form uses '_'.
+    // "ActivityManager" is the KGlobalAccel component registered by the
+    // upstream plasma-desktop activity KCM (friendly name "Activity
+    // Manager"). The compositor plans to drop activity support entirely
+    // (docs/kineticwe-2.0.md, Phase 6) and kactivitymanagerd is already
+    // blocked from autostarting, so its keybinds have no backing service
+    // and are not surfaced here.
     static const std::vector<std::string> kHidden{
+        "ActivityManager",
         "plasmashell",
         "org.kde.dolphin.desktop",
         "org.kde.konsole.desktop",
@@ -109,23 +115,98 @@ namespace {
     return name;
   }
 
-  // kwin first, then noctalia, then the rest alphabetically (the daemon's
-  // registration order is not a stable UI order).
+  // The label the UI shows for an action row: friendlyName when the daemon
+  // has one, otherwise the actionUnique id (matches buildActionRow at the
+  // call site). Sorting by this key keeps the rendered list in the same
+  // order as the visible labels.
+  [[nodiscard]] std::string_view actionDisplayName(const KeybindDbus::Action& action) {
+    if (!action.friendlyName.empty()) {
+      return action.friendlyName;
+    }
+    return action.actionUnique;
+  }
+
+  // kwin first, then noctalia, then the rest in case-insensitive alphabetical
+  // order of the user-visible display name (the daemon's registration
+  // order is not a stable UI order, and the user reads the list by display
+  // name — sorting by uniqueName would disagree with that for any component
+  // whose friendlyName differs from its uniqueName). Each component's
+  // actions are sorted the same way so the right-column rows read
+  // alphabetically and the keybinds.kwe mirror file stays stable.
   void orderComponents(std::vector<KeybindDbus::Component>& components) {
-    std::stable_sort(components.begin(), components.end(), [](const auto& a, const auto& b) {
-      const auto rank = [](const std::string& name) {
-        if (name == "kwin") {
-          return 0;
+    const auto rank = [](const std::string& name) {
+      if (name == "kwin") {
+        return 0;
+      }
+      if (name == "noctalia") {
+        return 1;
+      }
+      return 2;
+    };
+    // Natural (number-aware) string compare, case-insensitive. Walks both
+    // strings and at each step either takes a contiguous run of ASCII
+    // digits and compares them as integers, or compares the current
+    // characters case-insensitively. Ties fall back to length. This makes
+    // "Desktop 1" sort before "Desktop 2" before "Desktop 10" (the KWin
+    // actions are numbered, so the plain lexical order is unusable).
+    const auto naturalLess = [](std::string_view lhs, std::string_view rhs) {
+      std::size_t i = 0;
+      std::size_t j = 0;
+      while (i < lhs.size() && j < rhs.size()) {
+        const bool leftDigit = std::isdigit(static_cast<unsigned char>(lhs[i])) != 0;
+        const bool rightDigit = std::isdigit(static_cast<unsigned char>(rhs[j])) != 0;
+        if (leftDigit && rightDigit) {
+          // Skip leading zeros so "Desktop 01" sorts with "Desktop 1".
+          while (i < lhs.size() && lhs[i] == '0') {
+            ++i;
+          }
+          while (j < rhs.size() && rhs[j] == '0') {
+            ++j;
+          }
+          const std::size_t leftStart = i;
+          const std::size_t rightStart = j;
+          while (i < lhs.size() && std::isdigit(static_cast<unsigned char>(lhs[i])) != 0) {
+            ++i;
+          }
+          while (j < rhs.size() && std::isdigit(static_cast<unsigned char>(rhs[j])) != 0) {
+            ++j;
+          }
+          const std::size_t leftLen = i - leftStart;
+          const std::size_t rightLen = j - rightStart;
+          if (leftLen != rightLen) {
+            return leftLen < rightLen;
+          }
+          // Same length: compare digit-by-digit (we already stripped the
+          // leading zeros so all digits are significant).
+          for (std::size_t k = 0; k < leftLen; ++k) {
+            if (lhs[leftStart + k] != rhs[rightStart + k]) {
+              return lhs[leftStart + k] < rhs[rightStart + k];
+            }
+          }
+          // Numbers are equal; fall through to the next run.
+          continue;
         }
-        if (name == "noctalia") {
-          return 1;
+        const unsigned char lc = static_cast<unsigned char>(std::tolower(static_cast<unsigned char>(lhs[i])));
+        const unsigned char rc = static_cast<unsigned char>(std::tolower(static_cast<unsigned char>(rhs[j])));
+        if (lc != rc) {
+          return lc < rc;
         }
-        return 2;
-      };
+        ++i;
+        ++j;
+      }
+      return lhs.size() < rhs.size();
+    };
+    for (auto& component : components) {
+      std::stable_sort(component.actions.begin(), component.actions.end(),
+          [&](const KeybindDbus::Action& a, const KeybindDbus::Action& b) {
+            return naturalLess(actionDisplayName(a), actionDisplayName(b));
+          });
+    }
+    std::stable_sort(components.begin(), components.end(), [&](const auto& a, const auto& b) {
       if (rank(a.uniqueName) != rank(b.uniqueName)) {
         return rank(a.uniqueName) < rank(b.uniqueName);
       }
-      return a.uniqueName < b.uniqueName;
+      return naturalLess(componentDisplayName(a), componentDisplayName(b));
     });
   }
 
@@ -249,6 +330,7 @@ std::vector<std::string> KeybindsPage::resettableKeyPaths() const {
 }
 
 void KeybindsPage::resetAll() {
+  m_pendingRebind.reset();
   for (const auto& component : m_components) {
     for (const auto& action : component.actions) {
       if (action.actionUnique.starts_with(kSessionActionPrefix)) {
@@ -303,9 +385,26 @@ bool KeybindsPage::applyAll() {
   filterComponents(m_components);
   orderComponents(m_components);
   std::vector<KeybindsKwe::Entry> entries;
+  std::size_t customEntries = 0;
   for (const auto& component : m_components) {
     for (const auto& action : component.actions) {
-      if (action.active != action.defaults) {
+      // Custom keybinds (Applications / Custom Commands) are user-owned: persist
+      // their active chords unconditionally. The daemon may load a previously
+      // saved chord from kglobalaccelrc as BOTH active and default, so the
+      // generic `active != defaults` check would treat the user's own bind as
+      // stock and silently drop it from the mirror — losing it on the next
+      // login. Non-custom actions keep the override-only rule (active !=
+      // defaults) so the portable mirror stays minimal.
+      if (isCustomComponent(component.uniqueName)) {
+        if (!action.active.empty()) {
+          entries.push_back(KeybindsKwe::Entry{
+              .component = component.uniqueName,
+              .action = action.actionUnique,
+              .chords = action.active,
+          });
+          ++customEntries;
+        }
+      } else if (action.active != action.defaults) {
         entries.push_back(KeybindsKwe::Entry{
             .component = component.uniqueName,
             .action = action.actionUnique,
@@ -314,6 +413,7 @@ bool KeybindsPage::applyAll() {
       }
     }
   }
+  kLog.info("keybinds mirror: writing {} entry(s) ({} custom)", entries.size(), customEntries);
   if (!KeybindsKwe::save(KeybindsKwe::defaultPath(), entries)) {
     kLog.warn("keybinds mirror write failed; binds are live but the mirror is stale");
   }
@@ -332,49 +432,74 @@ void KeybindsPage::commitChord(
     kLog.warn("keybinds commit dropped unrepresentable chord for {}.{}", component, action);
     return;
   }
+  // Proposed chord list with the new chord in its slot.
+  if (index < chords.size()) {
+    chords[index] = *canonical;
+  } else {
+    chords.push_back(*canonical);
+  }
   // A chord already bound to another action is a conflict; the action's own
   // current bindings are fine (re-committing a value or moving it between
   // slots of the same action). The daemon's globalShortcutsByKey method is
   // unavailable on this fork, so conflicts are computed from the loaded
   // components (all actions with their active chords).
   const auto conflicts = [&] {
-    std::vector<std::tuple<std::string, std::string, std::string>> owners;
+    std::vector<std::pair<std::string, std::string>> owners;
     for (const auto& candidate : m_components) {
       for (const auto& candidateAction : candidate.actions) {
         if (std::ranges::find(candidateAction.active, *canonical) != candidateAction.active.end()) {
-          owners.emplace_back(candidate.uniqueName, candidateAction.actionUnique, candidateAction.friendlyName);
+          owners.emplace_back(candidate.uniqueName, candidateAction.actionUnique);
         }
       }
     }
     return owners;
   }();
-  for (const auto& [ownerComponent, ownerAction, ownerFriendly] : conflicts) {
-    if (ownerComponent != component || ownerAction != action) {
-      notify::error(
-          i18n::tr("notifications.internal.keybind-app"),
-          i18n::tr("notifications.internal.keybind-conflict-title"),
-          i18n::tr(
-              "notifications.internal.keybind-conflict-body", "{keybind}", KeybindCodec::toChordString(*canonical),
-              "{action}", ownerFriendly.empty() ? ownerAction : ownerFriendly,
-              "{component}", componentDisplayName(
-                                 *std::ranges::find_if(
-                                     m_components,
-                                     [&ownerComponent](const KeybindDbus::Component& c) {
-                                       return c.uniqueName == ownerComponent;
-                                     }
-                                 )
-                             )
-          )
-      );
-      return;
+  for (const auto& [ownerComponent, ownerAction] : conflicts) {
+    if (ownerComponent == component && ownerAction == action) {
+      continue;
     }
-  }
-  if (index < chords.size()) {
-    chords[index] = *canonical;
-  } else {
-    chords.push_back(*canonical);
+    // Conflict: hold the edit until the user decides whether to replace the
+    // current owner. The row renders a Replace/Cancel prompt while armed.
+    m_pendingRebind = PendingRebind{
+        .component = component,
+        .action = action,
+        .ownerComponent = ownerComponent,
+        .ownerAction = ownerAction,
+        .chord = *canonical,
+        .newChords = chords,
+        .index = index,
+    };
+    if (callbacks.requestRebuild) {
+      callbacks.requestRebuild();
+    }
+    return;
   }
   stageAndRebuild(component, action, std::move(chords), callbacks);
+}
+
+void KeybindsPage::confirmRebind(const Callbacks& callbacks) {
+  if (!m_pendingRebind.has_value()) {
+    return;
+  }
+  PendingRebind pending = std::move(*m_pendingRebind);
+  m_pendingRebind.reset();
+  // Stage the new chord list for the edited action and an empty list for the
+  // previous owner; applyAll() flushes both together.
+  stage(pending.component, pending.action, std::move(pending.newChords));
+  stage(pending.ownerComponent, pending.ownerAction, {});
+  if (callbacks.requestRebuild) {
+    callbacks.requestRebuild();
+  }
+}
+
+void KeybindsPage::cancelRebind(const Callbacks& callbacks) {
+  if (!m_pendingRebind.has_value()) {
+    return;
+  }
+  m_pendingRebind.reset();
+  if (callbacks.requestRebuild) {
+    callbacks.requestRebuild();
+  }
 }
 
 void KeybindsPage::removeChord(
@@ -392,6 +517,60 @@ void KeybindsPage::buildChordRow(
     Flex& parent, std::vector<KeyChord> chords, std::size_t index, const std::string& component,
     const std::string& action, float scale, const Callbacks& callbacks
 ) {
+  // A conflict prompted by this exact row: show Replace/Cancel instead of the
+  // recorder so the user decides whether to steal the chord from its owner.
+  if (m_pendingRebind.has_value() && m_pendingRebind->component == component
+      && m_pendingRebind->action == action && m_pendingRebind->index == index) {
+    const auto& pending = *m_pendingRebind;
+    std::string ownerActionName = pending.ownerAction;
+    std::string ownerComponentName = pending.ownerComponent;
+    if (const auto* owner = findAction(pending.ownerComponent, pending.ownerAction);
+        owner != nullptr && !owner->friendlyName.empty()) {
+      ownerActionName = owner->friendlyName;
+    }
+    const auto ownerComponent = std::ranges::find_if(
+        m_components, [&pending](const KeybindDbus::Component& c) { return c.uniqueName == pending.ownerComponent; }
+    );
+    if (ownerComponent != m_components.end()) {
+      ownerComponentName = componentDisplayName(*ownerComponent);
+    }
+    auto prompt = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .fillWidth = true,
+    });
+    prompt->addChild(makeLabel(
+        i18n::tr(
+            "settings.keybinds.conflict-prompt", "{keybind}", KeybindCodec::toChordString(pending.chord),
+            "{action}", ownerActionName, "{component}", ownerComponentName
+        ),
+        Style::fontSizeCaption * scale, colorSpecFromRole(ColorRole::Error)
+    ));
+    prompt->addChild(ui::spacer());
+    prompt->addChild(ui::button({
+        .text = i18n::tr("settings.keybinds.conflict-replace"),
+        .fontSize = Style::fontSizeCaption * scale,
+        .variant = ButtonVariant::Destructive,
+        .minHeight = Style::controlHeightSm * scale,
+        .paddingV = Style::spaceXs * scale,
+        .paddingH = Style::spaceSm * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .onClick = [this, callbacks]() { confirmRebind(callbacks); },
+    }));
+    prompt->addChild(ui::button({
+        .text = i18n::tr("settings.keybinds.conflict-cancel"),
+        .fontSize = Style::fontSizeCaption * scale,
+        .variant = ButtonVariant::Ghost,
+        .minHeight = Style::controlHeightSm * scale,
+        .paddingV = Style::spaceXs * scale,
+        .paddingH = Style::spaceSm * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .onClick = [this, callbacks]() { cancelRebind(callbacks); },
+    }));
+    parent.addChild(std::move(prompt));
+    return;
+  }
+
   const bool isAddSlot = index >= chords.size();
   const bool custom = isCustomComponent(component);
   // Custom actions are deleted as a whole; every other bind drops just this

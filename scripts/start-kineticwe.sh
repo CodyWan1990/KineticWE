@@ -177,8 +177,17 @@ done
 #     read the real $KWE_REAL_CONFIG_HOME, so the copies would silently drift.
 #     Keep only compositor-owned files; delete the rest. The real configs in
 #     $KWE_REAL_CONFIG_HOME are untouched. Idempotent.
+#
+#     Note: keybinds.kwe AND custom-keybinds.kwe are both compositor-owned —
+#     keybinds.kwe is the portable keybinds mirror (chords) and
+#     custom-keybinds.kwe is the kinetic-settings register of the user-added
+#     Applications / Custom Commands actions (component + action + exec).
+#     If custom-keybinds.kwe is dropped here, the shell loses the user's
+#     Application / Custom Command keybinds on every login because the
+#     custom-action registration step in CustomKeybinds::initialize() finds
+#     no definitions to register. Keep both files in lockstep.
 # ---------------------------------------------------------------------------
-_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
+_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe custom-keybinds.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
 for _entry in "$KWE_CONFIG_HOME"/* "$KWE_CONFIG_HOME"/.[!.]*; do
     [[ -e "$_entry" ]] || continue
     _name="${_entry##*/}"
@@ -188,6 +197,372 @@ for _entry in "$KWE_CONFIG_HOME"/* "$KWE_CONFIG_HOME"/.[!.]*; do
     echo "kineticwe: pruning stale user-app config from root: $_entry"
     rm -rf "$_entry"
 done
+# ---------------------------------------------------------------------------
+# 4d.5. One-shot migration: clear ALL of Spectacle's global-shortcut defaults
+#     (_launch, the screenshot actions and the Start/Stop * Recording actions)
+#     in the live kglobalaccelrc so none collide with KineticWE's own binds or
+#     the user's plans. The KineticWE Default Binds.kksrc clears them in fresh
+#     installs, but on an existing install the defaults were already written
+#     by Spectacle before the .kwe override could land. This migration runs
+#     once per version, marks the file with a `[Migration]
+#     SpectacleRecordingUnbound=` sentinel, and never touches user-set values
+#     after that.
+#
+#     One-time disruption: any custom keybind the user has previously set on a
+#     Spectacle action is cleared the first time this runs. That's intentional
+#     per the user request ("unbind by default"); post-migration, the user can
+#     rebind any Spectacle action in Kinetic Settings -> Keybinds -> Spectacle,
+#     and subsequent startups leave the rebind alone (sentinel suppresses
+#     re-clearing).
+#
+#     Implementation note: the migration is a small Python helper inline
+#     below (rather than a separate file) so the migration logic lives in
+#     exactly one place -- the session script that also contains every
+#     other kineticwe config migration. Atomic write (tmp + os.replace) so
+#     the daemon never sees a half-written file. No-op when the file
+#     already has the sentinel at the current version.
+# ---------------------------------------------------------------------------
+if [[ -f "$KWE_CONFIG_HOME/kglobalaccelrc" || -d "$KWE_CONFIG_HOME" ]]; then
+    KWE_SPECTACLE_MIG_VERSION="kineticwe-2.1"
+    export KWE_CONFIG_HOME KWE_SPECTACLE_MIG_VERSION
+    python3 - "$KWE_CONFIG_HOME/kglobalaccelrc" "$KWE_SPECTACLE_MIG_VERSION" <<'PY' || \
+        echo "kineticwe: Spectacle keybind migration failed (continuing)" >&2
+import os, sys, tempfile
+
+SPECTACLE = "[org.kde.spectacle.desktop][Global Shortcuts]"
+# Every action id from /usr/share/kglobalaccel/org.kde.spectacle.desktop
+# (`Actions=` list plus the app-launch action `_launch`).
+SPECTACLE_ACTIONS = (
+    "_launch",
+    "FullScreenScreenShot",
+    "CurrentMonitorScreenShot",
+    "ActiveWindowScreenShot",
+    "RectangularRegionScreenShot",
+    "WindowUnderCursorScreenShot",
+    "OpenWithoutScreenshot",
+    "RecordRegion",
+    "RecordScreen",
+    "RecordWindow",
+)
+MIGRATION_GROUP = "[Migration]"
+SENTINEL_KEY = "SpectacleRecordingUnbound"
+
+
+def _have_spectacle():
+    for d in os.environ.get("PATH", "").split(":"):
+        if not d:
+            continue
+        candidate = os.path.join(d, "spectacle")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return True
+    return False
+
+
+def _strip_existing_sentinels(lines):
+    out, skip = [], False
+    for line in lines:
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            skip = s == MIGRATION_GROUP
+            if not skip:
+                out.append(line)
+            continue
+        if not skip:
+            out.append(line)
+    return out
+
+
+def _read_sentinels(lines):
+    out, group = set(), None
+    for line in lines:
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            group = s
+            continue
+        if group == MIGRATION_GROUP and s.startswith(SENTINEL_KEY + "="):
+            out.add(s.split("=", 1)[1].strip())
+    return out
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("usage: spectacle_migration.py <kglobalaccelrc> <version>",
+              file=sys.stderr)
+        sys.exit(2)
+    path, version = sys.argv[1], sys.argv[2]
+
+    lines = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+
+    if version in _read_sentinels(lines):
+        return  # already migrated at this version
+
+    # Drop every existing [Migration] group so the file does not accumulate
+    # sentinels across version bumps; re-add a single canonical one at end.
+    lines = _strip_existing_sentinels(lines)
+
+    # Force every Spectacle action to empty inside the Spectacle group.
+    # Only create the group if Spectacle is actually installed (so users
+    # without Spectacle don't end up with a stray empty group in their
+    # kglobalaccelrc).
+    group, saw_spectacle, actions_seen, out = None, False, set(), []
+    for line in lines:
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            if group == SPECTACLE:
+                for action in SPECTACLE_ACTIONS:
+                    if action not in actions_seen:
+                        out.append(f"{action}=")
+                        actions_seen.add(action)
+            group = s
+            if group == SPECTACLE:
+                saw_spectacle = True
+            out.append(line)
+        elif group == SPECTACLE and s and "=" in s and not s.startswith("#"):
+            key = s.split("=", 1)[0].strip()
+            if key in SPECTACLE_ACTIONS:
+                out.append(f"{key}=")
+                actions_seen.add(key)
+            else:
+                out.append(line)
+        else:
+            out.append(line)
+    if group == SPECTACLE:
+        for action in SPECTACLE_ACTIONS:
+            if action not in actions_seen:
+                out.append(f"{action}=")
+                actions_seen.add(action)
+
+    if not saw_spectacle and _have_spectacle():
+        if out and out[-1].strip() != "":
+            out.append("")
+        out.append(SPECTACLE)
+        for action in SPECTACLE_ACTIONS:
+            out.append(f"{action}=")
+
+    out.append("")
+    out.append(MIGRATION_GROUP)
+    out.append(f"{SENTINEL_KEY}={version}")
+
+    new_contents = "\n".join(out) + "\n"
+    parent = os.path.dirname(path) or "."
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=parent,
+                                        prefix=".kglobalaccelrc.",
+                                        suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            f.write(new_contents)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+if __name__ == "__main__":
+    main()
+PY
+fi
+
+
+# ---------------------------------------------------------------------------
+# 4e. Default color scheme: Breeze Dark.
+#     The Breeze window decoration (and KDE apps) take their colors from the
+#     shared $KWE_REAL_CONFIG_HOME/kdeglobals color scheme. When no scheme is
+#     configured the decoration falls back to KColorScheme's built-in default,
+#     which is Breeze *Light*. Until the Kinetic Settings decorations/theming
+#     section lands, make the out-of-the-box default Breeze Dark for both new
+#     and existing users.
+#
+#     Gate: only apply when no color scheme is configured yet (no [Colors:*]
+#     groups and no non-empty ColorScheme= entry). This seeds new users and
+#     migrates existing users who are still on the bare light default, while
+#     never overwriting a scheme the user (or the Noctalia theme service) chose.
+#     The gate makes the step idempotent: once applied the scheme is set, so
+#     later logins skip it. No sentinel needed.
+#
+#     Implementation note: the merge is a small inline Python helper (rather
+#     than a separate file) so it lives with the rest of the session's config
+#     migrations. It mirrors the merge semantics of Noctalia's
+#     mergeKdeColorScheme (same group/key rules), preserving every non-color
+#     setting already in the user's kdeglobals. Atomic write (tmp + os.replace)
+#     so no reader ever sees a half-written file. No-op when kdeglobals already
+#     carries a scheme.
+# ---------------------------------------------------------------------------
+_KWE_BREEZE_DARK=""
+for _kwe_dir in "$HOME/.local/share" ${XDG_DATA_DIRS//:/ } "$INSTALL_PREFIX/share" /usr/local/share /usr/share; do
+    [[ -z "$_kwe_dir" ]] && continue
+    if [[ -f "$_kwe_dir/color-schemes/BreezeDark.colors" ]]; then
+        _KWE_BREEZE_DARK="$_kwe_dir/color-schemes/BreezeDark.colors"
+        break
+    fi
+done
+
+if [[ -n "$_KWE_BREEZE_DARK" ]]; then
+    KWE_KDE_GLOBALS="$KWE_REAL_CONFIG_HOME/kdeglobals"
+    export KWE_KDE_GLOBALS _KWE_BREEZE_DARK
+    python3 - "$KWE_KDE_GLOBALS" "$_KWE_BREEZE_DARK" <<'PY' || \
+        echo "kineticwe: Breeze Dark default seeding failed (continuing)" >&2
+import os
+import re
+import stat
+import sys
+import tempfile
+
+COLOR_PREFIX = "Colors:"
+
+# Name[xx] translation keys bloat kdeglobals; Plasma only writes the plain
+# Name= when applying a scheme, so skip them.
+_NAME_TRANSLATION = re.compile(r"^Name\[.*\]$")
+
+
+def _is_comment_or_blank(line):
+    stripped = line.strip()
+    return stripped == "" or stripped.startswith("#") or stripped.startswith(";")
+
+
+def _parse(path):
+    doc = {
+        "prefix": [],
+        "sections": [],       # list of {name, header, lines, keys, key_index}
+        "section_index": {},  # name -> index into sections
+    }
+    current = None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        return doc
+    for raw in lines:
+        line = raw[:-1] if raw.endswith("\r") else raw
+        stripped = line.strip()
+        if _is_comment_or_blank(stripped):
+            (current["lines"] if current else doc["prefix"]).append(line)
+            continue
+        if stripped.startswith("[") and stripped.endswith("]"):
+            name = stripped[1:-1]
+            section = {"name": name, "header": line, "lines": [], "keys": [], "key_index": {}}
+            doc["section_index"][name] = len(doc["sections"])
+            doc["sections"].append(section)
+            current = section
+            continue
+        equals = stripped.find("=")
+        if current is None or equals == -1:
+            continue
+        key = stripped[:equals].strip()
+        value = stripped[equals + 1:].strip()
+        if key == "" or key in current["key_index"]:
+            continue
+        line_index = len(current["lines"])
+        current["lines"].append(line)
+        current["key_index"][key] = len(current["keys"])
+        current["keys"].append({"name": key, "value": value, "line_index": line_index})
+    return doc
+
+
+def _append_key(section, key):
+    insert_at = len(section["lines"])
+    while insert_at > 0 and _is_comment_or_blank(section["lines"][insert_at - 1]):
+        insert_at -= 1
+    section["lines"].insert(insert_at, key["name"] + "=" + key["value"])
+
+
+def _merge(destination, source):
+    for source_section in source["sections"]:
+        name = source_section["name"]
+        index = destination["section_index"].get(name)
+        if index is None:
+            new_section = {"name": name, "header": "[" + name + "]", "lines": [], "keys": [], "key_index": {}}
+            for key in source_section["keys"]:
+                if _NAME_TRANSLATION.match(key["name"]):
+                    continue
+                _append_key(new_section, key)
+            destination["section_index"][name] = len(destination["sections"])
+            destination["sections"].append(new_section)
+            continue
+        destination_section = destination["sections"][index]
+        for source_key in source_section["keys"]:
+            if _NAME_TRANSLATION.match(source_key["name"]):
+                continue
+            destination_key_index = destination_section["key_index"].get(source_key["name"])
+            if destination_key_index is None:
+                _append_key(destination_section, source_key)
+            else:
+                destination_key = destination_section["keys"][destination_key_index]
+                destination_section["lines"][destination_key["line_index"]] = source_key["name"] + "=" + source_key["value"]
+
+
+def _serialize(doc):
+    out = []
+    for line in doc["prefix"]:
+        out.append(line)
+    for i, section in enumerate(doc["sections"]):
+        if i > 0 and out and (not out[-1].strip() == ""):
+            out.append("")
+        out.append(section["header"])
+        for line in section["lines"]:
+            out.append(line)
+    return "\n".join(out) + "\n"
+
+
+def _has_scheme(doc):
+    for section in doc["sections"]:
+        if section["name"].startswith(COLOR_PREFIX):
+            return True
+        if section["name"] in ("General", "KDE"):
+            for key in section["keys"]:
+                if key["name"] == "ColorScheme" and key["value"] != "":
+                    return True
+    return False
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("usage: breeze_dark_default.py <kdeglobals> <BreezeDark.colors>", file=sys.stderr)
+        sys.exit(2)
+    globals_path, scheme_path = sys.argv[1], sys.argv[2]
+
+    globals_doc = _parse(globals_path)
+    if _has_scheme(globals_doc):
+        return  # a scheme is already configured; do not touch it
+
+    scheme_doc = _parse(scheme_path)
+    if not scheme_doc["sections"]:
+        print("no sections in " + scheme_path, file=sys.stderr)
+        sys.exit(1)
+
+    _merge(globals_doc, scheme_doc)
+    new_contents = _serialize(globals_doc)
+
+    parent = os.path.dirname(globals_path) or "."
+    os.makedirs(parent, exist_ok=True)
+    mode = None
+    if os.path.exists(globals_path):
+        mode = stat.S_IMODE(os.stat(globals_path).st_mode)
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=parent, prefix=".kdeglobals.", suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            f.write(new_contents)
+        if mode is not None:
+            os.chmod(tmp_path, mode)
+        os.replace(tmp_path, globals_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+if __name__ == "__main__":
+    main()
+PY
+fi
+
 
 # ---------------------------------------------------------------------------
 # 5. Start kinetic-we (the compositor) and wait for its Wayland socket.

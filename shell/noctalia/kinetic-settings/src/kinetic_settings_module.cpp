@@ -10,6 +10,8 @@
 #include "ipc/ipc_service.h"
 
 #include <string>
+#include <unordered_map>
+#include <utility>
 
 namespace {
   constexpr Logger kLog("kinetic-settings");
@@ -42,7 +44,25 @@ void KineticSettingsModule::importKeybinds() {
   if (m_bus == nullptr) {
     return;
   }
-  const int applied = KeybindsKwe::applyToDaemon(*m_bus);
+  // User-added Applications / Custom Commands actions must replay their chords
+  // with exactly the friendly names they were registered with (doRegister),
+  // otherwise the daemon's findAction() cannot match the action id and the
+  // replay is silently dropped. Build the override map from the persisted
+  // definitions so the mirror's custom-component entries match at session
+  // start.
+  std::unordered_map<std::string, KeybindsKwe::FriendlyNameOverride> friendlyNameOverrides;
+  if (m_customKeybinds != nullptr) {
+    for (const auto& definition : m_customKeybinds->definitions()) {
+      KeybindsKwe::FriendlyNameOverride override;
+      override.componentFriendlyName =
+          definition.component == CustomKeybinds::kAppsComponent
+          ? std::string(CustomKeybinds::kAppsFriendly)
+          : std::string(CustomKeybinds::kCommandsFriendly);
+      override.actionFriendlyName = definition.friendlyName;
+      friendlyNameOverrides.emplace(definition.component + "." + definition.action, std::move(override));
+    }
+  }
+  const int applied = KeybindsKwe::applyToDaemon(*m_bus, friendlyNameOverrides);
   if (applied > 0) {
     kLog.info("keybinds import applied {} shortcut(s)", applied);
   }
