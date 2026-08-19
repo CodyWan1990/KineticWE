@@ -865,6 +865,7 @@ namespace noctalia::cli {
       msg::keyboardBacklightToggle,
       msg::keyboardBacklightUp,
       msg::keyboardLayoutCycle,
+      msg::keybindsImport,
       msg::kineticSettingsClose,
       msg::kineticSettingsOpen,
       msg::kineticSettingsToggle,

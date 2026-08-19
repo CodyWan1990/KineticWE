@@ -92,8 +92,10 @@ void CustomKeybinds::load() {
   const std::filesystem::path path = configHome() / "custom-keybinds.kwe";
   std::ifstream in(path);
   if (!in.is_open()) {
+    kLog.warn("custom keybinds: could not open definitions file {}", path.string());
     return;
   }
+  kLog.info("custom keybinds: reading definitions from {}", path.string());
   std::string line;
   std::string group;
   while (std::getline(in, line)) {

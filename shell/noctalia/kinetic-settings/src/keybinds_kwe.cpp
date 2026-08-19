@@ -35,7 +35,7 @@ namespace {
   // Returns false for unknown sub-groups so unrelated schemes are skipped.
   bool splitGroup(std::string_view group, std::string& component) {
     if (const auto bracket = group.find("]["); bracket != std::string_view::npos) {
-      const std::string_view sub = group.substr(bracket + 2, group.size() - bracket - 3);
+      const std::string_view sub = group.substr(bracket + 2, group.size() - bracket - 2);
       if (sub != "Global Shortcuts") {
         return false;
       }
@@ -67,6 +67,7 @@ std::filesystem::path defaultPath() { return configHome() / "keybinds.kwe"; }
 bool load(const std::filesystem::path& path, std::vector<Entry>& out) {
   std::ifstream in(path);
   if (!in.is_open()) {
+    kLog.warn("keybinds mirror: could not open {}", path.string());
     return false;
   }
   std::string line;
