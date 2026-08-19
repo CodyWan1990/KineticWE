@@ -16,11 +16,12 @@ namespace {
   constexpr auto kGlobalAccelInterface = "org.kde.KGlobalAccel";
   constexpr auto kComponentInterface = "org.kde.kglobalaccel.Component";
 
-  // KGlobalAccel::NoAutoloading — apply without persisting into the component's
-  // .rc "Default" list (KWin's shortcuts live in kglobalshortcutsrc instead).
-  constexpr std::uint32_t kNoAutoloading = 0x1;
-  // KGlobalAccel::Equal match for globalShortcutsByKey.
-  constexpr std::int32_t kMatchEqual = 0;
+  // This fork's KGlobalAccelD (pinned commit 5cc88399) renumbered the flags:
+  // SetPresent=2, NoAutoloading=4, IsDefault=8 — stock KDE uses NoAutoloading=1.
+  // SetPresent must be set: without it the daemon never marks the shortcut
+  // present, setActive() bails out and the key never reaches _active_keys, so
+  // the shortcut silently never triggers.
+  constexpr std::uint32_t kNoAutoloading = 0x6; // SetPresent | NoAutoloading
 
   const Logger kLog("kinetic-settings");
 
@@ -44,7 +45,11 @@ namespace {
       if (!key.has_value()) {
         continue;
       }
-      result.emplace_back(std::vector<std::int32_t>{static_cast<std::int32_t>(*key)});
+      // The kglobalaccel QKeySequence D-Bus codec (kglobalshortcutinfo_dbus.cpp)
+      // always emits 4 int slots per (ai) element: (key, 0, 0, 0). A shorter
+      // array makes the daemon's reader hit end-of-array on the 2nd int and
+      // abort the compositor.
+      result.emplace_back(std::vector<std::int32_t>{static_cast<std::int32_t>(*key), 0, 0, 0});
     }
     return result;
   }
@@ -130,11 +135,13 @@ std::vector<KeybindDbus::Component> KeybindDbus::components() {
 
 bool KeybindDbus::setActionShortcuts(
     const std::string& component, const std::string& action, const std::string& friendlyName,
-    const std::vector<KeyChord>& chords
+    const std::string& componentFriendlyName, const std::vector<KeyChord>& chords
 ) {
   try {
     auto proxy = sdbus::createProxy(m_bus.connection(), kGlobalAccelBusName, kGlobalAccelPath);
-    const std::vector<std::string> id{component, action, friendlyName};
+    // The daemon's findAction() rejects actionIds without all four entries:
+    // [component, action, component friendlyName, action friendlyName].
+    const std::vector<std::string> id{component, action, componentFriendlyName, friendlyName};
     Keysets result;
     proxy->callMethod("setShortcutKeys")
         .onInterface(kGlobalAccelInterface)
@@ -154,51 +161,4 @@ bool KeybindDbus::setActionShortcuts(
     kLog.warn("kglobalaccel setShortcutKeys failed for {}.{}: {}", component, action, e.what());
     return false;
   }
-}
-
-bool KeybindDbus::chordAvailable(const KeyChord& chord, const std::string& component) {
-  const auto key = KeybindCodec::toQtKey(chord);
-  if (!key.has_value()) {
-    return false;
-  }
-  try {
-    auto proxy = sdbus::createProxy(m_bus.connection(), kGlobalAccelBusName, kGlobalAccelPath);
-    sdbus::Struct<std::vector<std::int32_t>> keyArg{std::vector<std::int32_t>{static_cast<std::int32_t>(*key)}};
-    bool available = false;
-    proxy->callMethod("globalShortcutAvailable")
-        .onInterface(kGlobalAccelInterface)
-        .withArguments(keyArg, component)
-        .storeResultsTo(available);
-    return available;
-  } catch (const sdbus::Error& e) {
-    kLog.warn("kglobalaccel globalShortcutAvailable failed: {}", e.what());
-    return false;
-  }
-}
-
-std::vector<KeybindDbus::Owner> KeybindDbus::ownersOf(const KeyChord& chord) {
-  std::vector<KeybindDbus::Owner> result;
-  const auto key = KeybindCodec::toQtKey(chord);
-  if (!key.has_value()) {
-    return result;
-  }
-  try {
-    auto proxy = sdbus::createProxy(m_bus.connection(), kGlobalAccelBusName, kGlobalAccelPath);
-    sdbus::Struct<std::vector<std::int32_t>> keyArg{std::vector<std::int32_t>{static_cast<std::int32_t>(*key)}};
-    std::vector<ShortcutInfo> infos;
-    proxy->callMethod("globalShortcutsByKey")
-        .onInterface(kGlobalAccelInterface)
-        .withArguments(keyArg, kMatchEqual)
-        .storeResultsTo(infos);
-    for (const auto& info : infos) {
-      Owner owner;
-      owner.component = info.get<2>();
-      owner.action = info.get<0>();
-      owner.friendlyName = info.get<1>();
-      result.push_back(std::move(owner));
-    }
-  } catch (const sdbus::Error& e) {
-    kLog.warn("kglobalaccel globalShortcutsByKey failed: {}", e.what());
-  }
-  return result;
 }

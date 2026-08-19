@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kinetic-settings/src/custom_keybinds.h"
 #include "kinetic-settings/src/keybind_dbus.h"
 
 #include <functional>
@@ -21,7 +22,8 @@ struct KeyChord;
 // Noctalia settings content layout like the Workspaces/Tiling pages: a glyph +
 // title header, a component list on the left (like the KDE Shortcuts KCM) and
 // the selected component's actions on the right, each with a chord recorder
-// list and the Override badge / two-stage Reset buttons.
+// list (trash to the right of each bound chord; custom actions are deleted as
+// a whole) and the Override badge on the action's title line.
 //
 // Edits are STAGED and only reach the daemon when the window's Apply button
 // flushes everything: one setShortcutKeys call per staged action, then the
@@ -40,22 +42,16 @@ public:
   // Glue back to the owning window, same contract as the other pages.
   struct Callbacks {
     std::function<void()> requestRebuild;
-    std::function<void(std::string keyPath)> armReset;
-    std::function<void(std::string keyPath)> confirmReset;
   };
 
-  explicit KeybindsPage(SessionBus& bus);
+  explicit KeybindsPage(SessionBus& bus, CustomKeybinds& customKeybinds);
 
-  // Rebuilds the page node. `armedResetKey` is the "component.action" path
-  // whose Reset button is waiting for the confirming second click.
-  std::unique_ptr<Node>
-  build(float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks);
+  // Rebuilds the page node.
+  std::unique_ptr<Node> build(float scale, const Filter& filter, const Callbacks& callbacks);
 
   // "component.action" paths of every action on the page (Reset Page scope).
   [[nodiscard]] std::vector<std::string> resettableKeyPaths() const;
 
-  // Stages one action back at its defaults (nothing is applied until Apply).
-  void resetKeyPath(std::string_view keyPath);
   // Stages every action of every component back at its defaults.
   void resetAll();
 
@@ -105,7 +101,7 @@ private:
   [[nodiscard]] std::unique_ptr<Node> buildComponentList(float scale, const Callbacks& callbacks);
   void buildActionRow(
       Flex& parent, const KeybindDbus::Component& component, const KeybindDbus::Action& action, float scale,
-      std::string_view armedResetKey, const Callbacks& callbacks
+      const Callbacks& callbacks
   );
   void buildChordRow(
       Flex& parent, std::vector<KeyChord> chords, std::size_t index, const std::string& component,
@@ -115,6 +111,17 @@ private:
       Flex& parent, const std::string& component, const std::string& action, std::vector<KeyChord> chords,
       float scale, const Callbacks& callbacks
   );
+
+  // Whole-action deletion (custom components only): unregisters the action in
+  // the daemon and drops its definition, then reloads and rebuilds.
+  void removeCustomAction(const std::string& component, const std::string& action, const Callbacks& callbacks);
+
+  // "Add Application" / "Add Custom Command" flows.
+  [[nodiscard]] std::unique_ptr<Node> buildAddMenu(float scale, const Callbacks& callbacks);
+  [[nodiscard]] std::unique_ptr<Node> buildAppPicker(float scale, const Callbacks& callbacks);
+  [[nodiscard]] std::unique_ptr<Node> buildCommandForm(float scale, const Callbacks& callbacks);
+
+  [[nodiscard]] static bool isCustomComponent(std::string_view component);
 
   // Replaces chord slot `index` (appending when index == size) after
   // conflict-checking against every other action; notifies on conflict.
@@ -128,6 +135,7 @@ private:
   );
 
   SessionBus& m_bus;
+  CustomKeybinds& m_customKeybinds;
   KeybindDbus m_dbus;
   bool m_loaded = false;
   std::vector<KeybindDbus::Component> m_components;
@@ -136,4 +144,9 @@ private:
   // Chords staged for "component.action" paths; flushed by applyAll().
   std::map<std::string, std::vector<KeyChord>> m_pending;
   int m_recordingCount = 0;
+
+  // Add-application / add-command flows and the "+" dropdown.
+  enum class AddMode { None, Apps, Command };
+  bool m_addMenuOpen = false;
+  AddMode m_addMode = AddMode::None;
 };

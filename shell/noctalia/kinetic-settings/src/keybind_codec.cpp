@@ -235,8 +235,6 @@ constexpr std::uint32_t kXkbFCount = 35;
 constexpr std::uint32_t kXkbKpFirst = XKB_KEY_KP_Space; // 0xff80
 constexpr std::uint32_t kXkbKpLast = XKB_KEY_KP_Equal;  // 0xffbd
 
-[[nodiscard]] bool isLetterQt(std::uint32_t qt) noexcept { return qt >= 0x41 && qt <= 0x5a; }
-
 [[nodiscard]] std::uint32_t upperAscii(std::uint32_t sym) noexcept {
   return (sym >= 0x61 && sym <= 0x7a) ? sym - 0x20 : sym;
 }
@@ -349,12 +347,6 @@ std::optional<std::uint32_t> toQtKey(const KeyChord& chord) {
   }
   if ((chord.modifiers & KeyMod::Super) != 0) {
     key |= MetaModifier;
-  }
-  // Mirror the compositor (Xkb::modifiersRelevantForGlobalShortcuts): a Shift
-  // held to reach a letter is consumed by the letter itself and never reaches
-  // the daemon, so a chord keyed on a letter must not carry the Shift bit.
-  if (isLetterQt(*qt) && (key & ShiftModifier) != 0) {
-    key &= ~ShiftModifier;
   }
   return key;
 }

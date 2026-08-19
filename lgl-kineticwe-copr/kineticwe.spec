@@ -41,11 +41,14 @@ BuildRequires:  qt6-qttools-devel
 BuildRequires:  kf6-kauth-devel
 BuildRequires:  kf6-kcolorscheme-devel
 BuildRequires:  kf6-kconfig-devel
+BuildRequires:  kf6-kconfigng-devel
 BuildRequires:  kf6-kcoreaddons-devel
 BuildRequires:  kf6-kcrash-devel
 BuildRequires:  kf6-kdbusaddons-devel
 BuildRequires:  kf6-kglobalaccel-devel
+BuildRequires:  kf6-kio-core-libs
 BuildRequires:  kf6-kio-devel
+BuildRequires:  kf6-kio-gui
 BuildRequires:  kf6-kjobwidgets-devel
 BuildRequires:  kf6-kguiaddons-devel
 BuildRequires:  kf6-ki18n-devel
@@ -78,6 +81,7 @@ BuildRequires:  plasma-activities-devel
 BuildRequires:  libplasma-devel
 
 BuildRequires:  libepoxy-devel
+BuildRequires:  libglvnd-opengl
 BuildRequires:  wayland-devel
 BuildRequires:  wayland-protocols-devel
 BuildRequires:  libxkbcommon-devel
@@ -398,9 +402,9 @@ systemctl daemon-reload 2>/dev/null || true
 %{_bindir}/noctalia-kwe
 %{_datadir}/noctalia/
 %{_datadir}/applications/dev.noctalia.Noctalia.desktop
-%{_datadir}/applications/kineticwe-settings.desktop
+%{_datadir}/applications/dev.kineticwe.Settings.desktop
 %{_datadir}/icons/hicolor/scalable/apps/noctalia.svg
-%{_datadir}/icons/hicolor/scalable/apps/kineticwe.svg
+%{_datadir}/icons/hicolor/256x256/apps/kineticwe-logo.png
 
 %changelog
 * Sat Aug 15 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-17

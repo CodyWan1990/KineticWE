@@ -314,6 +314,7 @@ NoctaliaDockReload=
 NoctaliaDockShow=
 NoctaliaDockToggle=
 NoctaliaReloadConfig=
+NoctaliaRestartShell=Meta+Alt+R
 NoctaliaSessionLock=
 NoctaliaSessionLogout=
 NoctaliaSessionReboot=

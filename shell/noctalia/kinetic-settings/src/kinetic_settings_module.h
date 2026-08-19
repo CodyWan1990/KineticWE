@@ -2,6 +2,7 @@
 
 #include <memory>
 
+class CustomKeybinds;
 class IpcService;
 class KineticSettingsWindow;
 class RenderContext;
@@ -13,7 +14,9 @@ struct wl_surface;
 
 // The kinetic-settings module: owns the Kinetic Settings window and exposes
 // it through the `msg` IPC surface (kinetic-settings-open/close/toggle) so
-// the launcher desktop entry and gestures can drive it.
+// the launcher desktop entry and gestures can drive it. Also owns the custom
+// keybind service (user-added Applications / Custom Commands global
+// shortcuts), whose registration must run before the keybinds mirror replay.
 class KineticSettingsModule {
 public:
   KineticSettingsModule();
@@ -38,6 +41,7 @@ private:
   // `keybinds-import` IPC message.
   void importKeybinds();
 
+  std::unique_ptr<CustomKeybinds> m_customKeybinds;
   std::unique_ptr<KineticSettingsWindow> m_window;
   SessionBus* m_bus = nullptr;
 };

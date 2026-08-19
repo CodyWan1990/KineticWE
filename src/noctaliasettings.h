@@ -26,6 +26,7 @@ public:
 
 private:
     void registerShortcut(const QString &id, const QString &description, const QStringList &args, const QKeySequence &defaultShortcut = QKeySequence());
+    void registerProcessAction(const QString &id, const QString &description, const QStringList &command, const QKeySequence &defaultShortcut = QKeySequence());
     QList<QAction *> m_actions;
 };
 

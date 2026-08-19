@@ -734,8 +734,8 @@ reset_local() {
         "$TEST_PREFIX/share/noctalia"
         "$TEST_PREFIX/share/applications/dev.noctalia.Noctalia.desktop"
         "$TEST_PREFIX/share/icons/hicolor/scalable/apps/noctalia.svg"
-        "$TEST_PREFIX/share/applications/kineticwe-settings.desktop"
-        "$TEST_PREFIX/share/icons/hicolor/scalable/apps/kineticwe.svg"
+        "$TEST_PREFIX/share/applications/dev.kineticwe.Settings.desktop"
+        "$TEST_PREFIX/share/icons/hicolor/256x256/apps/kineticwe-logo.png"
     )
 
     for pattern in "${known_paths[@]}"; do

@@ -7,11 +7,14 @@
 #include "keybind_codec.h"
 #include "keybinds_kwe.h"
 #include "notification/notifications.h"
+#include "system/desktop_entry.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/glyph.h"
+#include "ui/controls/input.h"
 #include "ui/controls/label.h"
+#include "ui/controls/search_picker.h"
 #include "ui/controls/separator.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -32,6 +35,29 @@ namespace {
   // Per-window shortcuts (Window Close, Move, ...) are per-instance, not
   // rebindable globals; hide them like the KDE Shortcuts KCM.
   constexpr std::string_view kSessionActionPrefix = "_k_session:";
+  // Components whose binds stay active but are not shown in the page
+  // (the user's own apps; their binds persist in the daemon's config).
+  const std::vector<std::string>& hiddenComponents() {
+    // uniqueName is the id the component registered with (dot-form for
+    // desktop-file components); the daemon's dbusPath() form uses '_'.
+    static const std::vector<std::string> kHidden{
+        "plasmashell",
+        "org.kde.dolphin.desktop",
+        "org.kde.konsole.desktop",
+    };
+    return kHidden;
+  }
+
+  [[nodiscard]] bool isHiddenComponent(std::string_view uniqueName) {
+    const auto underscoreForm = [&uniqueName]() {
+      std::string form(uniqueName);
+      std::ranges::replace(form, '.', '_');
+      return form;
+    };
+    return std::ranges::any_of(hiddenComponents(), [&](const std::string& hidden) {
+      return uniqueName == hidden || underscoreForm() == hidden;
+    });
+  }
 
   [[nodiscard]] std::unique_ptr<Label>
   makeLabel(std::string_view text, float fontSize, const ColorSpec& color, FontWeight fontWeight = FontWeight::Normal) {
@@ -64,32 +90,6 @@ namespace {
         i18n::tr("settings.badges.override"), colorSpecFromRole(ColorRole::Primary, 0.15F),
         colorSpecFromRole(ColorRole::Primary), scale
     );
-  }
-
-  // The two-stage Reset action, same contract as the other pages.
-  [[nodiscard]] std::unique_ptr<Button> makeResetButton(
-      std::string path, bool pendingConfirmation, float scale, const KeybindsPage::Callbacks& callbacks
-  ) {
-    return ui::button({
-        .text = i18n::tr(pendingConfirmation ? "settings.actions.confirm-reset" : "settings.actions.reset"),
-        .fontSize = Style::fontSizeCaption * scale,
-        .variant = pendingConfirmation ? ButtonVariant::Destructive : ButtonVariant::Ghost,
-        .minHeight = Style::controlHeightSm * scale,
-        .paddingV = Style::spaceXs * scale,
-        .paddingH = Style::spaceSm * scale,
-        .radius = Style::scaledRadiusMd(scale),
-        .onClick = [path = std::move(path), pendingConfirmation, callbacks]() mutable {
-          if (!pendingConfirmation) {
-            if (callbacks.armReset) {
-              callbacks.armReset(std::move(path));
-            }
-            return;
-          }
-          if (callbacks.confirmReset) {
-            callbacks.confirmReset(std::move(path));
-          }
-        },
-    });
   }
 
   // kwin is branded "KWin"; everything else uses the daemon's friendly name
@@ -129,9 +129,16 @@ namespace {
     });
   }
 
+  void filterComponents(std::vector<KeybindDbus::Component>& components) {
+    std::erase_if(components, [](const KeybindDbus::Component& component) {
+      return isHiddenComponent(component.uniqueName);
+    });
+  }
+
 } // namespace
 
-KeybindsPage::KeybindsPage(SessionBus& bus) : m_bus(bus), m_dbus(bus) {}
+KeybindsPage::KeybindsPage(SessionBus& bus, CustomKeybinds& customKeybinds)
+    : m_bus(bus), m_customKeybinds(customKeybinds), m_dbus(bus) {}
 
 std::string KeybindsPage::keyPath(std::string_view component, std::string_view action) {
   return std::string(component) + '.' + std::string(action);
@@ -150,6 +157,7 @@ bool KeybindsPage::splitKeyPath(std::string_view keyPath, std::string& component
 void KeybindsPage::ensureLoaded() {
   if (!m_loaded) {
     m_components = m_dbus.components();
+    filterComponents(m_components);
     orderComponents(m_components);
     m_loaded = true;
   }
@@ -240,17 +248,6 @@ std::vector<std::string> KeybindsPage::resettableKeyPaths() const {
   return paths;
 }
 
-void KeybindsPage::resetKeyPath(std::string_view path) {
-  std::string component;
-  std::string action;
-  if (!splitKeyPath(path, component, action)) {
-    return;
-  }
-  if (const auto* daemonAction = findAction(component, action)) {
-    stage(component, action, daemonAction->defaults);
-  }
-}
-
 void KeybindsPage::resetAll() {
   for (const auto& component : m_components) {
     for (const auto& action : component.actions) {
@@ -275,16 +272,23 @@ bool KeybindsPage::applyAll() {
     if (!splitKeyPath(path, component, action)) {
       continue;
     }
-    // actionId[2] is the component's friendly name; look it up so the id
-    // matches what the daemon knows.
+    // actionId needs all four entries: [component, action, component
+    // friendlyName, action friendlyName]; the daemon rejects shorter ids.
     std::string componentFriendlyName = component;
+    std::string actionFriendlyName = action;
     const auto componentIt = std::ranges::find_if(
         m_components, [&component](const KeybindDbus::Component& c) { return c.uniqueName == component; }
     );
     if (componentIt != m_components.end() && !componentIt->friendlyName.empty()) {
       componentFriendlyName = componentIt->friendlyName;
+      const auto actionIt = std::ranges::find_if(
+          componentIt->actions, [&action](const KeybindDbus::Action& a) { return a.actionUnique == action; }
+      );
+      if (actionIt != componentIt->actions.end() && !actionIt->friendlyName.empty()) {
+        actionFriendlyName = actionIt->friendlyName;
+      }
     }
-    if (!m_dbus.setActionShortcuts(component, action, componentFriendlyName, chords)) {
+    if (!m_dbus.setActionShortcuts(component, action, actionFriendlyName, componentFriendlyName, chords)) {
       kLog.warn("keybinds apply failed for {}.{}; staged edits kept", component, action);
       return false;
     }
@@ -296,6 +300,7 @@ bool KeybindsPage::applyAll() {
   // state to kglobalshortcutsrc itself; a failed mirror write is only a
   // warning — the binds are already live.
   m_components = m_dbus.components();
+  filterComponents(m_components);
   orderComponents(m_components);
   std::vector<KeybindsKwe::Entry> entries;
   for (const auto& component : m_components) {
@@ -329,15 +334,36 @@ void KeybindsPage::commitChord(
   }
   // A chord already bound to another action is a conflict; the action's own
   // current bindings are fine (re-committing a value or moving it between
-  // slots of the same action).
-  for (const auto& owner : m_dbus.ownersOf(*canonical)) {
-    if (owner.component != component || owner.action != action) {
+  // slots of the same action). The daemon's globalShortcutsByKey method is
+  // unavailable on this fork, so conflicts are computed from the loaded
+  // components (all actions with their active chords).
+  const auto conflicts = [&] {
+    std::vector<std::tuple<std::string, std::string, std::string>> owners;
+    for (const auto& candidate : m_components) {
+      for (const auto& candidateAction : candidate.actions) {
+        if (std::ranges::find(candidateAction.active, *canonical) != candidateAction.active.end()) {
+          owners.emplace_back(candidate.uniqueName, candidateAction.actionUnique, candidateAction.friendlyName);
+        }
+      }
+    }
+    return owners;
+  }();
+  for (const auto& [ownerComponent, ownerAction, ownerFriendly] : conflicts) {
+    if (ownerComponent != component || ownerAction != action) {
       notify::error(
           i18n::tr("notifications.internal.keybind-app"),
           i18n::tr("notifications.internal.keybind-conflict-title"),
           i18n::tr(
               "notifications.internal.keybind-conflict-body", "{keybind}", KeybindCodec::toChordString(*canonical),
-              "{action}", owner.friendlyName.empty() ? owner.action : owner.friendlyName
+              "{action}", ownerFriendly.empty() ? ownerAction : ownerFriendly,
+              "{component}", componentDisplayName(
+                                 *std::ranges::find_if(
+                                     m_components,
+                                     [&ownerComponent](const KeybindDbus::Component& c) {
+                                       return c.uniqueName == ownerComponent;
+                                     }
+                                 )
+                             )
           )
       );
       return;
@@ -367,6 +393,11 @@ void KeybindsPage::buildChordRow(
     const std::string& action, float scale, const Callbacks& callbacks
 ) {
   const bool isAddSlot = index >= chords.size();
+  const bool custom = isCustomComponent(component);
+  // Custom actions are deleted as a whole; every other bind drops just this
+  // chord. The trash sits to the right of the recorder; an unbound custom
+  // action still gets one (its only way to delete the action).
+  const bool showTrash = !isAddSlot || custom;
 
   auto row = ui::row({
       .align = FlexAlign::Center,
@@ -392,7 +423,7 @@ void KeybindsPage::buildChordRow(
         }
       },
   }));
-  if (!isAddSlot) {
+  if (showTrash) {
     row->addChild(ui::button({
         .glyph = "trash",
         .fontSize = Style::fontSizeCaption * scale,
@@ -403,8 +434,12 @@ void KeybindsPage::buildChordRow(
         .padding = Style::spaceXs * scale,
         .radius = Style::scaledRadiusMd(scale),
         .onClick =
-            [this, component, action, chords, index, callbacks]() {
-              removeChord(component, action, chords, index, callbacks);
+            [this, component, action, chords, index, callbacks, custom]() {
+              if (custom) {
+                removeCustomAction(component, action, callbacks);
+              } else {
+                removeChord(component, action, chords, index, callbacks);
+              }
             },
     }));
   }
@@ -415,26 +450,28 @@ void KeybindsPage::buildChordsColumn(
     Flex& parent, const std::string& component, const std::string& action, std::vector<KeyChord> chords,
     float scale, const Callbacks& callbacks
 ) {
-  // One recorder per bound chord, an unset one when nothing is bound, and an
-  // extra "add" recorder whenever at least one chord exists.
+  // One recorder per bound chord, an unset one when nothing is bound.
   const std::size_t slots = std::max<std::size_t>(1, chords.size());
   for (std::size_t i = 0; i < slots; ++i) {
     buildChordRow(parent, chords, i, component, action, scale, callbacks);
-  }
-  if (!chords.empty()) {
-    buildChordRow(parent, chords, chords.size(), component, action, scale, callbacks);
   }
 }
 
 void KeybindsPage::buildActionRow(
     Flex& parent, const KeybindDbus::Component& component, const KeybindDbus::Action& action, float scale,
-    std::string_view armedResetKey, const Callbacks& callbacks
+    const Callbacks& callbacks
 ) {
-  const std::string path = keyPath(component.uniqueName, action.actionUnique);
   const bool isOverridden = overridden(component.uniqueName, action);
   const auto chords = effectiveChords(component.uniqueName, action.actionUnique);
 
-  auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
+  // One column per action: a title line ([name] ... [Override badge]) and one
+  // line per chord ([recorder] [trash]).
+  auto column = ui::column({
+      .align = FlexAlign::Start,
+      .gap = Style::spaceXs * scale,
+      .paddingV = 2.0F * scale,
+      .fillWidth = true,
+  });
   auto titleRow = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
@@ -445,27 +482,231 @@ void KeybindsPage::buildActionRow(
       colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
   ));
   titleRow->addChild(ui::spacer());
-  copy->addChild(std::move(titleRow));
-
-  auto actions = ui::column({.align = FlexAlign::End, .gap = Style::spaceXs * scale});
   if (isOverridden) {
-    auto badges = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    badges->addChild(makeOverrideBadge(scale));
-    badges->addChild(makeResetButton(path, armedResetKey == path, scale, callbacks));
-    actions->addChild(std::move(badges));
+    titleRow->addChild(makeOverrideBadge(scale));
   }
-  buildChordsColumn(*actions, component.uniqueName, action.actionUnique, chords, scale, callbacks);
+  column->addChild(std::move(titleRow));
 
-  auto row = ui::row(
-      {.align = FlexAlign::Center,
-       .justify = FlexJustify::SpaceBetween,
-       .gap = Style::spaceXs * scale,
-       .paddingV = 2.0F * scale,
-       .fillWidth = true}
+  buildChordsColumn(*column, component.uniqueName, action.actionUnique, chords, scale, callbacks);
+  parent.addChild(std::move(column));
+}
+
+bool KeybindsPage::isCustomComponent(std::string_view component) {
+  return component == CustomKeybinds::kAppsComponent || component == CustomKeybinds::kCommandsComponent;
+}
+
+void KeybindsPage::removeCustomAction(
+    const std::string& component, const std::string& action, const Callbacks& callbacks
+) {
+  // Best effort: unregister from the daemon and drop the definition; failures
+  // are logged inside the service. The list is always re-read from the daemon
+  // so the UI cannot keep showing an action that is already gone.
+  m_customKeybinds.remove(component, action);
+  m_pending.erase(keyPath(component, action));
+  m_loaded = false;
+  if (callbacks.requestRebuild) {
+    callbacks.requestRebuild();
+  }
+}
+
+std::unique_ptr<Node> KeybindsPage::buildAddMenu(float scale, const Callbacks& callbacks) {
+  auto menu = ui::column({.align = FlexAlign::End, .gap = Style::spaceXs * scale, .fillWidth = true});
+  auto card = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceXs * scale,
+      .padding = Style::spaceXs * scale,
+      .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
+      .radius = Style::scaledRadiusMd(scale),
+      .width = 220.0F * scale,
+  });
+  const auto menuItem = [scale, callbacks](std::string_view text, auto onPick) {
+    return ui::button({
+        .text = std::string(text),
+        .fontSize = Style::fontSizeCaption * scale,
+        .contentAlign = ButtonContentAlign::Start,
+        .variant = ButtonVariant::Ghost,
+        .minHeight = Style::controlHeight * scale,
+        .paddingV = Style::spaceXs * scale,
+        .paddingH = Style::spaceMd * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .onClick = std::move(onPick),
+    });
+  };
+  card->addChild(menuItem(
+      i18n::tr("settings.keybinds.add-application"),
+      [this, callbacks]() {
+        m_addMenuOpen = false;
+        m_addMode = AddMode::Apps;
+        if (callbacks.requestRebuild) {
+          callbacks.requestRebuild();
+        }
+      }
+  ));
+  card->addChild(menuItem(
+      i18n::tr("settings.keybinds.add-custom-command"),
+      [this, callbacks]() {
+        m_addMenuOpen = false;
+        m_addMode = AddMode::Command;
+        if (callbacks.requestRebuild) {
+          callbacks.requestRebuild();
+        }
+      }
+  ));
+  menu->addChild(std::move(card));
+  return menu;
+}
+
+std::unique_ptr<Node> KeybindsPage::buildAppPicker(float scale, const Callbacks& callbacks) {
+  auto column = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale, .fillWidth = true});
+  column->addChild(makeLabel(
+      i18n::tr("settings.keybinds.app-picker-title"), Style::fontSizeBody * scale,
+      colorSpecFromRole(ColorRole::OnSurfaceVariant)
+  ));
+
+  std::vector<SearchPickerOption> options;
+  for (const auto& entry : desktopEntries()) {
+    if (entry.exec.empty()) {
+      continue;
+    }
+    options.push_back(SearchPickerOption{
+        .value = entry.id,
+        .label = entry.name,
+        .icon = "app-window",
+    });
+  }
+  column->addChild(ui::searchPicker({
+      .placeholder = i18n::tr("settings.keybinds.app-picker-placeholder"),
+      .emptyText = i18n::tr("settings.keybinds.app-picker-empty"),
+      .options = std::move(options),
+      .height = 320.0F * scale,
+      .onActivated =
+          [this, callbacks](const SearchPickerOption& option) {
+            const auto& entries = desktopEntries();
+            const auto entry = std::ranges::find_if(
+                entries, [&option](const DesktopEntry& e) { return e.id == option.value; }
+            );
+            if (entry == entries.end()) {
+              return;
+            }
+            m_addMode = AddMode::None;
+            m_addMenuOpen = false;
+            if (m_customKeybinds.addApp(entry->id, entry->name, entry->exec)) {
+              m_loaded = false;
+            }
+            if (callbacks.requestRebuild) {
+              callbacks.requestRebuild();
+            }
+          },
+      .onCancel =
+          [this, callbacks]() {
+            m_addMode = AddMode::None;
+            if (callbacks.requestRebuild) {
+              callbacks.requestRebuild();
+            }
+          },
+      .configure =
+          [](SearchPicker& picker) {
+            picker.clearFill();
+            picker.clearBorder();
+            picker.setRadius(0.0F);
+            picker.setPadding(0.0F);
+          },
+  }));
+
+  column->addChild(ui::row(
+      {.align = FlexAlign::Center, .gap = Style::spaceXs * scale},
+      ui::button({
+          .text = i18n::tr("settings.keybinds.cancel"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .variant = ButtonVariant::Ghost,
+          .minHeight = Style::controlHeight * scale,
+          .paddingV = Style::spaceXs * scale,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick =
+              [this, callbacks]() {
+                m_addMode = AddMode::None;
+                if (callbacks.requestRebuild) {
+                  callbacks.requestRebuild();
+                }
+              },
+      })
+  ));
+  return column;
+}
+
+std::unique_ptr<Node> KeybindsPage::buildCommandForm(float scale, const Callbacks& callbacks) {
+  auto column = ui::column({.align = FlexAlign::Start, .gap = Style::spaceSm * scale, .fillWidth = true});
+  column->addChild(makeLabel(
+      i18n::tr("settings.keybinds.command-form-title"), Style::fontSizeBody * scale,
+      colorSpecFromRole(ColorRole::OnSurfaceVariant)
+  ));
+
+  auto input = std::make_unique<Input>();
+  input->setPlaceholder(i18n::tr("settings.keybinds.command-placeholder"));
+  input->setMinLayoutWidth(480.0F * scale);
+  Input* inputPtr = input.get();
+  input->setOnSubmit(
+      [this, inputPtr, callbacks](const std::string& command) {
+        if (command.empty()) {
+          return;
+        }
+        m_addMode = AddMode::None;
+        m_addMenuOpen = false;
+        if (m_customKeybinds.addCommand(command)) {
+          m_loaded = false;
+        }
+        if (callbacks.requestRebuild) {
+          callbacks.requestRebuild();
+        }
+      }
   );
-  row->addChild(std::move(copy));
-  row->addChild(std::move(actions));
-  parent.addChild(std::move(row));
+  column->addChild(std::move(input));
+
+  column->addChild(ui::row(
+      {.align = FlexAlign::Center, .gap = Style::spaceXs * scale},
+      ui::button({
+          .text = i18n::tr("settings.keybinds.add"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .variant = ButtonVariant::Primary,
+          .minHeight = Style::controlHeight * scale,
+          .paddingV = Style::spaceXs * scale,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick =
+              [this, inputPtr, callbacks]() {
+                const std::string command = inputPtr->value();
+                if (command.empty()) {
+                  return;
+                }
+                m_addMode = AddMode::None;
+                m_addMenuOpen = false;
+                if (m_customKeybinds.addCommand(command)) {
+                  m_loaded = false;
+                }
+                if (callbacks.requestRebuild) {
+                  callbacks.requestRebuild();
+                }
+              },
+      }),
+      ui::button({
+          .text = i18n::tr("settings.keybinds.cancel"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .variant = ButtonVariant::Ghost,
+          .minHeight = Style::controlHeight * scale,
+          .paddingV = Style::spaceXs * scale,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick =
+              [this, callbacks]() {
+                m_addMode = AddMode::None;
+                if (callbacks.requestRebuild) {
+                  callbacks.requestRebuild();
+                }
+              },
+      })
+  ));
+  return column;
 }
 
 std::unique_ptr<Node> KeybindsPage::buildComponentList(float scale, const Callbacks& callbacks) {
@@ -504,7 +745,7 @@ std::unique_ptr<Node> KeybindsPage::buildComponentList(float scale, const Callba
 }
 
 std::unique_ptr<Node>
-KeybindsPage::build(float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks) {
+KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callbacks) {
   ensureLoaded();
 
   auto root = ui::column({
@@ -515,22 +756,60 @@ KeybindsPage::build(float scale, const Filter& filter, std::string_view armedRes
       .fillWidth = true,
   });
 
-  // Section header: glyph + bold primary title (upstream makeSection).
-  root->addChild(ui::row(
-      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-      ui::glyph({
-          .glyph = "keyboard",
-          .glyphSize = Style::fontSizeHeader * scale,
-          .color = colorSpecFromRole(ColorRole::Primary),
-      }),
-      makeLabel("Keybinds", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
-  ));
+  // Section header: glyph + bold primary title, with the "+" add button on the
+  // far right of the title line.
+  auto header = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+  });
+  header->addChild(ui::glyph({
+      .glyph = "keyboard",
+      .glyphSize = Style::fontSizeHeader * scale,
+      .color = colorSpecFromRole(ColorRole::Primary),
+  }));
+  header->addChild(makeLabel("Keybinds", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold));
+  header->addChild(ui::spacer());
+  header->addChild(ui::button({
+      .glyph = "plus",
+      .fontSize = Style::fontSizeCaption * scale,
+      .glyphSize = Style::fontSizeBody * scale,
+      .variant = ButtonVariant::Ghost,
+      .minWidth = Style::controlHeight * scale,
+      .minHeight = Style::controlHeight * scale,
+      .padding = Style::spaceXs * scale,
+      .radius = Style::scaledRadiusMd(scale),
+      .onClick =
+          [this, callbacks]() {
+            m_addMenuOpen = !m_addMenuOpen;
+            if (m_addMenuOpen) {
+              m_addMode = AddMode::None;
+            }
+            if (callbacks.requestRebuild) {
+              callbacks.requestRebuild();
+            }
+          },
+  }));
+  root->addChild(std::move(header));
 
-  if (m_components.empty()) {
+  if (m_addMenuOpen) {
+    root->addChild(buildAddMenu(scale, callbacks));
+  }
+
+  if (m_components.empty() && m_addMode == AddMode::None) {
     root->addChild(makeLabel(
         "The compositor's shortcut service is unavailable.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)
     ));
+    return root;
+  }
+
+  if (m_addMode == AddMode::Apps) {
+    root->addChild(buildAppPicker(scale, callbacks));
+    return root;
+  }
+  if (m_addMode == AddMode::Command) {
+    root->addChild(buildCommandForm(scale, callbacks));
     return root;
   }
 
@@ -571,7 +850,7 @@ KeybindsPage::build(float scale, const Filter& filter, std::string_view armedRes
       if (!matchesFilter(*componentIt, action, filter)) {
         continue;
       }
-      buildActionRow(*actionsColumn, *componentIt, action, scale, armedResetKey, callbacks);
+      buildActionRow(*actionsColumn, *componentIt, action, scale, callbacks);
       anyRows = true;
     }
   }

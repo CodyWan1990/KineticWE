@@ -184,7 +184,6 @@ private:
   void refreshIdleLiveStatusText();
   void saveSupportReport();
   void saveConfigExport(settings::ConfigExportMode mode);
-  [[nodiscard]] bool headerDragRegionContains(float sceneX, float sceneY) const;
   void setSettingOverride(std::vector<std::string> path, ConfigOverrideValue value);
   void setSettingOverrides(std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides);
   void clearSettingOverride(std::vector<std::string> path);
@@ -236,7 +235,6 @@ private:
   std::unique_ptr<Node> m_sceneRoot;
   Flex* m_mainContainer = nullptr; // Outer Flex inside m_sceneRoot, sized to the window
   Box* m_panelBackground = nullptr;
-  Node* m_headerRow = nullptr;
   Node* m_filterRow = nullptr;
   Button* m_actionsMenuButton = nullptr;
   Flex* m_contentContainer = nullptr;

@@ -1121,46 +1121,6 @@ void SettingsWindow::rebuildSettingsContent() {
   }
 }
 
-std::unique_ptr<Flex> SettingsWindow::buildHeaderRow(float scale) {
-  return ui::row(
-      {
-          .align = FlexAlign::Center,
-          .justify = FlexJustify::SpaceBetween,
-          .gap = Style::spaceSm * scale,
-      },
-      ui::label({
-          .text = i18n::tr("settings.window.title"),
-          .fontSize = Style::fontSizeTitle * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      }),
-      ui::button({
-          .out = &m_actionsMenuButton,
-          .glyph = "more-vertical",
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Ghost,
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() { openActionsMenu(); },
-          .configure = [](Button& button) { button.setTabStop(false); },
-      }),
-      ui::button({
-          .glyph = "close",
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Default,
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() { close(); },
-          .configure = [](Button& button) { button.setTabStop(false); },
-      })
-  );
-}
-
 std::unique_ptr<Flex> SettingsWindow::buildFilterRow(
     float scale, const std::string& resetPageScope, std::vector<std::vector<std::string>> resetPagePaths
 ) {
@@ -1314,6 +1274,19 @@ std::unique_ptr<Flex> SettingsWindow::buildFilterRow(
         })
     );
   }
+
+  filters->addChild(ui::button({
+      .out = &m_actionsMenuButton,
+      .glyph = "more-vertical",
+      .glyphSize = Style::fontSizeBody * scale,
+      .variant = ButtonVariant::Ghost,
+      .minWidth = Style::controlHeightSm * scale,
+      .minHeight = Style::controlHeightSm * scale,
+      .padding = Style::spaceXs * scale,
+      .radius = Style::scaledRadiusMd(scale),
+      .onClick = [this]() { openActionsMenu(); },
+      .configure = [](Button& button) { button.setTabStop(false); },
+  }));
 
   return filters;
 }
@@ -2050,7 +2023,6 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
 
   m_inputDispatcher.setSceneRoot(nullptr);
   m_mainContainer = nullptr;
-  m_headerRow = nullptr;
   m_filterRow = nullptr;
   m_panelBackground = nullptr;
   m_contentContainer = nullptr;
@@ -2064,7 +2036,7 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
     m_sceneRoot->setPopupContext(m_selectPopup.get());
   }
 
-  const float bgOpacity = cfg.shell.settingsWindowTranslucent ? 0.75F : 1.0F;
+  const float bgOpacity = 1.0F;
 
   auto bg = ui::box({
       .width = w,
@@ -2090,7 +2062,6 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
       .height = h,
   });
 
-  m_headerRow = main->addChild(centeredRow(buildHeaderRow(scale)));
   m_filterRow = main->addChild(centeredRow(buildFilterRow(scale, resetPageScope, std::move(resetPagePaths))));
   if (auto status = buildStatusRow(scale)) {
     main->addChild(centeredRow(std::move(status)));

@@ -2,6 +2,7 @@
 
 #include "core/log.h"
 #include "wayland/wayland_connection.h"
+#include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 
 #include <algorithm>
@@ -20,6 +21,10 @@ namespace {
       .close = &ToplevelSurface::handleToplevelClose,
       .configure_bounds = &ToplevelSurface::handleToplevelConfigureBounds,
       .wm_capabilities = &ToplevelSurface::handleToplevelWmCapabilities,
+  };
+
+  const zxdg_toplevel_decoration_v1_listener kToplevelDecorationListener = {
+      .configure = &ToplevelSurface::handleToplevelDecorationConfigure,
   };
 
 } // namespace
@@ -70,6 +75,15 @@ bool ToplevelSurface::initialize(wl_output* output, ToplevelSurfaceConfig config
   }
 
   xdg_toplevel_add_listener(m_toplevel, &kToplevelListener, this);
+  if (config.decorated && m_connection.hasXdgDecorationManager()) {
+    m_toplevelDecoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
+        m_connection.xdgDecorationManager(), m_toplevel
+    );
+    zxdg_toplevel_decoration_v1_add_listener(m_toplevelDecoration, &kToplevelDecorationListener, this);
+    zxdg_toplevel_decoration_v1_set_mode(
+        m_toplevelDecoration, ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
+    );
+  }
   xdg_toplevel_set_title(m_toplevel, config.title.empty() ? "Noctalia" : config.title.c_str());
   xdg_toplevel_set_app_id(m_toplevel, config.appId != nullptr ? config.appId : "dev.noctalia.Noctalia");
   if (config.minWidth > 0 || config.minHeight > 0) {
@@ -159,7 +173,20 @@ void ToplevelSurface::handleToplevelConfigureBounds(
 void ToplevelSurface::
     handleToplevelWmCapabilities(void* /*data*/, xdg_toplevel* /*toplevel*/, wl_array* /*capabilities*/) {}
 
+void ToplevelSurface::handleToplevelDecorationConfigure(
+    void* data, zxdg_toplevel_decoration_v1* /*decoration*/, std::uint32_t mode
+) {
+  if (mode == ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE) {
+    auto* self = static_cast<ToplevelSurface*>(data);
+    kLog.warn("toplevel: compositor fell back to client-side decorations");
+  }
+}
+
 void ToplevelSurface::destroyRoleObjects() {
+  if (m_toplevelDecoration != nullptr) {
+    zxdg_toplevel_decoration_v1_destroy(m_toplevelDecoration);
+    m_toplevelDecoration = nullptr;
+  }
   if (m_toplevel != nullptr) {
     xdg_toplevel_destroy(m_toplevel);
     m_toplevel = nullptr;

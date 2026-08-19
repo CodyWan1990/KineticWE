@@ -170,6 +170,19 @@ bool save(const std::filesystem::path& path, const std::vector<Entry>& entries) 
   return true;
 }
 
+void removeEntries(
+    const std::filesystem::path& path, const std::string& component, const std::string& action
+) {
+  std::vector<Entry> entries;
+  if (!load(path, entries)) {
+    return;
+  }
+  std::erase_if(entries, [&](const Entry& entry) { return entry.component == component && entry.action == action; });
+  if (!save(path, entries)) {
+    kLog.warn("keybinds mirror entry removal failed for {}.{}", component, action);
+  }
+}
+
 int applyToDaemon(SessionBus& bus) {
   std::vector<Entry> entries;
   if (!load(defaultPath(), entries)) {
@@ -184,8 +197,22 @@ int applyToDaemon(SessionBus& bus) {
   int applied = 0;
   for (const auto& entry : entries) {
     const auto it = friendlyNames.find(entry.component);
-    const std::string& friendlyName = it == friendlyNames.end() ? entry.component : it->second;
-    if (!dbus.setActionShortcuts(entry.component, entry.action, friendlyName, entry.chords)) {
+    const std::string& componentFriendlyName = it == friendlyNames.end() ? entry.component : it->second;
+    const auto componentIt = std::ranges::find_if(
+        components, [&entry](const KeybindDbus::Component& c) { return c.uniqueName == entry.component; }
+    );
+    std::string actionFriendlyName = entry.action;
+    if (componentIt != components.end()) {
+      const auto actionIt = std::ranges::find_if(
+          componentIt->actions, [&entry](const KeybindDbus::Action& a) { return a.actionUnique == entry.action; }
+      );
+      if (actionIt != componentIt->actions.end() && !actionIt->friendlyName.empty()) {
+        actionFriendlyName = actionIt->friendlyName;
+      }
+    }
+    if (!dbus.setActionShortcuts(
+            entry.component, entry.action, actionFriendlyName, componentFriendlyName, entry.chords
+        )) {
       kLog.warn(
           "keybinds import skipped {}.{}: unknown action or rejected chords", entry.component, entry.action
       );

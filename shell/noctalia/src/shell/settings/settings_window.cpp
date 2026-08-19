@@ -175,26 +175,6 @@ float SettingsWindow::uiScale() const {
   return std::max(0.1F, m_config->config().accessibility.uiScale);
 }
 
-bool SettingsWindow::headerDragRegionContains(float sceneX, float sceneY) const {
-  if (m_sceneRoot == nullptr || m_headerRow == nullptr) {
-    return false;
-  }
-
-  float left = 0.0F;
-  float top = 0.0F;
-  float right = 0.0F;
-  float bottom = 0.0F;
-  Node::transformedBounds(m_headerRow, left, top, right, bottom);
-
-  const float sceneWidth = m_sceneRoot->width();
-  const float sceneHeight = m_sceneRoot->height();
-  const float dragLeft = std::min(0.0F, left);
-  const float dragTop = std::min(0.0F, top);
-  const float dragRight = std::max(sceneWidth, right);
-  const float dragBottom = std::clamp(bottom, 0.0F, sceneHeight);
-  return sceneX >= dragLeft && sceneX < dragRight && sceneY >= dragTop && sceneY < dragBottom;
-}
-
 bool SettingsWindow::ownsKeyboardSurface(wl_surface* surface) const noexcept {
   if (!isOpen() || surface == nullptr || m_surface == nullptr) {
     return false;
@@ -437,6 +417,7 @@ void SettingsWindow::open(std::string context) {
       .minHeight = minHeight,
       .title = i18n::tr("settings.window.native-title"),
       .appId = "dev.noctalia.Noctalia",
+      .decorated = true,
   };
 
   if (!m_surface->initialize(output, cfg)) {
@@ -514,7 +495,6 @@ void SettingsWindow::destroyWindow() {
   }
   m_idleLiveStatusLabel = nullptr;
   m_mainContainer = nullptr;
-  m_headerRow = nullptr;
   m_filterRow = nullptr;
   m_contentContainer = nullptr;
   m_contentScrollView = nullptr;
@@ -973,14 +953,6 @@ bool SettingsWindow::onPointerEvent(const PointerEvent& event) {
         m_pointerInside = true;
       }
       m_inputDispatcher.pointerMotion(static_cast<float>(event.sx), static_cast<float>(event.sy), event.serial);
-      if (pressed
-          && event.button == BTN_LEFT
-          && m_inputDispatcher.hoveredArea() == nullptr
-          && headerDragRegionContains(static_cast<float>(event.sx), static_cast<float>(event.sy))) {
-        m_surface->beginMove(event.serial);
-        consumed = true;
-        break;
-      }
       m_inputDispatcher.pointerButton(
           static_cast<float>(event.sx), static_cast<float>(event.sy), event.button, pressed
       );

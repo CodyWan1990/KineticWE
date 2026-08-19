@@ -33,6 +33,7 @@ struct wp_cursor_shape_manager_v1;
 struct ext_idle_notifier_v1;
 struct ext_idle_notification_v1;
 struct zwp_idle_inhibit_manager_v1;
+struct zxdg_decoration_manager_v1;
 struct ext_background_effect_manager_v1;
 struct xdg_activation_v1;
 struct ext_session_lock_manager_v1;
@@ -170,6 +171,7 @@ public:
   [[nodiscard]] bool hasSubcompositor() const noexcept;
   [[nodiscard]] bool hasXdgOutputManager() const noexcept;
   [[nodiscard]] bool hasXdgShell() const noexcept;
+  [[nodiscard]] bool hasXdgDecorationManager() const noexcept;
   [[nodiscard]] bool hasExtWorkspaceManager() const noexcept;
   [[nodiscard]] bool hasKdeVirtualDesktopManager() const noexcept;
   [[nodiscard]] bool hasDwlIpcManager() const noexcept;
@@ -199,6 +201,7 @@ public:
   [[nodiscard]] wl_subcompositor* subcompositor() const noexcept;
   [[nodiscard]] zwlr_layer_shell_v1* layerShell() const noexcept;
   [[nodiscard]] xdg_wm_base* xdgWmBase() const noexcept;
+  [[nodiscard]] zxdg_decoration_manager_v1* xdgDecorationManager() const noexcept;
   [[nodiscard]] ext_session_lock_manager_v1* sessionLockManager() const noexcept;
   [[nodiscard]] ext_idle_notifier_v1* idleNotifier() const noexcept;
   /// Inhibitor-aware idle notification (`get_idle_notification`); honors `zwp_idle_inhibitor_v1`.
@@ -303,6 +306,7 @@ private:
   zwlr_layer_shell_v1* m_layerShell = nullptr;
   zxdg_output_manager_v1* m_xdgOutputManager = nullptr;
   xdg_wm_base* m_xdgWmBase = nullptr;
+  zxdg_decoration_manager_v1* m_xdgDecorationManager = nullptr;
   wp_cursor_shape_manager_v1* m_cursorShapeManager = nullptr;
   xdg_activation_v1* m_xdgActivation = nullptr;
   ext_session_lock_manager_v1* m_sessionLockManager = nullptr;

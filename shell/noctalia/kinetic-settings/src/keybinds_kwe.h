@@ -42,6 +42,9 @@ namespace KeybindsKwe {
   // is omitted; an empty `entries` deletes the file. Returns false on failure.
   [[nodiscard]] bool save(const std::filesystem::path& path, const std::vector<Entry>& entries);
 
+  // Removes every entry for the given component.action from the mirror.
+  void removeEntries(const std::filesystem::path& path, const std::string& component, const std::string& action);
+
   // Replays the mirror into the daemon and returns how many entries were
   // applied. Stale/unknown actions and entries whose chords the daemon rejects
   // are skipped with a warning; the file itself is left untouched.

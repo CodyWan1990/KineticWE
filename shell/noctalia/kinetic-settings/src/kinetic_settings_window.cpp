@@ -35,8 +35,7 @@ namespace {
   constexpr float kWindowMinWidth = 860.0F;
   constexpr float kWindowMinHeight = 480.0F;
 
-  // Matches Noctalia's translucent settings window (Surface at 0.75).
-  constexpr float kBackgroundOpacity = 0.75F;
+  constexpr float kBackgroundOpacity = 1.0F;
   // Sidebar geometry mirrors Noctalia's settings_sidebar.cpp.
   constexpr float kSidebarWidth = 200.0F;
   constexpr float kSidebarPadding = 6.0F;
@@ -65,11 +64,13 @@ KineticSettingsWindow::KineticSettingsWindow() = default;
 KineticSettingsWindow::~KineticSettingsWindow() = default;
 
 void KineticSettingsWindow::initialize(
-    WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, float uiScale
+    WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, CustomKeybinds& customKeybinds,
+    float uiScale
 ) {
   m_wayland = &wayland;
   m_renderContext = &renderContext;
   m_bus = &bus;
+  m_customKeybinds = &customKeybinds;
   m_uiScale = std::max(0.1F, uiScale);
 }
 
@@ -130,6 +131,7 @@ void KineticSettingsWindow::open() {
       .minHeight = static_cast<std::uint32_t>(std::round(kWindowMinHeight * scale)),
       .title = "Kinetic Settings",
       .appId = "dev.kineticwe.Settings",
+      .decorated = true,
   };
   if (!m_surface->initialize(output, cfg)) {
     kLog.warn("kinetic-settings: failed to create toplevel surface");
@@ -147,7 +149,7 @@ void KineticSettingsWindow::open() {
     m_workspacesPage = std::make_unique<WorkspacesPage>(*m_bus);
   }
   if (m_keybindsPage == nullptr) {
-    m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus);
+    m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus, *m_customKeybinds);
   }
   m_tilingPage->reloadFromDisk();
   m_workspacesPage->reloadFromDisk();
@@ -357,20 +359,6 @@ KeybindsPage::Callbacks KineticSettingsWindow::keybindsPageCallbacks() {
   return KeybindsPage::Callbacks{
       .requestRebuild =
           [this]() { clearArmedResets(); requestSceneRebuild(); },
-      .armReset =
-          [this](std::string keyPath) {
-            m_armedResetKeyPath = std::move(keyPath);
-            m_resetPageArmed = false;
-            requestContentRebuild();
-          },
-      .confirmReset =
-          [this](std::string keyPath) {
-            clearArmedResets();
-            if (m_keybindsPage != nullptr) {
-              m_keybindsPage->resetKeyPath(keyPath);
-            }
-            requestSceneRebuild();
-          },
   };
 }
 
@@ -442,34 +430,6 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_keybindsPage != nullptr && !m_keybindsPage->resettableKeyPaths().empty();
   }
   return false;
-}
-
-std::unique_ptr<Flex> KineticSettingsWindow::buildHeaderRow(float scale) {
-  auto header = ui::row({
-      .align = FlexAlign::Center,
-      .justify = FlexJustify::SpaceBetween,
-      .gap = Style::spaceSm * scale,
-      .fillWidth = true,
-  });
-  header->addChild(ui::label({
-      .text = "Kinetic Settings",
-      .fontSize = Style::fontSizeTitle * scale,
-      .fontWeight = FontWeight::Bold,
-      .color = colorSpecFromRole(ColorRole::OnSurface, 1.0F),
-      .flexGrow = 1.0F,
-  }));
-  header->addChild(ui::button({
-      .glyph = "close",
-      .glyphSize = Style::fontSizeBody * scale,
-      .variant = ButtonVariant::Default,
-      .minWidth = Style::controlHeightSm * scale,
-      .minHeight = Style::controlHeightSm * scale,
-      .padding = Style::spaceXs * scale,
-      .radius = Style::scaledRadiusMd(scale),
-      .onClick = [this]() { close(); },
-      .configure = [](Button& button) { button.setTabStop(false); },
-  }));
-  return header;
 }
 
 std::unique_ptr<Flex> KineticSettingsWindow::buildFilterRow(float scale) {
@@ -706,7 +666,7 @@ void KineticSettingsWindow::rebuildContent() {
   case ActivePage::Keybinds:
     if (m_keybindsPage != nullptr) {
       m_pageContainer->addChild(
-          m_keybindsPage->build(uiScale(), keybindsFilter(), m_armedResetKeyPath, keybindsPageCallbacks())
+          m_keybindsPage->build(uiScale(), keybindsFilter(), keybindsPageCallbacks())
       );
     }
     break;
@@ -752,7 +712,6 @@ void KineticSettingsWindow::buildScene(float width, float height) {
       .height = height,
   });
 
-  main->addChild(buildHeaderRow(scale));
   main->addChild(buildFilterRow(scale));
 
   auto body = ui::row({

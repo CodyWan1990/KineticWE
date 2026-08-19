@@ -32,6 +32,7 @@
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
 #include "xdg-activation-v1-client-protocol.h"
+#include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-output-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 
@@ -52,6 +53,7 @@ namespace {
   constexpr std::uint32_t kLayerShellVersion = 4;
   constexpr std::uint32_t kXdgOutputManagerVersion = 3;
   constexpr std::uint32_t kXdgWmBaseVersion = 6;
+  constexpr std::uint32_t kXdgDecorationManagerVersion = 1;
   constexpr std::uint32_t kExtWorkspaceManagerVersion = 1;
   constexpr std::uint32_t kKdeVirtualDesktopManagementVersion = 4;
   constexpr std::uint32_t kWlrForeignToplevelManagerVersion = 3;
@@ -641,6 +643,7 @@ bool WaylandConnection::hasSubcompositor() const noexcept { return m_subcomposit
 
 bool WaylandConnection::hasXdgOutputManager() const noexcept { return m_xdgOutputManager != nullptr; }
 bool WaylandConnection::hasXdgShell() const noexcept { return m_xdgWmBase != nullptr; }
+bool WaylandConnection::hasXdgDecorationManager() const noexcept { return m_xdgDecorationManager != nullptr; }
 
 bool WaylandConnection::hasExtWorkspaceManager() const noexcept { return m_hasExtWorkspaceGlobal; }
 bool WaylandConnection::hasKdeVirtualDesktopManager() const noexcept { return m_hasKdeVirtualDesktopGlobal; }
@@ -757,6 +760,7 @@ wl_subcompositor* WaylandConnection::subcompositor() const noexcept { return m_s
 
 zwlr_layer_shell_v1* WaylandConnection::layerShell() const noexcept { return m_layerShell; }
 xdg_wm_base* WaylandConnection::xdgWmBase() const noexcept { return m_xdgWmBase; }
+zxdg_decoration_manager_v1* WaylandConnection::xdgDecorationManager() const noexcept { return m_xdgDecorationManager; }
 
 ext_session_lock_manager_v1* WaylandConnection::sessionLockManager() const noexcept { return m_sessionLockManager; }
 ext_idle_notifier_v1* WaylandConnection::idleNotifier() const noexcept { return m_idleNotifier; }
@@ -1023,6 +1027,14 @@ void WaylandConnection::bindGlobal(
     const auto bindVersion = std::min(version, kXdgWmBaseVersion);
     m_xdgWmBase = static_cast<xdg_wm_base*>(wl_registry_bind(registry, name, &xdg_wm_base_interface, bindVersion));
     xdg_wm_base_add_listener(m_xdgWmBase, &kXdgWmBaseListener, this);
+    return;
+  }
+
+  if (interfaceName == "zxdg_decoration_manager_v1") {
+    const auto bindVersion = std::min(version, kXdgDecorationManagerVersion);
+    m_xdgDecorationManager = static_cast<zxdg_decoration_manager_v1*>(
+        wl_registry_bind(registry, name, &zxdg_decoration_manager_v1_interface, bindVersion)
+    );
     return;
   }
 

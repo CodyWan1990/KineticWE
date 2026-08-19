@@ -16,6 +16,7 @@
 #include <utility>
 
 class Box;
+class CustomKeybinds;
 class Flex;
 class RenderContext;
 class SelectDropdownPopup;
@@ -40,7 +41,10 @@ public:
   KineticSettingsWindow(const KineticSettingsWindow&) = delete;
   KineticSettingsWindow& operator=(const KineticSettingsWindow&) = delete;
 
-  void initialize(WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, float uiScale);
+  void initialize(
+      WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, CustomKeybinds& customKeybinds,
+      float uiScale
+  );
 
   void open();
   void close();
@@ -72,7 +76,6 @@ private:
   void rebuildContent();
   void clearArmedResets() noexcept;
 
-  [[nodiscard]] std::unique_ptr<Flex> buildHeaderRow(float scale);
   [[nodiscard]] std::unique_ptr<Flex> buildFilterRow(float scale);
   [[nodiscard]] std::unique_ptr<Node> buildSidebar(float scale);
   // Filters/callbacks handed to whichever page is currently active. All pages
@@ -94,6 +97,7 @@ private:
   WaylandConnection* m_wayland = nullptr;
   RenderContext* m_renderContext = nullptr;
   SessionBus* m_bus = nullptr;
+  CustomKeybinds* m_customKeybinds = nullptr;
   float m_uiScale = 1.0F;
 
   std::unique_ptr<ToplevelSurface> m_surface;

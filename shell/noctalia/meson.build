@@ -346,6 +346,8 @@ foreach _p : [
     wayland_protos_dir / 'stable/viewporter/viewporter.xml'],
   ['idle-inhibit-unstable-v1',
     wayland_protos_dir / 'unstable/idle-inhibit/idle-inhibit-unstable-v1.xml'],
+  ['xdg-decoration-unstable-v1',
+    wayland_protos_dir / 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml'],
 
   # ── vendored / project-local protocols (loaded from protocols/) ───────────
   ['text-input-unstable-v3',
@@ -977,6 +979,7 @@ _noctalia_sources = files(
   'kinetic-settings/src/keybind_dbus.cpp',
   'kinetic-settings/src/keybinds_kwe.cpp',
   'kinetic-settings/src/keybinds_page.cpp',
+  'kinetic-settings/src/custom_keybinds.cpp',
   'kinetic-settings/src/kinetic_settings_module.cpp',
 )
 
@@ -1117,13 +1120,13 @@ install_data(
 )
 
 install_data(
-  'kinetic-settings/assets/kineticwe-settings.desktop',
+  'kinetic-settings/assets/dev.kineticwe.Settings.desktop',
   install_dir: get_option('datadir') / 'applications',
 )
 
 install_data(
-  'kinetic-settings/assets/kineticwe.svg',
-  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
+  'kinetic-settings/assets/kineticwe-logo.png',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / '256x256' / 'apps',
 )
 
 if build_tests

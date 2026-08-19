@@ -26,6 +26,11 @@ NoctaliaSettings::NoctaliaSettings(QObject *parent)
                      i18n("Reload Noctalia Config"),
                      {QStringLiteral("msg"), QStringLiteral("config-reload")});
 
+    registerProcessAction(QStringLiteral("NoctaliaRestartShell"),
+                          i18n("Restart Noctalia Shell"),
+                          {QStringLiteral("pkill"), QStringLiteral("-x"), QStringLiteral("noctalia-kwe")},
+                          QKeySequence(Qt::META | Qt::ALT | Qt::Key_R));
+
     registerShortcut(QStringLiteral("NoctaliaToggleSettings"),
                      i18n("Toggle Noctalia Settings"),
                      {QStringLiteral("msg"), QStringLiteral("settings-toggle")});
@@ -129,6 +134,32 @@ void NoctaliaSettings::registerShortcut(const QString &id, const QString &descri
 
     connect(action, &QAction::triggered, this, [args]() {
         QProcess::startDetached(QStringLiteral("noctalia-kwe"), args);
+    });
+
+    m_actions.append(action);
+}
+
+void NoctaliaSettings::registerProcessAction(const QString &id, const QString &description, const QStringList &command, const QKeySequence &defaultShortcut)
+{
+    QAction *action = new QAction(this);
+    action->setProperty("componentName", QStringLiteral("noctalia"));
+    action->setProperty("componentDisplayName", QStringLiteral("Noctalia"));
+    action->setObjectName(id);
+    action->setText(description);
+
+    QList<QKeySequence> shortcuts;
+    if (!defaultShortcut.isEmpty()) {
+        shortcuts.append(defaultShortcut);
+    }
+    KGlobalAccel::setGlobalShortcut(action, shortcuts);
+
+    connect(action, &QAction::triggered, this, [command]() {
+        if (command.isEmpty()) {
+            return;
+        }
+        const QString program = command.first();
+        const QStringList arguments = command.mid(1);
+        QProcess::startDetached(program, arguments);
     });
 
     m_actions.append(action);

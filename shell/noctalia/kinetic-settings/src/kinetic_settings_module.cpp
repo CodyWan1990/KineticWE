@@ -1,5 +1,6 @@
 #include "kinetic_settings_module.h"
 
+#include "kinetic-settings/src/custom_keybinds.h"
 #include "kinetic-settings/src/keybinds_kwe.h"
 #include "kinetic-settings/src/kinetic_settings_window.h"
 
@@ -23,8 +24,12 @@ void KineticSettingsModule::initialize(
     float uiScale
 ) {
   m_bus = &bus;
+  // Custom keybind actions must exist in the daemon before the mirror replay
+  // (importKeybinds) tries to re-apply their chords.
+  m_customKeybinds = std::make_unique<CustomKeybinds>(bus);
+  m_customKeybinds->initialize();
   m_window = std::make_unique<KineticSettingsWindow>();
-  m_window->initialize(wayland, renderContext, bus, uiScale);
+  m_window->initialize(wayland, renderContext, bus, *m_customKeybinds, uiScale);
   bindIpc(ipcService);
   // The compositor is already up by the time the shell (and this module)
   // initializes, so the persisted keybinds mirror can be replayed now. A

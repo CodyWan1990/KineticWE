@@ -745,7 +745,7 @@
       "greeter-sync-timeout": "Greeter sync is still waiting for administrator approval. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
       "greeter-sync-timeout-manual": "Greeter sync still needs administrator approval. Run in a terminal: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\"",
       "keybind-app": "Noctalia",
-      "keybind-conflict-body": "{keybind} is already bound to {action}",
+      "keybind-conflict-body": "{keybind} is already bound to {action} in {component}",
       "keybind-conflict-title": "Keybind conflict",
       "keybind-invalid-modifier": "This shortcut accepts a single key without modifiers.",
       "keybind-invalid-printable": "Printable keys (letters, numbers, symbols) require a modifier such as Ctrl or Alt.",
@@ -1152,6 +1152,17 @@
         "idle-for-one": "Idle for 1 second",
         "idle-for-seconds": "Idle for {seconds} seconds"
       }
+    },
+    "keybinds": {
+      "add": "Add",
+      "add-application": "Add Application…",
+      "add-custom-command": "Add Custom Command…",
+      "app-picker-empty": "No applications found.",
+      "app-picker-placeholder": "Search applications…",
+      "app-picker-title": "Pick an application to bind a shortcut to:",
+      "cancel": "Cancel",
+      "command-form-title": "Enter the shell command to run when the shortcut triggers:",
+      "command-placeholder": "e.g. switch-workspace next"
     },
     "navigation": {
       "groups": {

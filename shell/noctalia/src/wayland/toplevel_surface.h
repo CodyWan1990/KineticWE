@@ -10,6 +10,7 @@ struct wl_array;
 struct wl_output;
 struct xdg_surface;
 struct xdg_toplevel;
+struct zxdg_toplevel_decoration_v1;
 
 struct ToplevelSurfaceConfig {
   std::uint32_t width = 720;
@@ -18,6 +19,7 @@ struct ToplevelSurfaceConfig {
   std::uint32_t minHeight = 0;
   std::string title = "Noctalia";
   const char* appId = "dev.noctalia.Noctalia";
+  bool decorated = false;
 };
 
 class ToplevelSurface : public Surface {
@@ -44,12 +46,16 @@ public:
   static void
   handleToplevelConfigureBounds(void* data, xdg_toplevel* toplevel, std::int32_t width, std::int32_t height);
   static void handleToplevelWmCapabilities(void* data, xdg_toplevel* toplevel, wl_array* capabilities);
+  static void handleToplevelDecorationConfigure(
+      void* data, zxdg_toplevel_decoration_v1* decoration, std::uint32_t mode
+  );
 
 private:
   void destroyRoleObjects();
 
   xdg_surface* m_xdgSurface = nullptr;
   xdg_toplevel* m_toplevel = nullptr;
+  zxdg_toplevel_decoration_v1* m_toplevelDecoration = nullptr;
   std::function<void()> m_closedCallback;
   std::uint32_t m_pendingWidth = 0;
   std::uint32_t m_pendingHeight = 0;
