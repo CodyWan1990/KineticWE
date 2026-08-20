@@ -17,6 +17,14 @@ public:
   // Path to the config file ($XDG_CONFIG_HOME/kineticwe.kwe).
   [[nodiscard]] static std::filesystem::path defaultPath();
 
+  // Overrides the file this reader/writer targets. Default is kineticwe.kwe;
+  // the Appearance page uses this for its own portable appearance.kwe. Must be
+  // called before load()/save().
+  void setPath(std::filesystem::path path) { m_path = std::move(path); }
+
+  // The resolved target path (the override when set, else the default).
+  [[nodiscard]] std::filesystem::path path() const { return m_path.value_or(defaultPath()); }
+
   // Parse the file. Returns false when the file is missing or unreadable
   // (the module then seeds sane defaults on save).
   bool load();
@@ -53,4 +61,6 @@ private:
   // Preserves insertion order (std::map<string,map> — alphabetical is fine
   // and stable for KConfig).
   std::map<std::string, std::map<std::string, std::string>> m_groups;
+  // Optional custom target path (defaultPath() when unset).
+  std::optional<std::filesystem::path> m_path;
 };

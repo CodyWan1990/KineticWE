@@ -80,6 +80,10 @@ export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-g
 export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins:$INSTALL_PREFIX/lib64/plugins"
 export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
 export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-}"
+# Traditional-WM Qt theming (Hyprland/Niri style): tell Qt apps to load the
+# qt5ct platform theme plugin, which reads ~/.config/qt5ct/qt5ct.conf and
+# applies the Noctalia color scheme. qt5ct serves both Qt5 and Qt6 apps.
+export QT_QPA_PLATFORMTHEME=qt5ct
 
 # ---------------------------------------------------------------------------
 # 2. Session / desktop identity (2.0: hard cut to KineticWE)
@@ -138,6 +142,34 @@ if [[ ! -e "$KWE_CONFIG_HOME/kineticwe.kwe" ]]; then
     done
 fi
 
+# Seed the portable Appearance settings (Global Theme) so a fresh install
+# defaults to Breeze Dark. This file is read/written by Kinetic Settings ->
+# Appearance and travels with the rest of ~/.config/kineticwe when copied to a
+# new machine.
+if [[ ! -e "$KWE_CONFIG_HOME/appearance.kwe" ]]; then
+    printf '[Appearance]\nGlobalTheme=BreezeDark\n' > "$KWE_CONFIG_HOME/appearance.kwe"
+fi
+
+# Seed minimal qt5ct/qt6ct configs pointing at the Noctalia color scheme, so Qt
+# apps (which load these via QT_QPA_PLATFORMTHEME=qt5ct) are themed out of the
+# box. Only created when absent so a user's existing config (fonts, interface
+# tweaks) is never clobbered. The color scheme files themselves are regenerated
+# by Kinetic Settings -> Appearance on Apply.
+for _qttool in qt5ct qt6ct; do
+    _qtconf="${HOME}/.config/${_qttool}/${_qttool}.conf"
+    if [[ ! -e "$_qtconf" ]]; then
+        mkdir -p "$(dirname "$_qtconf")"
+        cat > "$_qtconf" << EOF
+[Appearance]
+color_scheme_path=${HOME}/.config/${_qttool}/colors/noctalia.conf
+custom_palette=true
+icon_theme=Papirus
+standard_dialogs=gtk3
+style=Breeze
+EOF
+    fi
+done
+
 # ---------------------------------------------------------------------------
 # 4c. One-time migration: earlier 2.0 builds resolved KWIN_CONFIG against the
 #     unredirected ~/.config, leaving compositor runtime state in FLAT
@@ -187,7 +219,7 @@ done
 #     custom-action registration step in CustomKeybinds::initialize() finds
 #     no definitions to register. Keep both files in lockstep.
 # ---------------------------------------------------------------------------
-_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe custom-keybinds.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
+_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe custom-keybinds.kwe appearance.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
 for _entry in "$KWE_CONFIG_HOME"/* "$KWE_CONFIG_HOME"/.[!.]*; do
     [[ -e "$_entry" ]] || continue
     _name="${_entry##*/}"

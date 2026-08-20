@@ -974,6 +974,34 @@ void CompositorPlatform::closeToplevelInfo(const ToplevelInfo& window) {
   }
 }
 
+void CompositorPlatform::minimizeToplevel(zwlr_foreign_toplevel_handle_v1* handle) {
+  m_wayland.minimizeToplevel(handle);
+}
+
+void CompositorPlatform::minimizeToplevelInfo(const ToplevelInfo& window) {
+  if (window.handle != nullptr) {
+    minimizeToplevel(window.handle);
+    return;
+  }
+  if (compositors::isKde() && m_kwinActiveWindow != nullptr && m_kwinActiveWindow->isAvailable()) {
+    m_kwinActiveWindow->minimizeWindow(window.title, window.appId, window.identifier);
+  }
+}
+
+void CompositorPlatform::restoreToplevel(zwlr_foreign_toplevel_handle_v1* handle) {
+  m_wayland.restoreToplevel(handle);
+}
+
+void CompositorPlatform::restoreToplevelInfo(const ToplevelInfo& window) {
+  if (window.handle != nullptr) {
+    restoreToplevel(window.handle);
+    return;
+  }
+  // Restoring a minimized window is equivalent to activating it; activating a
+  // minimized window un-minimizes and focuses it.
+  activateToplevelInfo(window);
+}
+
 bool CompositorPlatform::containsWlrToplevelHandle(zwlr_foreign_toplevel_handle_v1* handle) const {
   return m_wayland.containsWlrToplevelHandle(handle);
 }

@@ -42,6 +42,7 @@ namespace compositors::kde {
     [[nodiscard]] std::optional<std::string> focusedOutputName() const;
     void activateWindow(const std::string& title, const std::string& appId, const std::string& uuid = {});
     void closeWindow(const std::string& title, const std::string& appId, const std::string& uuid = {});
+    void minimizeWindow(const std::string& title, const std::string& appId, const std::string& uuid = {});
     [[nodiscard]] bool isAvailable() const noexcept { return m_scriptInstalled; }
 
   private:
@@ -51,6 +52,7 @@ namespace compositors::kde {
       std::string title;
       std::string outputName;
       std::vector<std::string> desktopIds;
+      bool minimized = false;
     };
 
     [[nodiscard]] bool ensureScriptFile(std::string& scriptPath) const;

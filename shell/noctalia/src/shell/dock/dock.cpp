@@ -1157,21 +1157,40 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
     return;
   }
 
+  const auto active = m_platform->activeToplevel();
+  const auto focusedCompositorWindowId = m_platform->focusedCompositorWindowId();
+  const std::string_view focusedCompositorWindowIdView =
+      focusedCompositorWindowId.has_value() ? std::string_view(*focusedCompositorWindowId) : std::string_view{};
+
+  // If any window of this app is minimized, restore the newest one.
+  for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
+    if (it->minimized) {
+      m_platform->restoreToplevelInfo(*it);
+      return;
+    }
+  }
+
+  // If the active window belongs to this app, minimize it (click-to-minimize toggle).
+  if (active.has_value()) {
+    for (const auto& w : windows) {
+      if (matchesActiveWindow(w, *active, focusedCompositorWindowIdView, windows)) {
+        m_platform->minimizeToplevelInfo(w);
+        return;
+      }
+    }
+  }
+
   if (windows.size() == 1) {
     m_platform->activateToplevelInfo(windows[0]);
     return;
   }
 
-  const auto active = m_platform->activeToplevel();
   std::string preferredIdentifier;
   if (const auto it = m_lastActiveIdentifierByAppIdLower.find(action.idLower);
       it != m_lastActiveIdentifierByAppIdLower.end()) {
     preferredIdentifier = it->second;
   }
 
-  const auto focusedCompositorWindowId = m_platform->focusedCompositorWindowId();
-  const std::string_view focusedCompositorWindowIdView =
-      focusedCompositorWindowId.has_value() ? std::string_view(*focusedCompositorWindowId) : std::string_view{};
   if (const ToplevelInfo* nextWindow =
           nextActivatableWindow(windows, active, focusedCompositorWindowIdView, preferredIdentifier);
       nextWindow != nullptr) {

@@ -16,11 +16,14 @@
 #include "main.h"
 #include "utils/common.h"
 // KDE
+#include <KGlobalAccel>
 #if KWIN_BUILD_GLOBALSHORTCUTS
 #include <kglobalacceld.h>
 #endif
 // Qt
 #include <QAction>
+#include <QKeySequence>
+#include <QStringList>
 // system
 #include <signal.h>
 #include <variant>
@@ -98,6 +101,45 @@ void GlobalShortcutsManager::init()
     if (!m_kglobalAccel->init()) {
         qCDebug(KWIN_CORE) << "Init of kglobalaccel failed";
         m_kglobalAccel.reset();
+        return;
+    }
+    clearSpectacleDefaults();
+#endif
+}
+
+void GlobalShortcutsManager::clearSpectacleDefaults()
+{
+#if KWIN_BUILD_GLOBALSHORTCUTS
+    if (!m_kglobalAccel) {
+        return;
+    }
+    // The action ids come from /usr/share/kglobalaccel/org.kde.spectacle.desktop
+    // ([Desktop Action ...] headers), NOT from the localized Name= strings.
+    // Marking each NoAutoloading with empty chords makes the daemon persist an
+    // empty bind (instead of autoloading the X-KDE-Shortcuts defaults) and is
+    // idempotent across restarts: re-applying an empty bind is a no-op. We do
+    // NOT call removeAllShortcuts() afterwards — unlike KWin's own actions
+    // (which re-register on every startup), Spectacle registers on demand, so
+    // removing the entry would let the daemon autoload the .desktop defaults
+    // the next time the component shows up.
+    const QStringList actions{
+        QStringLiteral("_launch"),
+        QStringLiteral("FullScreenScreenShot"),
+        QStringLiteral("CurrentMonitorScreenShot"),
+        QStringLiteral("ActiveWindowScreenShot"),
+        QStringLiteral("RectangularRegionScreenShot"),
+        QStringLiteral("WindowUnderCursorScreenShot"),
+        QStringLiteral("OpenWithoutScreenshot"),
+        QStringLiteral("RecordRegion"),
+        QStringLiteral("RecordScreen"),
+        QStringLiteral("RecordWindow"),
+    };
+    for (const QString &actionName : actions) {
+        QAction action;
+        action.setObjectName(actionName);
+        action.setProperty("componentName", QStringLiteral("org.kde.spectacle.desktop"));
+        action.setProperty("componentDisplayName", QStringLiteral("Spectacle"));
+        KGlobalAccel::self()->setShortcut(&action, {QKeySequence()}, KGlobalAccel::NoAutoloading);
     }
 #endif
 }

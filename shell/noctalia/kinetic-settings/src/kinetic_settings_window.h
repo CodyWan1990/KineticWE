@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kinetic-settings/src/appearance_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
 #include "kinetic-settings/src/tiling_page.h"
 #include "kinetic-settings/src/workspaces_page.h"
@@ -58,6 +59,10 @@ public:
 private:
   // Sidebar/secondary nav pages, grouped under the collapsible categories.
   enum class ActivePage {
+    // Appearance category (alphabetically first).
+    AppearanceGlobalTheme,
+    AppearanceIcons,
+    AppearanceCursors,
     Workspaces,
     Tiling,
     Keybinds,
@@ -78,6 +83,8 @@ private:
 
   [[nodiscard]] std::unique_ptr<Flex> buildFilterRow(float scale);
   [[nodiscard]] std::unique_ptr<Node> buildSidebar(float scale);
+  // Placeholder content for not-yet-implemented sub-pages (Icons, Cursors).
+  [[nodiscard]] std::unique_ptr<Node> buildComingSoon(std::string_view title, std::string_view message);
   // Filters/callbacks handed to whichever page is currently active. All pages
   // expose the same Filter/Callbacks shape, so these centralize the wiring.
   [[nodiscard]] TilingPage::Filter pageFilter() const;
@@ -86,6 +93,8 @@ private:
   [[nodiscard]] WorkspacesPage::Callbacks workspacesPageCallbacks();
   [[nodiscard]] KeybindsPage::Filter keybindsFilter() const;
   [[nodiscard]] KeybindsPage::Callbacks keybindsPageCallbacks();
+  [[nodiscard]] AppearancePage::Filter appearanceFilter() const;
+  [[nodiscard]] AppearancePage::Callbacks appearancePageCallbacks();
   void confirmResetPage();
   // Routes the filter row's Apply/Reset Page to the active page.
   void applyActivePage();
@@ -106,6 +115,7 @@ private:
   std::unique_ptr<TilingPage> m_tilingPage;
   std::unique_ptr<WorkspacesPage> m_workspacesPage;
   std::unique_ptr<KeybindsPage> m_keybindsPage;
+  std::unique_ptr<AppearancePage> m_appearancePage;
   std::unique_ptr<SelectDropdownPopup> m_selectPopup;
   wl_output* m_output = nullptr;
   Box* m_background = nullptr;
@@ -116,6 +126,7 @@ private:
   ActivePage m_activePage = ActivePage::Workspaces;
   bool m_windowManagementExpanded = true;
   bool m_inputOutputExpanded = true;
+  bool m_appearanceExpanded = true;
 
   ScrollViewState m_sidebarScrollState;
   ScrollViewState m_contentScrollState;

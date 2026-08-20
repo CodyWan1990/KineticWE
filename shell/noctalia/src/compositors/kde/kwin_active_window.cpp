@@ -162,6 +162,7 @@ function serializeWindow(window) {
     window.caption || "",
     desktopIdsFor(window),
     outputNameFor(window),
+    window.minimized ? "1" : "0",
   ].join(FIELD_SEP);
 }
 
@@ -201,6 +202,9 @@ function wireWindow(window) {
   }
   if (typeof window.outputChanged !== "undefined") {
     window.outputChanged.connect(updateTracked);
+  }
+  if (typeof window.minimizedChanged !== "undefined") {
+    window.minimizedChanged.connect(updateTracked);
   }
 }
 
@@ -376,6 +380,7 @@ namespace compositors::kde {
               .order = order++,
               .handle = nullptr,
               .extHandle = nullptr,
+              .minimized = window.minimized,
           }
       );
     }
@@ -526,6 +531,39 @@ for (const window of workspace.windowList()) {{
     const std::string label = std::format("noctalia-close-{}", ++m_transientScriptSerial);
     if (!runTransientScript(script, label)) {
       kLog.warn(R"(failed to close kde window class="{}" title="{}")", appId, title);
+    }
+  }
+
+  void KwinActiveWindow::minimizeWindow(const std::string& title, const std::string& appId, const std::string& uuid) {
+    if (!m_scriptInstalled) {
+      return;
+    }
+
+    const std::string script = std::format(
+        R"js(
+const targetUuid = {};
+const targetClass = {};
+const targetCaption = {};
+for (const window of workspace.windowList()) {{
+  if (!window || !window.normalWindow) {{
+    continue;
+  }}
+  const uuid = window.internalId === undefined ? "" : String(window.internalId);
+  const byUuid = targetUuid && uuid === targetUuid;
+  const byClassAndCaption = window.resourceClass === targetClass && window.caption === targetCaption;
+  if (!byUuid && !byClassAndCaption) {{
+    continue;
+  }}
+  window.minimized = true;
+  break;
+}}
+)js",
+        jsStringLiteral(uuid), jsStringLiteral(appId), jsStringLiteral(title)
+    );
+
+    const std::string label = std::format("noctalia-minimize-{}", ++m_transientScriptSerial);
+    if (!runTransientScript(script, label)) {
+      kLog.warn(R"(failed to minimize kde window class="{}" title="{}")", appId, title);
     }
   }
 
@@ -720,6 +758,7 @@ for (const window of workspace.windowList()) {{
           .title = StringUtils::windowTitleSingleLine(fields[2]),
           .outputName = fields.size() >= 5 ? fields[4] : std::string{},
           .desktopIds = {},
+          .minimized = fields.size() >= 6 && fields[5] == "1",
       };
       if (fields.size() >= 4 && !fields[3].empty() && fields[3] != "*") {
         window.desktopIds = splitString(fields[3], ',');
@@ -744,7 +783,8 @@ for (const window of workspace.windowList()) {{
             || lhs.appId != rhs.appId
             || lhs.title != rhs.title
             || lhs.outputName != rhs.outputName
-            || lhs.desktopIds != rhs.desktopIds) {
+            || lhs.desktopIds != rhs.desktopIds
+            || lhs.minimized != rhs.minimized) {
           return true;
         }
       }

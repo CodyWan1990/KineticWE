@@ -55,7 +55,7 @@ std::filesystem::path KineticweKwe::defaultPath() {
 
 bool KineticweKwe::load() {
   m_groups.clear();
-  std::ifstream in(defaultPath());
+  std::ifstream in(path());
   if (!in.is_open()) {
     return false;
   }
@@ -218,13 +218,13 @@ std::vector<std::string> KineticweKwe::groupNames() const {
 }
 
 bool KineticweKwe::save() const {
-  const auto path = defaultPath();
+  const auto target = path();
   std::error_code error;
-  std::filesystem::create_directories(path.parent_path(), error);
+  std::filesystem::create_directories(target.parent_path(), error);
   if (error) {
     return false;
   }
-  const auto tmpPath = path;
+  const auto tmpPath = target;
   std::string tmpName = tmpPath.string() + ".tmp";
   {
     std::ofstream out(tmpName);
@@ -242,6 +242,6 @@ bool KineticweKwe::save() const {
       out << '\n';
     }
   }
-  std::filesystem::rename(tmpName, path, error);
+  std::filesystem::rename(tmpName, target, error);
   return !error;
 }

@@ -117,6 +117,15 @@ public:
 private:
     void objectDeleted(QObject *object);
     bool add(GlobalShortcut sc, DeviceType device = DeviceType::Touchpad);
+    // Spectacle ships its default global shortcuts in
+    // /usr/share/kglobalaccel/org.kde.spectacle.desktop (RecordRegion,
+    // RecordScreen, RecordWindow, ...). The embedded kglobalaccel daemon
+    // autoloads those into a session unless each action is marked
+    // NoAutoloading. KineticWE ships those binds empty by default, so we mark
+    // the whole component NoAutoloading here — before Spectacle has a chance
+    // to register — and the empty state persists in kglobalaccelrc. Users can
+    // still rebind any Spectacle action later via Kinetic Settings.
+    void clearSpectacleDefaults();
 
     QList<GlobalShortcut> m_shortcuts;
 

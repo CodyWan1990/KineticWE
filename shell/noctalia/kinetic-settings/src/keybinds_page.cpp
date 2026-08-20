@@ -301,9 +301,11 @@ void KeybindsPage::stage(const std::string& component, const std::string& action
   // Editing back to what the daemon has un-stages (the row stops being dirty).
   if (const auto* daemonAction = findAction(component, action); daemonAction != nullptr
       && chords == daemonAction->active) {
+    kLog.warn("keybinds stage UNSTAGED {}.{} (matches daemon active)", component, action);
     m_pending.erase(path);
   } else {
     m_pending[path] = std::move(chords);
+    kLog.warn("keybinds stage STAGED {}.{} (pending={})", component, action, m_pending.size());
   }
 }
 
@@ -458,6 +460,7 @@ void KeybindsPage::commitChord(
     if (ownerComponent == component && ownerAction == action) {
       continue;
     }
+    kLog.warn("keybinds commit conflict {}.{} <- {} owned by {}.{}", component, action, KeybindCodec::toChordString(*canonical), ownerComponent, ownerAction);
     // Conflict: hold the edit until the user decides whether to replace the
     // current owner. The row renders a Replace/Cancel prompt while armed.
     m_pendingRebind = PendingRebind{
@@ -474,6 +477,7 @@ void KeybindsPage::commitChord(
     }
     return;
   }
+  kLog.warn("keybinds commit staged {}.{} -> [{}]", component, action, KeybindCodec::toChordString(*canonical));
   stageAndRebuild(component, action, std::move(chords), callbacks);
 }
 

@@ -10,6 +10,7 @@
 #include "ui/controls/box.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
+#include "ui/controls/glyph.h"
 #include "ui/controls/input.h"
 #include "ui/controls/label.h"
 #include "ui/controls/select_dropdown_popup.h"
@@ -151,9 +152,13 @@ void KineticSettingsWindow::open() {
   if (m_keybindsPage == nullptr) {
     m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus, *m_customKeybinds);
   }
+  if (m_appearancePage == nullptr) {
+    m_appearancePage = std::make_unique<AppearancePage>();
+  }
   m_tilingPage->reloadFromDisk();
   m_workspacesPage->reloadFromDisk();
   m_keybindsPage->reloadFromDisk();
+  m_appearancePage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
   m_surface->requestLayout();
@@ -362,6 +367,35 @@ KeybindsPage::Callbacks KineticSettingsWindow::keybindsPageCallbacks() {
   };
 }
 
+AppearancePage::Filter KineticSettingsWindow::appearanceFilter() const {
+  return AppearancePage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+AppearancePage::Callbacks KineticSettingsWindow::appearancePageCallbacks() {
+  return AppearancePage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_appearancePage != nullptr) {
+              m_appearancePage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 void KineticSettingsWindow::confirmResetPage() {
   clearArmedResets();
   resetActivePage();
@@ -372,6 +406,12 @@ void KineticSettingsWindow::confirmResetPage() {
 void KineticSettingsWindow::applyActivePage() {
   bool applied = false;
   switch (m_activePage) {
+  case ActivePage::AppearanceGlobalTheme:
+    applied = m_appearancePage != nullptr && m_appearancePage->applyAll();
+    break;
+  case ActivePage::AppearanceIcons:
+  case ActivePage::AppearanceCursors:
+    break;
   case ActivePage::Tiling:
     applied = m_tilingPage != nullptr && m_tilingPage->applyAll();
     break;
@@ -390,6 +430,14 @@ void KineticSettingsWindow::applyActivePage() {
 
 void KineticSettingsWindow::resetActivePage() {
   switch (m_activePage) {
+  case ActivePage::AppearanceGlobalTheme:
+    if (m_appearancePage != nullptr) {
+      m_appearancePage->resetAll();
+    }
+    break;
+  case ActivePage::AppearanceIcons:
+  case ActivePage::AppearanceCursors:
+    break;
   case ActivePage::Tiling:
     if (m_tilingPage != nullptr) {
       m_tilingPage->resetAll();
@@ -410,6 +458,11 @@ void KineticSettingsWindow::resetActivePage() {
 
 bool KineticSettingsWindow::activeHasPending() const {
   switch (m_activePage) {
+  case ActivePage::AppearanceGlobalTheme:
+    return m_appearancePage != nullptr && m_appearancePage->hasPending();
+  case ActivePage::AppearanceIcons:
+  case ActivePage::AppearanceCursors:
+    return false;
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && m_tilingPage->hasPending();
   case ActivePage::Workspaces:
@@ -422,6 +475,11 @@ bool KineticSettingsWindow::activeHasPending() const {
 
 bool KineticSettingsWindow::activeHasResettableSettings() const {
   switch (m_activePage) {
+  case ActivePage::AppearanceGlobalTheme:
+    return m_appearancePage != nullptr && !m_appearancePage->resettableKeyPaths().empty();
+  case ActivePage::AppearanceIcons:
+  case ActivePage::AppearanceCursors:
+    return false;
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && !m_tilingPage->resettableKeyPaths().empty();
   case ActivePage::Workspaces:
@@ -611,14 +669,17 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     }));
   };
 
-  addCategory("Window Management", m_windowManagementExpanded, [this]() {
-    m_windowManagementExpanded = !m_windowManagementExpanded;
+  // Categories are listed alphabetically: Appearance, Input & Output, then
+  // Window Management.
+  addCategory("Appearance", m_appearanceExpanded, [this]() {
+    m_appearanceExpanded = !m_appearanceExpanded;
     clearArmedResets();
     requestSceneRebuild();
   });
-  if (m_windowManagementExpanded) {
-    addSubNav(ActivePage::Workspaces, "device-desktop", "Workspaces");
-    addSubNav(ActivePage::Tiling, "layout-grid", "Tiling");
+  if (m_appearanceExpanded) {
+    addSubNav(ActivePage::AppearanceGlobalTheme, "palette", "Global Theme");
+    addSubNav(ActivePage::AppearanceIcons, "apps", "Icons");
+    addSubNav(ActivePage::AppearanceCursors, "mouse-2", "Cursors");
   }
 
   addCategory("Input & Output", m_inputOutputExpanded, [this]() {
@@ -630,7 +691,49 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     addSubNav(ActivePage::Keybinds, "keyboard", "Keybinds");
   }
 
+  addCategory("Window Management", m_windowManagementExpanded, [this]() {
+    m_windowManagementExpanded = !m_windowManagementExpanded;
+    clearArmedResets();
+    requestSceneRebuild();
+  });
+  if (m_windowManagementExpanded) {
+    addSubNav(ActivePage::Workspaces, "device-desktop", "Workspaces");
+    addSubNav(ActivePage::Tiling, "layout-grid", "Tiling");
+  }
+
   return sidebarScroll;
+}
+
+std::unique_ptr<Node>
+KineticSettingsWindow::buildComingSoon(std::string_view title, std::string_view message) {
+  const float scale = uiScale();
+  auto root = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .padding = Style::spaceLg * scale,
+      .fill = clearColorSpec(),
+      .fillWidth = true,
+  });
+  root->addChild(ui::row(
+      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
+      ui::glyph({
+          .glyph = "palette",
+          .glyphSize = Style::fontSizeHeader * scale,
+          .color = colorSpecFromRole(ColorRole::Primary),
+      }),
+      ui::label({
+          .text = std::string(title),
+          .fontSize = Style::fontSizeHeader * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::Primary),
+      })
+  ));
+  root->addChild(ui::label({
+      .text = std::string(message),
+      .fontSize = Style::fontSizeBody * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+  }));
+  return root;
 }
 
 void KineticSettingsWindow::rebuildContent() {
@@ -639,6 +742,21 @@ void KineticSettingsWindow::rebuildContent() {
   }
   removeAllChildren(*m_pageContainer);
   switch (m_activePage) {
+  case ActivePage::AppearanceGlobalTheme:
+    if (m_appearancePage != nullptr) {
+      m_pageContainer->addChild(
+          m_appearancePage->build(uiScale(), appearanceFilter(), m_armedResetKeyPath, appearancePageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::AppearanceIcons:
+  case ActivePage::AppearanceCursors:
+    // Placeholders — not yet implemented.
+    m_pageContainer->addChild(buildComingSoon(
+        m_activePage == ActivePage::AppearanceIcons ? "Icons" : "Cursors",
+        "This section is not implemented yet and will appear in a future update."
+    ));
+    break;
   case ActivePage::Tiling:
     if (m_tilingPage != nullptr) {
       // The compositor's D-Bus only exposes the active output, so the full
