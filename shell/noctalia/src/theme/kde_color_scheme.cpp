@@ -197,20 +197,20 @@ namespace noctalia::theme {
 
     std::filesystem::path kdeGlobalsPath() { return FileUtils::expandXdgBaseDir("$XDG_CONFIG_HOME/kdeglobals"); }
 
-    std::string notifyKdeColorSchemeChanged() {
-      try {
-        auto connection = sdbus::createSessionBusConnection();
-        auto object = sdbus::createObject(*connection, sdbus::ObjectPath{kKdeGlobalsSignalPath});
-        object->emitSignal(kKdeGlobalsSignalName)
-            .onInterface(kKdeGlobalsSignalInterface)
-            .withArguments(std::int32_t{0}, std::int32_t{0});
-      } catch (const sdbus::Error& error) {
-        return error.what();
-      }
-      return {};
-    }
-
   } // namespace
+
+  std::string notifyKdeColorSchemeChanged() {
+    try {
+      auto connection = sdbus::createSessionBusConnection();
+      auto object = sdbus::createObject(*connection, sdbus::ObjectPath{kKdeGlobalsSignalPath});
+      object->emitSignal(kKdeGlobalsSignalName)
+          .onInterface(kKdeGlobalsSignalInterface)
+          .withArguments(std::int32_t{0}, std::int32_t{0});
+    } catch (const sdbus::Error& error) {
+      return error.what();
+    }
+    return {};
+  }
 
   bool mergeKdeColorScheme(
       const std::filesystem::path& schemePath, const std::filesystem::path& kdeGlobalsPath, std::string* error

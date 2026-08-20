@@ -70,6 +70,7 @@ public:
     m_loaded = false;
     m_pending.clear();
     m_pendingRebind.reset();
+    m_errorNotice.clear();
   }
 
   // True while any chord recorder on the page is capturing input; the window
@@ -172,4 +173,9 @@ private:
   enum class AddMode { None, Apps, Command };
   bool m_addMenuOpen = false;
   AddMode m_addMode = AddMode::None;
+
+  // Human-readable message shown above the component list when the last Apply
+  // failed (e.g. the daemon rejected a staged chord). Cleared on the next
+  // successful Apply or when the page is reloaded.
+  std::string m_errorNotice;
 };

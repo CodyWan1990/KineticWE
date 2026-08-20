@@ -425,6 +425,12 @@ void KineticSettingsWindow::applyActivePage() {
   if (applied) {
     clearArmedResets();
     requestSceneRebuild();
+  } else {
+    // Pages surface apply failures through an on-page error notice (e.g. the
+    // keybinds page when the daemon rejects a chord). Rebuild so that notice
+    // is visible instead of leaving the user staring at an unresponsive Apply
+    // button.
+    requestSceneRebuild();
   }
 }
 

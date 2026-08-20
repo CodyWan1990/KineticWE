@@ -34,22 +34,24 @@ namespace {
   // Per-window shortcuts (Window Close, Move, ...) are per-instance, not
   // rebindable globals; hide them like the KDE Shortcuts KCM.
   constexpr std::string_view kSessionActionPrefix = "_k_session:";
-  // Components whose binds stay active but are not shown in the page
-  // (the user's own apps; their binds persist in the daemon's config).
+  // Components whose binds stay active but are not shown in the page. Only
+  // components that have no meaning outside a Plasma session are hidden:
+  // "ActivityManager" is the KGlobalAccel component registered by the upstream
+  // plasma-desktop activity KCM (friendly name "Activity Manager"). The
+  // compositor plans to drop activity support entirely (docs/kineticwe-2.0.md,
+  // Phase 6) and kactivitymanagerd is already blocked from autostarting, so its
+  // keybinds have no backing service and are not surfaced here. "plasmashell"
+  // is the Plasma shell itself, likewise meaningless on KineticWE.
+  //
+  // Regular apps (Konsole, Dolphin, ...) are NOT hidden: their binds live in
+  // the daemon's config and can silently hold a chord the user wants (e.g. a
+  // stale Ctrl+Alt+T left by a previous Plasma install). Surfacing them lets
+  // the user see and clear/rebind them instead of being surprised by an
+  // invisible conflict.
   const std::vector<std::string>& hiddenComponents() {
-    // uniqueName is the id the component registered with (dot-form for
-    // desktop-file components); the daemon's dbusPath() form uses '_'.
-    // "ActivityManager" is the KGlobalAccel component registered by the
-    // upstream plasma-desktop activity KCM (friendly name "Activity
-    // Manager"). The compositor plans to drop activity support entirely
-    // (docs/kineticwe-2.0.md, Phase 6) and kactivitymanagerd is already
-    // blocked from autostarting, so its keybinds have no backing service
-    // and are not surfaced here.
     static const std::vector<std::string> kHidden{
         "ActivityManager",
         "plasmashell",
-        "org.kde.dolphin.desktop",
-        "org.kde.konsole.desktop",
     };
     return kHidden;
   }
@@ -222,16 +224,25 @@ KeybindsPage::KeybindsPage(SessionBus& bus, CustomKeybinds& customKeybinds)
     : m_bus(bus), m_customKeybinds(customKeybinds), m_dbus(bus) {}
 
 std::string KeybindsPage::keyPath(std::string_view component, std::string_view action) {
-  return std::string(component) + '.' + std::string(action);
+  // Separator between the component and action halves of the pending-key path.
+  // It must never appear in a component or action name: both can contain dots
+  // (service components end in ".desktop"; custom-app actions are desktop-file
+  // ids like "org.kde.dolphin"), so a dot separator (used in an earlier rev)
+  // silently corrupted the round-trip and made every ".desktop" component —
+  // including Spectacle — fail to apply. The ASCII unit separator is never
+  // produced by any component/action name.
+  static constexpr char kSep = '\x1d';
+  return std::string(component) + kSep + std::string(action);
 }
 
 bool KeybindsPage::splitKeyPath(std::string_view keyPath, std::string& component, std::string& action) {
-  const auto dot = keyPath.find('.');
-  if (dot == std::string_view::npos || dot == 0 || dot + 1 >= keyPath.size()) {
+  static constexpr char kSep = '\x1d';
+  const auto sep = keyPath.find(kSep);
+  if (sep == std::string_view::npos || sep == 0 || sep + 1 >= keyPath.size()) {
     return false;
   }
-  component = keyPath.substr(0, dot);
-  action = keyPath.substr(dot + 1);
+  component = keyPath.substr(0, sep);
+  action = keyPath.substr(sep + 1);
   return true;
 }
 
@@ -348,6 +359,7 @@ void KeybindsPage::resetAll() {
 bool KeybindsPage::applyAll() {
   ensureLoaded();
   if (m_pending.empty()) {
+    m_errorNotice.clear();
     return true;
   }
   for (const auto& [path, chords] : m_pending) {
@@ -374,10 +386,17 @@ bool KeybindsPage::applyAll() {
     }
     if (!m_dbus.setActionShortcuts(component, action, actionFriendlyName, componentFriendlyName, chords)) {
       kLog.warn("keybinds apply failed for {}.{}; staged edits kept", component, action);
+      // Keep the staged edits for retry, but tell the user why Apply appeared
+      // to do nothing instead of leaving the button silently dead.
+      m_errorNotice = "Could not bind " + component + "." + action
+          + ". The daemon may have rejected the chord (e.g. it conflicts with "
+          + "another shortcut that cannot be shown). Your changes were kept; "
+          + "try again after clearing the conflicting bind.";
       return false;
     }
   }
   m_pending.clear();
+  m_errorNotice.clear();
 
   // Re-read the daemon (the source of truth) and rewrite the mirror with the
   // binds that actually differ from the defaults. The daemon persists its own
@@ -974,6 +993,18 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
           },
   }));
   root->addChild(std::move(header));
+
+  if (!m_errorNotice.empty()) {
+    root->addChild(ui::row(
+        {.align = FlexAlign::Center,
+         .gap = Style::spaceSm * scale,
+         .paddingV = Style::spaceXs * scale,
+         .paddingH = Style::spaceMd * scale,
+         .fill = colorSpecFromRole(ColorRole::Error, 0.15F),
+         .radius = Style::scaledRadiusMd(scale)},
+        makeLabel(m_errorNotice, Style::fontSizeCaption * scale, colorSpecFromRole(ColorRole::Error))
+    ));
+  }
 
   if (m_addMenuOpen) {
     root->addChild(buildAddMenu(scale, callbacks));

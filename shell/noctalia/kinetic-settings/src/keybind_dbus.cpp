@@ -151,8 +151,23 @@ bool KeybindDbus::setActionShortcuts(
     // compare the returned set with what we asked for.
     const auto accepted = decodeKeys(result);
     if (!sameChords(accepted, chords)) {
+      std::string requested;
+      for (const auto& c : chords) {
+        if (!requested.empty()) {
+          requested += ", ";
+        }
+        requested += KeybindCodec::toChordString(c);
+      }
+      std::string got;
+      for (const auto& c : accepted) {
+        if (!got.empty()) {
+          got += ", ";
+        }
+        got += KeybindCodec::toChordString(c);
+      }
       kLog.warn(
-          "kglobalaccel accepted {}/{} chords for {}.{}", accepted.size(), chords.size(), component, action
+          "kglobalaccel accepted {}/{} chords for {}.{}: requested [{}], got [{}]", accepted.size(), chords.size(),
+          component, action, requested, got
       );
       return false;
     }

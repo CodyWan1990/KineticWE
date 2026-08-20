@@ -1,6 +1,7 @@
 #include "appearance_page.h"
 
 #include "core/log.h"
+#include "core/process/process.h"
 #include "i18n/i18n.h"
 #include "theme/color.h"
 #include "theme/fixed_palette.h"
@@ -611,6 +612,22 @@ bool AppearancePage::applyTheme(std::string_view theme, std::string* error) {
     }
     return false;
   }
+
+  // 4. Notify Qt/KDE apps (including qt5ct) to reload their palette live.
+  if (const std::string notifyError = noctalia::theme::notifyKdeColorSchemeChanged(); !notifyError.empty()) {
+    kLog.warn("kinetic-settings: failed to notify Qt apps of theme change: {}", notifyError);
+  }
+
+  // 5. Notify GTK apps to switch light/dark live (gsettings/dconf — the same
+  // mechanism the shell's theme service uses), so GTK apps don't need a
+  // restart either.
+  const std::string gtkPref = dark ? "prefer-dark" : "prefer-light";
+  if (process::commandExists("gsettings")) {
+    (void)process::runAsync("gsettings set org.gnome.desktop.interface color-scheme \"" + gtkPref + "\"");
+  } else if (process::commandExists("dconf")) {
+    (void)process::runAsync("dconf write /org/gnome/desktop/interface/color-scheme \"'" + gtkPref + "'\"");
+  }
+
   return true;
 }
 
