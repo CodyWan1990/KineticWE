@@ -21,6 +21,7 @@ struct DesktopEntry {
   std::string icon;
   std::string categories;
   std::string keywords;
+  std::string mimeTypes; // semicolon-separated MIME types this app can handle
   std::string startupWmClass;
   std::string workingDir;
   bool noDisplay = false;

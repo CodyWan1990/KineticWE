@@ -29,8 +29,8 @@ class Node;
 // in-memory pending map and nothing touches disk until the window's Apply
 // button calls applyAll(), which saves appearance.kwe and regenerates
 // kdeglobals in one go. On failure the staged edits are kept so Apply can be
-// retried. The Icons and Cursors subcategories are placeholders (hidden until
-// implemented) and are rendered by the owning window, not this page.
+// retried. The Icons and Cursors subcategories live in their own pages
+// (IconsPage/CursorsPage) rendered by the owning window, not this page.
 class AppearancePage {
 public:
   using Value = std::variant<bool, int, double, std::string, std::vector<std::string>>;

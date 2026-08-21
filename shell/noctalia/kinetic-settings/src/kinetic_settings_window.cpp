@@ -155,10 +155,22 @@ void KineticSettingsWindow::open() {
   if (m_appearancePage == nullptr) {
     m_appearancePage = std::make_unique<AppearancePage>();
   }
+  if (m_iconsPage == nullptr) {
+    m_iconsPage = std::make_unique<IconsPage>();
+  }
+  if (m_cursorsPage == nullptr) {
+    m_cursorsPage = std::make_unique<CursorsPage>();
+  }
+  if (m_defaultAppsPage == nullptr) {
+    m_defaultAppsPage = std::make_unique<DefaultAppsPage>();
+  }
   m_tilingPage->reloadFromDisk();
   m_workspacesPage->reloadFromDisk();
   m_keybindsPage->reloadFromDisk();
   m_appearancePage->reloadFromDisk();
+  m_iconsPage->reloadFromDisk();
+  m_cursorsPage->reloadFromDisk();
+  m_defaultAppsPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
   m_surface->requestLayout();
@@ -237,7 +249,7 @@ void KineticSettingsWindow::prepareFrame(bool /*needsUpdate*/, bool needsLayout)
   } else if (m_contentRebuildRequested && m_sceneRoot != nullptr) {
     // Content-only rebuild (page inside the scroll view). The filter row —
     // including the search input and its focus — survives.
-    rebuildContent();
+    rebuildContent(renderer);
     m_contentRebuildRequested = false;
     m_sceneRoot->setSize(floatWidth, floatHeight);
     resizeSceneChrome(floatWidth, floatHeight);
@@ -396,6 +408,93 @@ AppearancePage::Callbacks KineticSettingsWindow::appearancePageCallbacks() {
   };
 }
 
+IconsPage::Filter KineticSettingsWindow::iconsFilter() const {
+  return IconsPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+IconsPage::Callbacks KineticSettingsWindow::iconsPageCallbacks() {
+  return IconsPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_iconsPage != nullptr) {
+              m_iconsPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
+CursorsPage::Filter KineticSettingsWindow::cursorsFilter() const {
+  return CursorsPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+CursorsPage::Callbacks KineticSettingsWindow::cursorsPageCallbacks() {
+  return CursorsPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_cursorsPage != nullptr) {
+              m_cursorsPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
+DefaultAppsPage::Filter KineticSettingsWindow::defaultAppsFilter() const {
+  return DefaultAppsPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+DefaultAppsPage::Callbacks KineticSettingsWindow::defaultAppsPageCallbacks() {
+  return DefaultAppsPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_defaultAppsPage != nullptr) {
+              m_defaultAppsPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 void KineticSettingsWindow::confirmResetPage() {
   clearArmedResets();
   resetActivePage();
@@ -410,7 +509,10 @@ void KineticSettingsWindow::applyActivePage() {
     applied = m_appearancePage != nullptr && m_appearancePage->applyAll();
     break;
   case ActivePage::AppearanceIcons:
+    applied = m_iconsPage != nullptr && m_iconsPage->applyAll();
+    break;
   case ActivePage::AppearanceCursors:
+    applied = m_cursorsPage != nullptr && m_cursorsPage->applyAll();
     break;
   case ActivePage::Tiling:
     applied = m_tilingPage != nullptr && m_tilingPage->applyAll();
@@ -420,6 +522,9 @@ void KineticSettingsWindow::applyActivePage() {
     break;
   case ActivePage::Keybinds:
     applied = m_keybindsPage != nullptr && m_keybindsPage->applyAll();
+    break;
+  case ActivePage::DefaultApps:
+    applied = m_defaultAppsPage != nullptr && m_defaultAppsPage->applyAll();
     break;
   }
   if (applied) {
@@ -442,7 +547,14 @@ void KineticSettingsWindow::resetActivePage() {
     }
     break;
   case ActivePage::AppearanceIcons:
+    if (m_iconsPage != nullptr) {
+      m_iconsPage->resetAll();
+    }
+    break;
   case ActivePage::AppearanceCursors:
+    if (m_cursorsPage != nullptr) {
+      m_cursorsPage->resetAll();
+    }
     break;
   case ActivePage::Tiling:
     if (m_tilingPage != nullptr) {
@@ -459,6 +571,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_keybindsPage->resetAll();
     }
     break;
+  case ActivePage::DefaultApps:
+    if (m_defaultAppsPage != nullptr) {
+      m_defaultAppsPage->resetAll();
+    }
+    break;
   }
 }
 
@@ -467,14 +584,17 @@ bool KineticSettingsWindow::activeHasPending() const {
   case ActivePage::AppearanceGlobalTheme:
     return m_appearancePage != nullptr && m_appearancePage->hasPending();
   case ActivePage::AppearanceIcons:
+    return m_iconsPage != nullptr && m_iconsPage->hasPending();
   case ActivePage::AppearanceCursors:
-    return false;
+    return m_cursorsPage != nullptr && m_cursorsPage->hasPending();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && m_tilingPage->hasPending();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && m_workspacesPage->hasPending();
   case ActivePage::Keybinds:
     return m_keybindsPage != nullptr && m_keybindsPage->hasPending();
+  case ActivePage::DefaultApps:
+    return m_defaultAppsPage != nullptr && m_defaultAppsPage->hasPending();
   }
   return false;
 }
@@ -484,14 +604,17 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
   case ActivePage::AppearanceGlobalTheme:
     return m_appearancePage != nullptr && !m_appearancePage->resettableKeyPaths().empty();
   case ActivePage::AppearanceIcons:
+    return m_iconsPage != nullptr && !m_iconsPage->resettableKeyPaths().empty();
   case ActivePage::AppearanceCursors:
-    return false;
+    return m_cursorsPage != nullptr && !m_cursorsPage->resettableKeyPaths().empty();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && !m_tilingPage->resettableKeyPaths().empty();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && !m_workspacesPage->resettableKeyPaths().empty();
   case ActivePage::Keybinds:
     return m_keybindsPage != nullptr && !m_keybindsPage->resettableKeyPaths().empty();
+  case ActivePage::DefaultApps:
+    return m_defaultAppsPage != nullptr && !m_defaultAppsPage->resettableKeyPaths().empty();
   }
   return false;
 }
@@ -675,8 +798,8 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     }));
   };
 
-  // Categories are listed alphabetically: Appearance, Input & Output, then
-  // Window Management.
+  // Categories are listed alphabetically: Appearance, Input & Output, System,
+  // then Window Management.
   addCategory("Appearance", m_appearanceExpanded, [this]() {
     m_appearanceExpanded = !m_appearanceExpanded;
     clearArmedResets();
@@ -707,42 +830,19 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     addSubNav(ActivePage::Tiling, "layout-grid", "Tiling");
   }
 
+  addCategory("System", m_systemExpanded, [this]() {
+    m_systemExpanded = !m_systemExpanded;
+    clearArmedResets();
+    requestSceneRebuild();
+  });
+  if (m_systemExpanded) {
+    addSubNav(ActivePage::DefaultApps, "apps", "Default Apps");
+  }
+
   return sidebarScroll;
 }
 
-std::unique_ptr<Node>
-KineticSettingsWindow::buildComingSoon(std::string_view title, std::string_view message) {
-  const float scale = uiScale();
-  auto root = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .padding = Style::spaceLg * scale,
-      .fill = clearColorSpec(),
-      .fillWidth = true,
-  });
-  root->addChild(ui::row(
-      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-      ui::glyph({
-          .glyph = "palette",
-          .glyphSize = Style::fontSizeHeader * scale,
-          .color = colorSpecFromRole(ColorRole::Primary),
-      }),
-      ui::label({
-          .text = std::string(title),
-          .fontSize = Style::fontSizeHeader * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::Primary),
-      })
-  ));
-  root->addChild(ui::label({
-      .text = std::string(message),
-      .fontSize = Style::fontSizeBody * scale,
-      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-  }));
-  return root;
-}
-
-void KineticSettingsWindow::rebuildContent() {
+void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
   if (m_pageContainer == nullptr) {
     return;
   }
@@ -756,12 +856,18 @@ void KineticSettingsWindow::rebuildContent() {
     }
     break;
   case ActivePage::AppearanceIcons:
+    if (m_iconsPage != nullptr) {
+      m_pageContainer->addChild(
+          m_iconsPage->build(uiScale(), renderer, iconsFilter(), m_armedResetKeyPath, iconsPageCallbacks())
+      );
+    }
+    break;
   case ActivePage::AppearanceCursors:
-    // Placeholders — not yet implemented.
-    m_pageContainer->addChild(buildComingSoon(
-        m_activePage == ActivePage::AppearanceIcons ? "Icons" : "Cursors",
-        "This section is not implemented yet and will appear in a future update."
-    ));
+    if (m_cursorsPage != nullptr) {
+      m_pageContainer->addChild(
+          m_cursorsPage->build(uiScale(), renderer, cursorsFilter(), m_armedResetKeyPath, cursorsPageCallbacks())
+      );
+    }
     break;
   case ActivePage::Tiling:
     if (m_tilingPage != nullptr) {
@@ -791,6 +897,13 @@ void KineticSettingsWindow::rebuildContent() {
     if (m_keybindsPage != nullptr) {
       m_pageContainer->addChild(
           m_keybindsPage->build(uiScale(), keybindsFilter(), keybindsPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::DefaultApps:
+    if (m_defaultAppsPage != nullptr) {
+      m_pageContainer->addChild(
+          m_defaultAppsPage->build(uiScale(), defaultAppsFilter(), m_armedResetKeyPath, defaultAppsPageCallbacks())
       );
     }
     break;
@@ -868,7 +981,8 @@ void KineticSettingsWindow::buildScene(float width, float height) {
   content->setDirection(FlexDirection::Vertical);
   content->setAlign(FlexAlign::Stretch);
   content->setGap(Style::spaceMd * scale);
-  rebuildContent();
+  auto& renderer = m_surface->renderTarget().renderer();
+  rebuildContent(renderer);
 
   body->addChild(std::move(scroll));
   main->addChild(std::move(body));
@@ -876,7 +990,6 @@ void KineticSettingsWindow::buildScene(float width, float height) {
   // Lay the new tree out before attaching it: the render path only draws
   // current geometry, so an unlaid-out scene renders blank until some later
   // relayout happens to run (e.g. on refocus).
-  auto& renderer = m_surface->renderTarget().renderer();
   main->layout(renderer);
   m_mainContainer = static_cast<Flex*>(m_sceneRoot->addChild(std::move(main)));
   m_inputDispatcher.setSceneRoot(m_sceneRoot.get());

@@ -1,6 +1,9 @@
 #pragma once
 
 #include "kinetic-settings/src/appearance_page.h"
+#include "kinetic-settings/src/cursors_page.h"
+#include "kinetic-settings/src/default_apps_page.h"
+#include "kinetic-settings/src/icons_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
 #include "kinetic-settings/src/tiling_page.h"
 #include "kinetic-settings/src/workspaces_page.h"
@@ -20,6 +23,7 @@ class Box;
 class CustomKeybinds;
 class Flex;
 class RenderContext;
+class Renderer;
 class SelectDropdownPopup;
 class SessionBus;
 class WaylandConnection;
@@ -66,6 +70,7 @@ private:
     Workspaces,
     Tiling,
     Keybinds,
+    DefaultApps,
   };
 
   void destroyWindow();
@@ -78,13 +83,13 @@ private:
   // row's search input alive (no focus loss while typing).
   void requestSceneRebuild();
   void requestContentRebuild();
-  void rebuildContent();
+  // Rebuilds the content area only. The renderer is required by the Icons and
+  // Cursors pages to load preview images.
+  void rebuildContent(Renderer& renderer);
   void clearArmedResets() noexcept;
 
   [[nodiscard]] std::unique_ptr<Flex> buildFilterRow(float scale);
   [[nodiscard]] std::unique_ptr<Node> buildSidebar(float scale);
-  // Placeholder content for not-yet-implemented sub-pages (Icons, Cursors).
-  [[nodiscard]] std::unique_ptr<Node> buildComingSoon(std::string_view title, std::string_view message);
   // Filters/callbacks handed to whichever page is currently active. All pages
   // expose the same Filter/Callbacks shape, so these centralize the wiring.
   [[nodiscard]] TilingPage::Filter pageFilter() const;
@@ -95,6 +100,12 @@ private:
   [[nodiscard]] KeybindsPage::Callbacks keybindsPageCallbacks();
   [[nodiscard]] AppearancePage::Filter appearanceFilter() const;
   [[nodiscard]] AppearancePage::Callbacks appearancePageCallbacks();
+  [[nodiscard]] IconsPage::Filter iconsFilter() const;
+  [[nodiscard]] IconsPage::Callbacks iconsPageCallbacks();
+  [[nodiscard]] CursorsPage::Filter cursorsFilter() const;
+  [[nodiscard]] CursorsPage::Callbacks cursorsPageCallbacks();
+  [[nodiscard]] DefaultAppsPage::Filter defaultAppsFilter() const;
+  [[nodiscard]] DefaultAppsPage::Callbacks defaultAppsPageCallbacks();
   void confirmResetPage();
   // Routes the filter row's Apply/Reset Page to the active page.
   void applyActivePage();
@@ -116,6 +127,9 @@ private:
   std::unique_ptr<WorkspacesPage> m_workspacesPage;
   std::unique_ptr<KeybindsPage> m_keybindsPage;
   std::unique_ptr<AppearancePage> m_appearancePage;
+  std::unique_ptr<IconsPage> m_iconsPage;
+  std::unique_ptr<CursorsPage> m_cursorsPage;
+  std::unique_ptr<DefaultAppsPage> m_defaultAppsPage;
   std::unique_ptr<SelectDropdownPopup> m_selectPopup;
   wl_output* m_output = nullptr;
   Box* m_background = nullptr;
@@ -123,10 +137,11 @@ private:
   Flex* m_mainContainer = nullptr;
 
   // Active secondary page and which sidebar categories are expanded.
-  ActivePage m_activePage = ActivePage::Workspaces;
+  ActivePage m_activePage = ActivePage::AppearanceGlobalTheme;
   bool m_windowManagementExpanded = true;
   bool m_inputOutputExpanded = true;
   bool m_appearanceExpanded = true;
+  bool m_systemExpanded = true;
 
   ScrollViewState m_sidebarScrollState;
   ScrollViewState m_contentScrollState;

@@ -266,6 +266,8 @@ namespace {
         entry.categories = std::string(value);
       } else if (key == "Keywords") {
         entry.keywords = std::string(value);
+      } else if (key == "MimeType") {
+        entry.mimeTypes = std::string(value);
       } else if (key == "StartupWMClass") {
         entry.startupWmClass = std::string(value);
       } else if (key == "NoDisplay") {

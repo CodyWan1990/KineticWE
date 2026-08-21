@@ -200,12 +200,16 @@ namespace noctalia::theme {
   } // namespace
 
   std::string notifyKdeColorSchemeChanged() {
+    return notifyKdeChange(0, 0);
+  }
+
+  std::string notifyKdeChange(std::int32_t type, std::int32_t arg) {
     try {
       auto connection = sdbus::createSessionBusConnection();
       auto object = sdbus::createObject(*connection, sdbus::ObjectPath{kKdeGlobalsSignalPath});
       object->emitSignal(kKdeGlobalsSignalName)
           .onInterface(kKdeGlobalsSignalInterface)
-          .withArguments(std::int32_t{0}, std::int32_t{0});
+          .withArguments(type, arg);
     } catch (const sdbus::Error& error) {
       return error.what();
     }

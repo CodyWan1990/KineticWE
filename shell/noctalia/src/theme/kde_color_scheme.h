@@ -22,4 +22,11 @@ namespace noctalia::theme {
   // failure, empty on success. Safe to call after rewriting the color scheme.
   [[nodiscard]] std::string notifyKdeColorSchemeChanged();
 
+  // Emits org.kde.KGlobalSettings.notifyChange(type, arg) on the session bus.
+  // Used for non-palette settings the compositor/KDE apps react to live:
+  //   type 4 = IconChanged (icons)
+  //   type 5 = CursorChanged (cursor theme — the compositor re-reads its config)
+  // Returns an error string on failure, empty on success.
+  [[nodiscard]] std::string notifyKdeChange(std::int32_t type, std::int32_t arg = 0);
+
 } // namespace noctalia::theme
