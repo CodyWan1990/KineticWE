@@ -1,0 +1,8 @@
+kineticwe (6.7.80-1) unstable; urgency=medium
+
+  * Initial KineticWE Debian packaging.
+  * Bundles kglobalacceld and kdecoration from pinned KDE master commits.
+  * Ships the xdg-desktop-portal-kwe portal backend and the noctalia-kwe
+    Noctalia fork shell as separate subpackages.
+
+ -- TheBlackDon <theblackdon@gitlab.com>  Sat, 22 Aug 2026 00:00:00 +0000

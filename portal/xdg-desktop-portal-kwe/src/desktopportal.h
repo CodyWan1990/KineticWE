@@ -19,6 +19,7 @@ class BackgroundPortal;
 class EmailPortal;
 class FileChooserPortal;
 class InhibitPortal;
+class OpenURIPortal;
 class PrintPortal;
 class ScreenshotPortal;
 class SettingsPortal;
@@ -40,6 +41,7 @@ private:
     EmailPortal *const m_email;
     FileChooserPortal *const m_fileChooser;
     InhibitPortal *const m_inhibit;
+    OpenURIPortal *const m_openURI;
     PrintPortal *const m_print;
     ScreenshotPortal *m_screenshot = nullptr;
     SettingsPortal *const m_settings;

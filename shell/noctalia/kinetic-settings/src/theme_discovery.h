@@ -26,7 +26,20 @@ struct ThemeInfo {
 [[nodiscard]] std::vector<ThemeInfo> iconThemes();
 
 // All installed cursor themes, sorted by display name (case-insensitive).
-[[nodiscard]] std::vector<ThemeInfo> cursorThemes();
+  [[nodiscard]] std::vector<ThemeInfo> cursorThemes();
+
+  // The XDG icon theme root directory (where icon and cursor themes live),
+  // preferring the user's own theme dir (~/.local/share/icons, ~/.icons) and
+  // falling back to the first existing system root. Used by the settings pages
+  // to open the folder in a file manager. Empty when nothing can be resolved.
+  [[nodiscard]] std::string iconRootPath();
+
+  // Opens the icon/cursor themes root directory in the user's default file
+  // manager. Resolves the handler for inode/directory from mimeapps.list (the
+  // file the Default Apps settings page writes), launches it with the directory
+  // as argument, and only falls back to xdg-open when no default is configured.
+  // Returns true when a launch was attempted.
+  bool openIconRoot();
 
 // Resolve a well-known icon name (e.g. "folder", "start-here") inside a
 // specific theme directory. Returns the best candidate path (SVG preferred,

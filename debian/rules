@@ -1,0 +1,93 @@
+#!/usr/bin/make -f
+
+# =============================================================================
+# KineticWE - Debian build rules
+# =============================================================================
+# Mirrors the phases of the COPR spec (%build / %install):
+#   1. Build kglobalacceld from pinned KDE master commit
+#   2. Build kdecoration from pinned KDE master commit
+#   3. Build kinetic-we (the compositor) against them
+#   4. Build xdg-desktop-portal-kwe (portal backend)
+#   5. Build noctalia-kwe (Noctalia fork shell)
+#
+# Pinned refs below must stay in sync with lgl-kineticwe-copr/kineticwe.spec.
+# =============================================================================
+
+%:
+	dh $@
+
+# KDE global shortcuts daemon, pinned commit
+KGA_REF := 5cc88399d8e2a7951798f85127e23f73f1fa0889
+# kdecoration, pinned commit (KDecoration3::Style)
+KDECO_REF := d13049250c0ea1afc279aa8dc99243565c0d83e8
+# kconfig_compiler fixed commit (KConfig < 6.30 enum-class setter bug)
+KCONFIG_REF := 41592ccfd9748be82c83ce98912037bffb73954e
+
+# Staging area for the pinned kglobalacceld/kdecoration builds so kinetic-we's
+# CMake can pick up their config files via CMAKE_PREFIX_PATH.
+STAGE := $(CURDIR)/deb-stage
+KGA_PREFIX := $(STAGE)/kga-install
+
+override_dh_auto_configure:
+	# Nothing to do here — all phases are handled in override_dh_auto_build.
+
+override_dh_auto_build:
+	# --- Phase 1: Build and install kglobalacceld to a staging prefix ---
+	mkdir -p $(STAGE)/kga-build
+	curl -fsSL https://invent.kde.org/plasma/kglobalacceld/-/archive/$(KGA_REF)/kglobalacceld-$(KGA_REF).tar.gz \
+		| tar xz -C $(STAGE)/kga-build --strip-components=1
+	cmake -S $(STAGE)/kga-build -B $(STAGE)/kga-build/build \
+		-DCMAKE_INSTALL_PREFIX=$(KGA_PREFIX) \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DBUILD_TESTING=OFF
+	cmake --build $(STAGE)/kga-build/build --parallel
+	cmake --install $(STAGE)/kga-build/build
+
+	# --- Phase 2: Build and install kdecoration to a staging prefix ---
+	mkdir -p $(STAGE)/kdeco-build
+	curl -fsSL https://invent.kde.org/plasma/kdecoration/-/archive/$(KDECO_REF)/kdecoration-$(KDECO_REF).tar.gz \
+		| tar xz -C $(STAGE)/kdeco-build --strip-components=1
+	cmake -S $(STAGE)/kdeco-build -B $(STAGE)/kdeco-build/build \
+		-DCMAKE_INSTALL_PREFIX=$(KGA_PREFIX) \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DBUILD_TESTING=OFF
+	cmake --build $(STAGE)/kdeco-build/build --parallel
+	cmake --install $(STAGE)/kdeco-build/build
+
+	# --- Phase 3: Build kinetic-we against the staged kglobalacceld/kdecoration ---
+	cmake -S $(CURDIR) -B $(STAGE)/kwe-build \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_PREFIX_PATH=$(KGA_PREFIX) \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DBUILD_TESTING=OFF \
+		-DKWIN_BUILD_GLOBALSHORTCUTS=ON
+	cmake --build $(STAGE)/kwe-build --parallel
+
+	# --- Phase 4: Build the KineticWE portal backend ---
+	cmake -S $(CURDIR)/portal/xdg-desktop-portal-kwe -B $(STAGE)/portal-build \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DBUILD_TESTING=OFF
+	cmake --build $(STAGE)/portal-build --parallel
+
+	# --- Phase 5: Build the Noctalia fork shell (noctalia-kwe) ---
+	meson setup $(STAGE)/shell-build $(CURDIR)/shell/noctalia \
+		--prefix /usr \
+		--buildtype=release \
+		-Dtests=disabled
+	meson compile -C $(STAGE)/shell-build
+
+override_dh_auto_install:
+	# Install each component into its own subpackage dir.
+	cmake --install $(STAGE)/kwe-build --destdir=$(CURDIR)/debian/kineticwe
+	cmake --install $(STAGE)/portal-build --destdir=$(CURDIR)/debian/xdg-desktop-portal-kwe
+	meson install -C $(STAGE)/shell-build --destdir $(CURDIR)/debian/kineticwe-noctalia
+	# kglobalacceld + kdecoration libraries (bundled by kineticwe-kglobalacceld)
+	cmake --install $(STAGE)/kga-build/build --destdir=$(CURDIR)/debian/kineticwe-kglobalacceld
+	cmake --install $(STAGE)/kdeco-build/build --destdir=$(CURDIR)/debian/kineticwe-kglobalacceld
+	# Session target for the 2.0 session model
+	install -Dm 0644 $(CURDIR)/scripts/kineticwe-session.target \
+		$(CURDIR)/debian/kineticwe/usr/lib/systemd/user/kineticwe-session.target
+
+override_dh_auto_clean:
+	rm -rf $(STAGE)

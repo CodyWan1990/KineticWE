@@ -1,0 +1,168 @@
+Source: kineticwe
+Section: kde
+Priority: optional
+Maintainer: TheBlackDon <theblackdon@gitlab.com>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               ninja-build,
+               g++,
+               pkg-config,
+               extra-cmake-modules,
+               meson,
+               qt6-base-dev,
+               qt6-base-private-dev,
+               qt6-declarative-dev,
+               qt6-svg-dev,
+               qt6-5compat-dev,
+               qt6-wayland-dev,
+               qt6-tools-dev,
+               qt6-shadertools-dev,
+               libkf6config-dev,
+               libkf6configwidgets-dev,
+               libkf6colorscheme-dev,
+               libkf6coreaddons-dev,
+               libkf6crash-dev,
+               libkf6dbusaddons-dev,
+               libkf6globalaccel-dev,
+               libkf6kio-dev,
+               libkf6jobwidgets-dev,
+               libkf6guiaddons-dev,
+               libkf6i18n-dev,
+               libkf6idletime-dev,
+               libkf6package-dev,
+               libkf6service-dev,
+               libkf6svg-dev,
+               libkf6widgetsaddons-dev,
+               libkf6windowsystem-dev,
+               libkf6declarative-dev,
+               libkf6cmutils-dev,
+               libkf6newstuff-dev,
+               libkf6xmlgui-dev,
+               libkf6runner-dev,
+               libkf6notifications-dev,
+               libkf6kirigami-dev,
+               libkf6auth-dev,
+               libkf6iconthemes-dev,
+               libkf6itemviews-dev,
+               libkf6statusnotifieritem-dev,
+               libkf6kiofilewidgets-dev,
+               kwayland-dev,
+               libkscreenlocker-dev,
+               libknighttime-dev,
+               libplasma-wayland-protocols-dev,
+               libplasma-activities-dev,
+               libplasma-dev,
+               libepoxy-dev,
+               libwayland-dev,
+               wayland-protocols,
+               libxkbcommon-dev,
+               libxkbcommon-x11-dev,
+               libinput-dev,
+               libdrm-dev,
+               libgbm-dev,
+               libdisplay-info-dev,
+               liblcms2-dev,
+               libxcvt-dev,
+               libcanberra-dev,
+               libevdev-dev,
+               libsystemd-dev,
+               libpipewire-0.3-dev,
+               libegl-dev,
+               libgles-dev,
+               libfreetype-dev,
+               libfontconfig-dev,
+               libvulkan-dev,
+               vulkan-headers,
+               libx11-dev,
+               libxcb1-dev,
+               libxcb-keysyms1-dev,
+               libxcb-cursor-dev,
+               libxcb-util-dev,
+               libxcb-icccm4-dev,
+               libxcb-image0-dev,
+               libxcb-render-util0-dev,
+               libqt6accessibilityclient-dev,
+               libcairo2-dev,
+               libpango1.0-dev,
+               libharfbuzz-dev,
+               libglib2.0-dev,
+               libpam0g-dev,
+               libpolkit-agent-1-dev,
+               libcurl4-openssl-dev,
+               libwebp-dev,
+               librsvg2-dev,
+               libqalculate-dev,
+               libxml2-dev,
+               libjemalloc-dev,
+               libsodium-dev,
+               libsecret-1-dev,
+               libsdbus-c++-dev,
+               libwireplumber-0.5-dev,
+               libsndfile1-dev,
+               libjxl-dev,
+               libmd4c-dev,
+               libtomlplusplus-dev,
+               nlohmann-json3-dev,
+               libical-dev
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: kineticwe
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+         qt6-base,
+         qt6-declarative,
+         qt6-svg,
+         qt6-wayland,
+         libkf6globalaccel,
+         libkf6kio,
+         libkf6idletime,
+         libkf6svg,
+         libkf6runner,
+         libkf6kirigami,
+         kwayland,
+         libkscreenlocker,
+         libknighttime,
+         libplasma6,
+         plasma-workspace,
+         milou,
+         aurorae,
+         breeze,
+         kscreen,
+         libqt6accessibilityclient6,
+         xwayland,
+         hwdata,
+         xdg-desktop-portal
+Description: KineticWE - A tiling KWin Wayland compositor
+ KineticWE is a fork of KWin that adds native tiling support for Wayland.
+ It is designed to pair with the Noctalia fork shell to form a complete
+ desktop experience called "KineticWE — A KWin Window Environment."
+ .
+ KineticWE bundles an in-process global shortcuts daemon (kglobalacceld)
+ and the kdecoration runtime libraries, both built from pinned KDE master
+ commits for API compatibility.
+
+Package: kineticwe-kglobalacceld
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: KDE Global Shortcuts Daemon (for KineticWE)
+ A newer build of kglobalacceld from git master, required by KineticWE.
+ This provides the in-process global shortcuts daemon that kinetic-we
+ links against directly via the KGlobalAccelD API.
+
+Package: xdg-desktop-portal-kwe
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, xdg-desktop-portal
+Description: KineticWE portal backend (rebranded xdg-desktop-portal-kde)
+ The xdg-desktop-portal backend for KineticWE sessions: a fork of KDE's
+ xdg-desktop-portal-kde (v6.7.4) rebranded to export the desktop as KineticWE.
+ Registers the org.freedesktop.impl.portal.desktop.kwe D-Bus service and is
+ selected by the freedesktop frontend via kineticwe-portals.conf.
+
+Package: kineticwe-noctalia
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Noctalia fork shell for KineticWE (noctalia-kwe)
+ The Noctalia v5 shell fork for KineticWE, vendored at shell/noctalia and
+ built in-tree. The binary is renamed to noctalia-kwe so it can coexist with
+ an upstream noctalia install.

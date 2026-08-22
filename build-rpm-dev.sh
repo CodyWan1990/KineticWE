@@ -28,6 +28,10 @@ set -euo pipefail
 # Environment variables:
 #   TEST_PREFIX     - Where to install for TTY testing (default: $HOME/.local)
 #   DISTROBOX_NAME  - Name of the distrobox container (default: kineticwe-build)
+#
+# On Debian/Ubuntu-based hosts use build-deb-dev.sh instead: it mirrors this
+# flow but builds inside a debian:sid distrobox via apt and can emit .deb
+# packages (--deb).
 # =============================================================================
 
 TEST_PREFIX="${TEST_PREFIX:-$HOME/.local}"

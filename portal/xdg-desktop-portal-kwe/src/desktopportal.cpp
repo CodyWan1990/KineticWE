@@ -20,6 +20,7 @@
 #include "globalshortcuts.h"
 #include "inhibit.h"
 #include "inputcapture.h"
+#include "openuri.h"
 #include "print.h"
 #include "remotedesktop.h"
 #include "screencast.h"
@@ -39,6 +40,7 @@ DesktopPortal::DesktopPortal(QObject *parent)
     , m_email(new EmailPortal(this))
     , m_fileChooser(new FileChooserPortal(this))
     , m_inhibit(new InhibitPortal(this))
+    , m_openURI(new OpenURIPortal(this))
     , m_print(new PrintPortal(this))
     , m_settings(new SettingsPortal(this))
     , m_dynamicLauncher(new DynamicLauncherPortal(this))

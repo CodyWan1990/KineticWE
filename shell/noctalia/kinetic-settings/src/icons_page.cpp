@@ -260,8 +260,8 @@ std::unique_ptr<Node> IconsPage::buildTile(
       .padding = Style::spaceXs * scale,
       .fill = selected ? colorSpecFromRole(ColorRole::Primary, 0.15F) : colorSpecFromRole(ColorRole::SurfaceVariant),
       .radius = Style::scaledRadiusMd(scale),
-      .border = selected ? colorSpecFromRole(ColorRole::Primary) : colorSpecFromRole(ColorRole::Outline),
-      .borderWidth = selected ? Style::emphasizedBorderWidth : Style::borderWidth,
+      .border = selected ? colorSpecFromRole(ColorRole::Primary) : clearColorSpec(),
+      .borderWidth = selected ? Style::emphasizedBorderWidth : 0.0F,
       .width = tileW,
       .height = tileH,
   });
@@ -335,6 +335,17 @@ std::unique_ptr<Node> IconsPage::build(
       }),
       makeLabel("Icons", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
   ));
+  // Opens the icon themes folder so the user can browse/install themes directly.
+  headerRow->addChild(ui::button({
+      .glyph = "folder-open",
+      .glyphSize = Style::fontSizeBody * scale,
+      .variant = ButtonVariant::Ghost,
+      .tooltip = "Open the icon themes folder",
+      .minHeight = Style::controlHeightSm * scale,
+      .padding = Style::spaceXs * scale,
+      .radius = Style::scaledRadiusMd(scale),
+      .onClick = []() { (void)theme_discovery::openIconRoot(); },
+  }));
   headerRow->addChild(ui::spacer());
   if (overridden()) {
     headerRow->addChild(makeResetButton(keyPath(), armedResetKey == keyPath(), scale, callbacks));

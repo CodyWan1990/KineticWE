@@ -58,6 +58,8 @@ set(xdg_desktop_portal_kde_SRCS
     inputcapturedialog.cpp
     notificationinhibition.cpp
     notificationinhibition.h
+    openuri.cpp
+    openuri.h
     outputsmodel.cpp outputsmodel.h
     print.cpp
     print.h
@@ -277,6 +279,13 @@ ecm_qt_declare_logging_category(xdg_desktop_portal_kde_SRCS
     CATEGORY_NAME "xdp-kde-wallpaper"
     HEADER wallpaper_debug.h
     DESCRIPTION "XDG Desktop Portal KDE Wallpaper"
+    EXPORT XDPKDE
+)
+ecm_qt_declare_logging_category(xdg_desktop_portal_kde_SRCS
+    IDENTIFIER "XdgDesktopPortalKdeOpenURI"
+    CATEGORY_NAME "xdp-kde-openuri"
+    HEADER openuri_debug.h
+    DESCRIPTION "XDG Desktop Portal KDE OpenURI"
     EXPORT XDPKDE
 )
 

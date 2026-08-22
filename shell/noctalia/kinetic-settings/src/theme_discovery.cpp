@@ -1,5 +1,8 @@
 #include "theme_discovery.h"
 
+#include "core/process/process.h"
+#include "system/desktop_entry.h"
+#include "system/desktop_entry_launch.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
@@ -123,9 +126,37 @@ namespace {
     return digit;
   }
 
+  // Counts image files (svg/png) in a directory tree, bounded to keep discovery
+  // cheap on large themes. Used to reject themes whose size directories are
+  // empty placeholders (e.g. legacy Bluecurve).
+  int countIconFiles(const fs::path& dir, int limit) {
+    int count = 0;
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(dir, ec)) {
+      if (count >= limit) {
+        break;
+      }
+      if (entry.is_directory(ec)) {
+        count += countIconFiles(entry.path(), limit);
+        continue;
+      }
+      const std::string ext = entry.path().extension().string();
+      if (ext == ".svg" || ext == ".png") {
+        ++count;
+      }
+    }
+    return count;
+  }
+
+  // Minimum number of image files a theme must provide (across its icon size
+  // directories) before it counts as a real icon theme. Filters out legacy or
+  // placeholder themes that only ship empty size directories.
+  constexpr int kMinIconFiles = 10;
+
   // Whether a theme directory contains icon content (vs only cursor content).
   bool hasIconContent(const fs::path& themeDir) {
     std::error_code ec;
+    int totalFiles = 0;
     for (const auto& entry : fs::directory_iterator(themeDir, ec)) {
       if (!entry.is_directory(ec)) {
         continue;
@@ -134,7 +165,11 @@ namespace {
       if (name == "cursors" || name == "cursors_scalable") {
         continue;
       }
-      if (isIconSizeDir(name)) {
+      if (!isIconSizeDir(name)) {
+        continue;
+      }
+      totalFiles += countIconFiles(entry.path(), kMinIconFiles);
+      if (totalFiles >= kMinIconFiles) {
         return true;
       }
     }
@@ -205,6 +240,99 @@ std::vector<ThemeInfo> iconThemes() {
 
 std::vector<ThemeInfo> cursorThemes() {
   return discover(true);
+}
+
+std::string iconRootPath() {
+  // User-owned dirs first (that's where themes get installed and managed).
+  const std::vector<std::string> roots = iconBaseDirs();
+  std::error_code ec;
+  for (const std::string& root : roots) {
+    if (fs::is_directory(root, ec)) {
+      return root;
+    }
+  }
+  if (!roots.empty()) {
+    return roots.front();
+  }
+  return {};
+}
+
+bool openIconRoot() {
+  const std::string dir = iconRootPath();
+  if (dir.empty()) {
+    return false;
+  }
+
+  // The user's real config home — where mimeapps.list lives (the file the
+  // Default Apps settings page writes). The shell process keeps the real
+  // XDG_CONFIG_HOME, so this resolves to the shared config location.
+  std::filesystem::path mimeapps;
+  if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg != nullptr && *xdg != '\0') {
+    mimeapps = std::filesystem::path(xdg) / "mimeapps.list";
+  } else if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+    mimeapps = std::filesystem::path(home) / ".config" / "mimeapps.list";
+  }
+
+  // Resolve the default handler id for inode/directory (e.g. "org.kde.dolphin").
+  std::string handlerId;
+  {
+    std::error_code ec;
+    std::ifstream in(mimeapps);
+    if (in.is_open()) {
+      bool inDefaultApps = false;
+      std::string line;
+      while (std::getline(in, line)) {
+        const std::string trimmed = StringUtils::trim(line);
+        if (trimmed.empty() || trimmed.front() == '#' || trimmed.front() == ';') {
+          continue;
+        }
+        if (trimmed.front() == '[') {
+          inDefaultApps = (trimmed == "[Default Applications]");
+          continue;
+        }
+        if (!inDefaultApps || !trimmed.starts_with("inode/directory=")) {
+          continue;
+        }
+        const std::string value = StringUtils::trim(std::string_view(trimmed).substr(16));
+        if (const std::size_t sep = value.find(';'); sep != std::string::npos) {
+          handlerId = value.substr(0, sep);
+        } else {
+          handlerId = value;
+        }
+        // mimeapps stores the id with the ".desktop" suffix; DesktopEntry::id is the stem.
+        if (handlerId.ends_with(".desktop")) {
+          handlerId.resize(handlerId.size() - 8);
+        }
+        break;
+      }
+    }
+  }
+
+  // Launch the resolved file manager with the directory as argument. The Exec
+  // field's %F/%U field codes are stripped by prepareCommand, so the directory
+  // is appended explicitly.
+  if (!handlerId.empty()) {
+    for (const DesktopEntry& entry : desktopEntries()) {
+      if (entry.id != handlerId) {
+        continue;
+      }
+      auto prepared = desktop_entry_launch::prepareCommand(entry.exec, entry.terminal);
+      if (prepared.has_value() && !prepared->args.empty()) {
+        std::vector<std::string> args = std::move(prepared->args);
+        args.push_back(dir);
+        return process::runAsync(args);
+      }
+      break;
+    }
+  }
+
+  // Fallback: let xdg-open resolve the handler (only useful when the running
+  // portal actually implements OpenURI; xdg-desktop-portal-kwe does not, so on
+  // KineticWE this path is effectively dead — kept for other environments).
+  if (process::commandExists("xdg-open")) {
+    return process::runAsync(std::vector<std::string>{"xdg-open", dir});
+  }
+  return false;
 }
 
 std::string resolveIconInTheme(const std::string& themePath, const std::string& iconName) {

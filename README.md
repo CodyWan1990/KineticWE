@@ -154,6 +154,33 @@ Both modules share a single option surface: `programs.kineticwe.enable` installs
 
 > **Note:** On the first build, Nix may error with a hash mismatch for the pinned `kdecoration` or `kglobalacceld` sources. Copy the expected hash from the error into `nix/kdecoration-git.nix` / `nix/kglobalacceld-git.nix` and rebuild.
 
+### Debian / Ubuntu (distrobox build)
+
+> **Prerequisite:** KineticWE requires **Qt ≥ 6.10** and **KF6 ≥ 6.27**. Debian **sid** already ships these (Qt6 6.10, KF6 6.26–6.28). On older suites (e.g. trixie with Qt6 6.8) enable Debian **experimental** inside the container for the needed packages.
+
+On Debian/Ubuntu-based systems, use `build-deb-dev.sh` to build KineticWE from source inside a **`debian:sid` distrobox** — the host stays clean and the result installs to `~/.local` for immediate TTY testing:
+
+```bash
+git clone https://gitlab.com/theblackdon/kineticwe
+cd kineticwe
+
+# Prerequisites (once):
+sudo apt install distrobox podman
+
+# Quick cmake build (recommended for dev):
+./build-deb-dev.sh --quick
+
+# Or produce .deb packages:
+./build-deb-dev.sh --deb
+
+# Test from a TTY:
+start-kineticwe
+```
+
+The first run creates the `kineticwe-deb-build` container (from `debian:sid`), installs every build dependency via `debian-deps.sh`, then builds `kglobalacceld` and `kdecoration` from pinned KDE master commits before compiling `kinetic-we`, the `xdg-desktop-portal-kwe` portal backend, and the `noctalia-kwe` shell.
+
+Useful flags: `--no-session` (skip the login-screen entry), `--no-extract` (build `.debs` only), `--reset-local` (remove dev files from `~/.local`). Override the image/container via `DEBIAN_IMAGE` / `DISTROBOX_NAME`.
+
 ---
 
 ## Troubleshooting
