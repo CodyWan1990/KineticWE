@@ -519,6 +519,7 @@
         "opacity": "Opacidade",
         "primary-color": "Cor Primária",
         "reset-defaults": "Redefinir para Padrão",
+        "reversed": "Invertido",
         "ring-opacity": "Opacidade do Anel",
         "rotation-speed": "Velocidade de Rotação",
         "scroll-step": "Graduação de Rolagem",
@@ -547,6 +548,7 @@
         "stat-gpu-temp": "Temperatura da GPU",
         "stat-gpu-usage": "Uso da GPU",
         "stat-gpu-vram": "VRAM da GPU",
+        "stat-gpu-vram-used": "VRAM Em Uso da GPU",
         "stat-net-rx": "Velocidade de Download",
         "stat-net-tx": "Velocidade de Upload",
         "stat-none": "Nenhum",
@@ -648,12 +650,22 @@
     },
     "context-menu": {
       "open": "Abrir",
-      "pin-to-dock": "Fixar no dock",
-      "unpin-from-dock": "Desfixar do dock"
+      "pin": "Fixar no Launcher",
+      "pin-to-dock": "Fixar no Dock",
+      "unpin": "Desfixar do Launcher",
+      "unpin-from-dock": "Desfixar do Dock"
     },
     "empty": {
       "no-results": "Nenhum resultado encontrado",
       "type-to-search": "Digite para pesquisar..."
+    },
+    "origins": {
+      "appimage": "AppImage",
+      "flatpak": "Flatpak",
+      "nix": "Nix",
+      "snap": "Snap",
+      "system": "Sistema",
+      "user": "Usuário"
     },
     "providers": {
       "applications": {
@@ -722,6 +734,8 @@
       "battery-low-body": "{device}: {percent}% restantes",
       "battery-low-title": "Bateria baixa",
       "calendar": "Calendário",
+      "calendar-credential-locked-body": "Desbloqueie o chaveiro usado pelo Serviço Secreto e, em seguida, tente novamente em “Configurações”. No GNOME Keyring, defina como padrão um chaveiro que seja desbloqueado automaticamente, como o “Login”.",
+      "calendar-credential-locked-title": "Keyring do calendário está bloqueado",
       "calendar-google-connect-browser-failed": "Não foi possível abrir nenhum navegador com a autorização do Google. Verifique seu navegador padrão ou a configuração do xdg-open.",
       "calendar-google-connect-credential-store-failed": "A autorização foi concluída, mas não foi possível salvar o token de atualização. Desbloqueie ou inicie o Secret Service e, em seguida, conecte-se novamente.",
       "calendar-google-connect-expired": "A autorização do Google expirou antes da conclusão do login. Inicie a conexão novamente.",
@@ -732,7 +746,7 @@
       "calendar-google-connect-start-failed": "Não foi possível iniciar a autorização do Google. Verifique sua conexão de rede e tente novamente.",
       "calendar-google-connect-start-http": "Não foi possível iniciar a autorização do Google. O agente OAuth retornou HTTP {status}.",
       "calendar-google-connect-timeout": "A autorização do Google expirou. Reinicie a conexão quando estiver pronto para fazer login.",
-      "config-migration-body": "A configuração antiga está sendo migrada na memória, incluindo {path}. Atualize a configuração de origem; as opções “Configurações” e “Validar configuração do noctalia” mostram a substituição necessária.",
+      "config-migration-body": "Atualize {path} no arquivo fonte. Noctalia está aplicando está substituição só temporariamente. Execute nocatlia config validade para listar cada mudança necessária.",
       "config-migration-title": "Atualiação de configuração necessária",
       "dbus-disabled": "Notificações DBus desabilitadas",
       "desktop-widgets-editor": "Editor de Widget",
@@ -886,6 +900,7 @@
       "credential-source-label": "Armazenamento de Credenciais",
       "delete-error": "Não foi possível deletar conta de calendário",
       "edit-title": "Editar Conta de Calendário",
+      "ics-url-label": "URL ICS",
       "id-label": "ID da Conta",
       "invalid": "Verifique os campos de conta de calendário destacados.",
       "name-label": "Nome de Exibição",
@@ -899,7 +914,8 @@
       "provider": {
         "custom": "CalDAV",
         "google": "Google",
-        "icloud": "ICloud"
+        "icloud": "ICloud",
+        "ics": "URL ICS"
       },
       "provider-label": "Provedor",
       "save": "Salvar",
@@ -1119,7 +1135,7 @@
       "merged-user-description": "Combina arquivos de configuração e alterações na interface gráfica em um único arquivo TOML. Os valores padrão predefinidos permanecem implícitos.",
       "merged-user-save-title": "Salvar Configuração de Usuário Mesclada",
       "merged-user-title": "Configuração de Usuário Mesclada (Recomendado)",
-      "title": "Exportar Configurações"
+      "title": "Exportar Configuração"
     },
     "idle": {
       "behavior": {
@@ -1134,6 +1150,7 @@
           "suspend": "Suspender"
         },
         "kind-section-label": "Ação",
+        "locked-timeout-label": "Tempo de espera enquanto bloqueado (segundos, 0 = desativado)",
         "name-label": "Nome",
         "name-placeholder": "idle-behavior",
         "resume-command-label": "Comando ao retomar",
@@ -1257,7 +1274,9 @@
         "add-title": "Adicionar Filtro de Notificação",
         "allow-permanent": "Autorização permanente",
         "allowed-urgencies-label": "Urgências permitidas",
+        "bypass-dnd": "Ignorar “Não Perturbe”",
         "flag": {
+          "dnd-bypass": "Ignorar \"Não perturbe\"",
           "history": "histórico",
           "permanent": "permanente",
           "sound": "som",
@@ -1465,8 +1484,6 @@
         "held-back": "versão mais antiga",
         "held-back-hint": "v{version} requer a API de plugins {required}; este Noctalia suporta até {current}. Atualize o Noctalia para obtê-la.",
         "incompatible-plugin-api": "APi de plugin incoompatível",
-        "loading": "Carregando plugins...",
-        "refreshing": "Atualizando plugins...",
         "remove": "Remover plugin",
         "requires": "Requer: {dependencies}",
         "title": "Plugins",
@@ -1508,6 +1525,7 @@
       },
       "store": {
         "add": "Adicionar ao Noctalia",
+        "back-to-catalog": "Voltar ao catálogo de plugins",
         "categories": "Categoria",
         "category-all": "Todos",
         "empty": "Não foram encontrados plugins",
@@ -2290,9 +2308,17 @@
           "description": "Mostrar rótulos de texto sob ícones de atalho na aba de início",
           "label": "Mostra Rótulos de Atalhos"
         },
+        "launcher-app-actions": {
+          "description": "Mostrar ações de aplicação junto com as aplicações",
+          "label": "Mostrar Ações de Aplicação"
+        },
         "launcher-app-grid": {
           "description": "Exibe uma grade de ícones de aplicativos com legendas abaixo deles quando os resultados forem apenas aplicativos",
           "label": "Visão em Grade de Apps"
+        },
+        "launcher-app-origin-indicator": {
+          "description": "Mostrar indicadores de origem do pacote nos resultados de aplicação",
+          "label": "Mostrar Indicadores de Origem da Aplicação"
         },
         "launcher-auto-paste": {
           "description": "Após ativar a calculadora, os emojis e outras funções de cópia, cole na janela em foco (os mesmos atalhos da colagem automática da área de transferência)",
@@ -2329,6 +2355,10 @@
         "launcher-global-windows": {
           "description": "Também mostrar janelas abertas na busca sem prefixo",
           "label": "Janelas na Busca Global"
+        },
+        "launcher-pinned-apps": {
+          "description": "IDs de entradas na área de trabalho dos aplicativos fixados no iniciador; eles aparecem em primeiro lugar quando o iniciador é aberto",
+          "label": "Apps Fixados"
         },
         "launcher-prefix-calculator": {
           "description": "Acionar prefixo cálculos",
@@ -2484,7 +2514,7 @@
         },
         "calendar-add": {
           "button": "Adicionar Conta",
-          "description": "Adicionar contas iCloud, CalDAV ou Google",
+          "description": "Adicionar contas iCloud, CalDAV, Google ou uma URL ICS",
           "label": "Contas de Calendário"
         },
         "calendar-credentials": {
@@ -2500,7 +2530,9 @@
         "calendar-edit": {
           "button": "Editar",
           "button-reconnect": "Reconectar",
+          "button-retry": "Tentar novamente",
           "description": "Atualizar essa conta de Calendário",
+          "description-locked": "O token de atualização está em um chaveiro bloqueado; desbloqueie o chaveiro e tente novamente",
           "description-reconnect": "Autorização do Google está ausente; reconecte esta conta."
         },
         "calendar-event-date-format": {
@@ -3229,6 +3261,7 @@
         "gpu-temp": "Temperatura da GPU",
         "gpu-usage": "Uso da GPU",
         "gpu-vram": "VRAM da GPU",
+        "gpu-vram-used": "VRAM Em Uso da GPU",
         "graph": "Gráfico",
         "graphic": "Gráfico",
         "hidden": "Oculto",
@@ -3475,6 +3508,10 @@
           "description": "Oculta ícones de privacidade inativos e oculta o widget quando nada estiver ativo",
           "label": "Ocultar Inativo"
         },
+        "hide-passive": {
+          "description": "Ocultar itens do tray cujo status do StatusNotifierItem seja \"Passive\"",
+          "label": "Ocultar Itens Passivos"
+        },
         "hide-when-empty": {
           "description": "Ocultar ícones da área de trabalho quando não houver janelas abertas",
           "label": "Ocultar Quando Inativo",
@@ -3520,6 +3557,10 @@
           "description": "Substitui a cor do widget apenas para ícones; cores hexadecimais fixas também são suportadas",
           "label": "Cor do Ícone"
         },
+        "icon-scale": {
+          "description": "Escala dos ícones dos aplicativos na barra de tarefas em relação ao seu tamanho padrão",
+          "label": "Escala de Ícone"
+        },
         "icon-size": {
           "description": "Tamanho do ícone em pixels",
           "label": "Tamanho do Ícone"
@@ -3548,6 +3589,10 @@
         "interface": {
           "description": "Interface de rede para monitorar; deixe vazio para usar o total agregado de todas interfaces",
           "label": "Interface"
+        },
+        "item-spacing": {
+          "description": "Espaço entre ítens da barra de tarefas quando agrupamento de espaços de trabalho está desativado",
+          "label": "Espaçamento de Item"
         },
         "label": {
           "description": "Texto estático opcional exibido neste botão",
@@ -3585,7 +3630,7 @@
         "max-label-chars": {
           "description": "Número máximo de caracteres a serem exibidos nos nomes dos espaços de trabalho",
           "label": "Máximo de Caracteres de Rótulo",
-          "workspaces-description": "Número máximo de caracteres para rótulos de nomes de espaços de trabalho"
+          "workspaces-description": "Número máximo de caracteres para rótulos não-numéricos de espaços de trabalho"
         },
         "max-length": {
           "description": "Comprimento máximo do widget em pixels",
@@ -3651,6 +3696,10 @@
           "description": "Opacidade dos apps fixados que não estão em execução",
           "label": "Opacidade do App Fixado"
         },
+        "reversed": {
+          "description": "Inverta a ordem de frequência de baixo-para-alto da barras",
+          "label": "Invertido"
+        },
         "scale": {
           "description": "Dimensionar este widget em relação à escala do conteúdo da barra",
           "label": "Escala"
@@ -3674,6 +3723,10 @@
         "show-all-outputs": {
           "description": "Incluir janelas de todos os monitores neste widget",
           "label": "Exibir Todos Monitores"
+        },
+        "show-all-workspaces": {
+          "description": "Mostrar espaços de trabalho de todos monitores neste widget",
+          "label": "Mostrar Todos Monitores"
         },
         "show-caps-lock": {
           "description": "Mostra o estado do Caps Lock",
@@ -3852,9 +3905,9 @@
     },
     "window": {
       "export-config": "Exportar Config...",
-      "export-config-saved": "Exportação de Config salvo.",
+      "export-config-saved": "Exportação de configuração salva.",
       "filter-overridden": "Sobrescrito",
-      "legacy-config-warning": "Configuração legada sendo migrada em memória: {issue}. Execute a noctalia config validate para todas as mudanças requeridas.",
+      "legacy-config-warning": "Configurações Legadas: {issue}. Edite esta entrada na fonte; Noctalia está aplicando está substituição só temporariamente. Execute nocatlia config validade para listar cada mudança necessária.",
       "native-title": "Configurações do Noctalia",
       "no-results": "Nenhuma configuração encontrada",
       "no-results-hint": "Tente um nome diferente de configuração ou uma tecla de config.",

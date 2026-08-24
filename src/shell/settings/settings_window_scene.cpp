@@ -1077,14 +1077,14 @@ void SettingsWindow::rebuildSettingsContent() {
                   markPluginListDirty();
                   requestSceneRebuild();
                 },
-            .autoUpdateEnabled = cfg.plugins.autoUpdate,
+            .autoUpdateMode = cfg.plugins.autoUpdate,
             .setAutoUpdate =
-                [this](bool on) {
-                  m_pluginManager->setAutoUpdateEnabled(on);
+                [this](PluginAutoUpdateMode mode) {
+                  m_pluginManager->setAutoUpdateMode(mode);
                   markPluginListDirty();
                   requestSceneRebuild();
                 },
-            .updateAll = [this]() { m_pluginManager->updateAll(); },
+            .updateAll = [this]() { m_pluginManager->updateAutoUpdateScope(PluginAutoUpdateMode::All); },
             .config = &cfg,
             .onConfigure = [this](std::string id) { openPluginSettingsEditor(std::move(id)); },
             .onRemove =
@@ -1481,6 +1481,7 @@ void SettingsWindow::refreshSettingsRegistry(const Config& cfg) {
                 .label = i18n::tr("settings.schema.services.calendar-credentials.button"),
                 .action = [this]() { m_calendarService->retryCredentialMigration(); },
                 .glyph = "refresh",
+                .variant = ButtonVariant::Secondary,
             },
         .searchText = "calendar credentials keyring secret service retry migration unlock",
     };
@@ -1537,6 +1538,7 @@ void SettingsWindow::refreshSettingsRegistry(const Config& cfg) {
                 .label = i18n::tr("settings.schema.services.calendar-storage.button"),
                 .action = [this]() { m_calendarService->retryCachePersistence(); },
                 .glyph = "refresh",
+                .variant = ButtonVariant::Secondary,
             },
         .searchText = "calendar events cache encryption storage keyring retry migration unlock",
         .visibleWhen = [](const Config& config) { return config.calendar.enabled; },
@@ -1644,7 +1646,7 @@ void SettingsWindow::refreshSettingsRegistry(const Config& cfg) {
                       }
                     },
                 .glyph = pendingConfirmation ? "warning" : "trash",
-                .destructive = pendingConfirmation,
+                .variant = pendingConfirmation ? ButtonVariant::Destructive : ButtonVariant::Default,
             },
         .searchText = "reset recover encrypted private storage clipboard calendar key",
     };
@@ -1876,26 +1878,40 @@ void SettingsWindow::refreshSettingsRegistry(const Config& cfg) {
       if (account.type != "google" && account.type != "caldav" && account.type != "ics") {
         continue;
       }
+      const bool credentialLocked = account.type == "google"
+          && m_calendarService != nullptr
+          && m_calendarService->googleAccountCredentialLocked(account.id);
       const bool reconnectRequired = account.type == "google"
           && m_calendarService != nullptr
           && m_calendarService->googleAccountNeedsReconnect(account.id);
+      const std::string_view descriptionKey = credentialLocked
+          ? "settings.schema.services.calendar-edit.description-locked"
+          : reconnectRequired ? "settings.schema.services.calendar-edit.description-reconnect"
+                              : "settings.schema.services.calendar-edit.description";
+      const std::string_view buttonKey = credentialLocked ? "settings.schema.services.calendar-edit.button-retry"
+          : reconnectRequired                             ? "settings.schema.services.calendar-edit.button-reconnect"
+                                                          : "settings.schema.services.calendar-edit.button";
       settings::SettingEntry btn{
           .section = settings::SettingsSection::Services,
           .group = "calendar",
           .title = account.displayName.empty() ? account.id : account.displayName,
-          .subtitle = i18n::tr(
-              reconnectRequired ? "settings.schema.services.calendar-edit.description-reconnect"
-                                : "settings.schema.services.calendar-edit.description"
-          ),
+          .subtitle = i18n::tr(descriptionKey),
           .path = {},
           .control =
               settings::ButtonSetting{
-                  .label = i18n::tr(
-                      reconnectRequired ? "settings.schema.services.calendar-edit.button-reconnect"
-                                        : "settings.schema.services.calendar-edit.button"
-                  ),
-                  .action = [this, id = account.id]() { openCalendarAccountEditor(id); },
-                  .glyph = reconnectRequired ? "brand-google" : "edit",
+                  .label = i18n::tr(buttonKey),
+                  .action =
+                      [this, id = account.id, credentialLocked]() {
+                        if (credentialLocked) {
+                          m_calendarService->requestRefresh();
+                          return;
+                        }
+                        openCalendarAccountEditor(id);
+                      },
+                  .glyph = credentialLocked ? "key"
+                      : reconnectRequired   ? "brand-google"
+                                            : "edit",
+                  .variant = credentialLocked ? ButtonVariant::Secondary : ButtonVariant::Default,
               },
           .searchText = "calendar account edit connect authorize caldav icloud google password ics ical subscription "
               + account.id,
@@ -2048,6 +2064,8 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
   logSettingsProfile("buildScene navigationState", phaseProfileWatch);
   phaseProfileWatch.reset();
 
+  dismissOpenSelectDropdown();
+  m_modalHost.detach();
   m_inputDispatcher.setSceneRoot(nullptr);
   m_mainContainer = nullptr;
   m_headerRow = nullptr;
@@ -2112,6 +2130,7 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
   logSettingsProfile("buildScene scrollTarget", phaseProfileWatch);
   phaseProfileWatch.reset();
   m_mainContainer = static_cast<Flex*>(m_sceneRoot->addChild(std::move(main)));
+  m_modalHost.attach(*m_sceneRoot, m_mainContainer, renderer, w, h);
 
   m_inputDispatcher.setTextInputContext(m_surface->wlSurface(), m_wayland->textInputService());
   m_inputDispatcher.setCursorShapeCallback([this](std::uint32_t serial, std::uint32_t shape) {
@@ -2127,7 +2146,9 @@ void SettingsWindow::buildScene(std::uint32_t width, std::uint32_t height) {
     }
   });
   m_inputDispatcher.setFocusChangeCallback([this](InputArea* /*old*/, InputArea* next) {
-    scrollFocusedAreaIntoView(next);
+    if (!m_modalHost.isOpen()) {
+      scrollFocusedAreaIntoView(next);
+    }
   });
   m_inputDispatcher.setSceneRoot(m_sceneRoot.get());
   m_surface->setSceneRoot(m_sceneRoot.get());
