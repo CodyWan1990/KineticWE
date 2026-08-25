@@ -71,6 +71,7 @@ class SinglePixelBufferManagerV1;
 class ColorRepresentationManagerV1;
 class BackendOutput;
 class ExtBackgroundEffectManagerV1;
+class SessionLockManagerV1Interface;
 
 class KWIN_EXPORT WaylandServer : public QObject
 {
@@ -226,6 +227,11 @@ public:
     PointerWarpV1 *pointerWarp() const;
     ExtBackgroundEffectManagerV1 *backgroundEffectManager() const;
 
+    /**
+     * @returns the ext-session-lock-v1 manager, or @c nullptr if not yet created.
+     */
+    SessionLockManagerV1Interface *sessionLockManager() const;
+
     void setRenderBackend(RenderBackend *backend);
 
 Q_SIGNALS:
@@ -304,6 +310,7 @@ private:
     ColorRepresentationManagerV1 *m_colorRepresentation = nullptr;
     PointerWarpV1 *m_pointerWarp = nullptr;
     ExtBackgroundEffectManagerV1 *m_backgroundEffect = nullptr;
+    SessionLockManagerV1Interface *m_sessionLockManager = nullptr;
 
     std::shared_ptr<FileDescriptor> m_sleepInhibitor;
     KWIN_SINGLETON(WaylandServer)

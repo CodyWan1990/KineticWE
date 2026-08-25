@@ -21,13 +21,22 @@ class DesktopEntry;
 // Persists to the standard XDG file ~/.config/mimeapps.list ([Default
 // Applications] group) using the same KineticweKwe reader/writer as the other
 // pages (pointed at mimeapps.list instead of kineticwe.kwe). Each row maps to
-// one or more MIME type keys; the effective value for a row is the first
-// present key's default application. "System" stages a removal of every key the
-// row owns so the freedesktop default applies.
+// one or more MIME type keys; applying a choice writes it to EVERY key the row
+// owns (each key resolves independently — writing only the first left
+// consumers of the other keys, e.g. x-scheme-handler/https, falling back past
+// the user's choice), and the effective value for a row is the first present
+// key's default application. "System" stages a removal of every key the row
+// owns so the freedesktop default applies. The terminal-emulator row is the
+// exception: terminals have no MIME type, so it persists to kdeglobals
+// ([General] TerminalApplication — the location KIO and this shell resolve
+// the terminal from) through kwriteconfig6.
 //
 // App options come from the shell's desktop-entry registry (desktopEntries()),
 // filtered to entries that declare support for the row's MIME types (or, for
-// the terminal row, entries marked Terminal=true).
+// the terminal row, entries that ARE terminal emulators — the TerminalEmulator
+// desktop-file category or a well-known terminal program; never the
+// Terminal=true key, which means "runs inside a terminal", i.e. console
+// tools like htop, not terminals).
 //
 // Like the other pages, edits are STAGED: changing a dropdown only updates an
 // in-memory pending map and nothing touches mimeapps.list until the window's
@@ -59,8 +68,9 @@ public:
   void resetAll();
 
   [[nodiscard]] bool hasPending() const noexcept { return !m_pending.empty(); }
-  // Writes every staged edit to mimeapps.list. Returns false on failure (the
-  // staged edits are kept for retry).
+  // Writes every staged edit (mimeapps.list rows plus the terminal row's
+  // kdeglobals key) and refreshes the desktop caches. Returns false on failure
+  // (the staged edits are kept for retry).
   bool applyAll();
 
   void reloadFromDisk() noexcept {
@@ -83,7 +93,12 @@ private:
     // Semicolon-separated MIME keys this row manages. May be empty for rows
     // filtered by another predicate (e.g. the terminal emulator row).
     std::string_view mimeKeys;
-    // For rows without MIME keys (terminal): whether to match by terminal=true.
+    // For rows without MIME keys (terminal): match terminal emulators (the
+    // TerminalEmulator desktop-file category or a well-known terminal program;
+    // the Terminal=true key means "runs inside a terminal" — console tools —
+    // and must NOT be used). Such rows persist to kdeglobals
+    // [General] TerminalApplication instead of mimeapps.list (see
+    // writeTerminalApplication()).
     bool matchByTerminal = false;
   };
 
@@ -106,6 +121,10 @@ private:
 
   // Stage an edit; un-stages when it matches the value already in the file.
   void stage(const Field& field, const Value& value);
+  // Writes (or clears, when empty) the terminal row's choice to kdeglobals
+  // [General] TerminalApplication via terminal_launch::writeConfiguredTerminal.
+  // Returns false (with the error notice set) on failure.
+  [[nodiscard]] bool writeTerminalApplication(const Value& value);
   void stageAndRebuild(const Field& field, const Value& value, const Callbacks& callbacks);
 
   [[nodiscard]] std::unique_ptr<Node>

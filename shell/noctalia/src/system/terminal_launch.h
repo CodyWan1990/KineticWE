@@ -17,4 +17,14 @@ namespace terminal_launch {
 
   [[nodiscard]] bool launch(std::string_view command, const Options& options = {});
 
+  // The user's configured terminal command from kdeglobals [General]
+  // TerminalApplication ("" when unset) — the location KDE's terminal
+  // component chooser, KIO and the Default Applications settings page share.
+  [[nodiscard]] std::string configuredTerminal();
+
+  // Writes (empty command: deletes) kdeglobals [General] TerminalApplication
+  // via kwriteconfig6, so the shared file keeps its exact KConfig formatting.
+  // Returns false when kwriteconfig6 is unavailable or fails.
+  [[nodiscard]] bool writeConfiguredTerminal(std::string_view command);
+
 } // namespace terminal_launch

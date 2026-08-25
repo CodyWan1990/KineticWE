@@ -22,6 +22,7 @@
 #include "layershellv1window.h"
 #include "main.h"
 #include "options.h"
+#include "sessionlockv1integration.h"
 #include "utils/envvar.h"
 #include "utils/kernel.h"
 #include "virtualdesktops.h"
@@ -72,6 +73,7 @@
 #include "wayland/securitycontext_v1.h"
 #include "wayland/server_decoration.h"
 #include "wayland/server_decoration_palette.h"
+#include "wayland/session_lock_v1.h"
 #include "wayland/shadow.h"
 #include "wayland/singlepixelbuffer.h"
 #include "wayland/subcompositor.h"
@@ -536,6 +538,13 @@ void WaylandServer::initWorkspace()
     connect(layerShellV1Integration, &LayerShellV1Integration::windowCreated,
             this, &WaylandServer::registerWindow);
 
+    auto sessionLockV1Integration = new SessionLockV1Integration(this);
+    connect(sessionLockV1Integration, &SessionLockV1Integration::windowCreated,
+            this, &WaylandServer::registerWindow);
+    m_sessionLockManager = sessionLockV1Integration->manager();
+    connect(m_sessionLockManager, &SessionLockManagerV1Interface::lockedChanged,
+            this, &WaylandServer::lockStateChanged);
+
     if (qEnvironmentVariableIntValue("KWIN_WAYLAND_SUPPORT_XX_PIP_V1") == 1) {
         auto pipV1Integration = new XXPipV1Integration(this);
         connect(pipV1Integration, &XXPipV1Integration::windowCreated,
@@ -765,6 +774,9 @@ XdgSurfaceWindow *WaylandServer::findXdgSurfaceWindow(SurfaceInterface *surface)
 
 bool WaylandServer::isScreenLocked() const
 {
+    if (m_sessionLockManager && m_sessionLockManager->isSessionLocked()) {
+        return true;
+    }
 #if KWIN_BUILD_SCREENLOCKER
     if (!kwinApp()->supportsLockScreen()) {
         return false;
@@ -773,6 +785,11 @@ bool WaylandServer::isScreenLocked() const
 #else
     return false;
 #endif
+}
+
+SessionLockManagerV1Interface *WaylandServer::sessionLockManager() const
+{
+    return m_sessionLockManager;
 }
 
 bool WaylandServer::isKeyboardShortcutsInhibited() const

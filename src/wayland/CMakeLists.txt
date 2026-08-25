@@ -36,6 +36,7 @@ ecm_add_qtwayland_server_protocol_kde(WaylandProtocols_xml
         ${PROJECT_SOURCE_DIR}/src/wayland/protocols/wlr-layer-shell-unstable-v1.xml
         ${PROJECT_SOURCE_DIR}/src/wayland/protocols/xx-fractional-scale-v2.xml
         ${PROJECT_SOURCE_DIR}/src/wayland/protocols/xx-pip-v1.xml
+        ${PROJECT_SOURCE_DIR}/src/wayland/protocols/ext-session-lock-v1.xml
 
         ${WaylandProtocols_DATADIR}/stable/linux-dmabuf/linux-dmabuf-v1.xml
         ${WaylandProtocols_DATADIR}/stable/presentation-time/presentation-time.xml
@@ -145,6 +146,7 @@ target_sources(kwin PRIVATE
     securitycontext_v1.cpp
     server_decoration.cpp
     server_decoration_palette.cpp
+    session_lock_v1.cpp
     shadow.cpp
     shmclientbuffer.cpp
     singlepixelbuffer.cpp
@@ -233,6 +235,7 @@ install(FILES
     securitycontext_v1.h
     server_decoration.h
     server_decoration_palette.h
+    session_lock_v1.h
     shadow.h
     singlepixelbuffer.h
     slide.h
@@ -263,6 +266,7 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/qwayland-server-color-representation-v1.h
     ${CMAKE_CURRENT_BINARY_DIR}/qwayland-server-content-type-v1.h
     ${CMAKE_CURRENT_BINARY_DIR}/qwayland-server-ext-background-effect-v1.h
+    ${CMAKE_CURRENT_BINARY_DIR}/qwayland-server-ext-session-lock-v1.h
     ${CMAKE_CURRENT_BINARY_DIR}/qwayland-server-fifo-v1.h
     ${CMAKE_CURRENT_BINARY_DIR}/qwayland-server-kde-external-brightness-v1.h
     ${CMAKE_CURRENT_BINARY_DIR}/qwayland-server-linux-drm-syncobj-v1.h
@@ -275,6 +279,7 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/wayland-color-representation-v1-server-protocol.h
     ${CMAKE_CURRENT_BINARY_DIR}/wayland-content-type-v1-server-protocol.h
     ${CMAKE_CURRENT_BINARY_DIR}/wayland-ext-background-effect-v1-server-protocol.h
+    ${CMAKE_CURRENT_BINARY_DIR}/wayland-ext-session-lock-v1-server-protocol.h
     ${CMAKE_CURRENT_BINARY_DIR}/wayland-fifo-v1-server-protocol.h
     ${CMAKE_CURRENT_BINARY_DIR}/wayland-kde-external-brightness-v1-server-protocol.h
     ${CMAKE_CURRENT_BINARY_DIR}/wayland-linux-drm-syncobj-v1-server-protocol.h

@@ -89,26 +89,25 @@ kf6_pkgs=(
     libkf6widgetsaddons-dev
     libkf6windowsystem-dev
     libkf6declarative-dev
-    libkf6cmutils-dev
+    libkf6kcmutils-dev
     libkf6newstuff-dev
     libkf6xmlgui-dev
     libkf6runner-dev
     libkf6notifications-dev
-    libkf6kirigami-dev
+    libkirigami-dev
     libkf6auth-dev
     libkf6iconthemes-dev
     libkf6itemviews-dev
     libkf6statusnotifieritem-dev
-    libkf6kiofilewidgets-dev
 )
 
 # Plasma / KDE
 plasma_pkgs=(
     kwayland-dev
-    libkscreenlocker-dev
-    libknighttime-dev
-    libplasma-wayland-protocols-dev
-    libplasma-activities-dev
+    kscreenlocker-dev
+    knighttime-dev
+    plasma-wayland-protocols
+    libplasmaactivities-dev
     libplasma-dev
 )
 
@@ -134,12 +133,12 @@ system_pkgs=(
     libfreetype-dev
     libfontconfig-dev
     libvulkan-dev
-    vulkan-headers
 )
 
 # X11 / Xwayland
 x11_pkgs=(
     libx11-dev
+    libx11-xcb-dev
     libxcb1-dev
     libxcb-keysyms1-dev
     libxcb-cursor-dev
@@ -147,11 +146,27 @@ x11_pkgs=(
     libxcb-icccm4-dev
     libxcb-image0-dev
     libxcb-render-util0-dev
+    libxcb-composite0-dev
+    libxcb-dri3-dev
+    libxcb-present-dev
+    libxcb-randr0-dev
+    libxcb-res0-dev
+    libxcb-shape0-dev
+    libxcb-sync-dev
+    libxcb-xfixes0-dev
+    libxcb-xinerama0-dev
+    libxcb-xinput-dev
+    libxcb-dpms0-dev
+    libxcb-record0-dev
+    libxcb-screensaver0-dev
+    libxcb-shm0-dev
+    libxcb-render0-dev
 )
 
 # Misc
 misc_pkgs=(
-    libqt6accessibilityclient-dev
+    libcups2-dev
+    libqaccessibilityclient-qt6-dev
     libcairo2-dev
     libpango1.0-dev
     libharfbuzz-dev
@@ -248,11 +263,11 @@ if [[ ! -f /usr/include/stb/stb_image_resize2.h && ! -f /usr/local/include/stb/s
     sudo curl -fsSL -o /usr/local/include/stb/stb_image_write.h \
         https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
 fi
-if [[ ! -f /usr/local/include/stb/stb_image_resize2.h ]]; then
+if [[ ! -f /usr/include/stb/stb_image_resize2.h && ! -f /usr/local/include/stb/stb_image_resize2.h ]]; then
     error "stb/stb_image_resize2.h could not be obtained."
     exit 1
 fi
-if [[ ! -f /usr/local/include/stb/stb_image_write.h ]]; then
+if [[ ! -f /usr/include/stb/stb_image_write.h && ! -f /usr/local/include/stb/stb_image_write.h ]]; then
     error "stb/stb_image_write.h could not be obtained."
     exit 1
 fi

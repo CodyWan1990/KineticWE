@@ -579,7 +579,7 @@ bool AppearancePage::applyTheme(std::string_view theme, std::string* error) {
   );
 
   colors += "[WM]\n";
-  colors += "activeBackground=" + csv(primaryContainer, "#000000") + "\n";
+  colors += "activeBackground=" + csv(surfaceContainer, "#000000") + "\n";
   colors += "activeBlend=" + csv(onPrimaryContainer, "#ffffff") + "\n";
   colors += "activeForeground=" + csv(onPrimaryContainer, "#ffffff") + "\n";
   colors += "inactiveBackground=" + csv(surface, "#000000") + "\n";

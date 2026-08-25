@@ -98,10 +98,17 @@ setup_distrobox() {
         info "Container '${DISTROBOX_NAME}' already exists."
     else
         info "Creating distrobox from ${DISTROBOX_IMAGE}..."
+        # Debian sid (systemd >= 261) runs `systemd-tmpfiles --create` in its
+        # postinst, which chowns the host's bind-mounted /tmp and fails inside a
+        # rootless podman container (fchownat: Operation not permitted). That
+        # aborts distrobox's "Installing basic packages" step (Debian bug
+        # #1140336). Divert `systemd-tmpfiles` to a no-op so the postinst
+        # completes; the real binary is preserved at .../systemd-tmpfiles.distrib.
         distrobox create \
             --name "$DISTROBOX_NAME" \
             --image "$DISTROBOX_IMAGE" \
             --additional-flags "--userns=keep-id" \
+            --pre-init-hooks "mkdir -p /usr/bin && printf '#!/bin/sh\nexit 0\n' > /usr/bin/systemd-tmpfiles && chmod 0755 /usr/bin/systemd-tmpfiles && dpkg-divert --local --add /usr/bin/systemd-tmpfiles" \
             --yes
         info "Container created."
     fi

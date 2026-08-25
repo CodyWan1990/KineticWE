@@ -4,6 +4,8 @@
 #include "core/process/process.h"
 #include "i18n/i18n.h"
 #include "system/desktop_entry.h"
+#include "system/desktop_entry_launch.h"
+#include "system/terminal_launch.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
@@ -16,6 +18,8 @@
 #include "util/string_utils.h"
 
 #include <algorithm>
+#include <array>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <functional>
@@ -118,6 +122,60 @@ namespace {
   // appended to match the id form KDE/xdg-mime use.
   [[nodiscard]] std::string desktopFileId(const DesktopEntry& entry) {
     return entry.id + ".desktop";
+  }
+
+  // Basename of a command's first token: "/usr/bin/kitty -e sh" and "kitty"
+  // both reduce to "kitty". Used to match a stored terminal command to a
+  // desktop entry's Exec program.
+  [[nodiscard]] std::string programBasename(std::string_view command) {
+    std::string_view token = command.substr(0, command.find(' '));
+    token = StringUtils::trimRightView(StringUtils::trimLeftView(token));
+    if (const std::size_t slash = token.rfind('/'); slash != std::string_view::npos) {
+      token = token.substr(slash + 1);
+    }
+    return std::string(token);
+  }
+
+  // Whether `entry` IS a terminal emulator. The desktop-file Terminal=true key
+  // means the opposite — "run this program inside a terminal" — so it selects
+  // console tools (htop, btop, yazi, ...), never terminals themselves; kitty,
+  // konsole and friends all declare Terminal=false. Terminals are therefore
+  // identified by the registered TerminalEmulator desktop-file category, with
+  // a bare-exec well-known-program fallback (mirroring terminal_launch's
+  // discovery list) for desktop files that lack the category. The fallback
+  // deliberately requires a SINGLE-token Exec: launchers that merely run
+  // something inside a terminal (custom "kitty --hold --class btop btop"
+  // entries, kglobalaccel command shortcuts, ...) carry the payload as extra
+  // arguments and must never be offered as terminals — with a loose
+  // program-name match they both polluted the option list and hijacked the
+  // readback (the first registry match for "kitty" was the btop wrapper, not
+  // kitty itself).
+  [[nodiscard]] bool isTerminalEmulatorEntry(const DesktopEntry& entry) {
+    for (const std::string& category : splitMimeKeys(entry.categoriesLower)) {
+      if (category == "terminalemulator") {
+        return true;
+      }
+    }
+    // Bare command only: extra arguments mean this is a wrapper around a
+    // command, not the terminal itself.
+    if (entry.exec.find(' ') != std::string::npos) {
+      return false;
+    }
+    const std::string program = programBasename(entry.exec);
+    if (program.empty()) {
+      return false;
+    }
+    static constexpr std::array<std::string_view, 17> kTerminalPrograms = {
+        "x-terminal-emulator", "ghostty",        "kitty",          "alacritty",   "wezterm",    "foot",
+        "konsole",             "gnome-terminal", "kgx",            "ptyxis",      "xterm",      "terminator",
+        "tilix",               "xfce4-terminal", "lxterminal",     "guake",       "yakuake",
+    };
+    for (const std::string_view candidate : kTerminalPrograms) {
+      if (program == candidate) {
+        return true;
+      }
+    }
+    return false;
   }
 
 } // namespace
@@ -242,6 +300,33 @@ void DefaultAppsPage::ensureLoaded() {
 }
 
 DefaultAppsPage::Value DefaultAppsPage::fileBackedValue(const Field& field) const {
+  // The terminal row is not a MIME default: it persists to kdeglobals
+  // ([General] TerminalApplication), the location KIO and this shell resolve
+  // the terminal from. Map the stored command back to a terminal desktop-entry
+  // id so the dropdown can select it.
+  if (field.matchByTerminal) {
+    const std::string stored = terminal_launch::configuredTerminal();
+    const std::string storedProgram = programBasename(stored);
+    kLog.info("default-apps terminal readback: stored='{}' program='{}'", stored, storedProgram);
+    if (storedProgram.empty()) {
+      return Value{};
+    }
+    for (const DesktopEntry& entry : desktopEntries()) {
+      if (!isTerminalEmulatorEntry(entry)) {
+        continue;
+      }
+      const auto prepared = desktop_entry_launch::prepareCommand(entry.exec, false);
+      if (prepared.has_value() && !prepared->args.empty()
+          && programBasename(prepared->args.front()) == storedProgram) {
+        kLog.info("default-apps terminal readback: matched entry '{}'", desktopFileId(entry));
+        return desktopFileId(entry);
+      }
+    }
+    // Configured but not among the offered entries (e.g. uninstalled): surface
+    // the raw command so the control shows the placeholder instead of
+    // pretending "System" is active.
+    return stored;
+  }
   // The effective default for a row is the first MIME key that has a default
   // application configured.
   for (const std::string& key : splitMimeKeys(field.mimeKeys)) {
@@ -286,7 +371,7 @@ std::vector<const DesktopEntry*> DefaultAppsPage::candidateApps(const Field& fie
   std::vector<const DesktopEntry*> candidates;
   for (const DesktopEntry& entry : desktopEntries()) {
     if (field.matchByTerminal) {
-      if (entry.terminal) {
+      if (isTerminalEmulatorEntry(entry)) {
         candidates.push_back(&entry);
       }
     } else if (entrySupportsMimeKeys(entry, field.mimeKeys)) {
@@ -326,25 +411,37 @@ bool DefaultAppsPage::applyAll() {
     return true;
   }
 
-  // A non-empty value sets the first MIME key and clears the others the row
-  // owns; "System" (empty) removes every key the row owns so the freedesktop
-  // default applies.
+  bool mimeDirty = false;
   for (const auto& [path, value] : m_pending) {
-    if (const Field* field = findField(path)) {
-      const auto keys = splitMimeKeys(field->mimeKeys);
-      bool wrote = false;
-      for (const std::string& key : keys) {
-        if (!wrote && !value.empty()) {
-          m_config.setString("Default Applications", key, value);
-          wrote = true;
-        } else {
-          m_config.removeKey("Default Applications", key);
-        }
+    const Field* field = findField(path);
+    if (field == nullptr) {
+      continue;
+    }
+    // The terminal row persists to kdeglobals ([General] TerminalApplication)
+    // rather than mimeapps.list — terminals have no MIME type.
+    if (field->matchByTerminal) {
+      if (!writeTerminalApplication(value)) {
+        return false;
+      }
+      continue;
+    }
+    // A non-empty value sets EVERY MIME key the row owns: each key resolves
+    // independently, so writing only the first (and dropping the rest) left
+    // consumers of the other keys (e.g. x-scheme-handler/https) falling back
+    // past the user's choice. "System" (empty) removes every key the row owns
+    // so the freedesktop default applies.
+    const auto keys = splitMimeKeys(field->mimeKeys);
+    for (const std::string& key : keys) {
+      if (value.empty()) {
+        m_config.removeKey("Default Applications", key);
+      } else {
+        m_config.setString("Default Applications", key, value);
       }
     }
+    mimeDirty = true;
   }
 
-  if (!m_config.save()) {
+  if (mimeDirty && !m_config.save()) {
     m_errorNotice = "Failed to write mimeapps.list. Your changes were kept; try Apply again.";
     kLog.warn("kinetic-settings: failed to write {}", m_config.path().string());
     return false;
@@ -354,16 +451,55 @@ bool DefaultAppsPage::applyAll() {
   // for every consumer, not just xdg-open: update-desktop-database rebuilds
   // mimeinfo.cache (used by some launchers) and kbuildsycoca rebuilds KDE's
   // KApplicationTrader cache (used by KDE apps to resolve default apps). Both
-  // are no-ops when the tool isn't installed.
+  // are no-ops when the tool isn't installed. kbuildsycoca6 runs synchronously
+  // (bounded — it completes in well under a second on typical installs) so the
+  // refreshed cache is already visible when Apply returns; a fire-and-forget
+  // rebuild previously left a window where lookups still hit the stale cache
+  // and launched the old default.
   if (process::commandExists("update-desktop-database")) {
     (void)process::runAsync("update-desktop-database");
   }
   if (process::commandExists("kbuildsycoca6")) {
-    (void)process::runAsync("kbuildsycoca6");
+    const auto result = process::runSyncWithTimeout({"kbuildsycoca6"}, std::chrono::seconds(15));
+    if (!result) {
+      kLog.warn("kinetic-settings: kbuildsycoca6 failed (exit {})", result.exitCode);
+    }
   }
 
   m_pending.clear();
   m_errorNotice.clear();
+  return true;
+}
+
+bool DefaultAppsPage::writeTerminalApplication(const Value& value) {
+  // "System" (empty) clears the key so KIO's built-in default applies.
+  std::string command;
+  if (!value.empty()) {
+    // Map the desktop-file id ("kitty.desktop") back to its Exec command, with
+    // the desktop-entry field codes stripped by prepareCommand.
+    const std::string id = value.ends_with(".desktop") ? value.substr(0, value.size() - 8) : value;
+    for (const DesktopEntry& entry : desktopEntries()) {
+      if (entry.id != id) {
+        continue;
+      }
+      const auto prepared = desktop_entry_launch::prepareCommand(entry.exec, false);
+      if (prepared.has_value() && !prepared->args.empty()) {
+        command = StringUtils::join(prepared->args, " ");
+      }
+      break;
+    }
+    kLog.info("default-apps terminal apply: id='{}' command='{}'", id, command);
+    if (command.empty()) {
+      m_errorNotice = "The selected terminal could not be resolved. Your changes were kept; try Apply again.";
+      return false;
+    }
+  }
+  if (!terminal_launch::writeConfiguredTerminal(command)) {
+    m_errorNotice = "Failed to write the terminal setting. Your changes were kept; try Apply again.";
+    kLog.warn("kinetic-settings: kwriteconfig6 failed for TerminalApplication");
+    return false;
+  }
+  kLog.info("default-apps terminal apply: wrote TerminalApplication='{}'", command);
   return true;
 }
 
@@ -433,6 +569,12 @@ DefaultAppsPage::buildControl(const Field& field, float scale, const Callbacks& 
   }
 
   const Value current = effectiveValue(field);
+  if (field.matchByTerminal) {
+    kLog.info(
+        "default-apps terminal buildControl: current='{}' staged={} candidates={}",
+        current, m_pending.contains(keyPath(field)), candidates.size()
+    );
+  }
   std::optional<std::size_t> selectedIndex;
   if (!current.empty()) {
     // Match the configured desktop-file id (e.g. "firefox.desktop") to a

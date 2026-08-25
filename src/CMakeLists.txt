@@ -211,6 +211,8 @@ target_sources(kwin PRIVATE
     scripting/windowmodel.cpp
     scripting/windowthumbnailitem.cpp
     scripting/workspace_wrapper.cpp
+    sessionlockv1integration.cpp
+    sessionlockv1window.cpp
     shadow.cpp
     sm.cpp
     tablet_input.cpp
@@ -538,6 +540,8 @@ install(FILES
     rules.h
     screenedge.h
     screenedgegestures.h
+    sessionlockv1integration.h
+    sessionlockv1window.h
     shadow.h
     sm.h
     tablet_input.h

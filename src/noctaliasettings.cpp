@@ -42,7 +42,8 @@ NoctaliaSettings::NoctaliaSettings(QObject *parent)
 
     registerShortcut(QStringLiteral("NoctaliaSessionLock"),
                      i18n("Lock Session"),
-                     {QStringLiteral("msg"), QStringLiteral("session"), QStringLiteral("lock")});
+                     {QStringLiteral("msg"), QStringLiteral("session"), QStringLiteral("lock")},
+                     QKeySequence(Qt::META | Qt::Key_L));
 
     registerShortcut(QStringLiteral("NoctaliaSessionLogout"),
                      i18n("Log Out"),

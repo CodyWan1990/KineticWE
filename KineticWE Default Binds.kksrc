@@ -93,7 +93,7 @@ ZoomOut=Ctrl+-
 
 [ksmserver][Global Shortcuts]
 Halt Without Confirmation=
-Lock Session=Screensaver; Meta+L
+Lock Session=Screensaver
 Log Out=Ctrl+Alt+Del
 Log Out Without Confirmation=
 LogOut=
@@ -315,7 +315,7 @@ NoctaliaDockShow=
 NoctaliaDockToggle=
 NoctaliaReloadConfig=
 NoctaliaRestartShell=Meta+Alt+R
-NoctaliaSessionLock=
+NoctaliaSessionLock=Meta+L
 NoctaliaSessionLogout=
 NoctaliaSessionReboot=
 NoctaliaSessionShutdown=

@@ -2,9 +2,13 @@
 
 #include "core/process/process.h"
 #include "util/file_utils.h"
+#include "util/string_utils.h"
 
 #include <array>
+#include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <unistd.h>
 #include <utility>
@@ -83,6 +87,17 @@ namespace {
     return false;
   }
 
+  // The user's kdeglobals (shared KDE config) in the real config home.
+  [[nodiscard]] std::filesystem::path kdeglobalsPath() {
+    if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg != nullptr && *xdg != '\0') {
+      return std::filesystem::path(xdg) / "kdeglobals";
+    }
+    if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+      return std::filesystem::path(home) / ".config" / "kdeglobals";
+    }
+    return {};
+  }
+
   std::vector<std::string> discoverTerminal(const terminal_launch::Options& options) {
     if (!options.terminalCandidates.empty()) {
       for (const auto& candidate : options.terminalCandidates) {
@@ -99,6 +114,18 @@ namespace {
 
     if (const char* envTerminal = std::getenv("TERMINAL"); envTerminal != nullptr && envTerminal[0] != '\0') {
       std::vector<std::string> terminal = tokenize(envTerminal);
+      if (!terminal.empty() && isExecutableOnPath(terminal.front())) {
+        return terminal;
+      }
+    }
+
+    // Honor the terminal configured in kdeglobals [General] TerminalApplication
+    // (what KDE's component chooser, KIO and the Default Applications settings
+    // page write) ahead of the built-in candidate list, so the user's choice
+    // actually launches Terminal=true desktop entries. Falls through when the
+    // configured command is missing or not executable.
+    if (const std::string configured = terminal_launch::configuredTerminal(); !configured.empty()) {
+      std::vector<std::string> terminal = tokenize(configured);
       if (!terminal.empty() && isExecutableOnPath(terminal.front())) {
         return terminal;
       }
@@ -153,6 +180,79 @@ namespace terminal_launch {
   bool launch(std::string_view command, const Options& options) {
     auto prepared = prepareCommand(command, options);
     return prepared.has_value() && process::runAsync(*prepared);
+  }
+
+  std::string configuredTerminal() {
+    const std::filesystem::path path = kdeglobalsPath();
+    if (path.empty()) {
+      return {};
+    }
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec)) {
+      return {};
+    }
+    std::ifstream in(path);
+    if (!in.is_open()) {
+      return {};
+    }
+    bool inGeneral = false;
+    std::string line;
+    while (std::getline(in, line)) {
+      if (!line.empty() && (line.back() == '\r' || line.back() == '\n')) {
+        line.pop_back();
+      }
+      const std::string trimmed = StringUtils::trim(line);
+      if (trimmed.empty() || trimmed.front() == '#' || trimmed.front() == ';') {
+        continue;
+      }
+      if (trimmed.front() == '[' && trimmed.back() == ']') {
+        inGeneral = (trimmed == "[General]");
+        continue;
+      }
+      if (!inGeneral) {
+        continue;
+      }
+      const std::size_t eq = trimmed.find('=');
+      if (eq == std::string::npos) {
+        continue;
+      }
+      std::string key = StringUtils::trim(trimmed.substr(0, eq));
+      // KConfig expansion/immutability suffixes (e.g. "TerminalApplication[$e]").
+      if (const std::size_t bracket = key.find('['); bracket != std::string::npos) {
+        key.resize(bracket);
+      }
+      if (key != "TerminalApplication") {
+        continue;
+      }
+      std::string value = trimmed.substr(eq + 1);
+      if (!value.empty() && value.front() == ' ') {
+        value.erase(value.begin());
+      }
+      return value;
+    }
+    return {};
+  }
+
+  bool writeConfiguredTerminal(std::string_view command) {
+    if (!process::commandExists("kwriteconfig6")) {
+      return false;
+    }
+    // Delegate to KDE's own config writer so kdeglobals — a file other KDE
+    // components also write — keeps its exact KConfig formatting. The absolute
+    // path keeps the write consistent with configuredTerminal()'s read even if
+    // XDG_CONFIG_HOME ever gets redirected.
+    const std::filesystem::path target = kdeglobalsPath();
+    if (target.empty()) {
+      return false;
+    }
+    std::vector<std::string> args{
+        "kwriteconfig6", "--file", target.string(), "--group", "General", "--key", "TerminalApplication"};
+    if (command.empty()) {
+      args.push_back("--delete");
+    } else {
+      args.push_back(std::string(command));
+    }
+    return static_cast<bool>(process::runSyncWithTimeout(args, std::chrono::seconds(10)));
   }
 
 } // namespace terminal_launch
