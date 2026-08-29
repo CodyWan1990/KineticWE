@@ -16,7 +16,9 @@
 #include <KConfigGroup>
 
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QStandardPaths>
+#include <QTimer>
 
 namespace KWin
 {
@@ -34,6 +36,32 @@ DecorationPalette::DecorationPalette(const QString &colorScheme)
     m_watcher = KConfigWatcher::create(m_colorSchemeConfig);
 
     connect(m_watcher.data(), &KConfigWatcher::configChanged, this, &DecorationPalette::update);
+
+    // The palette file is written by external tools (the Noctalia theme
+    // service merges its generated color scheme into kdeglobals with a raw
+    // atomic write), and it is opened here by absolute path because the
+    // compositor's config root is redirected (see kineticweKdeGlobalsPath()).
+    // KConfigWatcher is DBus-notify only and explicitly refuses absolute
+    // paths (see kconfigwatcher.cpp in KConfig), so it never fires for this
+    // file and decoration colors would stay frozen until restart. Mirror
+    // TilingController and add a QFileSystemWatcher fallback.
+    const QString watchedFile = m_colorScheme.isEmpty() ? kineticweKdeGlobalsPath() : m_colorScheme;
+    m_fileWatcher = new QFileSystemWatcher(this);
+    m_fileWatcher->addPath(watchedFile);
+    connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, [this, watchedFile]() {
+        // Writers use atomic-rename semantics which invalidate the inotify
+        // watch on the original inode; re-adding the path restores the watch
+        // on the new file.
+        m_fileWatcher->addPath(watchedFile);
+        m_fileReloadTimer.start();
+    });
+
+    // Debounce: an atomic write (write-to-tmp + rename) can produce several
+    // fileChanged events, and the DBus KConfigWatcher may fire on top of
+    // them. Coalesce everything into a single re-read + repaint.
+    m_fileReloadTimer.setSingleShot(true);
+    m_fileReloadTimer.setInterval(50);
+    connect(&m_fileReloadTimer, &QTimer::timeout, this, &DecorationPalette::update);
 
     update();
 }

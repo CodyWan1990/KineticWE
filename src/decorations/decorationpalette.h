@@ -17,6 +17,7 @@
 #include <KSharedConfig>
 #include <QFileSystemWatcher>
 #include <QPalette>
+#include <QTimer>
 
 #include <optional>
 
@@ -45,6 +46,8 @@ private:
 
     QString m_colorScheme;
     KConfigWatcher::Ptr m_watcher;
+    QFileSystemWatcher *m_fileWatcher = nullptr;
+    QTimer m_fileReloadTimer;
 
     struct LegacyColors
     {

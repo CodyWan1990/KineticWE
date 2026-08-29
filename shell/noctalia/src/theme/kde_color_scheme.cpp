@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <optional>
 #include <sdbus-c++/sdbus-c++.h>
 #include <sstream>
@@ -23,6 +24,10 @@ namespace noctalia::theme {
     constexpr const char* kKdeGlobalsSignalPath = "/KGlobalSettings";
     constexpr const char* kKdeGlobalsSignalInterface = "org.kde.KGlobalSettings";
     constexpr const char* kKdeGlobalsSignalName = "notifyChange";
+
+    constexpr const char* kKConfigNotifySignalPath = "/kdeglobals";
+    constexpr const char* kKConfigNotifySignalInterface = "org.kde.kconfig.notify";
+    constexpr const char* kKConfigNotifySignalName = "ConfigChanged";
 
     struct KdeConfigKey {
       std::string name;
@@ -197,6 +202,29 @@ namespace noctalia::theme {
 
     std::filesystem::path kdeGlobalsPath() { return FileUtils::expandXdgBaseDir("$XDG_CONFIG_HOME/kdeglobals"); }
 
+    // Emits org.kde.kconfig.notify ConfigChanged so KConfigWatcher listeners
+    // (running KF6 applications watching the relative-named kdeglobals) reparse
+    // the config and reload their palette live. Qt's QDBus marshals the
+    // payload as QHash<QString, QByteArrayList>, whose DBus signature is
+    // a{saay}; in sdbus-c++ that maps to map<string, vector<vector<uint8_t>>>.
+    // Best-effort: returns an error string on failure, empty on success.
+    std::string notifyKConfigGroupsChanged(const std::vector<std::string>& groups) {
+      try {
+        auto connection = sdbus::createSessionBusConnection();
+        auto object = sdbus::createObject(*connection, sdbus::ObjectPath{kKConfigNotifySignalPath});
+        std::map<std::string, std::vector<std::vector<uint8_t>>> changes;
+        for (const std::string& group : groups) {
+          changes.emplace(group, std::vector<std::vector<uint8_t>>{});
+        }
+        object->emitSignal(kKConfigNotifySignalName)
+            .onInterface(kKConfigNotifySignalInterface)
+            .withArguments(changes);
+      } catch (const sdbus::Error& error) {
+        return error.what();
+      }
+      return {};
+    }
+
   } // namespace
 
   std::string notifyKdeColorSchemeChanged() {
@@ -239,6 +267,17 @@ namespace noctalia::theme {
       setError(error, "failed to write " + kdeGlobalsPath.string());
       return false;
     }
+
+    // Also emit the modern kconfig DBus notification so applications that use
+    // KConfigWatcher (running KF6 apps) live-reload, not just apps launched
+    // afterwards. Best-effort: the legacy KGlobalSettings signal emitted by
+    // applyKdeColorScheme covers the remaining listeners.
+    std::vector<std::string> mergedGroups;
+    mergedGroups.reserve(scheme.sections.size());
+    for (const KdeConfigSection& section : scheme.sections) {
+      mergedGroups.push_back(section.name);
+    }
+    (void)notifyKConfigGroupsChanged(mergedGroups);
     return true;
   }
 
