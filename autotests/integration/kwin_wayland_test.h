@@ -30,6 +30,7 @@
 #include "qwayland-color-management-v1.h"
 #include "qwayland-color-representation-v1.h"
 #include "qwayland-cursor-shape-v1.h"
+#include "qwayland-ext-session-lock-v1.h"
 #include "qwayland-fake-input.h"
 #include "qwayland-fifo-v1.h"
 #include "qwayland-fractional-scale-v1.h"
@@ -793,6 +794,56 @@ public:
     std::unique_ptr<XdgToplevelDragV1> createDrag(KWayland::Client::DataSource *source);
 };
 
+class SessionLockSurfaceV1 : public QObject, public QtWayland::ext_session_lock_surface_v1
+{
+    Q_OBJECT
+
+public:
+    explicit SessionLockSurfaceV1(::ext_session_lock_surface_v1 *object);
+    ~SessionLockSurfaceV1() override;
+
+Q_SIGNALS:
+    void configureRequested(quint32 serial, const QSize &size);
+
+protected:
+    void ext_session_lock_surface_v1_configure(uint32_t serial, uint32_t width, uint32_t height) override;
+};
+
+class SessionLockV1 : public QObject, public QtWayland::ext_session_lock_v1
+{
+    Q_OBJECT
+
+public:
+    explicit SessionLockV1(::ext_session_lock_v1 *object);
+    ~SessionLockV1() override;
+
+    std::unique_ptr<SessionLockSurfaceV1> createSurface(KWayland::Client::Surface *surface, KWayland::Client::Output *output);
+
+    bool hasReceivedLocked() const;
+    void unlock();
+
+Q_SIGNALS:
+    void locked();
+    void finished();
+
+protected:
+    void ext_session_lock_v1_locked() override;
+    void ext_session_lock_v1_finished() override;
+
+private:
+    bool m_locked = false;
+    bool m_unlocked = false;
+};
+
+class SessionLockManagerV1 : public QtWayland::ext_session_lock_manager_v1
+{
+public:
+    SessionLockManagerV1(::wl_registry *registry, uint32_t id, int version);
+    ~SessionLockManagerV1() override;
+
+    std::unique_ptr<SessionLockV1> createLock();
+};
+
 enum class AdditionalWaylandInterface : uint64_t {
     Seat = 1 << 0,
     DataDeviceManager = 1 << 1,
@@ -830,6 +881,7 @@ enum class AdditionalWaylandInterface : uint64_t {
     Viewporter = 1ull << 33,
     AlphaModifierV1 = 1ull << 34,
     TearingControlV1 = 1ull << 35,
+    SessionLockV1 = 1ull << 36,
 };
 Q_DECLARE_FLAGS(AdditionalWaylandInterfaces, AdditionalWaylandInterface)
 
@@ -1224,6 +1276,7 @@ struct Connection
     std::unique_ptr<WaylandClient::Viewporter> viewporter;
     std::unique_ptr<AlphaModifierV1> alphaModifier;
     std::unique_ptr<TearingControlManagerV1> tearingControl;
+    std::unique_ptr<SessionLockManagerV1> sessionLockManager;
     // TODO port everything away from KWayland::Client::Seat
     std::unique_ptr<WlSeat> kwinSeat;
 };

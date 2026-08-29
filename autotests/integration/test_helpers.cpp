@@ -597,6 +597,9 @@ std::unique_ptr<Connection> Connection::setup(int socket, AdditionalWaylandInter
         if (flags & AdditionalWaylandInterface::TearingControlV1 && interface == wp_tearing_control_manager_v1_interface.name) {
             c->tearingControl = std::make_unique<TearingControlManagerV1>(*c->registry, name, version);
         }
+        if (flags & AdditionalWaylandInterface::SessionLockV1 && interface == ext_session_lock_manager_v1_interface.name) {
+            c->sessionLockManager = std::make_unique<SessionLockManagerV1>(*c->registry, name, std::min(version, 1u));
+        }
         if (flags.testFlag(AdditionalWaylandInterface::Seat) && interface == wl_seat_interface.name) {
             c->kwinSeat = std::make_unique<WlSeat>(*c->registry, name, version);
         }
@@ -749,6 +752,7 @@ Connection::~Connection()
     viewporter.reset();
     alphaModifier.reset();
     tearingControl.reset();
+    sessionLockManager.reset();
     kwinSeat.reset();
 
     delete queue; // Must be destroyed last
@@ -2395,6 +2399,87 @@ XdgToplevelDragV1::XdgToplevelDragV1(::xdg_toplevel_drag_v1 *id)
 XdgToplevelDragV1::~XdgToplevelDragV1()
 {
     destroy();
+}
+
+SessionLockSurfaceV1::SessionLockSurfaceV1(::ext_session_lock_surface_v1 *object)
+    : QtWayland::ext_session_lock_surface_v1(object)
+{
+}
+
+SessionLockSurfaceV1::~SessionLockSurfaceV1()
+{
+    destroy();
+}
+
+void SessionLockSurfaceV1::ext_session_lock_surface_v1_configure(uint32_t serial, uint32_t width, uint32_t height)
+{
+    Q_EMIT configureRequested(serial, QSize(width, height));
+}
+
+SessionLockV1::SessionLockV1(::ext_session_lock_v1 *object)
+    : QtWayland::ext_session_lock_v1(object)
+{
+}
+
+SessionLockV1::~SessionLockV1()
+{
+    if (!isInitialized()) {
+        return;
+    }
+    if (m_unlocked) {
+        // unlock_and_destroy has already been sent; nothing more to do.
+        return;
+    }
+    if (m_locked) {
+        unlock_and_destroy();
+    } else {
+        destroy();
+    }
+}
+
+std::unique_ptr<SessionLockSurfaceV1> SessionLockV1::createSurface(KWayland::Client::Surface *surface, KWayland::Client::Output *output)
+{
+    return std::make_unique<SessionLockSurfaceV1>(get_lock_surface(*surface, output->output()));
+}
+
+bool SessionLockV1::hasReceivedLocked() const
+{
+    return m_locked;
+}
+
+void SessionLockV1::unlock()
+{
+    if (!isInitialized() || m_unlocked) {
+        return;
+    }
+    unlock_and_destroy();
+    m_unlocked = true;
+}
+
+void SessionLockV1::ext_session_lock_v1_locked()
+{
+    m_locked = true;
+    Q_EMIT locked();
+}
+
+void SessionLockV1::ext_session_lock_v1_finished()
+{
+    Q_EMIT finished();
+}
+
+SessionLockManagerV1::SessionLockManagerV1(::wl_registry *registry, uint32_t id, int version)
+    : QtWayland::ext_session_lock_manager_v1(registry, id, version)
+{
+}
+
+SessionLockManagerV1::~SessionLockManagerV1()
+{
+    destroy();
+}
+
+std::unique_ptr<SessionLockV1> SessionLockManagerV1::createLock()
+{
+    return std::make_unique<SessionLockV1>(lock());
 }
 
 WlSeat::WlSeat(::wl_registry *registry, uint32_t id, int version)

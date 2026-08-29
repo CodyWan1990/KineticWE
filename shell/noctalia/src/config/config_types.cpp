@@ -131,7 +131,7 @@ std::vector<IdleBehaviorConfig> defaultIdleBehaviors() {
   return {
       IdleBehaviorConfig{
           .name = "lock",
-          .enabled = false,
+          .enabled = true,
           .timeoutSeconds = 600,
           .action = "lock",
           .command = "",

@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2008-2011 Kristian Hogsberg
+  SPDX-FileCopyrightText: 2015 Sebastian Kugler
+  SPDX-FileCopyrightText: 2021 Meven Car
+  SPDX-License-Identifier: MIT-CMU
+
+  Client ABI for KineticWE's output-management protocol.
+
+  This is deliberately kept in the shell subtree so the shell can be built as
+  an independent package. The interface and message order match
+  src/wayland/protocols/kde-output-device-v2.xml; descriptions are omitted
+  because they do not affect the wire ABI. The protocol is consumed directly
+  through wayland-client and is not a KDE library dependency.
+-->
+<protocol name="kde_output_device_v2">
+  <interface name="kde_output_device_registry_v2" version="24">
+    <event name="finished" type="destructor" since="21"/>
+    <event name="output" since="21">
+      <arg name="output" type="new_id" interface="kde_output_device_v2"/>
+    </event>
+    <request name="stop" since="21"/>
+  </interface>
+
+  <interface name="kde_output_device_v2" version="24">
+    <event name="geometry">
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="physical_width" type="int"/>
+      <arg name="physical_height" type="int"/>
+      <arg name="subpixel" type="int"/>
+      <arg name="make" type="string"/>
+      <arg name="model" type="string"/>
+      <arg name="transform" type="int"/>
+    </event>
+    <event name="current_mode">
+      <arg name="mode" type="object" interface="kde_output_device_mode_v2"/>
+    </event>
+    <event name="mode">
+      <arg name="mode" type="new_id" interface="kde_output_device_mode_v2"/>
+    </event>
+    <event name="done"/>
+    <event name="scale">
+      <arg name="factor" type="fixed"/>
+    </event>
+    <event name="edid">
+      <arg name="raw" type="string"/>
+    </event>
+    <event name="enabled">
+      <arg name="enabled" type="int"/>
+    </event>
+    <event name="uuid">
+      <arg name="uuid" type="string"/>
+    </event>
+    <event name="serial_number">
+      <arg name="serialNumber" type="string"/>
+    </event>
+    <event name="eisa_id">
+      <arg name="eisaId" type="string"/>
+    </event>
+    <event name="capabilities">
+      <arg name="flags" type="uint"/>
+    </event>
+    <event name="overscan">
+      <arg name="overscan" type="uint"/>
+    </event>
+    <event name="vrr_policy">
+      <arg name="vrr_policy" type="uint"/>
+    </event>
+    <event name="rgb_range">
+      <arg name="rgb_range" type="uint"/>
+    </event>
+    <event name="name" since="2">
+      <arg name="name" type="string"/>
+    </event>
+    <event name="high_dynamic_range" since="3">
+      <arg name="hdr_enabled" type="uint"/>
+    </event>
+    <event name="sdr_brightness" since="3">
+      <arg name="sdr_brightness" type="uint"/>
+    </event>
+    <event name="wide_color_gamut" since="3">
+      <arg name="wcg_enabled" type="uint"/>
+    </event>
+    <event name="auto_rotate_policy" since="4">
+      <arg name="policy" type="uint"/>
+    </event>
+    <event name="icc_profile_path" since="5">
+      <arg name="profile_path" type="string"/>
+    </event>
+    <event name="brightness_metadata" since="6">
+      <arg name="max_peak_brightness" type="uint"/>
+      <arg name="max_frame_average_brightness" type="uint"/>
+      <arg name="min_brightness" type="uint"/>
+    </event>
+    <event name="brightness_overrides" since="6">
+      <arg name="max_peak_brightness" type="int"/>
+      <arg name="max_average_brightness" type="int"/>
+      <arg name="min_brightness" type="int"/>
+    </event>
+    <event name="sdr_gamut_wideness" since="6">
+      <arg name="gamut_wideness" type="uint"/>
+    </event>
+    <event name="color_profile_source" since="7">
+      <arg name="source" type="uint"/>
+    </event>
+    <event name="brightness" since="8">
+      <arg name="brightness" type="uint"/>
+    </event>
+    <event name="color_power_tradeoff" since="10">
+      <arg name="preference" type="uint"/>
+    </event>
+    <event name="dimming" since="11">
+      <arg name="multiplier" type="uint"/>
+    </event>
+    <event name="replication_source" since="13">
+      <arg name="source" type="string"/>
+    </event>
+    <event name="ddc_ci_allowed" since="14">
+      <arg name="allowed" type="uint"/>
+    </event>
+    <event name="max_bits_per_color" since="15">
+      <arg name="max_bpc" type="uint"/>
+    </event>
+    <event name="max_bits_per_color_range" since="15">
+      <arg name="min_value" type="uint"/>
+      <arg name="max_value" type="uint"/>
+    </event>
+    <event name="automatic_max_bits_per_color_limit" since="15">
+      <arg name="max_bpc_limit" type="uint"/>
+    </event>
+    <event name="edr_policy" since="16">
+      <arg name="policy" type="uint"/>
+    </event>
+    <event name="sharpness" since="17">
+      <arg name="sharpness" type="uint"/>
+    </event>
+    <event name="priority" since="18">
+      <arg name="priority" type="uint"/>
+    </event>
+    <event name="auto_brightness" since="20">
+      <arg name="enabled" type="uint"/>
+    </event>
+    <event name="removed" since="21"/>
+    <event name="hdr_icc_profile_path" since="22">
+      <arg name="profile_path" type="string"/>
+    </event>
+    <event name="hdr_color_profile_source" since="22">
+      <arg name="source" type="uint"/>
+    </event>
+    <event name="abm_level" since="23">
+      <arg name="level" type="uint"/>
+    </event>
+    <request name="release" type="destructor" since="21"/>
+  </interface>
+
+  <interface name="kde_output_device_mode_v2" version="24">
+    <event name="size">
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </event>
+    <event name="refresh">
+      <arg name="refresh" type="int"/>
+    </event>
+    <event name="preferred"/>
+    <event name="removed"/>
+    <event name="flags" since="19">
+      <arg name="flags" type="uint"/>
+    </event>
+    <event name="cvt" since="24">
+      <arg name="clock" type="uint"/>
+      <arg name="hdisplay" type="uint"/>
+      <arg name="hsync_start" type="uint"/>
+      <arg name="hsync_end" type="uint"/>
+      <arg name="htotal" type="uint"/>
+      <arg name="hskew" type="uint"/>
+      <arg name="vdisplay" type="uint"/>
+      <arg name="vsync_start" type="uint"/>
+      <arg name="vsync_end" type="uint"/>
+      <arg name="vtotal" type="uint"/>
+      <arg name="vscan" type="uint"/>
+      <arg name="flags" type="uint"/>
+    </event>
+  </interface>
+</protocol>

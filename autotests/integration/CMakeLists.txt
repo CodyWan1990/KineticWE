@@ -15,6 +15,7 @@ qt6_generate_wayland_protocol_client_sources(KWinIntegrationTestFramework
         ${Wayland_DATADIR}/wayland.xml
 
         ${CMAKE_SOURCE_DIR}/src/wayland/protocols/wlr-layer-shell-unstable-v1.xml
+        ${CMAKE_SOURCE_DIR}/src/wayland/protocols/ext-session-lock-v1.xml
         ${WaylandProtocols_DATADIR}/stable/presentation-time/presentation-time.xml
         ${WaylandProtocols_DATADIR}/stable/tablet/tablet-v2.xml
         ${WaylandProtocols_DATADIR}/stable/viewporter/viewporter.xml
@@ -105,6 +106,7 @@ endif()
 if (KWIN_BUILD_SCREENLOCKER)
     integrationTest(NAME testLockScreen SRCS lockscreen.cpp LIBS KF6::GlobalAccel PROPERTIES RUN_SERIAL TRUE)
 endif()
+integrationTest(NAME testSessionLockV1 SRCS sessionlockv1_test.cpp)
 integrationTest(NAME testBounceKeys SRCS bounce_keys_test.cpp)
 integrationTest(NAME testVulkan SRCS vulkan_test.cpp)
 integrationTest(NAME testButtonRebind SRCS buttonrebind_test.cpp)

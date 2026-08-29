@@ -374,6 +374,10 @@ foreach _p : [
     'protocols/wlr-screencopy-unstable-v1.xml'],
   ['wlr-output-management-unstable-v1',
     'protocols/wlr-output-management-unstable-v1.xml'],
+  ['kde-output-device-v2',
+    'protocols/kde-output-device-v2.xml'],
+  ['kde-output-management-v2',
+    'protocols/kde-output-management-v2.xml'],
 ]
   _name = _p[0]
   _xml  = _p[1]
@@ -985,6 +989,8 @@ _noctalia_sources = files(
   'src/ipc/cli.cpp',
   'kinetic-settings/src/kineticwe_kwe.cpp',
   'kinetic-settings/src/compositor_dbus.cpp',
+  'kinetic-settings/src/display_backend.cpp',
+  'kinetic-settings/src/display_page.cpp',
   'kinetic-settings/src/default_apps_page.cpp',
   'kinetic-settings/src/kinetic_settings_window.cpp',
   'kinetic-settings/src/appearance_page.cpp',

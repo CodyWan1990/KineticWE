@@ -187,21 +187,26 @@ Useful flags: `--no-session` (skip the login-screen entry), `--no-extract` (buil
 
 ### Power management not working (brightness, idle/DPMS, suspend, power profiles)
 
-The `start-kineticwe` session launcher starts `upowerd` and `org_kde_powerdevil` automatically. It resolves distro-specific paths (`/usr/libexec` on Fedora/RHEL, `/usr/lib` on Arch) and guarantees `WAYLAND_DISPLAY` is set — PowerDevil aborts at startup if that variable is missing.
+Power management is provided by the Noctalia process inside the KineticWE
+session. It handles idle actions, lock-before-suspend, DPMS, brightness, and
+session power actions without starting KDE's PowerDevil daemon. UPower and
+`power-profiles-daemon` are optional freedesktop services used for battery and
+power-profile information.
 
-Verify PowerDevil is running and registered on D-Bus:
+Check the Noctalia log for power-service initialization:
 
 ```bash
-pgrep -f org_kde_powerdevil
-busctl --user list | grep org.kde.Solid.PowerManagement
-cat ~/.local/share/powerdevil.log
+grep -E 'idle|lockscreen|logind|brightness|power profiles|upower' ~/.local/share/noctalia.log
 ```
 
-> **Note:** If you previously created a manual `powerdevil-user.service` systemd unit as a workaround, disable it to avoid launching PowerDevil twice:
->
-> ```bash
-> systemctl --user disable --now powerdevil-user.service
-> ```
+The idle/DPMS settings live in `~/.config/noctalia/config.toml` under
+`[lockscreen]`, `[idle]`, and `[idle.behavior.<name>]`. You can test the
+compositor output path directly with:
+
+```bash
+noctalia-kwe msg dpms-off
+noctalia-kwe msg dpms-on
+```
 
 ---
 
@@ -250,4 +255,3 @@ A new Feature can only be added to KWin if:
 All new added features are under probation, that is if any of the non-functional requirements as listed above do not hold true in the next two feature releases, the added feature will be removed again.
 
 The same non functional requirements hold true for any kind of plugins (effects, scripts, etc.). It is suggested to use scripted plugins and distribute them separately.
-

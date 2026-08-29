@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2008-2011 Kristian Hogsberg
+  SPDX-FileCopyrightText: 2015 Sebastian Kugler
+  SPDX-FileCopyrightText: 2021 Meven Car
+  SPDX-FileCopyrightText: 2023 Xaver Hugl
+  SPDX-License-Identifier: MIT-CMU
+
+  Client ABI for KineticWE's output-management protocol. Message order and
+  since versions match src/wayland/protocols/kde-output-management-v2.xml.
+  This is a protocol description, not a KDE library dependency.
+-->
+<protocol name="kde_output_management_v2">
+  <interface name="kde_output_management_v2" version="22">
+    <request name="create_configuration">
+      <arg name="id" type="new_id" interface="kde_output_configuration_v2"/>
+    </request>
+    <request name="create_mode_list">
+      <arg name="id" type="new_id" interface="kde_mode_list_v2"/>
+    </request>
+  </interface>
+
+  <interface name="kde_output_configuration_v2" version="22">
+    <request name="enable">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="enable" type="int"/>
+    </request>
+    <request name="mode">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="mode" type="object" interface="kde_output_device_mode_v2"/>
+    </request>
+    <request name="transform">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="transform" type="int"/>
+    </request>
+    <request name="position">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+    </request>
+    <request name="scale">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="scale" type="fixed"/>
+    </request>
+    <request name="apply"/>
+    <request name="destroy" type="destructor"/>
+    <request name="overscan">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="overscan" type="uint"/>
+    </request>
+    <request name="set_vrr_policy">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="policy" type="uint"/>
+    </request>
+    <request name="set_rgb_range">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="rgb_range" type="uint"/>
+    </request>
+    <request name="set_primary_output" since="2">
+      <arg name="output" type="object" interface="kde_output_device_v2"/>
+    </request>
+    <request name="set_priority" since="3">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="priority" type="uint"/>
+    </request>
+    <request name="set_high_dynamic_range" since="4">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="enable_hdr" type="uint"/>
+    </request>
+    <request name="set_sdr_brightness" since="4">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="sdr_brightness" type="uint"/>
+    </request>
+    <request name="set_wide_color_gamut" since="4">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="enable_wcg" type="uint"/>
+    </request>
+    <request name="set_auto_rotate_policy" since="5">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="policy" type="uint"/>
+    </request>
+    <request name="set_icc_profile_path" since="6">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="profile_path" type="string"/>
+    </request>
+    <request name="set_brightness_overrides" since="7">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="max_peak_brightness" type="int"/>
+      <arg name="max_frame_average_brightness" type="int"/>
+      <arg name="min_brightness" type="int"/>
+    </request>
+    <request name="set_sdr_gamut_wideness" since="7">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="gamut_wideness" type="uint"/>
+    </request>
+    <request name="set_color_profile_source" since="8">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="color_profile_source" type="uint"/>
+    </request>
+    <request name="set_brightness" since="9">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="brightness" type="uint"/>
+    </request>
+    <request name="set_color_power_tradeoff" since="10">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="preference" type="uint"/>
+    </request>
+    <request name="set_dimming" since="11">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="multiplier" type="uint"/>
+    </request>
+    <request name="set_replication_source" since="13">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="source" type="string"/>
+    </request>
+    <request name="set_ddc_ci_allowed" since="14">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="allowed" type="uint"/>
+    </request>
+    <request name="set_max_bits_per_color" since="15">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="max_bpc" type="uint"/>
+    </request>
+    <request name="set_edr_policy" since="16">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="policy" type="uint"/>
+    </request>
+    <request name="set_sharpness" since="17">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="sharpness" type="uint"/>
+    </request>
+    <request name="set_custom_modes" since="18">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="modes" type="object" interface="kde_mode_list_v2"/>
+    </request>
+    <request name="set_auto_brightness" since="19">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="enabled" type="uint"/>
+    </request>
+    <request name="set_hdr_icc_profile_path" since="20">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="profile_path" type="string"/>
+    </request>
+    <request name="set_hdr_color_profile_source" since="20">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="color_profile_source" type="uint"/>
+    </request>
+    <request name="set_abm_level" since="21">
+      <arg name="outputdevice" type="object" interface="kde_output_device_v2"/>
+      <arg name="level" type="uint"/>
+    </request>
+    <event name="applied"/>
+    <event name="failed"/>
+    <event name="failure_reason" since="12">
+      <arg name="reason" type="string"/>
+    </event>
+  </interface>
+
+  <interface name="kde_mode_list_v2" version="21">
+    <request name="destroy" type="destructor"/>
+    <request name="add_mode"/>
+    <request name="set_resolution">
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+    </request>
+    <request name="set_refresh_rate">
+      <arg name="rate" type="uint"/>
+    </request>
+    <request name="set_reduced_blanking">
+      <arg name="reduced" type="uint"/>
+    </request>
+    <request name="add_cvt" since="21">
+      <arg name="clock" type="uint"/>
+      <arg name="hdisplay" type="uint"/>
+      <arg name="hsync_start" type="uint"/>
+      <arg name="hsync_end" type="uint"/>
+      <arg name="htotal" type="uint"/>
+      <arg name="hskew" type="uint"/>
+      <arg name="vdisplay" type="uint"/>
+      <arg name="vsync_start" type="uint"/>
+      <arg name="vsync_end" type="uint"/>
+      <arg name="vtotal" type="uint"/>
+      <arg name="vscan" type="uint"/>
+      <arg name="flags" type="uint"/>
+    </request>
+  </interface>
+</protocol>

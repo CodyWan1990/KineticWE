@@ -16,6 +16,7 @@
 
 #include "qwayland-server-ext-session-lock-v1.h"
 
+#include <QHash>
 #include <QPointer>
 #include <QSet>
 #include <QTimer>
@@ -36,6 +37,7 @@ public:
     void sendConfigure();
 
     SessionLockSurfaceV1Interface *q;
+    Resource *protocolResource = nullptr;
     QPointer<SurfaceInterface> surface;
     QPointer<OutputInterface> output;
     SessionLockV1InterfacePrivate *lock = nullptr;
@@ -59,6 +61,7 @@ public:
     void sendFinished();
 
     SessionLockV1Interface *q;
+    Resource *protocolResource = nullptr;
     SessionLockManagerV1InterfacePrivate *manager = nullptr;
     bool locked = false;
     bool finished = false;
@@ -81,11 +84,13 @@ public:
 
     void engageLock(SessionLockV1Interface *lock);
     void disengageLock();
+    void abandonLock(SessionLockV1Interface *lock);
     void maybeSendLocked();
     void handleFramePresented(LogicalOutput *output);
     void checkBlankedOutputs();
     bool hasMappedLockSurfaceForOutput(LogicalOutput *output) const;
     void trackOutput(LogicalOutput *output);
+    void stopTrackingLock();
 
     SessionLockManagerV1Interface *q;
     Display *display;
@@ -93,6 +98,7 @@ public:
     bool sessionLocked = false;
     bool lockSent = false;
     QSet<LogicalOutput *> pendingOutputs;
+    QHash<LogicalOutput *, QMetaObject::Connection> presentationConnections;
     QTimer graceTimer;
     QTimer timeoutTimer;
 
@@ -113,13 +119,13 @@ SessionLockV1InterfacePrivate::SessionLockV1InterfacePrivate(SessionLockV1Interf
 
 void SessionLockSurfaceV1InterfacePrivate::sendConfigure()
 {
-    if (!output || output->isRemoved() || !surface) {
+    if (!protocolResource || !output || output->isRemoved() || !surface) {
         return;
     }
     const QSize size = output->handle()->geometryF().size().toSize();
     pendingConfigureSerial = output->display()->nextSerial();
     acked = false;
-    send_configure(resource()->handle, pendingConfigureSerial, size.width(), size.height());
+    send_configure(protocolResource->handle, pendingConfigureSerial, size.width(), size.height());
 }
 
 void SessionLockSurfaceV1InterfacePrivate::ext_session_lock_surface_v1_destroy(Resource *resource)
@@ -129,8 +135,11 @@ void SessionLockSurfaceV1InterfacePrivate::ext_session_lock_surface_v1_destroy(R
 
 void SessionLockSurfaceV1InterfacePrivate::ext_session_lock_surface_v1_ack_configure(Resource *resource, uint32_t serial)
 {
+    if (!protocolResource) {
+        return;
+    }
     if (serial != pendingConfigureSerial) {
-        wl_resource_post_error(resource->handle, error_invalid_serial, "invalid serial provided in ack_configure");
+        wl_resource_post_error(protocolResource->handle, error_invalid_serial, "invalid serial provided in ack_configure");
         return;
     }
     if (!surface) {
@@ -143,11 +152,16 @@ void SessionLockSurfaceV1InterfacePrivate::ext_session_lock_surface_v1_ack_confi
 
 void SessionLockSurfaceV1InterfacePrivate::ext_session_lock_surface_v1_destroy_resource(Resource *resource)
 {
+    protocolResource = nullptr;
     if (lock) {
         lock->surfaces.removeAll(q);
+        lock = nullptr;
     }
     Q_EMIT q->aboutToBeDestroyed();
-    delete q;
+    // Defer deletion: the generated destroy_func reads the private implementation
+    // back from the resource after this callback returns (see
+    // qtwaylandscanner.cpp), so the wrapper must stay alive until then.
+    q->deleteLater();
 }
 
 SessionLockSurfaceV1Interface::SessionLockSurfaceV1Interface(SurfaceInterface *surface, OutputInterface *output)
@@ -176,20 +190,20 @@ bool SessionLockSurfaceV1Interface::isMapped() const
 
 void SessionLockV1InterfacePrivate::sendLocked()
 {
-    if (locked) {
+    if (locked || !protocolResource) {
         return;
     }
     locked = true;
-    send_locked(resource()->handle);
+    send_locked(protocolResource->handle);
 }
 
 void SessionLockV1InterfacePrivate::sendFinished()
 {
-    if (finished) {
+    if (finished || !protocolResource) {
         return;
     }
     finished = true;
-    send_finished(resource()->handle);
+    send_finished(protocolResource->handle);
 }
 
 void SessionLockV1InterfacePrivate::ext_session_lock_v1_get_lock_surface(Resource *resource,
@@ -197,50 +211,58 @@ void SessionLockV1InterfacePrivate::ext_session_lock_v1_get_lock_surface(Resourc
                                                                          struct ::wl_resource *surface_resource,
                                                                          struct ::wl_resource *output_resource)
 {
+    if (!protocolResource) {
+        return;
+    }
     SurfaceInterface *surface = SurfaceInterface::get(surface_resource);
     OutputInterface *output = OutputInterface::get(output_resource);
     if (!surface || !output) {
-        wl_resource_post_error(resource->handle, error_role, "invalid surface or output");
+        wl_resource_post_error(protocolResource->handle, error_role, "invalid surface or output");
         return;
     }
 
     if (surface->role()) {
-        wl_resource_post_error(resource->handle, error_role, "given wl_surface already has a role");
+        wl_resource_post_error(protocolResource->handle, error_role, "given wl_surface already has a role");
         return;
     }
     if (surface->buffer()) {
-        wl_resource_post_error(resource->handle, error_already_constructed, "given wl_surface already has a buffer attached or committed");
+        wl_resource_post_error(protocolResource->handle, error_already_constructed, "given wl_surface already has a buffer attached or committed");
         return;
     }
     for (SessionLockSurfaceV1Interface *lockSurface : surfaces) {
         if (lockSurface->output() == output) {
-            wl_resource_post_error(resource->handle, error_duplicate_output, "given output already has a lock surface");
+            wl_resource_post_error(protocolResource->handle, error_duplicate_output, "given output already has a lock surface");
             return;
         }
     }
-    surface->setRole(SessionLockV1Interface::role());
 
     auto lockSurface = new SessionLockSurfaceV1Interface(surface, output);
+    lockSurface->d->protocolResource = lockSurface->d->add(resource->client(), id, resource->version());
+    if (!lockSurface->d->protocolResource) {
+        wl_client_post_no_memory(resource->client());
+        delete lockSurface;
+        return;
+    }
+    surface->setRole(SessionLockV1Interface::role());
     lockSurface->d->lock = this;
     surfaces.append(lockSurface);
-    lockSurface->d->add(resource->client(), id, resource->version());
 
     QObject::connect(surface, &SurfaceInterface::committed, lockSurface, [lockSurface]() {
         SessionLockSurfaceV1InterfacePrivate *d = lockSurface->d.get();
-        if (!d->surface || !d->output) {
+        if (!d->protocolResource || !d->surface || !d->output) {
             return;
         }
         if (!d->acked) {
-            wl_resource_post_error(d->resource()->handle, SessionLockSurfaceV1InterfacePrivate::error_commit_before_first_ack, "surface committed before first ack_configure");
+            wl_resource_post_error(d->protocolResource->handle, SessionLockSurfaceV1InterfacePrivate::error_commit_before_first_ack, "surface committed before first ack_configure");
             return;
         }
         if (!d->surface->buffer()) {
-            wl_resource_post_error(d->resource()->handle, SessionLockSurfaceV1InterfacePrivate::error_null_buffer, "surface committed with a null buffer");
+            wl_resource_post_error(d->protocolResource->handle, SessionLockSurfaceV1InterfacePrivate::error_null_buffer, "surface committed with a null buffer");
             return;
         }
         const QSize surfaceSize = d->surface->size().toSize();
         if (!d->ackedSize.isEmpty() && (surfaceSize.width() != d->ackedSize.width() || surfaceSize.height() != d->ackedSize.height())) {
-            wl_resource_post_error(d->resource()->handle, SessionLockSurfaceV1InterfacePrivate::error_dimensions_mismatch, "failed to match ack'd width/height");
+            wl_resource_post_error(d->protocolResource->handle, SessionLockSurfaceV1InterfacePrivate::error_dimensions_mismatch, "failed to match ack'd width/height");
             return;
         }
         if (!d->mapped) {
@@ -255,11 +277,13 @@ void SessionLockV1InterfacePrivate::ext_session_lock_v1_get_lock_surface(Resourc
         // itself stays alive until the client destroys its session lock surface.
         if (SessionLockV1InterfacePrivate *lock = lockSurface->d->lock) {
             lock->surfaces.removeAll(lockSurface);
+            lockSurface->d->lock = nullptr;
         }
     });
     QObject::connect(output, &OutputInterface::removed, lockSurface, [lockSurface]() {
         if (SessionLockV1InterfacePrivate *lock = lockSurface->d->lock) {
             lock->surfaces.removeAll(lockSurface);
+            lockSurface->d->lock = nullptr;
         }
     });
     QObject::connect(output->handle(), &LogicalOutput::geometryChanged, lockSurface, [lockSurface]() {
@@ -273,7 +297,9 @@ void SessionLockV1InterfacePrivate::ext_session_lock_v1_get_lock_surface(Resourc
 void SessionLockV1InterfacePrivate::ext_session_lock_v1_destroy(Resource *resource)
 {
     if (locked) {
-        wl_resource_post_error(resource->handle, error_invalid_destroy, "attempted to destroy session lock while locked");
+        if (protocolResource) {
+            wl_resource_post_error(protocolResource->handle, error_invalid_destroy, "attempted to destroy session lock while locked");
+        }
         return;
     }
     if (manager && manager->activeLock == q) {
@@ -295,14 +321,21 @@ void SessionLockV1InterfacePrivate::ext_session_lock_v1_unlock_and_destroy(Resou
 
 void SessionLockV1InterfacePrivate::ext_session_lock_v1_destroy_resource(Resource *resource)
 {
+    protocolResource = nullptr;
     for (SessionLockSurfaceV1Interface *lockSurface : surfaces) {
         lockSurface->d->lock = nullptr;
     }
     if (manager && manager->activeLock == q) {
-        manager->disengageLock();
+        // The owning client disappeared or was killed without a valid
+        // unlock_and_destroy. Keep the session locked: the desktop must not be
+        // revealed by a locker crash, disconnect, or protocol error.
+        manager->abandonLock(q);
     }
     Q_EMIT q->aboutToBeDestroyed();
-    delete q;
+    // Defer deletion: the generated destroy_func reads the private implementation
+    // back from the resource after this callback returns (see
+    // qtwaylandscanner.cpp), so the wrapper must stay alive until then.
+    q->deleteLater();
 }
 
 SessionLockV1Interface::SessionLockV1Interface()
@@ -366,6 +399,9 @@ void SessionLockManagerV1InterfacePrivate::engageLock(SessionLockV1Interface *lo
     });
     QObject::connect(workspace(), &Workspace::outputRemoved, q, [this](LogicalOutput *output) {
         pendingOutputs.remove(output);
+        if (presentationConnections.contains(output)) {
+            QObject::disconnect(presentationConnections.take(output));
+        }
         maybeSendLocked();
     });
 
@@ -379,13 +415,22 @@ void SessionLockManagerV1InterfacePrivate::engageLock(SessionLockV1Interface *lo
     timeoutTimer.start();
 }
 
-void SessionLockManagerV1InterfacePrivate::disengageLock()
+void SessionLockManagerV1InterfacePrivate::stopTrackingLock()
 {
     graceTimer.stop();
     timeoutTimer.stop();
     QObject::disconnect(workspace(), &Workspace::outputAdded, q, nullptr);
     QObject::disconnect(workspace(), &Workspace::outputRemoved, q, nullptr);
+    for (auto it = presentationConnections.begin(); it != presentationConnections.end(); ++it) {
+        QObject::disconnect(it.value());
+    }
+    presentationConnections.clear();
     pendingOutputs.clear();
+}
+
+void SessionLockManagerV1InterfacePrivate::disengageLock()
+{
+    stopTrackingLock();
     if (activeLock) {
         activeLock->d->manager = nullptr;
         activeLock = nullptr;
@@ -397,13 +442,32 @@ void SessionLockManagerV1InterfacePrivate::disengageLock()
     }
 }
 
+void SessionLockManagerV1InterfacePrivate::abandonLock(SessionLockV1Interface *lock)
+{
+    if (activeLock != lock) {
+        return;
+    }
+    stopTrackingLock();
+    activeLock->d->manager = nullptr;
+    activeLock = nullptr;
+    lockSent = false;
+    // Deliberately keep sessionLocked == true and do not emit lockedChanged:
+    // the active locker vanished unexpectedly (crash, disconnect, or protocol
+    // error) and must not be allowed to reveal the desktop. The session stays
+    // protected until an authorized locker acquires the abandoned lock.
+}
+
 void SessionLockManagerV1InterfacePrivate::trackOutput(LogicalOutput *output)
 {
     pendingOutputs.insert(output);
-    QObject::connect(output->backendOutput()->renderLoop(), &RenderLoop::framePresented,
-            q, [this, output](RenderLoop *, std::chrono::nanoseconds, PresentationMode) {
-                handleFramePresented(output);
-            });
+    if (presentationConnections.contains(output)) {
+        QObject::disconnect(presentationConnections.take(output));
+    }
+    presentationConnections.insert(output,
+            QObject::connect(output->backendOutput()->renderLoop(), &RenderLoop::framePresented,
+                    q, [this, output](RenderLoop *, std::chrono::nanoseconds, PresentationMode) {
+                        handleFramePresented(output);
+                    }));
 }
 
 bool SessionLockManagerV1InterfacePrivate::hasMappedLockSurfaceForOutput(LogicalOutput *output) const
@@ -465,7 +529,12 @@ void SessionLockManagerV1InterfacePrivate::ext_session_lock_manager_v1_lock(Reso
 {
     SessionLockV1Interface *lock = new SessionLockV1Interface();
     lock->d->manager = this;
-    lock->d->add(resource->client(), id, resource->version());
+    lock->d->protocolResource = lock->d->add(resource->client(), id, resource->version());
+    if (!lock->d->protocolResource) {
+        wl_client_post_no_memory(resource->client());
+        delete lock;
+        return;
+    }
     engageLock(lock);
 }
 

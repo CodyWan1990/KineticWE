@@ -310,7 +310,7 @@ address          = ""                # e.g. "Toronto, ON"; geocoded when auto_lo
 [idle.behavior.lock]
 timeout = 600
 action = "lock"
-enabled = false
+enabled = true
 
 [idle.behavior.screen-off]
 timeout = 660

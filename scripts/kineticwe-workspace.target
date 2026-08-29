@@ -31,7 +31,6 @@ Wants=plasma-kded6.service
 Wants=plasma-kcminit-phase1.service
 Wants=plasma-kcminit.service
 Wants=plasma-kwallet-pam.service
-Wants=plasma-powerdevil.service
 Wants=plasma-polkit-agent.service
 Wants=plasma-restoresession.service
 Wants=plasma-gmenudbusmenuproxy.service
@@ -45,4 +44,3 @@ Wants=xdg-desktop-autostart.target
 Before=xdg-desktop-autostart.target
 Before=plasma-restoresession.service
 Before=plasma-startupsound.service
-

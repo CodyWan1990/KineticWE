@@ -152,6 +152,14 @@ void KineticSettingsWindow::open() {
   if (m_keybindsPage == nullptr) {
     m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus, *m_customKeybinds);
   }
+  if (m_displayPage == nullptr) {
+    m_displayPage = std::make_unique<DisplayPage>(*m_wayland);
+    m_displayPage->setOutputChangeCallback([this]() {
+      if (m_activePage == ActivePage::Displays) {
+        requestContentRebuild();
+      }
+    });
+  }
   if (m_appearancePage == nullptr) {
     m_appearancePage = std::make_unique<AppearancePage>();
   }
@@ -171,6 +179,7 @@ void KineticSettingsWindow::open() {
   m_iconsPage->reloadFromDisk();
   m_cursorsPage->reloadFromDisk();
   m_defaultAppsPage->reloadFromDisk();
+  m_displayPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
   m_surface->requestLayout();
@@ -495,6 +504,38 @@ DefaultAppsPage::Callbacks KineticSettingsWindow::defaultAppsPageCallbacks() {
   };
 }
 
+DisplayPage::Filter KineticSettingsWindow::displayFilter() const {
+  return DisplayPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+DisplayPage::Callbacks KineticSettingsWindow::displayPageCallbacks() {
+  return DisplayPage::Callbacks{
+      .requestRebuild =
+          [this]() {
+            clearArmedResets();
+            requestSceneRebuild();
+          },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_displayPage != nullptr) {
+              m_displayPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 void KineticSettingsWindow::confirmResetPage() {
   clearArmedResets();
   resetActivePage();
@@ -522,6 +563,9 @@ void KineticSettingsWindow::applyActivePage() {
     break;
   case ActivePage::Keybinds:
     applied = m_keybindsPage != nullptr && m_keybindsPage->applyAll();
+    break;
+  case ActivePage::Displays:
+    applied = m_displayPage != nullptr && m_displayPage->applyAll();
     break;
   case ActivePage::DefaultApps:
     applied = m_defaultAppsPage != nullptr && m_defaultAppsPage->applyAll();
@@ -571,6 +615,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_keybindsPage->resetAll();
     }
     break;
+  case ActivePage::Displays:
+    if (m_displayPage != nullptr) {
+      m_displayPage->resetAll();
+    }
+    break;
   case ActivePage::DefaultApps:
     if (m_defaultAppsPage != nullptr) {
       m_defaultAppsPage->resetAll();
@@ -593,6 +642,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_workspacesPage != nullptr && m_workspacesPage->hasPending();
   case ActivePage::Keybinds:
     return m_keybindsPage != nullptr && m_keybindsPage->hasPending();
+  case ActivePage::Displays:
+    return m_displayPage != nullptr && m_displayPage->hasPending();
   case ActivePage::DefaultApps:
     return m_defaultAppsPage != nullptr && m_defaultAppsPage->hasPending();
   }
@@ -613,6 +664,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_workspacesPage != nullptr && !m_workspacesPage->resettableKeyPaths().empty();
   case ActivePage::Keybinds:
     return m_keybindsPage != nullptr && !m_keybindsPage->resettableKeyPaths().empty();
+  case ActivePage::Displays:
+    return m_displayPage != nullptr && !m_displayPage->resettableKeyPaths().empty();
   case ActivePage::DefaultApps:
     return m_defaultAppsPage != nullptr && !m_defaultAppsPage->resettableKeyPaths().empty();
   }
@@ -818,6 +871,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   });
   if (m_inputOutputExpanded) {
     addSubNav(ActivePage::Keybinds, "keyboard", "Keybinds");
+    addSubNav(ActivePage::Displays, "device-desktop", "Displays");
   }
 
   addCategory("Window Management", m_windowManagementExpanded, [this]() {
@@ -897,6 +951,13 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
     if (m_keybindsPage != nullptr) {
       m_pageContainer->addChild(
           m_keybindsPage->build(uiScale(), keybindsFilter(), keybindsPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::Displays:
+    if (m_displayPage != nullptr) {
+      m_pageContainer->addChild(
+          m_displayPage->build(uiScale(), displayFilter(), m_armedResetKeyPath, displayPageCallbacks())
       );
     }
     break;

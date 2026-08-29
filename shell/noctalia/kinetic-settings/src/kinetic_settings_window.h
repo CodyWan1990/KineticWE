@@ -3,6 +3,7 @@
 #include "kinetic-settings/src/appearance_page.h"
 #include "kinetic-settings/src/cursors_page.h"
 #include "kinetic-settings/src/default_apps_page.h"
+#include "kinetic-settings/src/display_page.h"
 #include "kinetic-settings/src/icons_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
 #include "kinetic-settings/src/tiling_page.h"
@@ -70,6 +71,7 @@ private:
     Workspaces,
     Tiling,
     Keybinds,
+    Displays,
     DefaultApps,
   };
 
@@ -106,6 +108,8 @@ private:
   [[nodiscard]] CursorsPage::Callbacks cursorsPageCallbacks();
   [[nodiscard]] DefaultAppsPage::Filter defaultAppsFilter() const;
   [[nodiscard]] DefaultAppsPage::Callbacks defaultAppsPageCallbacks();
+  [[nodiscard]] DisplayPage::Filter displayFilter() const;
+  [[nodiscard]] DisplayPage::Callbacks displayPageCallbacks();
   void confirmResetPage();
   // Routes the filter row's Apply/Reset Page to the active page.
   void applyActivePage();
@@ -126,6 +130,7 @@ private:
   std::unique_ptr<TilingPage> m_tilingPage;
   std::unique_ptr<WorkspacesPage> m_workspacesPage;
   std::unique_ptr<KeybindsPage> m_keybindsPage;
+  std::unique_ptr<DisplayPage> m_displayPage;
   std::unique_ptr<AppearancePage> m_appearancePage;
   std::unique_ptr<IconsPage> m_iconsPage;
   std::unique_ptr<CursorsPage> m_cursorsPage;

@@ -43,8 +43,6 @@ depends=(
     'libcanberra'
     'procps-ng'
     'psmisc'
-    'upower'
-    'powerdevil'
 )
 
 makedepends=(
@@ -146,6 +144,7 @@ optdepends=(
     'plasma-pa: Audio volume management'
     'kinfocenter: System information center'
     'kde-gtk-config: GTK application styling'
+    'upower: Battery and power-device integration for Noctalia'
 )
 # COPR-compatible package replacement metadata
 # Mimics the COPR spec's Provides + Obsoletes for kwin, kwin-common, kwin-libs,

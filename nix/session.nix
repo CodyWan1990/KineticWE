@@ -8,7 +8,6 @@
   xwayland,
   kdePackages,
   psmisc,
-  upower,
 }:
 
 let
@@ -145,12 +144,6 @@ if command -v busctl >/dev/null 2>&1; then
 fi
 nohup @xdg_desktop_portal@ >"$HOME/.local/share/xdg-desktop-portal.log" 2>&1 &
 
-# Power management (best-effort; paths are Nix store binaries).
-# org_kde_powerdevil aborts at startup if WAYLAND_DISPLAY is unset; it is
-# exported at the top of this payload.
-nohup @upowerd@ >/dev/null 2>&1 &
-nohup @powerdevil@ >/dev/null 2>&1 &
-
 # Run noctalia under a supervisor loop: if it crashes or is killed it is
 # restarted automatically instead of taking the whole session down. The
 # session ends only when the login session itself is terminated (logout),
@@ -178,8 +171,8 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP KDE_SESSION_VERSION KDE_FULL_SESSION XDG_MENU_PREFIX XDG_DATA_DIRS 2>/dev/null || true
 fi
 
-log "Launching: ${dl}KINETIC_WE --xwayland --exit-with-session ${dl}STARTUP_PAYLOAD"
-exec "${dl}KINETIC_WE" --xwayland --exit-with-session "${dl}STARTUP_PAYLOAD"
+log "Launching: ${dl}KINETIC_WE --xwayland --no-lockscreen --exit-with-session ${dl}STARTUP_PAYLOAD"
+exec "${dl}KINETIC_WE" --xwayland --no-lockscreen --exit-with-session "${dl}STARTUP_PAYLOAD"
 SCRIPTEOF
     chmod +x "$out/bin/start-kineticwe"
 
@@ -187,11 +180,9 @@ SCRIPTEOF
     # find the binaries without relying on PATH propagation).
     substituteInPlace "$out/bin/start-kineticwe" \
       --replace-fail "@noctalia@" "${noctalia}/bin/noctalia" \
-      --replace-fail "@kwin_share@" "${kineticWe}/share" \
-      --replace-fail "@xdg_desktop_portal@" "${xdg-desktop-portal}/libexec/xdg-desktop-portal" \
-      --replace-fail "@xdg_desktop_portal_kde@" "${kdePackages.xdg-desktop-portal-kde}/libexec/xdg-desktop-portal-kde" \
-      --replace-fail "@upowerd@" "${upower}/libexec/upowerd" \
-      --replace-fail "@powerdevil@" "${kdePackages.powerdevil}/libexec/org_kde_powerdevil"
+       --replace-fail "@kwin_share@" "${kineticWe}/share" \
+       --replace-fail "@xdg_desktop_portal@" "${xdg-desktop-portal}/libexec/xdg-desktop-portal" \
+       --replace-fail "@xdg_desktop_portal_kde@" "${kdePackages.xdg-desktop-portal-kde}/libexec/xdg-desktop-portal-kde"
 
     # Wrap so helpers (xwayland, killall, kbuildsycoca6) are on PATH.
     wrapProgram "$out/bin/start-kineticwe" \

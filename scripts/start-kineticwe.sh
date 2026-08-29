@@ -609,7 +609,7 @@ RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 _before_wayland="$(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep '^wayland-' || true)"
 _before_x11="$(ls -1 /tmp/.X11-unix 2>/dev/null | grep '^X[0-9]' || true)"
 
-XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland &
+XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen &
 KWIN_PID=$!
 
 # If this script dies (logout, Ctrl-C, logind teardown), take the compositor down.
@@ -675,8 +675,8 @@ systemctl --user start kineticwe-session.target 2>/dev/null || true
 #     backend (org.freedesktop.impl.portal.desktop.kwe) — never the KDE one.
 systemctl --user start xdg-desktop-portal.service 2>/dev/null || true
 
-# 2.0 deferred hooks (add here as they land, no KDE deps):
-#   - In-shell power service (replaces PowerDevil / upowerd).
+# Power management is initialized inside noctalia-kwe. No PowerDevil or
+# upowerd process is started by the session launcher.
 
 # ---------------------------------------------------------------------------
 # 7. Start the shell (Noctalia fork, noctalia-kwe) — supervised, in the background
@@ -700,4 +700,3 @@ wait "$KWIN_PID" || true
 kill "$SHELL_PID" 2>/dev/null || true
 pkill -x noctalia-kwe 2>/dev/null || true
 trap - EXIT
-
