@@ -59,7 +59,36 @@ their results, (3) the exact build/test command for the user to run locally
 
 ---
 
-## 2. Sub-agentic workflow
+## 2. Plan first, get approval before implementing
+
+No code changes happen without a plan. This applies to every change, no
+matter how small or large — a one-line typo fix, a comment, a refactor, a
+new feature.
+
+- **Plan before any edit:** before writing, editing, or deleting any file, the
+  agent must present a plan stating: the goal, the exact files to touch, the
+  approach, and any risks or open questions. Read-only investigation (code
+  search, reading files, running allowed static checks) is fine before and
+  during planning — that is not a change.
+- **Get approval:** wait for explicit user approval before implementing. Do
+  not start editing until the user says go. If the user approves with
+  amendments, implement the amended plan.
+- **Plan deviations:** if, during implementation, the agent discovers the plan
+  is wrong or incomplete (e.g. the real fix touches different files than
+  planned), stop and present the revised plan for approval before continuing —
+  do not improvise.
+- **Sub-agents:** the orchestrator must pass the approved plan to every
+  sub-agent in the delegation; sub-agents must not deviate from it. If a
+  sub-agent hits an unexpected snag, it reports back to the orchestrator
+  rather than improvising, and the orchestrator returns to the user for
+  approval if the plan needs to change.
+- **Exceptions:** none. Even trivial changes (comments, formatting, typos)
+  get a plan and approval first. A plan can be a single sentence for tiny
+  changes, but it must exist and be approved before any edit.
+
+---
+
+## 3. Sub-agentic workflow
 
 Work in this repo follows an orchestrator / sub-agent model.
 
@@ -84,7 +113,7 @@ Work in this repo follows an orchestrator / sub-agent model.
 
 ---
 
-## 3. Repository map
+## 4. Repository map
 
 | Path | What it is |
 |---|---|
@@ -96,7 +125,7 @@ Work in this repo follows an orchestrator / sub-agent model.
 | `build-*.sh`, `*-deps.sh` | User-only distrobox build scripts — never run |
 | `flake.nix`, `nix/`, `PKGBUILD`, `kineticwe.spec`, `debian/` | Packaging — edit allowed, build forbidden |
 
-## 4. General conventions
+## 5. General conventions
 
 - Follow `.clang-format` and existing KDE/KWin code style; match the
   surrounding code in `shell/noctalia` (QML) and the meson module.

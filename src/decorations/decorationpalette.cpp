@@ -154,7 +154,11 @@ QPalette DecorationPalette::palette() const
 
 void DecorationPalette::update()
 {
-    m_colorSchemeConfig->sync();
+    // KSharedConfig caches the parsed file in memory; sync() only flushes
+    // pending writes and does not re-read external edits. The theme service
+    // writes kdeglobals directly, so reparseConfiguration() is required to
+    // pick up the new colors (same pattern as TilingController).
+    m_colorSchemeConfig->reparseConfiguration();
     m_palette = KColorScheme::createApplicationPalette(m_colorSchemeConfig);
 
     if (KColorScheme::isColorSetSupported(m_colorSchemeConfig, KColorScheme::Header)) {
