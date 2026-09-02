@@ -566,6 +566,15 @@ void Options::setBorderlessMaximizedWindows(bool borderlessMaximizedWindows)
     Q_EMIT borderlessMaximizedWindowsChanged();
 }
 
+void Options::setDefaultDecorationPolicy(DecorationPolicy defaultDecorationPolicy)
+{
+    if (m_defaultDecorationPolicy == defaultDecorationPolicy) {
+        return;
+    }
+    m_defaultDecorationPolicy = defaultDecorationPolicy;
+    Q_EMIT defaultDecorationPolicyChanged();
+}
+
 void Options::setKillPingTimeout(int killPingTimeout)
 {
     if (m_killPingTimeout == killPingTimeout) {
@@ -748,6 +757,7 @@ void Options::syncFromKcfgc()
     setSnapOnlyWhenOverlapping(m_settings->snapOnlyWhenOverlapping());
     setKillPingTimeout(m_settings->killPingTimeout());
     setBorderlessMaximizedWindows(m_settings->borderlessMaximizedWindows());
+    setDefaultDecorationPolicy(static_cast<DecorationPolicy>(m_settings->defaultDecorationPolicy()));
     setElectricBorderMaximize(m_settings->electricBorderMaximize());
     setElectricBorderTiling(m_settings->electricBorderTiling());
     setElectricBorderCornerRatio(m_settings->electricBorderCornerRatio());

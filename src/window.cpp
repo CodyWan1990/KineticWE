@@ -4493,7 +4493,11 @@ void Window::applyWindowRules()
     setKeepAbove(keepAbove());
     setKeepBelow(keepBelow());
     setFullScreen(isRequestedFullScreen());
-    setDecorationPolicy(decorationPolicy());
+    // Reseed the decoration base to the global default on every application so
+    // the compositor-wide "hide titlebars" option affects all windows (new,
+    // session-restored, and already-open on reconfigure). A window rule that
+    // sets "decorationpolicy" still wins via checkDecorationPolicy() below.
+    setDecorationPolicy(options->defaultDecorationPolicy());
     updateColorScheme();
     updateLayer();
     // FSP

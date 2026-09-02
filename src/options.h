@@ -12,6 +12,7 @@
 #pragma once
 
 #include "core/renderloop.h"
+#include "effect/globals.h"
 #include "main.h"
 
 #include <KConfigWatcher>
@@ -174,6 +175,13 @@ class KWIN_EXPORT Options : public QObject
      */
     Q_PROPERTY(float electricBorderCornerRatio READ electricBorderCornerRatio WRITE setElectricBorderCornerRatio NOTIFY electricBorderCornerRatioChanged)
     Q_PROPERTY(bool borderlessMaximizedWindows READ borderlessMaximizedWindows WRITE setBorderlessMaximizedWindows NOTIFY borderlessMaximizedWindowsChanged)
+    /**
+     * The default decoration policy applied to every window that is not
+     * overridden by a window rule. ClientPreference (the default) follows the
+     * client's preferred decoration mode; None forces no titlebar/frame. A
+     * window rule setting "decorationpolicy" always wins over this default.
+     */
+    Q_PROPERTY(DecorationPolicy defaultDecorationPolicy READ defaultDecorationPolicy WRITE setDefaultDecorationPolicy NOTIFY defaultDecorationPolicyChanged)
     /**
      * timeout before non-responding application will be killed after attempt to close.
      */
@@ -623,6 +631,11 @@ public:
         return borderless_maximized_windows;
     }
 
+    DecorationPolicy defaultDecorationPolicy() const
+    {
+        return m_defaultDecorationPolicy;
+    }
+
     /**
      * Timeout before non-responding application will be killed after attempt to close.
      */
@@ -705,6 +718,7 @@ public:
     void setElectricBorderTiling(bool electricBorderTiling);
     void setElectricBorderCornerRatio(float electricBorderCornerRatio);
     void setBorderlessMaximizedWindows(bool borderlessMaximizedWindows);
+    void setDefaultDecorationPolicy(DecorationPolicy defaultDecorationPolicy);
     void setKillPingTimeout(int killPingTimeout);
     void setCompositingMode(int compositingMode);
     void setAllowTearing(bool allow);
@@ -883,6 +897,7 @@ Q_SIGNALS:
     void electricBorderCornerRatioChanged();
     void electricBorderAllScreenCornerChanged();
     void borderlessMaximizedWindowsChanged();
+    void defaultDecorationPolicyChanged();
     void killPingTimeoutChanged();
     void compositingModeChanged();
     void animationSpeedChanged();
@@ -954,6 +969,7 @@ private:
     bool electric_border_all_screen_corner;
     float electric_border_corner_ratio;
     bool borderless_maximized_windows;
+    DecorationPolicy m_defaultDecorationPolicy = DecorationPolicy::ClientPreference;
     bool condensed_title;
 
     bool m_allowTearing = true;

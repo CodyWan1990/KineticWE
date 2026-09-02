@@ -602,6 +602,21 @@ fi
 #    root (per-command env prefix); everything else in the session keeps the
 #    real config home so user apps read/write ~/.config as usual.
 # ---------------------------------------------------------------------------
+# 5a. DRM debug (output-config / HDR troubleshooting).
+#     Opt-out via KWE_DRM_DEBUG=0 (default: on). When enabled we turn on the
+#     compositor's kwin_wayland_drm logging category so the "Atomic modeset
+#     test failed!" line together with the errno (e.g. "Invalid argument" /
+#     EINVAL) is emitted whenever a modeset is rejected, and we capture the
+#     compositor's stderr to a dedicated log file for easy grepping. Set
+#     KWE_DRM_DEBUG=0 to return to the quiet default.
+# ---------------------------------------------------------------------------
+KWE_DRM_DEBUG="${KWE_DRM_DEBUG:-1}"
+_KWE_DRM_LOG=""
+if [[ "$KWE_DRM_DEBUG" != "0" ]]; then
+    _KWE_DRM_LOG="$HOME/.local/share/kineticwe-drm.log"
+    : > "$_KWE_DRM_LOG"
+    echo "kineticwe: DRM debug on -> $_KWE_DRM_LOG (set KWE_DRM_DEBUG=0 to disable)" >&2
+fi
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
 # Snapshot existing sockets so we can tell which one kinetic-we creates — the
@@ -609,8 +624,13 @@ RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 _before_wayland="$(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep '^wayland-' || true)"
 _before_x11="$(ls -1 /tmp/.X11-unix 2>/dev/null | grep '^X[0-9]' || true)"
 
-XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen &
-KWIN_PID=$!
+if [[ -n "$_KWE_DRM_LOG" ]]; then
+    QT_LOGGING_RULES="kwin_wayland_drm=true" XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen 2>>"$_KWE_DRM_LOG" &
+    KWIN_PID=$!
+else
+    XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen &
+    KWIN_PID=$!
+fi
 
 # If this script dies (logout, Ctrl-C, logind teardown), take the compositor down.
 trap 'kill "$KWIN_PID" 2>/dev/null || true' EXIT

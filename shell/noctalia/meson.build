@@ -1003,6 +1003,7 @@ _noctalia_sources = files(
   'kinetic-settings/src/keybind_dbus.cpp',
   'kinetic-settings/src/keybinds_kwe.cpp',
   'kinetic-settings/src/keybinds_page.cpp',
+  'kinetic-settings/src/window_rules_page.cpp',
   'kinetic-settings/src/custom_keybinds.cpp',
   'kinetic-settings/src/kinetic_settings_module.cpp',
 )

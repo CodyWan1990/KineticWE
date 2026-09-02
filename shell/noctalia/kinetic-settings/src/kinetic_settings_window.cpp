@@ -152,6 +152,9 @@ void KineticSettingsWindow::open() {
   if (m_keybindsPage == nullptr) {
     m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus, *m_customKeybinds);
   }
+  if (m_windowRulesPage == nullptr) {
+    m_windowRulesPage = std::make_unique<WindowRulesPage>(*m_bus);
+  }
   if (m_displayPage == nullptr) {
     m_displayPage = std::make_unique<DisplayPage>(*m_wayland);
     m_displayPage->setOutputChangeCallback([this]() {
@@ -175,6 +178,7 @@ void KineticSettingsWindow::open() {
   m_tilingPage->reloadFromDisk();
   m_workspacesPage->reloadFromDisk();
   m_keybindsPage->reloadFromDisk();
+  m_windowRulesPage->reloadFromDisk();
   m_appearancePage->reloadFromDisk();
   m_iconsPage->reloadFromDisk();
   m_cursorsPage->reloadFromDisk();
@@ -388,6 +392,21 @@ KeybindsPage::Callbacks KineticSettingsWindow::keybindsPageCallbacks() {
   };
 }
 
+WindowRulesPage::Filter KineticSettingsWindow::windowRulesFilter() const {
+  return WindowRulesPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+WindowRulesPage::Callbacks KineticSettingsWindow::windowRulesPageCallbacks() {
+  return WindowRulesPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+  };
+}
+
 AppearancePage::Filter KineticSettingsWindow::appearanceFilter() const {
   return AppearancePage::Filter{
       .searchQuery = m_searchQuery,
@@ -558,6 +577,9 @@ void KineticSettingsWindow::applyActivePage() {
   case ActivePage::Tiling:
     applied = m_tilingPage != nullptr && m_tilingPage->applyAll();
     break;
+  case ActivePage::WindowRules:
+    applied = m_windowRulesPage != nullptr && m_windowRulesPage->applyAll();
+    break;
   case ActivePage::Workspaces:
     applied = m_workspacesPage != nullptr && m_workspacesPage->applyAll();
     break;
@@ -605,6 +627,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_tilingPage->resetAll();
     }
     break;
+  case ActivePage::WindowRules:
+    if (m_windowRulesPage != nullptr) {
+      m_windowRulesPage->resetAll();
+    }
+    break;
   case ActivePage::Workspaces:
     if (m_workspacesPage != nullptr) {
       m_workspacesPage->resetAll();
@@ -638,6 +665,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_cursorsPage != nullptr && m_cursorsPage->hasPending();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && m_tilingPage->hasPending();
+  case ActivePage::WindowRules:
+    return m_windowRulesPage != nullptr && m_windowRulesPage->hasPending();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && m_workspacesPage->hasPending();
   case ActivePage::Keybinds:
@@ -660,6 +689,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_cursorsPage != nullptr && !m_cursorsPage->resettableKeyPaths().empty();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && !m_tilingPage->resettableKeyPaths().empty();
+  case ActivePage::WindowRules:
+    return m_windowRulesPage != nullptr && !m_windowRulesPage->resettableKeyPaths().empty();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && !m_workspacesPage->resettableKeyPaths().empty();
   case ActivePage::Keybinds:
@@ -882,6 +913,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   if (m_windowManagementExpanded) {
     addSubNav(ActivePage::Workspaces, "device-desktop", "Workspaces");
     addSubNav(ActivePage::Tiling, "layout-grid", "Tiling");
+    addSubNav(ActivePage::WindowRules, "window", "Window Rules");
   }
 
   addCategory("System", m_systemExpanded, [this]() {
@@ -944,6 +976,13 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
     if (m_workspacesPage != nullptr) {
       m_pageContainer->addChild(
           m_workspacesPage->build(uiScale(), workspacesFilter(), m_armedResetKeyPath, workspacesPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::WindowRules:
+    if (m_windowRulesPage != nullptr) {
+      m_pageContainer->addChild(
+          m_windowRulesPage->build(uiScale(), windowRulesFilter(), windowRulesPageCallbacks())
       );
     }
     break;

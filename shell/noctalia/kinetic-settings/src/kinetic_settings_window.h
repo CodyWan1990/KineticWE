@@ -7,6 +7,7 @@
 #include "kinetic-settings/src/icons_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
 #include "kinetic-settings/src/tiling_page.h"
+#include "kinetic-settings/src/window_rules_page.h"
 #include "kinetic-settings/src/workspaces_page.h"
 
 #include "render/animation/animation_manager.h"
@@ -70,6 +71,7 @@ private:
     AppearanceCursors,
     Workspaces,
     Tiling,
+    WindowRules,
     Keybinds,
     Displays,
     DefaultApps,
@@ -100,6 +102,8 @@ private:
   [[nodiscard]] WorkspacesPage::Callbacks workspacesPageCallbacks();
   [[nodiscard]] KeybindsPage::Filter keybindsFilter() const;
   [[nodiscard]] KeybindsPage::Callbacks keybindsPageCallbacks();
+  [[nodiscard]] WindowRulesPage::Filter windowRulesFilter() const;
+  [[nodiscard]] WindowRulesPage::Callbacks windowRulesPageCallbacks();
   [[nodiscard]] AppearancePage::Filter appearanceFilter() const;
   [[nodiscard]] AppearancePage::Callbacks appearancePageCallbacks();
   [[nodiscard]] IconsPage::Filter iconsFilter() const;
@@ -130,6 +134,7 @@ private:
   std::unique_ptr<TilingPage> m_tilingPage;
   std::unique_ptr<WorkspacesPage> m_workspacesPage;
   std::unique_ptr<KeybindsPage> m_keybindsPage;
+  std::unique_ptr<WindowRulesPage> m_windowRulesPage;
   std::unique_ptr<DisplayPage> m_displayPage;
   std::unique_ptr<AppearancePage> m_appearancePage;
   std::unique_ptr<IconsPage> m_iconsPage;

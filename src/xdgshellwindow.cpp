@@ -1404,7 +1404,7 @@ DecorationPolicy XdgToplevelWindow::initialDecorationPolicy(const std::optional<
             return decorationPolicy.value();
         }
     }
-    return decorationPolicy();
+    return options->defaultDecorationPolicy();
 }
 
 QString XdgToplevelWindow::initialShortcut(const std::optional<XdgToplevelSessionData> &session) const
