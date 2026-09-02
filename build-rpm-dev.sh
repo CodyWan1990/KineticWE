@@ -16,6 +16,8 @@ set -euo pipefail
 #   ./build-rpm-dev.sh --reset                  # Revert rpm-ostree override
 #   ./build-rpm-dev.sh --reset-local            # Remove dev files from TEST_PREFIX + login entry
 #   ./build-rpm-dev.sh --quick --no-session     # Skip installing the login-screen session entry
+#   ./build-rpm-dev.sh --install-host-deps      # Implies --quick; after the build, install any
+#                                               # missing host runtime deps the session needs
 #
 # All build modes install into TEST_PREFIX so you can test with a single command.
 #
@@ -852,6 +854,10 @@ print_usage() {
     info "  ./build-rpm-dev.sh --quick"
     echo
 
+    info "Build and auto-install any missing host runtime deps in one step:"
+    info "  ./build-rpm-dev.sh --install-host-deps"
+    echo
+
     if find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" ! -name '*.src.rpm' -print0 2>/dev/null | grep -qz .; then
         info "RPM packages:"
         find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" ! -name '*.src.rpm' -exec ls -lh {} \; 2>/dev/null | sed 's/^/  /'
@@ -883,6 +889,7 @@ main() {
     local do_reset=false
     local do_reset_local=false
     local do_quick=false
+    local do_install_host_deps=false
     local do_session=true
 
     for arg in "$@"; do
@@ -893,11 +900,18 @@ main() {
             --reset)   do_reset=true ;;
             --reset-local) do_reset_local=true ;;
             --quick)   do_quick=true ;;
+            --install-host-deps) do_install_host_deps=true ;;
             --no-session) do_session=false ;;
-            --help|-h) echo "Usage: $0 [--install] [--ostree] [--reboot] [--quick] [--no-session] [--reset] [--reset-local]"; exit 0 ;;
+            --help|-h) echo "Usage: $0 [--install] [--ostree] [--reboot] [--quick] [--install-host-deps] [--no-session] [--reset] [--reset-local]"; exit 0 ;;
             *)         warn "Unknown option: $arg";;
         esac
     done
+
+    # --install-host-deps implies the quick build so the dev binaries exist to
+    # inspect for missing host libraries (it is a modifier, not a build mode).
+    if $do_install_host_deps; then
+        do_quick=true
+    fi
 
     if $do_reset_local; then
         echo "=========================================="
@@ -927,6 +941,10 @@ main() {
         check_prereqs
         setup_distrobox
         quick_build
+        if $do_install_host_deps; then
+            step "Installing missing host runtime dependencies..."
+            TEST_PREFIX="$TEST_PREFIX" "$SCRIPT_DIR/install-runtime-deps.sh"
+        fi
         verify_host_deps
         install_startup_script
         if $do_session; then
