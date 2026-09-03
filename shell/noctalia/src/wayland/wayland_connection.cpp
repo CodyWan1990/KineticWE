@@ -16,6 +16,7 @@
 #include "hyprland-toplevel-mapping-v1-client-protocol.h"
 #include "idle-inhibit-unstable-v1-client-protocol.h"
 #include "org-kde-plasma-virtual-desktop-client-protocol.h"
+#include "plasma-window-management-client-protocol.h"
 #include "text-input-unstable-v3-client-protocol.h"
 #include "util/string_utils.h"
 #include "viewporter-client-protocol.h"
@@ -56,6 +57,7 @@ namespace {
   constexpr std::uint32_t kXdgDecorationManagerVersion = 1;
   constexpr std::uint32_t kExtWorkspaceManagerVersion = 1;
   constexpr std::uint32_t kKdeVirtualDesktopManagementVersion = 4;
+  constexpr std::uint32_t kPlasmaWindowManagementVersion = 18;
   constexpr std::uint32_t kWlrForeignToplevelManagerVersion = 3;
   constexpr std::uint32_t kExtForeignToplevelListVersion = 1;
   constexpr std::uint32_t kCursorShapeManagerVersion = 1;
@@ -389,6 +391,12 @@ void WaylandConnection::setKdeVirtualDesktopManagerCallback(
   m_kdeVirtualDesktopManagerCallback = std::move(callback);
 }
 
+void WaylandConnection::setPlasmaWindowManagementCallback(
+    std::function<void(org_kde_plasma_window_management*)> callback
+) {
+  m_plasmaWindowManagementCallback = std::move(callback);
+}
+
 void WaylandConnection::setToplevelChangeCallback(ChangeCallback callback) {
   m_toplevelsHandler.setChangeCallback(callback);
   m_extForeignToplevels.setChangeCallback(std::move(callback));
@@ -655,6 +663,7 @@ bool WaylandConnection::hasXdgDecorationManager() const noexcept { return m_xdgD
 
 bool WaylandConnection::hasExtWorkspaceManager() const noexcept { return m_hasExtWorkspaceGlobal; }
 bool WaylandConnection::hasKdeVirtualDesktopManager() const noexcept { return m_hasKdeVirtualDesktopGlobal; }
+bool WaylandConnection::hasPlasmaWindowManagement() const noexcept { return m_hasPlasmaWindowManagementGlobal; }
 bool WaylandConnection::hasDwlIpcManager() const noexcept { return m_hasDwlIpcGlobal; }
 bool WaylandConnection::hasForeignToplevelManager() const noexcept { return m_hasForeignToplevelManagerGlobal; }
 
@@ -1074,6 +1083,20 @@ void WaylandConnection::bindGlobal(
     return;
   }
 
+  if (interfaceName == org_kde_plasma_window_management_interface.name) {
+    m_hasPlasmaWindowManagementGlobal = true;
+    const auto bindVersion = std::min(version, kPlasmaWindowManagementVersion);
+    auto* manager = static_cast<org_kde_plasma_window_management*>(
+        wl_registry_bind(registry, name, &org_kde_plasma_window_management_interface, bindVersion)
+    );
+    if (m_plasmaWindowManagementCallback) {
+      m_plasmaWindowManagementCallback(manager);
+    } else {
+      org_kde_plasma_window_management_destroy(manager);
+    }
+    return;
+  }
+
   if (interfaceName == zdwl_ipc_manager_v2_interface.name) {
     m_hasDwlIpcGlobal = true;
     auto* manager =
@@ -1489,10 +1512,12 @@ void WaylandConnection::cleanup() {
   m_hasExtWorkspaceGlobal = false;
   m_hasDwlIpcGlobal = false;
   m_hasForeignToplevelManagerGlobal = false;
+  m_hasPlasmaWindowManagementGlobal = false;
   m_outputAddedCallback = nullptr;
   m_outputRemovedCallback = nullptr;
   m_extWorkspaceManagerCallback = nullptr;
   m_kdeVirtualDesktopManagerCallback = nullptr;
+  m_plasmaWindowManagementCallback = nullptr;
   m_dwlIpcManagerCallback = nullptr;
 }
 

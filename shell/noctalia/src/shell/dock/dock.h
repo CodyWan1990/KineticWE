@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/config_types.h"
+#include "shell/dock/plasma_window_geometry.h"
 #include "system/desktop_entry.h"
 #include "system/icon_resolver.h"
 #include "ui/signal.h"
@@ -65,6 +66,9 @@ private:
   bool syncInstanceModel(shell::dock::DockInstance& instance);
   void rebuildItems(shell::dock::DockInstance& instance);
   void updateVisuals(shell::dock::DockInstance& instance);
+  // Publishes dock-item geometry via the KWin plasma-window-management protocol
+  // so minimize effects animate windows into the dock icon. No-op off-KineticWE.
+  void publishWindowGeometries(shell::dock::DockInstance& instance);
   void updateHoverZoomPointer(shell::dock::DockInstance& instance, float sceneX, float sceneY);
   void clearHoverZoomPointer(shell::dock::DockInstance& instance);
   void activateOrLaunchItem(shell::dock::DockInstance& instance, const shell::dock::DockItemAction& action);
@@ -101,6 +105,8 @@ private:
   std::optional<PendingLaunchFocus> m_pendingLaunchFocus;
   std::vector<std::unique_ptr<shell::dock::DockInstance>> m_instances;
   std::unordered_map<wl_surface*, shell::dock::DockInstance*> m_surfaceMap;
+  shell::dock::PlasmaWindowGeometryBridge m_windowGeometry;
+  org_kde_plasma_window_management* m_geometryManager = nullptr;
   shell::dock::DockInstance* m_hoveredInstance = nullptr;
   shell::dock::DockInstance* m_popupOwnerInstance = nullptr; // instance that owns the current open popup
   std::unique_ptr<shell::dock::DockPopup> m_itemMenu;        // right-click context menu

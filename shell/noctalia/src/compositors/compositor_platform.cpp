@@ -605,6 +605,9 @@ CompositorPlatform::CompositorPlatform(WaylandConnection& wayland)
   m_wayland.setKdeVirtualDesktopManagerCallback([this](org_kde_plasma_virtual_desktop_management* management) {
     bindKdeVirtualDesktop(management);
   });
+  m_wayland.setPlasmaWindowManagementCallback([this](org_kde_plasma_window_management* management) {
+    bindPlasmaWindowManagement(management);
+  });
   m_wayland.setHyprlandToplevelMappingManagerCallback([this](hyprland_toplevel_mapping_manager_v1* manager) {
     bindHyprlandToplevelMappingManager(manager);
   });
@@ -619,6 +622,7 @@ CompositorPlatform::~CompositorPlatform() {
   m_wayland.setOutputLifecycleCallbacks({}, {});
   m_wayland.setWorkspaceManagerCallbacks({}, {});
   m_wayland.setKdeVirtualDesktopManagerCallback({});
+  m_wayland.setPlasmaWindowManagementCallback({});
   m_wayland.setHyprlandToplevelMappingManagerCallback({});
   m_wayland.setToplevelChangeCallback({});
 }
@@ -662,6 +666,7 @@ void CompositorPlatform::cleanup() {
   if (m_workspaces != nullptr) {
     m_workspaces->cleanup();
   }
+  m_plasmaWindowManagement = nullptr;
   m_initialized = false;
 }
 
@@ -1644,6 +1649,14 @@ void CompositorPlatform::bindKdeVirtualDesktop(org_kde_plasma_virtual_desktop_ma
   if (m_workspaces != nullptr) {
     m_workspaces->bindKdeVirtualDesktop(management);
   }
+}
+
+void CompositorPlatform::bindPlasmaWindowManagement(org_kde_plasma_window_management* management) {
+  m_plasmaWindowManagement = management;
+}
+
+org_kde_plasma_window_management* CompositorPlatform::plasmaWindowManagement() const noexcept {
+  return m_plasmaWindowManagement;
 }
 
 void CompositorPlatform::bindDwlIpcWorkspace(zdwl_ipc_manager_v2* manager) {

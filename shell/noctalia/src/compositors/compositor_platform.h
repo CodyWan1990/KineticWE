@@ -19,6 +19,7 @@ struct wl_output;
 struct wl_surface;
 struct ext_workspace_manager_v1;
 struct org_kde_plasma_virtual_desktop_management;
+struct org_kde_plasma_window_management;
 struct zdwl_ipc_manager_v2;
 struct hyprland_toplevel_mapping_manager_v1;
 struct zwlr_foreign_toplevel_handle_v1;
@@ -59,6 +60,9 @@ public:
   void initialize();
   void startKdeActiveWindow(SessionBus& bus);
   void cleanup();
+
+  // Plasma/KineticWE window-manager global; non-null only on KDE compositors.
+  [[nodiscard]] org_kde_plasma_window_management* plasmaWindowManagement() const noexcept;
 
   [[nodiscard]] WaylandConnection& wayland() noexcept { return m_wayland; }
   [[nodiscard]] const WaylandConnection& wayland() const noexcept { return m_wayland; }
@@ -198,6 +202,7 @@ private:
 
   void bindExtWorkspace(ext_workspace_manager_v1* manager);
   void bindKdeVirtualDesktop(org_kde_plasma_virtual_desktop_management* management);
+  void bindPlasmaWindowManagement(org_kde_plasma_window_management* management);
   void bindDwlIpcWorkspace(zdwl_ipc_manager_v2* manager);
   void notifyToplevelsChanged();
   void onOutputAdded(wl_output* output);
@@ -224,6 +229,7 @@ private:
   ChangeCallback m_toplevelChangeCallback;
   std::unique_ptr<compositors::hyprland::HyprlandToplevelMapping> m_hyprlandToplevelMapping;
   std::unique_ptr<compositors::kde::KwinActiveWindow> m_kwinActiveWindow;
+  org_kde_plasma_window_management* m_plasmaWindowManagement = nullptr;
   std::unique_ptr<OutputProbe> m_outputProbe;
   std::vector<WorkspaceModelSnapshot> m_lastWorkspaceModelSnapshot;
   std::optional<std::string> m_lastFocusedCompositorWindowId;

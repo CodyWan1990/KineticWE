@@ -117,6 +117,12 @@ namespace shell::dock {
     } else if (needsUpdate && callbacks.updateVisuals) {
       callbacks.updateVisuals(instance);
     }
+
+    // Geometry must reflect the just-laid-out / updated item positions so the
+    // compositor can animate minimized windows into the dock icon.
+    if (callbacks.publishGeometries) {
+      callbacks.publishGeometries(instance);
+    }
   }
 
   void syncDockSlideLayerTransform(DockInstance& instance, const DockConfig& cfg) {

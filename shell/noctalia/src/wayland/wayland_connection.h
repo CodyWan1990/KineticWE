@@ -41,6 +41,7 @@ struct zwlr_foreign_toplevel_manager_v1;
 struct zwlr_foreign_toplevel_handle_v1;
 struct ext_workspace_manager_v1;
 struct org_kde_plasma_virtual_desktop_management;
+struct org_kde_plasma_window_management;
 struct zdwl_ipc_manager_v2;
 struct zwp_virtual_keyboard_manager_v1;
 struct zwp_text_input_manager_v3;
@@ -146,6 +147,7 @@ public:
       std::function<void(ext_workspace_manager_v1*)> extWorkspace, std::function<void(zdwl_ipc_manager_v2*)> dwlIpc
   );
   void setKdeVirtualDesktopManagerCallback(std::function<void(org_kde_plasma_virtual_desktop_management*)> callback);
+  void setPlasmaWindowManagementCallback(std::function<void(org_kde_plasma_window_management*)> callback);
   void setToplevelChangeCallback(ChangeCallback callback);
   void setHyprlandToplevelMappingManagerCallback(
       std::function<void(hyprland_toplevel_mapping_manager_v1* manager)> callback
@@ -174,6 +176,7 @@ public:
   [[nodiscard]] bool hasXdgDecorationManager() const noexcept;
   [[nodiscard]] bool hasExtWorkspaceManager() const noexcept;
   [[nodiscard]] bool hasKdeVirtualDesktopManager() const noexcept;
+  [[nodiscard]] bool hasPlasmaWindowManagement() const noexcept;
   [[nodiscard]] bool hasDwlIpcManager() const noexcept;
   [[nodiscard]] bool hasForeignToplevelManager() const noexcept;
   [[nodiscard]] bool hasExtForeignToplevelList() const noexcept;
@@ -335,6 +338,7 @@ private:
   bool m_hasLayerShellGlobal = false;
   bool m_hasExtWorkspaceGlobal = false;
   bool m_hasKdeVirtualDesktopGlobal = false;
+  bool m_hasPlasmaWindowManagementGlobal = false;
   bool m_hasDwlIpcGlobal = false;
   bool m_hasForeignToplevelManagerGlobal = false;
   bool m_hasExtForeignToplevelListGlobal = false;
@@ -345,6 +349,7 @@ private:
   std::function<void(wl_output*)> m_outputRemovedCallback;
   std::function<void(ext_workspace_manager_v1*)> m_extWorkspaceManagerCallback;
   std::function<void(org_kde_plasma_virtual_desktop_management*)> m_kdeVirtualDesktopManagerCallback;
+  std::function<void(org_kde_plasma_window_management*)> m_plasmaWindowManagementCallback;
   std::function<void(zdwl_ipc_manager_v2*)> m_dwlIpcManagerCallback;
   std::function<void(hyprland_toplevel_mapping_manager_v1*)> m_hyprlandToplevelMappingManagerCallback;
   std::unordered_map<wl_surface*, wl_output*> m_surfaceOutputMap;

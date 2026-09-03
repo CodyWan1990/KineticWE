@@ -40,6 +40,12 @@ static WindowType scopeToType(const QString &scope)
     if (lowerScope.startsWith(QStringLiteral("noctalia-wallpaper"))) {
         return WindowType::Desktop;
     }
+    // The Noctalia dock uses the "noctalia-dock" namespace (distinct from the
+    // generic "dock").  Recognise it as a Dock so `Window::isDock()` is true and
+    // effects (e.g. Magic Lamp) can animate minimized windows into it.
+    if (lowerScope.startsWith(QStringLiteral("noctalia-dock"))) {
+        return WindowType::Dock;
+    }
     return scopeToType.value(lowerScope, WindowType::Normal);
 }
 

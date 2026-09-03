@@ -6,6 +6,7 @@
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "ipc/ipc_service.h"
+#include "render/scene/input_area.h"
 #include "render/scene/node.h"
 #include "shell/dock/dock_context_menu.h"
 #include "shell/dock/dock_geometry.h"
@@ -26,6 +27,7 @@
 #include <cassert>
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <format>
 #include <optional>
 #include <wayland-client-core.h>
@@ -285,6 +287,11 @@ bool Dock::initialize(CompositorPlatform& platform, ConfigService* config, Rende
   m_config = config;
   m_renderContext = renderContext;
 
+  // Adopt the compositor's plasma-window-management global (KDE/KineticWE only)
+  // so dock-item geometry can drive the magic-lamp minimize animation.
+  m_geometryManager = platform.plasmaWindowManagement();
+  m_windowGeometry.bind(m_geometryManager);
+
   const auto& cfg = m_config->config().dock;
   m_config->addReloadCallback(
       [this]() {
@@ -415,6 +422,7 @@ void Dock::detachInstanceState(shell::dock::DockInstance& inst) {
   if (inst.surface != nullptr) {
     if (wl_surface* const wls = inst.surface->wlSurface()) {
       m_surfaceMap.erase(wls);
+      m_windowGeometry.clearPanel(wls);
     }
   }
   if (m_hoveredInstance == &inst) {
@@ -810,6 +818,8 @@ void Dock::createInstance(const WaylandOutput& output) {
                 [this](shell::dock::DockInstance& callbackInstance) { return syncInstanceModel(callbackInstance); },
             .rebuildItems = [this](shell::dock::DockInstance& callbackInstance) { rebuildItems(callbackInstance); },
             .updateVisuals = [this](shell::dock::DockInstance& callbackInstance) { updateVisuals(callbackInstance); },
+            .publishGeometries =
+                [this](shell::dock::DockInstance& callbackInstance) { publishWindowGeometries(callbackInstance); },
         },
         needsUpdate, needsLayout
     );
@@ -938,6 +948,68 @@ void Dock::updateVisuals(shell::dock::DockInstance& instance) {
       },
       instance.snapshot
   );
+}
+
+void Dock::publishWindowGeometries(shell::dock::DockInstance& instance) {
+  if (m_platform == nullptr || m_config == nullptr || instance.surface == nullptr) {
+    return;
+  }
+  // The global can appear after the dock initializes (or be replaced on a
+  // reconnect); (re)adopt it before publishing so we never silently skip.
+  org_kde_plasma_window_management* const manager = m_platform->plasmaWindowManagement();
+  if (manager != m_geometryManager) {
+    m_geometryManager = manager;
+    m_windowGeometry.bind(manager);
+  }
+  // Without the KDE/KineticWE global there is no way to publish geometry;
+  // skip the per-repaint window queries entirely on other compositors.
+  if (manager == nullptr) {
+    return;
+  }
+  wl_surface* const panel = instance.surface->wlSurface();
+  if (panel == nullptr) {
+    return;
+  }
+
+  const auto& cfg = m_config->config().dock;
+  wl_output* const outputFilter = shell::dock::dockFilterOutput(cfg, instance.output);
+
+  std::unordered_map<std::string, shell::dock::DockWindowRect> windowRects;
+  const auto& models = instance.snapshot.items;
+  const auto& views = instance.items;
+  const std::size_t count = std::min(models.size(), views.size());
+  for (std::size_t i = 0; i < count; ++i) {
+    if (views[i].area == nullptr) {
+      continue;
+    }
+    float left = 0.0F, top = 0.0F, right = 0.0F, bottom = 0.0F;
+    Node::transformedBounds(views[i].area, left, top, right, bottom);
+    // set_minimized_geometry uses unsigned coords, so clamp into the surface's
+    // positive quadrant (auto-hide slide can push an item partly off-surface).
+    const int x = static_cast<int>(std::lround(left));
+    const int y = static_cast<int>(std::lround(top));
+    const int w = static_cast<int>(std::lround(right)) - std::max(x, 0);
+    const int h = static_cast<int>(std::lround(bottom)) - std::max(y, 0);
+    if (w <= 0 || h <= 0) {
+      continue;
+    }
+    shell::dock::DockWindowRect rect{
+        .x = std::max(x, 0),
+        .y = std::max(y, 0),
+        .width = w,
+        .height = h,
+    };
+    const auto windows = shell::dock::windowsForDockItem(
+        *m_platform, models[i].windowLookupIdLower, models[i].windowLookupWmClassLower, outputFilter
+    );
+    for (const auto& window : windows) {
+      if (!window.identifier.empty()) {
+        windowRects[window.identifier] = rect;
+      }
+    }
+  }
+
+  m_windowGeometry.sync(panel, windowRects);
 }
 
 void Dock::updateHoverZoomPointer(shell::dock::DockInstance& instance, float sceneX, float sceneY) {

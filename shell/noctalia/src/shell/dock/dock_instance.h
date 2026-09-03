@@ -85,6 +85,8 @@ namespace shell::dock {
     std::function<bool(DockInstance&)> syncModel;
     std::function<void(DockInstance&)> rebuildItems;
     std::function<void(DockInstance&)> updateVisuals;
+    // Called after the scene is built/updated so geometry can be (re)published.
+    std::function<void(DockInstance&)> publishGeometries;
   };
 
   void prepareFrame(
