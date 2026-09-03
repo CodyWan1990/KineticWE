@@ -143,6 +143,7 @@ void Rules::readFromSettings(const RuleSettings *settings)
     READ_SET_RULE(skipswitcher);
     READ_SET_RULE(above);
     READ_SET_RULE(below);
+    READ_SET_RULE(floating);
     READ_SET_RULE(fullscreen);
     // HACK: decorationpolicy is stored as int until KF6 >= 6.29, see rulesettings.kcfg
     decorationpolicy = static_cast<KWin::DecorationPolicy>(settings->decorationpolicy());
@@ -230,6 +231,7 @@ void Rules::write(RuleSettings *settings) const
     WRITE_SET_RULE(skipswitcher, Skipswitcher, );
     WRITE_SET_RULE(above, Above, );
     WRITE_SET_RULE(below, Below, );
+    WRITE_SET_RULE(floating, Floating, );
     WRITE_SET_RULE(fullscreen, Fullscreen, );
     WRITE_SET_RULE(decorationpolicy, Decorationpolicy, int); // HACK: stored as int until KF6 >= 6.29, see rulesettings.kcfg
 
@@ -706,6 +708,7 @@ APPLY_RULE(skippager, SkipPager, bool)
 APPLY_RULE(skipswitcher, SkipSwitcher, bool)
 APPLY_RULE(above, KeepAbove, bool)
 APPLY_RULE(below, KeepBelow, bool)
+APPLY_RULE(floating, Floating, bool)
 APPLY_RULE(fullscreen, FullScreen, bool)
 APPLY_RULE(decorationpolicy, DecorationPolicy, KWin::DecorationPolicy)
 APPLY_FORCE_RULE(decocolor, DecoColor, QString)
@@ -760,6 +763,7 @@ bool Rules::discardUsed(bool withdrawn)
     DISCARD_USED_SET_RULE(skipswitcher);
     DISCARD_USED_SET_RULE(above);
     DISCARD_USED_SET_RULE(below);
+    DISCARD_USED_SET_RULE(floating);
     DISCARD_USED_SET_RULE(fullscreen);
     DISCARD_USED_SET_RULE(decorationpolicy);
     DISCARD_USED_FORCE_RULE(decocolor);
@@ -905,6 +909,7 @@ CHECK_RULE(SkipPager, bool)
 CHECK_RULE(SkipSwitcher, bool)
 CHECK_RULE(KeepAbove, bool)
 CHECK_RULE(KeepBelow, bool)
+CHECK_RULE(Floating, bool)
 CHECK_RULE(FullScreen, bool)
 CHECK_RULE(DecorationPolicy, KWin::DecorationPolicy)
 CHECK_FORCE_RULE(DecoColor, QString)

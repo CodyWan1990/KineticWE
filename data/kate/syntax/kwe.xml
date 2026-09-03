@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language SYSTEM "language.dtd">
+<!--
+    Kate / KWrite syntax for KineticWE *.kwe config files. These are KConfig
+    INI files (the compositor parses them natively), so this just maps the .kwe
+    extension to the INI highlighting rules.
+
+    Install: copy this file to a Kate/KWrite syntax dir, e.g.:
+        ~/.local/share/kate/syntax/kwe.xml
+    Then restart Kate/KWrite. Alternatively symlink `kwe.xml` -> `ini.xml`
+    (the INI rules) in that directory, since the INI grammar already matches.
+-->
+<language name="KWE Config" version="1" kateversion="5.60"
+          section="Config" extensions="*.kwe"
+          mimetype="application/x-kwe-config"
+          author="KineticWE" license="GPL">
+    <highlighting>
+        <contexts>
+            <context name="normal" attribute="Normal Text" lineEndContext="#stay">
+                <detectSpaces/>
+                <DetectChar attribute="Comment" context="comment" char="#"/>
+                <DetectChar attribute="Comment" context="comment" char=";"/>
+                <DetectChar attribute="Section" context="section" char="["/>
+                <DetectChar attribute="Key" context="key" char="="/>
+                <DetectIdentifier/>
+            </context>
+
+            <context name="comment" attribute="Comment" lineEndContext="#pop">
+                <DetectSpaces/>
+            </context>
+
+            <context name="section" attribute="Section" lineEndContext="#pop">
+                <DetectChar attribute="Section" context="section" char="["/>
+                <DetectChar attribute="Section" context="section" char="]"/>
+            </context>
+
+            <context name="key" attribute="Key" lineEndContext="#pop">
+                <DetectChar attribute="Value" context="value" char="="/>
+            </context>
+
+            <context name="value" attribute="Value" lineEndContext="#pop">
+                <DetectChar attribute="Comment" context="comment" char="#"/>
+                <DetectChar attribute="Comment" context="comment" char=";"/>
+            </context>
+        </contexts>
+        <itemDatas>
+            <itemData name="Normal Text" defStyleNum="dsNormal" spellChecking="false"/>
+            <itemData name="Comment" defStyleNum="dsComment"/>
+            <itemData name="Section" defStyleNum="dsSection"/>
+            <itemData name="Key" defStyleNum="dsKeyword"/>
+            <itemData name="Value" defStyleNum="dsString"/>
+        </itemDatas>
+    </highlighting>
+    <general>
+        <comments>
+            <comment name="singleLine" start="#"/>
+        </comments>
+    </general>
+</language>

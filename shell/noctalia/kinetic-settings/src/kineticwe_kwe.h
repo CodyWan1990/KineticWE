@@ -17,6 +17,9 @@ public:
   // Path to the config file ($XDG_CONFIG_HOME/kineticwe.kwe).
   [[nodiscard]] static std::filesystem::path defaultPath();
 
+  // Path to the window-rule book (~/.config/kineticwe/rules.kwe).
+  [[nodiscard]] static std::filesystem::path rulesDefaultPath();
+
   // Overrides the file this reader/writer targets. Default is kineticwe.kwe;
   // the Appearance page uses this for its own portable appearance.kwe. Must be
   // called before load()/save().
@@ -41,6 +44,11 @@ public:
   void setInt(std::string_view group, std::string_view key, int value);
   void setDouble(std::string_view group, std::string_view key, double value);
   void setStringList(std::string_view group, std::string_view key, const std::vector<std::string>& values);
+
+  // Drops every group so the file can be rebuilt from scratch (used by
+  // window-rules, where the whole file is one owning list). Loaded content,
+  // if any, is discarded; call save() afterwards to write the new state.
+  void clear() { m_groups.clear(); }
 
   // Whether `key` is explicitly present in `group` (regardless of value).
   [[nodiscard]] bool hasKey(std::string_view group, std::string_view key) const;

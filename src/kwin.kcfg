@@ -225,6 +225,16 @@
             <min>0</min>
             <max>3</max>
         </entry>
+        <entry name="DefaultActiveOpacity" type="Int">
+            <default>100</default>
+            <min>0</min>
+            <max>100</max>
+        </entry>
+        <entry name="DefaultInactiveOpacity" type="Int">
+            <default>100</default>
+            <min>0</min>
+            <max>100</max>
+        </entry>
         <entry name="InteractiveWindowMoveEnabled" type="Bool">
             <default>true</default>
         </entry>

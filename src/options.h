@@ -183,6 +183,16 @@ class KWIN_EXPORT Options : public QObject
      */
     Q_PROPERTY(DecorationPolicy defaultDecorationPolicy READ defaultDecorationPolicy WRITE setDefaultDecorationPolicy NOTIFY defaultDecorationPolicyChanged)
     /**
+     * The default opacity (0.0-1.0) applied to the active window when no window
+     * rule overrides opacityactive. Rules still win via checkOpacityActive.
+     */
+    Q_PROPERTY(qreal defaultActiveOpacity READ defaultActiveOpacity WRITE setDefaultActiveOpacity NOTIFY defaultActiveOpacityChanged)
+    /**
+     * The default opacity (0.0-1.0) applied to inactive windows when no window
+     * rule overrides opacityinactive. Rules still win via checkOpacityInactive.
+     */
+    Q_PROPERTY(qreal defaultInactiveOpacity READ defaultInactiveOpacity WRITE setDefaultInactiveOpacity NOTIFY defaultInactiveOpacityChanged)
+    /**
      * timeout before non-responding application will be killed after attempt to close.
      */
     Q_PROPERTY(int killPingTimeout READ killPingTimeout WRITE setKillPingTimeout NOTIFY killPingTimeoutChanged)
@@ -636,6 +646,16 @@ public:
         return m_defaultDecorationPolicy;
     }
 
+    qreal defaultActiveOpacity() const
+    {
+        return m_defaultActiveOpacity;
+    }
+
+    qreal defaultInactiveOpacity() const
+    {
+        return m_defaultInactiveOpacity;
+    }
+
     /**
      * Timeout before non-responding application will be killed after attempt to close.
      */
@@ -719,6 +739,8 @@ public:
     void setElectricBorderCornerRatio(float electricBorderCornerRatio);
     void setBorderlessMaximizedWindows(bool borderlessMaximizedWindows);
     void setDefaultDecorationPolicy(DecorationPolicy defaultDecorationPolicy);
+    void setDefaultActiveOpacity(qreal defaultActiveOpacity);
+    void setDefaultInactiveOpacity(qreal defaultInactiveOpacity);
     void setKillPingTimeout(int killPingTimeout);
     void setCompositingMode(int compositingMode);
     void setAllowTearing(bool allow);
@@ -898,6 +920,8 @@ Q_SIGNALS:
     void electricBorderAllScreenCornerChanged();
     void borderlessMaximizedWindowsChanged();
     void defaultDecorationPolicyChanged();
+    void defaultActiveOpacityChanged();
+    void defaultInactiveOpacityChanged();
     void killPingTimeoutChanged();
     void compositingModeChanged();
     void animationSpeedChanged();
@@ -970,6 +994,8 @@ private:
     float electric_border_corner_ratio;
     bool borderless_maximized_windows;
     DecorationPolicy m_defaultDecorationPolicy = DecorationPolicy::ClientPreference;
+    qreal m_defaultActiveOpacity = 1.0;
+    qreal m_defaultInactiveOpacity = 1.0;
     bool condensed_title;
 
     bool m_allowTearing = true;

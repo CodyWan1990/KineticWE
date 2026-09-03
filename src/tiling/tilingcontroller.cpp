@@ -793,6 +793,13 @@ void TilingController::onWindowAdded(Window *window)
     }
 
     TilingState::Mode mode = m_rules->initialMode(window);
+    // A window rule can force a matched window to float (or to tile).
+    // checkFloating() returns the rule's value when a rule applies, otherwise
+    // the passed-in default (the tiling layer's own initial mode).
+    if (window->supportsWindowRules()) {
+        const bool initialFloating = (mode == TilingState::Mode::Floating);
+        mode = window->rules()->checkFloating(initialFloating, true) ? TilingState::Mode::Floating : TilingState::Mode::Tiled;
+    }
     window->tilingState().mode = mode;
 
     // The xwaylandvideobridge capture surface is documented to be fully
@@ -992,6 +999,24 @@ void TilingController::onWindowClassChanged(Window *window)
     // known. A window already Floating needs no correction; an ignored
     // window that is somehow not yet tiled is handled by onWindowAdded.
     if (window->tilingState().mode != TilingState::Mode::Tiled) {
+        return;
+    }
+
+    // On native Wayland the window's rules are set up after onWindowAdded ran,
+    // so re-check a float rule now that the class (and rules) are known. A
+    // window-rule float overrides the tiling default.
+    if (window->supportsWindowRules() && window->rules()->checkFloating(false, true)) {
+        removeWindowFromLayouts(window);
+        window->tilingState().mode = TilingState::Mode::Floating;
+        auto it = m_preTileGeometry.find(window);
+        if (it != m_preTileGeometry.end()) {
+            const RectF preTileGeometry = it.value();
+            m_preTileGeometry.erase(it);
+            if (!preTileGeometry.isEmpty()) {
+                window->moveResize(preTileGeometry);
+            }
+        }
+        updateBorders();
         return;
     }
 
@@ -1341,6 +1366,9 @@ void TilingController::onInteractiveMoveResizeStarted()
     MoveContext context;
     context.engine = engine;
     context.output = window->output();
+    context.desktop = window->desktops().isEmpty()
+        ? VirtualDesktopManager::self()->currentDesktop(context.output)
+        : window->desktops().constFirst();
     context.originalGeometryRestore = window->geometryRestore();
     m_activeMoves[window] = context;
 
@@ -1399,16 +1427,29 @@ void TilingController::onWindowMoveFinished(Window *window)
         m_activeMoves.erase(it);
 
         LogicalOutput *currentOutput = window->output() ? window->output() : m_workspace->activeOutput();
+        // Resolve the desktop the window is on at release time. During a drag
+        // to another workspace (e.g. edge-switching while holding the window)
+        // the desktop set changes, but onWindowDesktopsChanged deliberately
+        // skips migration while the move is in progress. Resolve it here so
+        // the window lands correctly on the destination workspace.
+        VirtualDesktop *currentDesktop = window->desktops().isEmpty()
+            ? VirtualDesktopManager::self()->currentDesktop(currentOutput)
+            : window->desktops().constFirst();
         const bool movedToOtherOutput = context.output && currentOutput && context.output != currentOutput;
+        // Only treat a desktop set change as a cross-workspace migration for
+        // single-desktop (non on-all-desktops) windows, mirroring the guard in
+        // onWindowDesktopsChanged().
+        const bool movedToOtherDesktop = (!window->isOnAllDesktops() && window->desktops().size() == 1)
+            && context.desktop && currentDesktop && context.desktop != currentDesktop;
 
-        if (movedToOtherOutput && context.engine) {
-            // The window left its original output. Clean up the empty source
-            // tile and add it to the new output's layout engine.
+        if ((movedToOtherOutput || movedToOtherDesktop) && context.engine) {
+            // The window left its original output and/or workspace during the
+            // drag. Clean up the empty source leaf and add it to the
+            // destination (output, desktop) layout engine, mirroring what
+            // onWindowDesktopsChanged()/migrateWindow() would have done if the
+            // move had not been in progress.
             context.engine->cancelMoveWindow(window);
-            VirtualDesktop *desktop = window->desktops().isEmpty()
-                ? VirtualDesktopManager::self()->currentDesktop(currentOutput)
-                : window->desktops().constFirst();
-            addWindowToLayout(window, currentOutput, desktop);
+            addWindowToLayout(window, currentOutput, currentDesktop);
             window->setGeometryRestore(context.originalGeometryRestore);
             return;
         }

@@ -344,6 +344,10 @@ private:
     struct MoveContext {
         QPointer<LayoutEngine> engine;
         QPointer<LogicalOutput> output;
+        // The desktop the window was on when the move started. Used to detect
+        // a cross-workspace drag (see onWindowMoveFinished) so the window is
+        // migrated to the destination workspace's layout engine on release.
+        QPointer<VirtualDesktop> desktop;
         RectF originalGeometryRestore;
     };
     QHash<Window *, MoveContext> m_activeMoves;

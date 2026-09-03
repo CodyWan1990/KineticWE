@@ -575,6 +575,24 @@ void Options::setDefaultDecorationPolicy(DecorationPolicy defaultDecorationPolic
     Q_EMIT defaultDecorationPolicyChanged();
 }
 
+void Options::setDefaultActiveOpacity(qreal defaultActiveOpacity)
+{
+    if (m_defaultActiveOpacity == defaultActiveOpacity) {
+        return;
+    }
+    m_defaultActiveOpacity = defaultActiveOpacity;
+    Q_EMIT defaultActiveOpacityChanged();
+}
+
+void Options::setDefaultInactiveOpacity(qreal defaultInactiveOpacity)
+{
+    if (m_defaultInactiveOpacity == defaultInactiveOpacity) {
+        return;
+    }
+    m_defaultInactiveOpacity = defaultInactiveOpacity;
+    Q_EMIT defaultInactiveOpacityChanged();
+}
+
 void Options::setKillPingTimeout(int killPingTimeout)
 {
     if (m_killPingTimeout == killPingTimeout) {
@@ -758,6 +776,8 @@ void Options::syncFromKcfgc()
     setKillPingTimeout(m_settings->killPingTimeout());
     setBorderlessMaximizedWindows(m_settings->borderlessMaximizedWindows());
     setDefaultDecorationPolicy(static_cast<DecorationPolicy>(m_settings->defaultDecorationPolicy()));
+    setDefaultActiveOpacity(m_settings->defaultActiveOpacity() / 100.0);
+    setDefaultInactiveOpacity(m_settings->defaultInactiveOpacity() / 100.0);
     setElectricBorderMaximize(m_settings->electricBorderMaximize());
     setElectricBorderTiling(m_settings->electricBorderTiling());
     setElectricBorderCornerRatio(m_settings->electricBorderCornerRatio());

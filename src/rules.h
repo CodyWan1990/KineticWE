@@ -60,6 +60,7 @@ public:
     bool checkSkipSwitcher(bool skip, bool init = false) const;
     bool checkKeepAbove(bool above, bool init = false) const;
     bool checkKeepBelow(bool below, bool init = false) const;
+    bool checkFloating(bool floating, bool init = false) const;
     bool checkFullScreen(bool fs, bool init = false) const;
     DecorationPolicy checkDecorationPolicy(DecorationPolicy policy, bool init = false) const;
     QString checkDecoColor(QString schemeFile) const;
@@ -172,6 +173,7 @@ public:
     bool applySkipSwitcher(bool &skip, bool init) const;
     bool applyKeepAbove(bool &above, bool init) const;
     bool applyKeepBelow(bool &below, bool init) const;
+    bool applyFloating(bool &floating, bool init) const;
     bool applyFullScreen(bool &fs, bool init) const;
     bool applyDecorationPolicy(KWin::DecorationPolicy &policy, bool init) const;
     bool applyDecoColor(QString &schemeFile) const;
@@ -267,6 +269,8 @@ private:
     SetRule aboverule;
     bool below;
     SetRule belowrule;
+    bool floating;
+    SetRule floatingrule;
     bool fullscreen;
     SetRule fullscreenrule;
     KWin::DecorationPolicy decorationpolicy;

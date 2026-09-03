@@ -292,6 +292,17 @@
       <default code="true">Rules::UnusedSetRule</default>
     </entry>
 
+    <entry name="floating" type="Bool">
+      <label>Floating</label>
+      <default>false</default>
+    </entry>
+    <entry name="floatingrule" type="Int">
+      <label>Floating rule type</label>
+      <min code="true">Rules::UnusedSetRule</min>
+      <max code="true">static_cast&lt;Rules::SetRule&gt;(Rules::ForceTemporarily)</max>
+      <default code="true">Rules::UnusedSetRule</default>
+    </entry>
+
     <entry name="fullscreen" type="Bool">
       <label>Fullscreen</label>
       <default>false</default>

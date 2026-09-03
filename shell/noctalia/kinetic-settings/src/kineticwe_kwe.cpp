@@ -53,6 +53,10 @@ std::filesystem::path KineticweKwe::defaultPath() {
   return configHome() / "kineticwe.kwe";
 }
 
+std::filesystem::path KineticweKwe::rulesDefaultPath() {
+  return configHome() / "rules.kwe";
+}
+
 bool KineticweKwe::load() {
   m_groups.clear();
   std::ifstream in(path());

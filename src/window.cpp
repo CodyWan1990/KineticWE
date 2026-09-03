@@ -4513,10 +4513,12 @@ void Window::applyWindowRules()
     setShortcut(rules()->checkShortcut(shortcut().toString()));
     // see also X11Window::setActive()
     if (isActive()) {
-        setOpacity(rules()->checkOpacityActive(opacity()));
+        // Reseed the opacity base to the compositor-wide default (a matching
+        // window rule that sets opacityactive still wins via checkOpacityActive).
+        setOpacity(rules()->checkOpacityActive(options->defaultActiveOpacity()));
         workspace()->disableGlobalShortcutsForClient(rules()->checkDisableGlobalShortcuts(false));
     } else {
-        setOpacity(rules()->checkOpacityInactive(opacity()));
+        setOpacity(rules()->checkOpacityInactive(options->defaultInactiveOpacity()));
     }
     setDesktopFileName(rules()->checkDesktopFile(desktopFileName()));
     setExcludeFromCapture(rules()->checkExcludeFromCapture(excludeFromCapture()));
