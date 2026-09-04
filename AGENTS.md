@@ -11,6 +11,8 @@ The user builds and tests locally on their own machine. An agent's job ends at
 "code is written and statically verified." Under no circumstances run anything
 that compiles, links, packages, installs, or launches binaries.
 
+Always let me know if I need to build just noctalia or the entire build with ./build-rpm-dev.sh --quick. 
+
 ### Forbidden — never run, in any form
 
 - **Build tools:** `cmake --build`, `ninja`, `make`, `meson compile`,

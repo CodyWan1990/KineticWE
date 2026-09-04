@@ -1,6 +1,7 @@
 #include "kinetic_settings_window.h"
 
 #include "core/input/key_symbols.h"
+#include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "core/log.h"
 #include "i18n/i18n.h"
 #include "render/render_context.h"
@@ -156,6 +157,9 @@ void KineticSettingsWindow::open() {
   if (m_windowRulesPage == nullptr) {
     m_windowRulesPage = std::make_unique<WindowRulesPage>(*m_bus, *m_wayland);
   }
+  if (m_windowBehaviorPage == nullptr) {
+    m_windowBehaviorPage = std::make_unique<WindowBehaviorPage>(*m_bus);
+  }
   if (m_displayPage == nullptr) {
     m_displayPage = std::make_unique<DisplayPage>(*m_wayland);
     m_displayPage->setOutputChangeCallback([this]() {
@@ -180,6 +184,7 @@ void KineticSettingsWindow::open() {
   m_workspacesPage->reloadFromDisk();
   m_keybindsPage->reloadFromDisk();
   m_windowRulesPage->reloadFromDisk();
+  m_windowBehaviorPage->reloadFromDisk();
   m_appearancePage->reloadFromDisk();
   m_iconsPage->reloadFromDisk();
   m_cursorsPage->reloadFromDisk();
@@ -204,6 +209,10 @@ void KineticSettingsWindow::toggle() {
 }
 
 void KineticSettingsWindow::destroyWindow() {
+  if (m_shortcutInhibitor != nullptr) {
+    zwp_keyboard_shortcuts_inhibitor_v1_destroy(m_shortcutInhibitor);
+    m_shortcutInhibitor = nullptr;
+  }
   m_inputDispatcher.pointerLeave();
   m_inputDispatcher.setSceneRoot(nullptr);
   if (m_selectPopup != nullptr) {
@@ -390,6 +399,7 @@ KeybindsPage::Callbacks KineticSettingsWindow::keybindsPageCallbacks() {
   return KeybindsPage::Callbacks{
       .requestRebuild =
           [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .recordingChanged = [this](bool) { updateKeyboardShortcutInhibit(); },
   };
 }
 
@@ -405,6 +415,38 @@ WindowRulesPage::Callbacks KineticSettingsWindow::windowRulesPageCallbacks() {
   return WindowRulesPage::Callbacks{
       .requestRebuild =
           [this]() { clearArmedResets(); requestSceneRebuild(); },
+  };
+}
+
+WindowBehaviorPage::Filter KineticSettingsWindow::windowBehaviorFilter() const {
+  return WindowBehaviorPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+WindowBehaviorPage::Callbacks KineticSettingsWindow::windowBehaviorPageCallbacks() {
+  return WindowBehaviorPage::Callbacks{
+      .requestRebuild =
+          [this]() {
+            clearArmedResets();
+            requestSceneRebuild();
+          },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_windowBehaviorPage != nullptr) {
+              m_windowBehaviorPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
   };
 }
 
@@ -581,6 +623,9 @@ void KineticSettingsWindow::applyActivePage() {
   case ActivePage::WindowRules:
     applied = m_windowRulesPage != nullptr && m_windowRulesPage->applyAll();
     break;
+  case ActivePage::WindowBehavior:
+    applied = m_windowBehaviorPage != nullptr && m_windowBehaviorPage->applyAll();
+    break;
   case ActivePage::Workspaces:
     applied = m_workspacesPage != nullptr && m_workspacesPage->applyAll();
     break;
@@ -633,6 +678,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_windowRulesPage->resetAll();
     }
     break;
+  case ActivePage::WindowBehavior:
+    if (m_windowBehaviorPage != nullptr) {
+      m_windowBehaviorPage->resetAll();
+    }
+    break;
   case ActivePage::Workspaces:
     if (m_workspacesPage != nullptr) {
       m_workspacesPage->resetAll();
@@ -668,6 +718,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_tilingPage != nullptr && m_tilingPage->hasPending();
   case ActivePage::WindowRules:
     return m_windowRulesPage != nullptr && m_windowRulesPage->hasPending();
+  case ActivePage::WindowBehavior:
+    return m_windowBehaviorPage != nullptr && m_windowBehaviorPage->hasPending();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && m_workspacesPage->hasPending();
   case ActivePage::Keybinds:
@@ -692,6 +744,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_tilingPage != nullptr && !m_tilingPage->resettableKeyPaths().empty();
   case ActivePage::WindowRules:
     return m_windowRulesPage != nullptr && !m_windowRulesPage->resettableKeyPaths().empty();
+  case ActivePage::WindowBehavior:
+    return m_windowBehaviorPage != nullptr && !m_windowBehaviorPage->resettableKeyPaths().empty();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && !m_workspacesPage->resettableKeyPaths().empty();
   case ActivePage::Keybinds:
@@ -912,6 +966,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     requestSceneRebuild();
   });
   if (m_windowManagementExpanded) {
+    addSubNav(ActivePage::WindowBehavior, "window", "Window Behavior");
     addSubNav(ActivePage::Workspaces, "device-desktop", "Workspaces");
     addSubNav(ActivePage::Tiling, "layout-grid", "Tiling");
     addSubNav(ActivePage::WindowRules, "window", "Window Rules");
@@ -984,6 +1039,15 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
     if (m_windowRulesPage != nullptr) {
       m_pageContainer->addChild(
           m_windowRulesPage->build(uiScale(), windowRulesFilter(), windowRulesPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::WindowBehavior:
+    if (m_windowBehaviorPage != nullptr) {
+      m_pageContainer->addChild(
+          m_windowBehaviorPage->build(
+              uiScale(), windowBehaviorFilter(), m_armedResetKeyPath, windowBehaviorPageCallbacks()
+          )
       );
     }
     break;
@@ -1136,6 +1200,19 @@ bool KineticSettingsWindow::onPointerEvent(const PointerEvent& event) {
     );
   }
   return false;
+}
+
+void KineticSettingsWindow::updateKeyboardShortcutInhibit() {
+  if (!isOpen() || m_surface == nullptr || m_wayland == nullptr) {
+    return;
+  }
+  const bool capturing = m_keybindsPage != nullptr && m_keybindsPage->isCapturing();
+  if (capturing && m_shortcutInhibitor == nullptr) {
+    m_shortcutInhibitor = m_wayland->createKeyboardShortcutsInhibitor(m_surface->wlSurface());
+  } else if (!capturing && m_shortcutInhibitor != nullptr) {
+    zwp_keyboard_shortcuts_inhibitor_v1_destroy(m_shortcutInhibitor);
+    m_shortcutInhibitor = nullptr;
+  }
 }
 
 void KineticSettingsWindow::onKeyboardEvent(const KeyboardEvent& event) {

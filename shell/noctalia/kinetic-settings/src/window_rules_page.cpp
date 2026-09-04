@@ -345,7 +345,7 @@ const std::vector<WindowRulesPage::RuleField>& WindowRulesPage::ruleFields() {
       {"below", "belowrule", RuleValueKind::Bool, RulePolicyKind::SetRule, "Arrangement & Access", "Keep below other windows"},
       {"floating", "floatingrule", RuleValueKind::Bool, RulePolicyKind::SetRule, "Arrangement & Access", "Float window"},
       // Appearance & Fixes
-      {"decorationpolicy", "decorationpolicyrule", RuleValueKind::Option, RulePolicyKind::SetRule, "Appearance & Fixes", "Title bar & frame"},
+      {"decorationpolicy", "decorationpolicyrule", RuleValueKind::TitleBar, RulePolicyKind::SetRule, "Appearance & Fixes", "Title bar"},
       {"opacityactive", "opacityactiverule", RuleValueKind::Percentage, RulePolicyKind::ForceRule, "Appearance & Fixes", "Active opacity"},
       {"opacityinactive", "opacityinactiverule", RuleValueKind::Percentage, RulePolicyKind::ForceRule, "Appearance & Fixes", "Inactive opacity"},
   };
@@ -807,9 +807,53 @@ WindowRulesPage::buildRuleFieldRow(std::size_t ruleIndex, const RuleField& field
       }));
       break;
     }
+    case RuleValueKind::TitleBar: {
+      // Three-state title-bar override: Not set (follow the global Toggle Title
+      // Bars), Hide (force no decoration), Show (force a title bar).
+      int state = 0; // 0 = not set, 1 = hide, 2 = show
+      if (currentPolicy != 0) {
+        state = (currentValue == "0") ? 1 : 2;
+      }
+      std::vector<std::string> labels{"Not set (follow global)", "Hide title bar", "Show title bar"};
+      controls->addChild(ui::select({
+          .options = std::move(labels),
+          .selectedIndex = static_cast<std::size_t>(state),
+          .fontSize = Style::fontSizeCaption * scale,
+          .controlHeight = Style::controlHeight * scale,
+          .glyphSize = Style::fontSizeBody * scale,
+          .width = 190.0F * scale,
+          .height = Style::controlHeight * scale,
+          .onSelectionChanged =
+              [this, ruleIndex, key = std::string(field.key), polKey = std::string(field.policyKey), callbacks](std::size_t index, std::string_view) {
+                if (ruleIndex >= m_ruleList.size()) {
+                  return;
+                }
+                auto& rule = m_ruleList[ruleIndex];
+                m_newRuleDrafts.erase(rule.id);
+                if (index == 0) {
+                  // Not set: follow the global Toggle Title Bars default.
+                  rule.values.erase(key);
+                  rule.values[polKey] = "0";
+                } else if (index == 1) {
+                  // Hide: force DecorationPolicy::None.
+                  rule.values[key] = "0";
+                  rule.values[polKey] = "2";
+                } else {
+                  // Show: force DecorationPolicy::ClientPreference.
+                  rule.values[key] = "1";
+                  rule.values[polKey] = "2";
+                }
+                m_rulesDirty = true;
+                if (callbacks.requestRebuild) {
+                  callbacks.requestRebuild();
+                }
+              },
+      }));
+      break;
+    }
     }
 
-  if (!policyKey.empty()) {
+  if (!policyKey.empty() && field.valueKind != RuleValueKind::TitleBar) {
     const auto& opts = policyOptions(field.policyKind);
     bool policyEnabled = field.policyKind != RulePolicyKind::None;
     if (policyEnabled) {

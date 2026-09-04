@@ -142,9 +142,13 @@ void PointerInputRedirection::init()
     std::for_each(clients.begin(), clients.end(), setupMoveResizeConnection);
     connect(workspace(), &Workspace::windowAdded, this, setupMoveResizeConnection);
 
-    // warp the cursor to center of screen containing the workspace center
-    if (const LogicalOutput *output = workspace()->outputAt(workspace()->geometry().center())) {
-        warp(output->geometry().center());
+    // warp the cursor to the center of the primary screen, so new windows open
+    // on the monitor chosen as primary in the display settings
+    for (const LogicalOutput *output : workspace()->outputOrder()) {
+        if (!output->isPlaceholder()) {
+            warp(output->geometry().center());
+            break;
+        }
     }
     updateAfterScreenChange();
 

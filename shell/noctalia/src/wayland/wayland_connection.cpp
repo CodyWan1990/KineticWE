@@ -15,6 +15,7 @@
 #include "hyprland-focus-grab-v1-client-protocol.h"
 #include "hyprland-toplevel-mapping-v1-client-protocol.h"
 #include "idle-inhibit-unstable-v1-client-protocol.h"
+#include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "org-kde-plasma-virtual-desktop-client-protocol.h"
 #include "plasma-window-management-client-protocol.h"
 #include "text-input-unstable-v3-client-protocol.h"
@@ -65,6 +66,7 @@ namespace {
   constexpr std::uint32_t kExtSessionLockManagerVersion = 1;
   constexpr std::uint32_t kExtIdleNotifierVersion = 2;
   constexpr std::uint32_t kIdleInhibitManagerVersion = 1;
+  constexpr std::uint32_t kKeyboardShortcutsInhibitManagerVersion = 1;
   constexpr std::uint32_t kExtBackgroundEffectManagerVersion = 1;
   constexpr std::uint32_t kFractionalScaleManagerVersion = 1;
   constexpr std::uint32_t kHyprlandFocusGrabManagerVersion = 1;
@@ -671,6 +673,9 @@ bool WaylandConnection::hasExtForeignToplevelList() const noexcept { return m_ha
 bool WaylandConnection::hasSessionLockManager() const noexcept { return m_sessionLockManager != nullptr; }
 bool WaylandConnection::hasIdleNotifier() const noexcept { return m_idleNotifier != nullptr; }
 bool WaylandConnection::hasIdleInhibitManager() const noexcept { return m_idleInhibitManager != nullptr; }
+bool WaylandConnection::hasKeyboardShortcutsInhibitManager() const noexcept {
+  return m_keyboardShortcutsInhibitManager != nullptr;
+}
 bool WaylandConnection::hasXdgActivation() const noexcept { return m_xdgActivation != nullptr; }
 bool WaylandConnection::hasFractionalScale() const noexcept {
   return m_fractionalScaleManager != nullptr && m_viewporter != nullptr;
@@ -792,6 +797,14 @@ ext_idle_notification_v1* WaylandConnection::createIdleNotification(std::uint32_
 }
 
 zwp_idle_inhibit_manager_v1* WaylandConnection::idleInhibitManager() const noexcept { return m_idleInhibitManager; }
+zwp_keyboard_shortcuts_inhibitor_v1* WaylandConnection::createKeyboardShortcutsInhibitor(wl_surface* surface) {
+  if (m_keyboardShortcutsInhibitManager == nullptr || m_seat == nullptr || surface == nullptr) {
+    return nullptr;
+  }
+  return zwp_keyboard_shortcuts_inhibit_manager_v1_inhibit_shortcuts(
+      m_keyboardShortcutsInhibitManager, surface, m_seat
+  );
+}
 bool WaylandConnection::hasBackgroundEffectBlur() const noexcept { return m_backgroundEffectBlurSupported; }
 ext_background_effect_manager_v1* WaylandConnection::backgroundEffectManager() const noexcept {
   return m_backgroundEffectManager;
@@ -1173,6 +1186,11 @@ void WaylandConnection::bindGlobal(
     m_idleInhibitManager = static_cast<zwp_idle_inhibit_manager_v1*>(
         wl_registry_bind(registry, name, &zwp_idle_inhibit_manager_v1_interface, bindVersion)
     );
+  } else if (interfaceName == zwp_keyboard_shortcuts_inhibit_manager_v1_interface.name) {
+    const auto bindVersion = std::min(version, kKeyboardShortcutsInhibitManagerVersion);
+    m_keyboardShortcutsInhibitManager = static_cast<zwp_keyboard_shortcuts_inhibit_manager_v1*>(
+        wl_registry_bind(registry, name, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, bindVersion)
+    );
     return;
   }
 
@@ -1399,6 +1417,10 @@ void WaylandConnection::cleanup() {
   if (m_idleInhibitManager != nullptr) {
     zwp_idle_inhibit_manager_v1_destroy(m_idleInhibitManager);
     m_idleInhibitManager = nullptr;
+  }
+  if (m_keyboardShortcutsInhibitManager != nullptr) {
+    zwp_keyboard_shortcuts_inhibit_manager_v1_destroy(m_keyboardShortcutsInhibitManager);
+    m_keyboardShortcutsInhibitManager = nullptr;
   }
   if (m_backgroundEffectManager != nullptr) {
     ext_background_effect_manager_v1_destroy(m_backgroundEffectManager);

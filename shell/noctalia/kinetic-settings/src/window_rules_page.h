@@ -127,7 +127,7 @@ private:
     std::map<std::string, std::string> values;
   };
 
-  enum class RuleValueKind { Text, Bool, Option, Percentage, Point, Size, Desktop, Screen };
+  enum class RuleValueKind { Text, Bool, Option, Percentage, Point, Size, Desktop, Screen, TitleBar };
   enum class RulePolicyKind { None, StringMatch, SetRule, ForceRule };
   struct RuleField {
     std::string_view key;

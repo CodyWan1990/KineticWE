@@ -18,7 +18,9 @@
 #include <charconv>
 #include <cmath>
 #include <format>
+#include <iterator>
 #include <limits>
+#include <optional>
 #include <ranges>
 #include <utility>
 
@@ -174,6 +176,49 @@ const DisplayPage::OutputInfo* DisplayPage::findOutput(std::string_view id) cons
 DisplayPage::Settings DisplayPage::effectiveSettings(const OutputInfo& output) const {
   const auto it = m_pending.find(output.id);
   return it == m_pending.end() ? output.settings : it->second;
+}
+
+std::string DisplayPage::primaryOutputId() const {
+  std::optional<std::string> primary;
+  std::uint32_t bestPriority = std::numeric_limits<std::uint32_t>::max();
+  for (const auto& output : m_backend.outputs()) {
+    if (!effectiveSettings(output).enabled) {
+      continue;
+    }
+    const auto priority = effectiveSettings(output).priority;
+    if (priority < bestPriority) {
+      bestPriority = priority;
+      primary = output.id;
+    }
+  }
+  return primary.value_or(std::string{});
+}
+
+void DisplayPage::setPrimaryOutput(std::string id) {
+  // The primary output is the one with the lowest priority in the compositor's
+  // output order. Renumber every enabled output so the chosen primary sorts
+  // first (priority 0) and the rest follow in their current order.
+  std::vector<const OutputInfo*> ordered;
+  ordered.reserve(m_backend.outputs().size());
+  for (const auto& output : m_backend.outputs()) {
+    if (effectiveSettings(output).enabled) {
+      ordered.push_back(&output);
+    }
+  }
+  const auto it = std::ranges::find_if(ordered, [&id](const OutputInfo* output) {
+    return output->id == id;
+  });
+  if (it == ordered.end()) {
+    return;
+  }
+  std::rotate(ordered.begin(), it, std::next(it));
+
+  std::uint32_t priority = 0;
+  for (const auto* output : ordered) {
+    auto settings = effectiveSettings(*output);
+    settings.priority = priority++;
+    stage(std::move(settings));
+  }
 }
 
 void DisplayPage::stage(Settings settings) {
@@ -709,6 +754,37 @@ std::unique_ptr<Node> DisplayPage::buildOutputDetails(
       scale
   );
 
+  if (current.enabled) {
+    const bool isPrimary = primaryOutputId() == id;
+    std::unique_ptr<Node> primaryControl;
+    if (isPrimary) {
+      primaryControl = ui::label({
+          .text = "Primary",
+          .fontSize = Style::fontSizeCaption * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::Primary),
+      });
+    } else {
+      primaryControl = ui::button({
+          .text = "Set as primary",
+          .fontSize = Style::fontSizeCaption * scale,
+          .variant = ButtonVariant::Ghost,
+          .minWidth = Style::controlHeight * scale,
+          .minHeight = Style::controlHeight * scale,
+          .padding = Style::spaceSm * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick = [this, id, callbacks]() {
+            setPrimaryOutput(id);
+            requestRebuild(callbacks);
+          },
+      });
+    }
+    addSettingRow(
+        *card, "Primary display", "Where the cursor starts and new windows open by default",
+        std::move(primaryControl), scale
+    );
+  }
+
   std::vector<std::string> modeOptions;
   std::vector<DisplayOutputBackend::Mode> modeValues;
   for (const auto& mode : output.modes) {
@@ -1108,20 +1184,6 @@ std::unique_ptr<Node> DisplayPage::buildOutputDetails(
           scale
       );
     }
-    if (m_backend.supportsKineticFeature(3)) {
-      const std::uint32_t maxPriority = std::max<std::uint32_t>(
-          static_cast<std::uint32_t>(m_backend.outputs().size() + 1), current.priority + 1
-      );
-      addSettingRow(
-          *card, "Output priority", "Lower values are placed earlier in the compositor's output order", makeSlider(
-              current.priority, 0.0, static_cast<double>(maxPriority), 1.0, scale, [stageUpdate](double value) {
-                stageUpdate([value](Settings& settings) { settings.priority = static_cast<std::uint32_t>(std::lround(value)); });
-              }
-          ),
-          scale
-      );
-    }
-
     if (m_backend.supportsKineticFeature(7)) {
       addSettingRow(
           *card, "Maximum peak brightness override", "Override the panel metadata in nits; use -1 for automatic", makeText(

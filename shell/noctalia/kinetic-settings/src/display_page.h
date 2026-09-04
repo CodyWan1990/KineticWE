@@ -76,6 +76,8 @@ private:
   void ensureLoaded();
   [[nodiscard]] const OutputInfo* findOutput(std::string_view id) const;
   [[nodiscard]] Settings effectiveSettings(const OutputInfo& output) const;
+  [[nodiscard]] std::string primaryOutputId() const;
+  void setPrimaryOutput(std::string id);
   void stage(Settings settings);
   void requestRebuild(const Callbacks& callbacks) const;
 

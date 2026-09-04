@@ -353,7 +353,11 @@ std::optional<std::uint32_t> toQtKey(const KeyChord& chord) {
 
 std::optional<KeyChord> fromQtKey(std::uint32_t key) {
   const bool keypad = (key & KeypadModifier) != 0;
-  const auto sym = qtToSym(key & ~0x3f000000U, keypad);
+  // Clear only the modifier bits (0x02000000..0x20000000 = 0x3E000000). Bit 24
+  // (0x01000000) is the high byte of every Qt special key (Qt::Key_Left = 0x01000012,
+  // Key_Tab = 0x01000001, F-keys, ...); must be preserved or the round-trip drops
+  // or mis-maps every non-printable key (arrows, navigation, F-keys, keypad).
+  const auto sym = qtToSym(key & ~0x3E000000U, keypad);
   if (!sym.has_value()) {
     return std::nullopt;
   }

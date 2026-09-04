@@ -41,7 +41,11 @@ namespace {
   // compositor plans to drop activity support entirely (docs/kineticwe-2.0.md,
   // Phase 6) and kactivitymanagerd is already blocked from autostarting, so its
   // keybinds have no backing service and are not surfaced here. "plasmashell"
-  // is the Plasma shell itself, likewise meaningless on KineticWE.
+  // is the Plasma shell itself, likewise meaningless on KineticWE. "ksmserver"
+  // (friendly name "Session Management") exposes Plasma's own power/lock/logout
+  // actions, which KineticWE satisfies through Noctalia (panel power menu,
+  // lockscreen, drawer) — surfacing them here only invites binding a chord that
+  // doesn't do what the Plasma action would, so it is hidden.
   //
   // Regular apps (Konsole, Dolphin, ...) are NOT hidden: their binds live in
   // the daemon's config and can silently hold a chord the user wants (e.g. a
@@ -52,6 +56,7 @@ namespace {
     static const std::vector<std::string> kHidden{
         "ActivityManager",
         "plasmashell",
+        "ksmserver",
     };
     return kHidden;
   }
@@ -461,14 +466,17 @@ void KeybindsPage::commitChord(
   }
   // A chord already bound to another action is a conflict; the action's own
   // current bindings are fine (re-committing a value or moving it between
-  // slots of the same action). The daemon's globalShortcutsByKey method is
-  // unavailable on this fork, so conflicts are computed from the loaded
-  // components (all actions with their active chords).
+  // slots of the same action). Because the daemon's globalShortcutsByKey
+  // method is unavailable on this fork, conflicts are computed from what the
+  // page shows: effectiveChords() so a chord STAGED on another action (but not
+  // yet applied) is still reported, instead of only the daemon's on-disk
+  // chords.
   const auto conflicts = [&] {
     std::vector<std::pair<std::string, std::string>> owners;
     for (const auto& candidate : m_components) {
       for (const auto& candidateAction : candidate.actions) {
-        if (std::ranges::find(candidateAction.active, *canonical) != candidateAction.active.end()) {
+        const auto candidateChords = effectiveChords(candidate.uniqueName, candidateAction.actionUnique);
+        if (std::ranges::find(candidateChords, *canonical) != candidateChords.end()) {
           owners.emplace_back(candidate.uniqueName, candidateAction.actionUnique);
         }
       }
@@ -618,10 +626,13 @@ void KeybindsPage::buildChordRow(
           [this, component, action, chords, index, callbacks](KeyChord chord) {
             commitChord(component, action, chords, index, chord, callbacks);
           },
-      .onRecordingChanged = [this](bool recording) {
+      .onRecordingChanged = [this, callbacks](bool recording) {
         m_recordingCount += recording ? 1 : -1;
         if (m_recordingCount < 0) {
           m_recordingCount = 0;
+        }
+        if (callbacks.recordingChanged) {
+          callbacks.recordingChanged(recording);
         }
       },
   }));

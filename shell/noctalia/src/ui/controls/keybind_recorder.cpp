@@ -22,6 +22,34 @@ namespace {
 
   constexpr float kRecorderMinWidth = 220.0F;
 
+  // Maps a modifier keysym to its KeyMod bit so we can track held modifiers
+  // from the key symbols themselves. The compositor's key-event `modifiers`
+  // bitmask drops the Meta/Super bit on this fork (xkb LOGO is not reflected),
+  // so keying off it alone would silently drop Meta from recorded chords.
+  [[nodiscard]] std::uint32_t modifierBitForSym(std::uint32_t sym) noexcept {
+    switch (sym) {
+    case XKB_KEY_Shift_L:
+    case XKB_KEY_Shift_R:
+    case XKB_KEY_Shift_Lock:
+      return KeyMod::Shift;
+    case XKB_KEY_Control_L:
+    case XKB_KEY_Control_R:
+      return KeyMod::Ctrl;
+    case XKB_KEY_Alt_L:
+    case XKB_KEY_Alt_R:
+      return KeyMod::Alt;
+    case XKB_KEY_Meta_L:
+    case XKB_KEY_Meta_R:
+    case XKB_KEY_Super_L:
+    case XKB_KEY_Super_R:
+    case XKB_KEY_Hyper_L:
+    case XKB_KEY_Hyper_R:
+      return KeyMod::Super;
+    default:
+      return 0;
+    }
+  }
+
 } // namespace
 
 KeybindRecorder::KeybindRecorder() {
@@ -202,7 +230,7 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
   }
 
   // Must run before the modifier-preview branch so a bare Super press is also caught.
-  if (!m_superAllowed && ((modifiers & KeyMod::Super) != 0 || KeySymbol::isSuperModifier(sym))) {
+  if (!m_superAllowed && (((m_pendingModifiers | modifiers) & KeyMod::Super) != 0 || KeySymbol::isSuperModifier(sym))) {
     notify::error(
         i18n::tr("notifications.internal.keybind-app"), i18n::tr("notifications.internal.keybind-invalid-title"),
         i18n::tr("notifications.internal.keybind-invalid-super")
@@ -221,12 +249,16 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
   }
 
   if (KeySymbol::isModifier(sym)) {
-    m_pendingModifiers = modifiers;
+    // Accumulate held modifiers from the modifier key's own symbol, so a held
+    // Meta/Super survives even when the compositor's `modifiers` mask omits it.
+    // Overwriting with `modifiers` alone would drop Meta mid-chord (only "Ctrl"
+    // would end up recorded/displayed).
+    m_pendingModifiers |= (modifiers | modifierBitForSym(sym));
     refreshLabel();
     return;
   }
 
-  if (m_modifierPolicy == ModifierPolicy::Required && modifiers == 0 && isPrintableKey(sym)) {
+  if (m_modifierPolicy == ModifierPolicy::Required && (m_pendingModifiers | modifiers) == 0 && isPrintableKey(sym)) {
     notify::error(
         i18n::tr("notifications.internal.keybind-app"), i18n::tr("notifications.internal.keybind-invalid-title"),
         i18n::tr("notifications.internal.keybind-invalid-printable")
@@ -235,7 +267,7 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
     return;
   }
 
-  if (m_modifierPolicy == ModifierPolicy::Forbidden && modifiers != 0) {
+  if (m_modifierPolicy == ModifierPolicy::Forbidden && (m_pendingModifiers | modifiers) != 0) {
     notify::error(
         i18n::tr("notifications.internal.keybind-app"), i18n::tr("notifications.internal.keybind-invalid-title"),
         i18n::tr("notifications.internal.keybind-invalid-modifier")
@@ -246,7 +278,7 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
 
   // Shift-only + printable is just a character variant (e.g. Shift+l = L),
   // not a meaningful shortcut. Reject it in both Required and Optional modes.
-  if (modifiers == KeyMod::Shift && isPrintableKey(sym)) {
+  if ((m_pendingModifiers | modifiers) == KeyMod::Shift && isPrintableKey(sym)) {
     notify::error(
         i18n::tr("notifications.internal.keybind-app"), i18n::tr("notifications.internal.keybind-invalid-title"),
         i18n::tr("notifications.internal.keybind-invalid-printable")
@@ -255,7 +287,8 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
     return;
   }
 
-  const std::uint32_t cleanModifiers = m_superAllowed ? modifiers : (modifiers & ~KeyMod::Super);
+  const std::uint32_t effectiveModifiers = m_pendingModifiers | modifiers;
+  const std::uint32_t cleanModifiers = m_superAllowed ? effectiveModifiers : (effectiveModifiers & ~KeyMod::Super);
   KeyChord chord{.sym = sym, .modifiers = cleanModifiers};
   m_chord = chord;
   if (m_onCommit) {
@@ -269,7 +302,7 @@ void KeybindRecorder::handleKeyUp(std::uint32_t sym, std::uint32_t modifiers) {
     return;
   }
   if (KeySymbol::isModifier(sym)) {
-    m_pendingModifiers = modifiers;
+    m_pendingModifiers = (m_pendingModifiers | modifiers) & ~modifierBitForSym(sym);
     refreshLabel();
   }
 }

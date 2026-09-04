@@ -43,6 +43,11 @@ public:
   // Glue back to the owning window, same contract as the other pages.
   struct Callbacks {
     std::function<void()> requestRebuild;
+    // Fires when any chord recorder on the page starts (true) or stops (false)
+    // capturing. The window uses it to inhibit compositor global shortcuts while
+    // a bind is being recorded, so a taken chord can be captured for the
+    // conflict-overwrite flow instead of being consumed by the compositor.
+    std::function<void(bool)> recordingChanged;
   };
 
   explicit KeybindsPage(SessionBus& bus, CustomKeybinds& customKeybinds);
@@ -71,6 +76,10 @@ public:
     m_pending.clear();
     m_pendingRebind.reset();
     m_errorNotice.clear();
+    // Drop any leftover capture count (e.g. a recorder was destroyed while
+    // recording, or the window closed mid-capture) so a stale isCapturing()
+    // can't leave the keyboard-shortcuts inhibitor held open.
+    m_recordingCount = 0;
   }
 
   // True while any chord recorder on the page is capturing input; the window

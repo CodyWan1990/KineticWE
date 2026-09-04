@@ -7,6 +7,7 @@
 #include "kinetic-settings/src/icons_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
 #include "kinetic-settings/src/tiling_page.h"
+#include "kinetic-settings/src/window_behavior_page.h"
 #include "kinetic-settings/src/window_rules_page.h"
 #include "kinetic-settings/src/workspaces_page.h"
 
@@ -33,6 +34,7 @@ struct KeyboardEvent;
 struct PointerEvent;
 struct wl_output;
 struct wl_surface;
+struct zwp_keyboard_shortcuts_inhibitor_v1;
 
 // Self-contained xdg-toplevel settings window for KineticWE desktop settings
 // (kinetic-settings module). Owns its own surface and scene; never touches
@@ -61,6 +63,11 @@ public:
   [[nodiscard]] bool ownsKeyboardSurface(wl_surface* surface) const noexcept;
   [[nodiscard]] bool onPointerEvent(const PointerEvent& event);
   void onKeyboardEvent(const KeyboardEvent& event);
+  // Keeps a compositor keyboard-shortcuts inhibitor alive only while a keybind
+  // recorder is capturing. This makes the compositor stop consuming global
+  // shortcuts for the window so a chord that is already bound elsewhere can be
+  // captured (and the conflict-overwrite prompt shown) instead of being eaten.
+  void updateKeyboardShortcutInhibit();
 
 private:
   // Sidebar/secondary nav pages, grouped under the collapsible categories.
@@ -69,6 +76,7 @@ private:
     AppearanceGlobalTheme,
     AppearanceIcons,
     AppearanceCursors,
+    WindowBehavior,
     Workspaces,
     Tiling,
     WindowRules,
@@ -104,6 +112,8 @@ private:
   [[nodiscard]] KeybindsPage::Callbacks keybindsPageCallbacks();
   [[nodiscard]] WindowRulesPage::Filter windowRulesFilter() const;
   [[nodiscard]] WindowRulesPage::Callbacks windowRulesPageCallbacks();
+  [[nodiscard]] WindowBehaviorPage::Filter windowBehaviorFilter() const;
+  [[nodiscard]] WindowBehaviorPage::Callbacks windowBehaviorPageCallbacks();
   [[nodiscard]] AppearancePage::Filter appearanceFilter() const;
   [[nodiscard]] AppearancePage::Callbacks appearancePageCallbacks();
   [[nodiscard]] IconsPage::Filter iconsFilter() const;
@@ -135,12 +145,15 @@ private:
   std::unique_ptr<WorkspacesPage> m_workspacesPage;
   std::unique_ptr<KeybindsPage> m_keybindsPage;
   std::unique_ptr<WindowRulesPage> m_windowRulesPage;
+  std::unique_ptr<WindowBehaviorPage> m_windowBehaviorPage;
   std::unique_ptr<DisplayPage> m_displayPage;
   std::unique_ptr<AppearancePage> m_appearancePage;
   std::unique_ptr<IconsPage> m_iconsPage;
   std::unique_ptr<CursorsPage> m_cursorsPage;
   std::unique_ptr<DefaultAppsPage> m_defaultAppsPage;
   std::unique_ptr<SelectDropdownPopup> m_selectPopup;
+  // Non-null only while a keybind recorder is capturing (see updateKeyboardShortcutInhibit).
+  zwp_keyboard_shortcuts_inhibitor_v1* m_shortcutInhibitor = nullptr;
   wl_output* m_output = nullptr;
   Box* m_background = nullptr;
   Flex* m_pageContainer = nullptr;

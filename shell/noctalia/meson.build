@@ -346,6 +346,8 @@ foreach _p : [
     wayland_protos_dir / 'stable/viewporter/viewporter.xml'],
   ['idle-inhibit-unstable-v1',
     wayland_protos_dir / 'unstable/idle-inhibit/idle-inhibit-unstable-v1.xml'],
+  ['keyboard-shortcuts-inhibit-unstable-v1',
+    wayland_protos_dir / 'unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml'],
   ['xdg-decoration-unstable-v1',
     wayland_protos_dir / 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml'],
 
@@ -1007,6 +1009,7 @@ _noctalia_sources = files(
   'kinetic-settings/src/keybinds_kwe.cpp',
   'kinetic-settings/src/keybinds_page.cpp',
   'kinetic-settings/src/window_rules_page.cpp',
+  'kinetic-settings/src/window_behavior_page.cpp',
   'kinetic-settings/src/custom_keybinds.cpp',
   'kinetic-settings/src/kinetic_settings_module.cpp',
 )

@@ -1,5 +1,6 @@
 # Things that should be installed on fresh isnteall
 breeze theme
+Set a base theme and cursor theme on install. 
 A terminal with a defualt keybind of meta+T 
 ## Keybinds not working
 display configuration
