@@ -37,8 +37,9 @@ namespace {
   constexpr float kWindowMinHeight = 480.0F;
 
   constexpr float kBackgroundOpacity = 1.0F;
-  // Sidebar geometry mirrors Noctalia's settings_sidebar.cpp.
-  constexpr float kSidebarWidth = 200.0F;
+  // Sidebar geometry mirrors Noctalia's settings_sidebar.cpp, widened slightly
+  // so the larger category rows keep "Window Management" fully visible.
+  constexpr float kSidebarWidth = 220.0F;
   constexpr float kSidebarPadding = 6.0F;
   constexpr float kSidebarGap = 2.0F;
   constexpr float kPrimaryNavGlyphSize = 18.0F;
@@ -153,7 +154,7 @@ void KineticSettingsWindow::open() {
     m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus, *m_customKeybinds);
   }
   if (m_windowRulesPage == nullptr) {
-    m_windowRulesPage = std::make_unique<WindowRulesPage>(*m_bus);
+    m_windowRulesPage = std::make_unique<WindowRulesPage>(*m_bus, *m_wayland);
   }
   if (m_displayPage == nullptr) {
     m_displayPage = std::make_unique<DisplayPage>(*m_wayland);
@@ -835,11 +836,11 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     nav->addChild(ui::button({
         .text = std::string(title),
         .glyph = expanded ? "chevron-down" : "chevron-right",
-        .fontSize = Style::fontSizeCaption * scale,
+        .fontSize = Style::fontSizeBody * scale,
         .glyphSize = kPrimaryNavGlyphSize * scale,
         .contentAlign = ButtonContentAlign::Start,
         .variant = ButtonVariant::Tab,
-        .minHeight = Style::controlHeightSm * scale,
+        .minHeight = Style::controlHeight * scale,
         .paddingV = Style::spaceXs * scale,
         .paddingH = kPrimaryNavPaddingH * scale,
         .gap = kPrimaryNavGap * scale,

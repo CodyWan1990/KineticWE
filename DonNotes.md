@@ -1,4 +1,6 @@
-
+# Things that should be installed on fresh isnteall
+breeze theme
+A terminal with a defualt keybind of meta+T 
 ## Keybinds not working
 display configuration
 

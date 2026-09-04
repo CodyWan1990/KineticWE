@@ -52,8 +52,12 @@ namespace {
       }
     } else {
       pushUniqueDir(dirs, "/usr/local/share");
-      pushUniqueDir(dirs, "/usr/share");
     }
+    // Always include the system data dir so icons/cursors installed in
+    // /usr/share are discovered even when XDG_DATA_DIRS is unset or omits
+    // it (minimal fresh session, some atomic distros, etc.). The user dirs
+    // are enumerated first above, so user-installed themes still win.
+    pushUniqueDir(dirs, "/usr/share");
     return dirs;
   }
 

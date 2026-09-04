@@ -14,6 +14,7 @@
 
 class Flex;
 class Node;
+class WaylandConnection;
 
 // The Window Rules settings page: compositor-wide "Window defaults" plus the
 // per-window rule book.
@@ -50,7 +51,7 @@ public:
     std::function<void()> requestRebuild;
   };
 
-  explicit WindowRulesPage(class SessionBus& bus);
+  explicit WindowRulesPage(class SessionBus& bus, class WaylandConnection& wayland);
 
   std::unique_ptr<Node> build(float scale, const Filter& filter, const Callbacks& callbacks);
 
@@ -126,7 +127,7 @@ private:
     std::map<std::string, std::string> values;
   };
 
-  enum class RuleValueKind { Text, Bool, Option, Percentage, Point, Size };
+  enum class RuleValueKind { Text, Bool, Option, Percentage, Point, Size, Desktop, Screen };
   enum class RulePolicyKind { None, StringMatch, SetRule, ForceRule };
   struct RuleField {
     std::string_view key;
@@ -172,6 +173,7 @@ private:
   void setRulePolicy(std::size_t index, const std::string& policyKey, int policy, const Callbacks& callbacks);
 
   CompositorDbus m_dbus;
+  WaylandConnection& m_wayland; // live monitor (output) list for the Monitor rule
   KineticweKwe m_config;      // kineticwe.kwe (window defaults)
   KineticweKwe m_rulesConfig; // rules.kwe (window rules)
   bool m_loaded = false;

@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "dbus/session_bus.h"
 #include "ui/builders.h"
+#include "wayland/wayland_connection.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/glyph.h"
 #include "ui/controls/input.h"
@@ -66,7 +67,8 @@ namespace {
 
 } // namespace
 
-WindowRulesPage::WindowRulesPage(SessionBus& bus) : m_dbus(bus) {
+WindowRulesPage::WindowRulesPage(SessionBus& bus, WaylandConnection& wayland)
+    : m_dbus(bus), m_wayland(wayland) {
   m_rulesConfig.setPath(KineticweKwe::rulesDefaultPath());
 }
 
@@ -323,7 +325,7 @@ const std::vector<WindowRulesPage::RuleField>& WindowRulesPage::ruleFields() {
   static const std::vector<RuleField> kFields{
       // Matching
       {"wmclass", "wmclassmatch", RuleValueKind::Text, RulePolicyKind::StringMatch, "Window matching", "Window class (application)"},
-      {"wmclasscomplete", "", RuleValueKind::Bool, RulePolicyKind::None, "Window matching", "Match whole window class"},
+      {"wmclasscomplete", "", RuleValueKind::Bool, RulePolicyKind::None, "Window matching", "Match full class string (instance + class, e.g. \"kitty kitty\")"},
       {"windowrole", "windowrolematch", RuleValueKind::Text, RulePolicyKind::StringMatch, "Window matching", "Window role"},
       {"title", "titlematch", RuleValueKind::Text, RulePolicyKind::StringMatch, "Window matching", "Window title"},
       // Size & Position
@@ -334,6 +336,8 @@ const std::vector<WindowRulesPage::RuleField>& WindowRulesPage::ruleFields() {
       {"maximizevert", "maximizevertrule", RuleValueKind::Bool, RulePolicyKind::SetRule, "Size & Position", "Maximized vertically"},
       {"minimize", "minimizerule", RuleValueKind::Bool, RulePolicyKind::SetRule, "Size & Position", "Minimized"},
       {"fullscreen", "fullscreenrule", RuleValueKind::Bool, RulePolicyKind::SetRule, "Size & Position", "Fullscreen"},
+      {"desktops", "desktopsrule", RuleValueKind::Desktop, RulePolicyKind::SetRule, "Size & Position", "Workspaces"},
+      {"screen", "screenrule", RuleValueKind::Screen, RulePolicyKind::SetRule, "Size & Position", "Monitor"},
       // Arrangement & Access (stacking). Skip taskbar/pager/switcher are
       // intentionally omitted: KineticWE doesn't run a Plasma taskbar, pager or
       // switcher, so those window rules have no effect here.
@@ -394,8 +398,9 @@ bool WindowRulesPage::fieldActive(const RuleField& field, const std::string& val
   }
   if (!field.policyKey.empty()) {
     // A property (SetRule/ForceRule) is active once a policy is chosen; for
-    // geometry also require a value so an empty point/size isn't written.
-    if (field.valueKind == RuleValueKind::Point || field.valueKind == RuleValueKind::Size) {
+    // geometry / desktop / screen also require a value so an empty selection
+    // isn't written.
+    if (field.valueKind == RuleValueKind::Point || field.valueKind == RuleValueKind::Size || field.valueKind == RuleValueKind::Desktop || field.valueKind == RuleValueKind::Screen) {
       return policy != 0 && !value.empty();
     }
     return policy != 0;
@@ -680,6 +685,79 @@ WindowRulesPage::buildRuleFieldRow(std::size_t ruleIndex, const RuleField& field
       pairRow->addChild(makeLabel(isSize ? "H" : "Y", Style::fontSizeCaption * scale, colorSpecFromRole(ColorRole::OnSurfaceVariant), FontWeight::Bold));
       pairRow->addChild(std::move(fieldB));
       controls->addChild(std::move(pairRow));
+      break;
+    }
+    case RuleValueKind::Desktop: {
+      const auto desktops = m_dbus.virtualDesktops();
+      std::vector<std::string> labels{"All workspaces"};
+      std::vector<std::string> values{""};
+      for (const auto& desktop : desktops) {
+        labels.push_back(desktop.name.empty() ? desktop.id : desktop.name);
+        values.push_back(desktop.id);
+      }
+      std::optional<std::size_t> selected;
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        if (values[i] == currentValue) {
+          selected = i;
+          break;
+        }
+      }
+      controls->addChild(ui::select({
+          .options = std::move(labels),
+          .selectedIndex = selected,
+          .fontSize = Style::fontSizeCaption * scale,
+          .controlHeight = Style::controlHeight * scale,
+          .glyphSize = Style::fontSizeBody * scale,
+          .width = 190.0F * scale,
+          .height = Style::controlHeight * scale,
+          .onSelectionChanged =
+              [this, ruleIndex, key = std::string(field.key), values, callbacks](std::size_t index, std::string_view) {
+                if (index < values.size()) {
+                  setRuleValue(ruleIndex, key, values[index], callbacks);
+                }
+              },
+      }));
+      break;
+    }
+    case RuleValueKind::Screen: {
+      const auto& outputs = m_wayland.outputs();
+      std::vector<std::string> labels{"Default monitor"};
+      std::vector<std::string> values{""};
+      for (std::size_t i = 0; i < outputs.size(); ++i) {
+        const auto& output = outputs[i];
+        std::string label;
+        if (!output.description.empty()) {
+          label = output.description;
+        } else if (!output.connectorName.empty()) {
+          label = output.connectorName;
+        } else {
+          label = "Monitor " + std::to_string(i + 1);
+        }
+        labels.push_back(std::move(label));
+        values.push_back(std::to_string(i));
+      }
+      std::optional<std::size_t> selected;
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        if (values[i] == currentValue) {
+          selected = i;
+          break;
+        }
+      }
+      controls->addChild(ui::select({
+          .options = std::move(labels),
+          .selectedIndex = selected,
+          .fontSize = Style::fontSizeCaption * scale,
+          .controlHeight = Style::controlHeight * scale,
+          .glyphSize = Style::fontSizeBody * scale,
+          .width = 190.0F * scale,
+          .height = Style::controlHeight * scale,
+          .onSelectionChanged =
+              [this, ruleIndex, key = std::string(field.key), values, callbacks](std::size_t index, std::string_view) {
+                if (index < values.size()) {
+                  setRuleValue(ruleIndex, key, values[index], callbacks);
+                }
+              },
+      }));
       break;
     }
     }
