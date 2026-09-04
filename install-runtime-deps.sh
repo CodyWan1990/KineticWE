@@ -15,6 +15,13 @@ set -euo pipefail
 # and can also be run directly after a build to top up deps:
 #   ./install-runtime-deps.sh
 #
+# On a fresh minimal host (an install from TTY with no desktop packages) the
+# KineticWE session would otherwise come up with no Breeze icon/cursor theme
+# and no terminal. So in addition to the library resolution below it also
+# installs the default session packages: the Breeze icon theme, the Breeze
+# color schemes, the Breeze cursor theme and Alacritty. These installs are
+# idempotent — any package the host already has is skipped.
+#
 # How it works:
 #   1. Detect the host package manager (dnf / apt).
 #   2. ldd the dev binaries (kinetic-we, noctalia-kwe, xdg-desktop-portal-kwe)
@@ -62,6 +69,18 @@ BASELINE_RPM_PKGS=(
     kf6-kbookmark
     kf6-kservice
     kf6-kcrash
+)
+
+# Default session packages so a fresh install from TTY actually has: the
+# Breeze icon theme (breeze-icon-theme), the Breeze color schemes that the
+# session seeds (BreezeDark/BreezeLight — plasma-breeze-common), the Breeze
+# cursor theme, and a terminal the user can launch. Installed idempotently by
+# install_default_session_packages.
+DEFAULT_RPM_PKGS=(
+    breeze-icon-theme
+    plasma-breeze-common
+    breeze-cursor-theme
+    alacritty
 )
 
 RED='\033[0;31m'
@@ -151,8 +170,41 @@ verify_resolved() {
     [[ ${#missing_libs[@]} -eq 0 ]]
 }
 
+# Install the default session packages (Breeze icon theme, Breeze cursor theme,
+# Alacritty) on a fresh host. Skips anything already installed, so re-runs are
+# no-ops. This is what makes a fresh-from-TTY install come up with icons, a
+# cursor theme and a terminal instead of a bare desktop.
+install_default_session_packages() {
+    local -a missing=()
+    local pkg
+    for pkg in "${DEFAULT_RPM_PKGS[@]}"; do
+        if [[ "$PM" == dnf ]]; then
+            if ! rpm -q "$pkg" &>/dev/null; then
+                missing+=("$pkg")
+            fi
+        elif ! dpkg-query -W "$pkg" &>/dev/null 2>&1; then
+            missing+=("$pkg")
+        fi
+    done
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        info "Default session packages already installed."
+        return 0
+    fi
+    echo
+    info "Fresh host: installing default session packages (Breeze icons, cursor theme, terminal):"
+    printf '    %s\n' "${missing[@]}"
+    if [[ "$PM" == dnf ]]; then
+        sudo dnf install -y "${missing[@]}"
+    else
+        sudo apt-get install -y "${missing[@]}"
+    fi
+    info "Default session packages installed."
+}
+
 main() {
     detect_pkgmgr
+
+    install_default_session_packages
 
     local has_binaries=false binary
     for binary in "${DEV_BINARIES[@]}"; do

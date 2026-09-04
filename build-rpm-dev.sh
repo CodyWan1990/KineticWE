@@ -17,7 +17,10 @@ set -euo pipefail
 #   ./build-rpm-dev.sh --reset-local            # Remove dev files from TEST_PREFIX + login entry
 #   ./build-rpm-dev.sh --quick --no-session     # Skip installing the login-screen session entry
 #   ./build-rpm-dev.sh --install-host-deps      # Implies --quick; after the build, install any
-#                                               # missing host runtime deps the session needs
+#                                               # missing host runtime deps the session needs,
+#                                               # plus the default session packages (Breeze icon/
+#                                               # cursor themes, color schemes, Alacritty) on a
+#                                               # fresh host
 #
 # All build modes install into TEST_PREFIX so you can test with a single command.
 #
@@ -856,6 +859,7 @@ print_usage() {
 
     info "Build and auto-install any missing host runtime deps in one step:"
     info "  ./build-rpm-dev.sh --install-host-deps"
+    info "  (also installs the default session packages: Breeze icon/cursor themes, color schemes, Alacritty)"
     echo
 
     if find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" ! -name '*.src.rpm' -print0 2>/dev/null | grep -qz .; then

@@ -597,6 +597,134 @@ fi
 
 
 # ---------------------------------------------------------------------------
+# 4f. Default desktop-content seeding.
+#     A fresh install from TTY has no KDE desktop packages, so even after
+#     installing the Breeze packages the session would come up with no cursor
+#     theme, no icon theme and no terminal default (and nothing to launch with
+#     a shortcut). Seed those — plus a Meta+T -> Alacritty shortcut — only when
+#     they are unset, so a user's existing choices (icons, cursor, terminal,
+#     keybinds) are never clobbered. Idempotent;
+#
+#     The compositor config keys ([Mouse] cursorTheme/cursorSize) are the ones
+#     KWin and the launch-time cursor actually read; kdeglobals carries the
+#     shared Qt/KDE settings (icon theme, cursor, default terminal);
+#     appearance.kwe is the portable mirror the Kinetic Settings Appearance
+#     page drives; and the custom-command definition + chord are what the shell
+#     registers/replays at start so Meta+T fires Alacritty.
+# ---------------------------------------------------------------------------
+# Only seed the default Meta+T -> Alacritty shortcut on the first run (when the
+# user has no custom keybinds yet). Once custom-keybinds.kwe exists the user has
+# interacted with custom keybinds, so re-seeding the shortcut on every login
+# would resurrect a bind they deliberately unbound or reassigned.
+KWE_SEED_KEYBINDS=""
+if [[ ! -e "$KWE_CONFIG_HOME/custom-keybinds.kwe" ]]; then
+    KWE_SEED_KEYBINDS="1"
+fi
+export KWE_CONFIG_HOME KWE_SEED_KEYBINDS
+python3 - "$KWE_CONFIG_HOME" "$KWE_REAL_CONFIG_HOME" <<'PY' || \
+    echo "kineticwe: desktop-default seeding failed (continuing)" >&2
+import os
+import stat
+import sys
+import tempfile
+
+
+def _write(path, contents):
+    parent = os.path.dirname(path) or "."
+    os.makedirs(parent, exist_ok=True)
+    mode = None
+    if os.path.exists(path):
+        mode = stat.S_IMODE(os.stat(path).st_mode)
+    fd, tmp = tempfile.mkstemp(dir=parent, prefix=".kwe-seed.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(contents)
+        if mode is not None:
+            os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _ensure(path, header, key, value):
+    # Ensure `key=value` exists inside the `[header]` section of a KConfig-style
+    # file, preserving every other line. Creates the file/section if missing;
+    # leaves the file untouched when the key is already present.
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            lines = [l[:-1] if l.endswith("\r") else l for l in f.read().splitlines()]
+    else:
+        lines = []
+    sections, preamble, cur = [], [], None
+    for line in lines:
+        if line.startswith("[") and line.endswith("]"):
+            cur = [line, []]
+            sections.append(cur)
+        else:
+            (cur[1] if cur is not None else preamble).append(line)
+    keyline = key + "=" + value
+    target = next((s for s in sections if s[0] == header), None)
+    if target is not None:
+        for line in target[1]:
+            if line.split("=", 1)[0].strip() == key:
+                return  # already present; leave untouched
+        target[1].insert(0, keyline)
+    else:
+        sections.append([header, [keyline]])
+    out = list(preamble)
+    for i, (h, body) in enumerate(sections):
+        if i > 0 and out and out[-1].strip() != "":
+            out.append("")
+        out.append(h)
+        out.extend(body)
+    _write(path, "\n".join(out) + "\n")
+
+
+def main():
+    if len(sys.argv) != 3:
+        print("usage: kwe_seed_defaults.py <configHome> <realConfigHome>", file=sys.stderr)
+        sys.exit(2)
+    config_home, real_config_home = sys.argv[1], sys.argv[2]
+    cfg = lambda name: os.path.join(config_home, name)
+
+    # Portable Appearance settings (drive the Kinetic Settings pages).
+    _ensure(cfg("appearance.kwe"), "[Appearance]", "IconTheme", "breeze")
+    _ensure(cfg("appearance.kwe"), "[Appearance]", "CursorTheme", "breeze_cursors")
+    _ensure(cfg("appearance.kwe"), "[Appearance]", "CursorSize", "24")
+
+    # What the compositor actually reads for the pointer cursor.
+    _ensure(cfg("kineticwe.kwe"), "[Mouse]", "cursorTheme", "breeze_cursors")
+    _ensure(cfg("kineticwe.kwe"), "[Mouse]", "cursorSize", "24")
+
+    # Shared Qt/KDE settings so apps see icons and the cursor and can open a
+    # terminal.
+    kde = os.path.join(real_config_home, "kdeglobals")
+    _ensure(kde, "[Icons]", "Theme", "breeze")
+    _ensure(kde, "[KDE]", "cursorTheme", "breeze_cursors")
+    _ensure(kde, "[KDE]", "cursorSize", "24")
+    _ensure(kde, "[General]", "TerminalApplication", "alacritty")
+
+    # Meta+T -> Alacritty, so a fresh user has a terminal to start from. The
+    # action is registered with the daemon (custom-keybinds.kwe) and its chord
+    # is replayed (keybinds.kwe) at session start by the shell. First-run only
+    # (see KWE_SEED_KEYBINDS in the shell wrapper) so a user's later changes to
+    # this bind are never undone.
+    if os.environ.get("KWE_SEED_KEYBINDS") == "1":
+        _ensure(cfg("custom-keybinds.kwe"), "[custom-commands]", "cmd-1", "Terminal")
+        _ensure(cfg("custom-keybinds.kwe"), "[custom-commands:exec]", "cmd-1", "alacritty")
+        _ensure(cfg("keybinds.kwe"), "[custom-commands][Global Shortcuts]", "cmd-1", "Meta+T")
+
+
+if __name__ == "__main__":
+    main()
+PY
+
+
+# ---------------------------------------------------------------------------
 # 5. Start kinetic-we (the compositor) and wait for its Wayland socket.
 #    Only the compositor process gets XDG_CONFIG_HOME pointed at the kineticwe
 #    root (per-command env prefix); everything else in the session keeps the
