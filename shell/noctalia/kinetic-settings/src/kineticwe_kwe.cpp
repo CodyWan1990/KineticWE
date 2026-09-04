@@ -22,12 +22,12 @@ namespace {
     return ".";
   }
 
-  // KConfig INI list encoding: items separated by ';', '\' and ';' escaped.
+  // KConfig INI list encoding: items separated by ',', '\' and ',' escaped.
   std::string escapeListItem(std::string_view item) {
     std::string out;
     out.reserve(item.size());
     for (const char c : item) {
-      if (c == '\\' || c == ';') {
+      if (c == '\\' || c == ',') {
         out.push_back('\\');
       }
       out.push_back(c);
@@ -153,8 +153,8 @@ std::vector<std::string> KineticweKwe::readStringList(std::string_view group, st
   }
   std::size_t start = 0;
   for (std::size_t i = 0; i <= value->size(); ++i) {
-    const char c = i < value->size() ? (*value)[i] : ';';
-    if (c == ';') {
+    const char c = i < value->size() ? (*value)[i] : ',';
+    if (c == ',') {
       out.push_back(unescapeListItem(std::string_view(*value).substr(start, i - start)));
       start = i + 1;
     }
@@ -185,7 +185,7 @@ void KineticweKwe::setStringList(std::string_view group, std::string_view key, c
   std::string encoded;
   for (std::size_t i = 0; i < values.size(); ++i) {
     if (i > 0) {
-      encoded.push_back(';');
+      encoded.push_back(',');
     }
     encoded += escapeListItem(values[i]);
   }

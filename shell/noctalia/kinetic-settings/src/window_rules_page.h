@@ -171,6 +171,9 @@ private:
   void cancelEdit(const Callbacks& callbacks);
   void setRuleValue(std::size_t index, const std::string& key, std::string value, const Callbacks& callbacks);
   void setRulePolicy(std::size_t index, const std::string& policyKey, int policy, const Callbacks& callbacks);
+  // Runs the compositor's interactive window pick and fills the rule's matching
+  // + geometry from the selected window.
+  void detectWindow(std::size_t index, const Callbacks& callbacks);
 
   CompositorDbus m_dbus;
   WaylandConnection& m_wayland; // live monitor (output) list for the Monitor rule

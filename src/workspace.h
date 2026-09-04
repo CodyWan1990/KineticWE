@@ -474,6 +474,7 @@ public Q_SLOTS:
     void slotWindowToPrevScreen();
 
     void slotToggleShowDesktop();
+    void slotToggleTitleBars();
 
     void slotWindowMaximize();
     void slotWindowMaximizeVertical();

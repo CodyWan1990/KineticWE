@@ -22,6 +22,36 @@ public:
   // e.g. "DP-1"; empty when the compositor can't be reached.
   [[nodiscard]] std::string activeOutputName();
 
+  // Window properties returned by org.kde.KWin queryWindowInfo (the
+  // interactive "detect window properties" pick). Empty strings / 0 mean the
+  // property was absent; `valid` is false when the pick failed or was
+  // cancelled.
+  struct DetectedWindow {
+    std::string resourceClass;
+    std::string resourceName;
+    std::string role;
+    std::string caption;
+    std::string desktopFile;
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    bool fullscreen = false;
+    bool keepAbove = false;
+    bool keepBelow = false;
+    bool minimized = false;
+    bool noBorder = false;
+    bool maximizeHorizontal = false;
+    bool maximizeVertical = false;
+    int decorationPolicy = 1;
+    bool valid = false;
+  };
+
+  // Starts an interactive window pick (the compositor grabs the next pointer
+  // click) and BLOCKS until the user selects a window, then returns its
+  // properties. `valid` is false when the pick was cancelled or failed.
+  [[nodiscard]] DetectedWindow queryWindowInfo();
+
   // Live tiling state (org.kde.KWin.Tiling).
   [[nodiscard]] std::string currentLayout();
   [[nodiscard]] std::vector<std::string> enabledLayouts();

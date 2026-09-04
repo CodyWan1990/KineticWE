@@ -32,6 +32,7 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QPalette>
 #include <QStandardPaths>
@@ -110,17 +111,29 @@ TilingController::TilingController(Workspace *workspace)
         });
 
         m_noctaliaFsWatcher = new QFileSystemWatcher(this);
-        m_noctaliaFsWatcher->addPath(noctaliaPath);
-        connect(m_noctaliaFsWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &) {
-            // Re-arm the watcher: many editors (and the kconfig writer)
-            // use atomic-rename semantics which invalidate the inotify
-            // watch on the original inode. Re-adding the path restores
-            // the watch on the new inode.
-            if (!m_noctaliaPath.isEmpty()) {
-                m_noctaliaFsWatcher->addPath(m_noctaliaPath);
-            }
-            onColorSourcesChanged();
-        });
+        // Watch the parent directory rather than the file itself: writers use
+        // atomic-rename semantics which replace the inode and silently kill a
+        // direct file watch's inotify watch. A directory's inode is never
+        // replaced, so its watch survives; filter the noisy directoryChanged
+        // signal by the watched file's mtime + size.
+        if (m_noctaliaFsWatcher->addPath(QFileInfo(noctaliaPath).absolutePath())) {
+            m_noctaliaMtime = QFileInfo(noctaliaPath).lastModified().toMSecsSinceEpoch();
+            m_noctaliaSize = QFileInfo(noctaliaPath).size();
+            connect(m_noctaliaFsWatcher, &QFileSystemWatcher::directoryChanged, this, [this](const QString &) {
+                if (m_noctaliaPath.isEmpty()) {
+                    return;
+                }
+                const QFileInfo info(m_noctaliaPath);
+                const qint64 mtime = info.lastModified().toMSecsSinceEpoch();
+                const qint64 size = info.size();
+                if (mtime == m_noctaliaMtime && size == m_noctaliaSize) {
+                    return;
+                }
+                m_noctaliaMtime = mtime;
+                m_noctaliaSize = size;
+                onColorSourcesChanged();
+            });
+        }
     }
     m_kdeglobalsConfig = KSharedConfig::openConfig(kineticweKdeGlobalsPath(), KConfig::FullConfig);
     m_kdeglobalsWatcher = KConfigWatcher::create(m_kdeglobalsConfig);
@@ -132,13 +145,25 @@ TilingController::TilingController(Workspace *workspace)
     // kconfig D-Bus notify interface does not cover it — the same QFileSystemWatcher
     // fallback as noctalia.colors above is needed for live theme changes.
     m_kdeglobalsFsWatcher = new QFileSystemWatcher(this);
-    m_kdeglobalsFsWatcher->addPath(kineticweKdeGlobalsPath());
-    connect(m_kdeglobalsFsWatcher, &QFileSystemWatcher::fileChanged, this, [this]() {
-        // Re-arm the watcher: many writers use atomic-rename semantics which
-        // invalidate the inotify watch on the original inode.
-        m_kdeglobalsFsWatcher->addPath(kineticweKdeGlobalsPath());
-        onColorSourcesChanged();
-    });
+    // Same directory-watch approach as the noctalia colors file above: the
+    // theme service replaces kdeglobals with an atomic rename, which kills a
+    // direct file watch's inotify watch.
+    const QString kdeglobalsPath = kineticweKdeGlobalsPath();
+    if (m_kdeglobalsFsWatcher->addPath(QFileInfo(kdeglobalsPath).absolutePath())) {
+        m_kdeglobalsMtime = QFileInfo(kdeglobalsPath).lastModified().toMSecsSinceEpoch();
+        m_kdeglobalsSize = QFileInfo(kdeglobalsPath).size();
+        connect(m_kdeglobalsFsWatcher, &QFileSystemWatcher::directoryChanged, this, [this, kdeglobalsPath]() {
+            const QFileInfo info(kdeglobalsPath);
+            const qint64 mtime = info.lastModified().toMSecsSinceEpoch();
+            const qint64 size = info.size();
+            if (mtime == m_kdeglobalsMtime && size == m_kdeglobalsSize) {
+                return;
+            }
+            m_kdeglobalsMtime = mtime;
+            m_kdeglobalsSize = size;
+            onColorSourcesChanged();
+        });
+    }
 
     // Debounce: a single Noctalia theme switch can fire multiple
     // fileChanged events (write-to-tmp + rename produces two), and the

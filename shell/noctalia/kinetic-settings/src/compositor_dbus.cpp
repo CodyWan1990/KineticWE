@@ -42,6 +42,83 @@ std::string CompositorDbus::activeOutputName() {
   }
 }
 
+CompositorDbus::DetectedWindow CompositorDbus::queryWindowInfo() {
+  DetectedWindow out;
+  try {
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, kKwinPath);
+    std::map<std::string, sdbus::Variant> map;
+    proxy->callMethod("queryWindowInfo").onInterface(kKwinInterface).storeResultsTo(map);
+
+    const auto str = [&map](const char* key) -> std::string {
+      const auto it = map.find(key);
+      if (it == map.end()) {
+        return {};
+      }
+      try {
+        return it->second.get<std::string>();
+      } catch (...) {
+        return {};
+      }
+    };
+    const auto integer = [&map](const char* key, int fallback = 0) -> int {
+      const auto it = map.find(key);
+      if (it == map.end()) {
+        return fallback;
+      }
+      try {
+        return it->second.get<int>();
+      } catch (...) {
+        return fallback;
+      }
+    };
+    const auto boolean = [&map](const char* key, bool fallback = false) -> bool {
+      const auto it = map.find(key);
+      if (it == map.end()) {
+        return fallback;
+      }
+      try {
+        return it->second.get<bool>();
+      } catch (...) {
+        return fallback;
+      }
+    };
+    // Window::x()/y()/width()/height() are qreal, so these arrive as doubles.
+    const auto real = [&map](const char* key, double fallback = 0.0) -> double {
+      const auto it = map.find(key);
+      if (it == map.end()) {
+        return fallback;
+      }
+      try {
+        return it->second.get<double>();
+      } catch (...) {
+        return fallback;
+      }
+    };
+
+    out.resourceClass = str("resourceClass");
+    out.resourceName = str("resourceName");
+    out.role = str("role");
+    out.caption = str("caption");
+    out.desktopFile = str("desktopFile");
+    out.x = static_cast<int>(real("x"));
+    out.y = static_cast<int>(real("y"));
+    out.width = static_cast<int>(real("width"));
+    out.height = static_cast<int>(real("height"));
+    out.fullscreen = boolean("fullscreen");
+    out.keepAbove = boolean("keepAbove");
+    out.keepBelow = boolean("keepBelow");
+    out.minimized = boolean("minimized");
+    out.noBorder = boolean("noBorder");
+    out.maximizeHorizontal = boolean("maximizeHorizontal");
+    out.maximizeVertical = boolean("maximizeVertical");
+    out.decorationPolicy = integer("decorationPolicy", 1);
+    out.valid = true;
+  } catch (const sdbus::Error& e) {
+    kLog.warn("kwin queryWindowInfo failed: {}", e.what());
+  }
+  return out;
+}
+
 std::string CompositorDbus::currentLayout() {
   try {
     std::string result;

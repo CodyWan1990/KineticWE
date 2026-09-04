@@ -556,6 +556,53 @@ void WindowRulesPage::setRulePolicy(std::size_t index, const std::string& policy
   }
 }
 
+void WindowRulesPage::detectWindow(std::size_t index, const Callbacks& callbacks) {
+  if (index >= m_ruleList.size()) {
+    return;
+  }
+  // Blocks until the compositor finishes the interactive window pick.
+  const auto detected = m_dbus.queryWindowInfo();
+  if (!detected.valid) {
+    m_errorNotice = "Window detection cancelled or failed.";
+    if (callbacks.requestRebuild) {
+      callbacks.requestRebuild();
+    }
+    return;
+  }
+
+  auto& rule = m_ruleList[index];
+  m_newRuleDrafts.erase(rule.id);
+
+  // Matching criteria from the picked window.
+  if (!detected.resourceClass.empty()) {
+    rule.values["wmclass"] = detected.resourceClass;
+    rule.values["wmclassmatch"] = "1"; // Exact
+    rule.values.erase("wmclasscomplete");
+  }
+  if (!detected.caption.empty()) {
+    rule.values["title"] = detected.caption;
+    rule.values["titlematch"] = "1";
+  }
+  if (!detected.role.empty()) {
+    rule.values["windowrole"] = detected.role;
+    rule.values["windowrolematch"] = "1";
+  }
+  // Geometry, pre-filled as "Apply initially" so the window spawns back where
+  // it was picked. The user can change/remove these.
+  if (detected.width > 0 && detected.height > 0) {
+    rule.values["size"] = std::to_string(detected.width) + "," + std::to_string(detected.height);
+    rule.values["sizerule"] = "3"; // Apply initially
+  }
+  rule.values["position"] = std::to_string(detected.x) + "," + std::to_string(detected.y);
+  rule.values["positionrule"] = "3"; // Apply initially
+
+  m_errorNotice.clear();
+  m_rulesDirty = true;
+  if (callbacks.requestRebuild) {
+    callbacks.requestRebuild();
+  }
+}
+
 // ---- Build: field row ------------------------------------------------------
 
 std::unique_ptr<Node>
@@ -889,6 +936,12 @@ std::unique_ptr<Node> WindowRulesPage::buildRuleEditor(float scale, const Callba
   auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
   header->addChild(makeLabel("Edit window rule", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold));
   header->addChild(ui::spacer());
+  header->addChild(ui::button({
+      .text = "Detect", .fontSize = Style::fontSizeCaption * scale, .variant = ButtonVariant::Primary,
+      .minHeight = Style::controlHeight * scale, .paddingV = Style::spaceXs * scale, .paddingH = Style::spaceMd * scale,
+      .radius = Style::scaledRadiusMd(scale),
+      .onClick = [this, index, callbacks]() { detectWindow(index, callbacks); },
+  }));
   header->addChild(ui::button({
       .text = "Done", .fontSize = Style::fontSizeCaption * scale, .variant = ButtonVariant::Ghost,
       .minHeight = Style::controlHeight * scale, .paddingV = Style::spaceXs * scale, .paddingH = Style::spaceMd * scale,

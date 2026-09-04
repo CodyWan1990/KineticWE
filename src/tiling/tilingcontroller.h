@@ -330,10 +330,14 @@ private:
     // QStandardPaths::locate() returns an absolute path.
     QFileSystemWatcher *m_noctaliaFsWatcher = nullptr;
     QString m_noctaliaPath;
+    qint64 m_noctaliaMtime = -1;
+    qint64 m_noctaliaSize = -1;
     // kdeglobals is opened by absolute path too (real config home, outside
     // the compositor's redirected config root), so it needs the same
     // QFileSystemWatcher fallback.
     QFileSystemWatcher *m_kdeglobalsFsWatcher = nullptr;
+    qint64 m_kdeglobalsMtime = -1;
+    qint64 m_kdeglobalsSize = -1;
     // Debounce the color re-reads: editors and shell-integration daemons
     // often rewrite the file in two steps (write tmp + rename), which
     // produces multiple fileChanged events in quick succession.

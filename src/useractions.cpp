@@ -1019,6 +1019,9 @@ void Workspace::initShortcuts()
     initShortcut("Show Desktop", i18n("Peek at Desktop"),
                  0, &Workspace::slotToggleShowDesktop, false);
 
+    initShortcut("Toggle Title Bars", i18n("Toggle Title Bars"),
+                 0, &Workspace::slotToggleTitleBars, false);
+
     initShortcut("Kill Window", i18n("Kill Window"), Qt::META | Qt::CTRL | Qt::Key_Escape, &Workspace::slotKillWindow, true);
 
     // Noctalia shell commands

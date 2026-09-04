@@ -48,6 +48,10 @@ private:
     KConfigWatcher::Ptr m_watcher;
     QFileSystemWatcher *m_fileWatcher = nullptr;
     QTimer m_fileReloadTimer;
+    // Fingerprint of the watched file used to filter the noisy directoryChanged
+    // signal (the watcher observes the parent directory, see constructor).
+    qint64 m_fileMtime = -1;
+    qint64 m_fileSize = -1;
 
     struct LegacyColors
     {

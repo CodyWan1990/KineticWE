@@ -47,17 +47,32 @@ DecorationPalette::DecorationPalette(const QString &colorScheme)
     // TilingController and add a QFileSystemWatcher fallback.
     const QString watchedFile = m_colorScheme.isEmpty() ? kineticweKdeGlobalsPath() : m_colorScheme;
     m_fileWatcher = new QFileSystemWatcher(this);
-    m_fileWatcher->addPath(watchedFile);
-    connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, [this, watchedFile]() {
-        // Writers use atomic-rename semantics which invalidate the inotify
-        // watch on the original inode; re-adding the path restores the watch
-        // on the new file.
-        m_fileWatcher->addPath(watchedFile);
-        m_fileReloadTimer.start();
-    });
+    // Watch the parent directory instead of the file itself. The Noctalia
+    // theme service rewrites kdeglobals with an atomic rename (write-tmp +
+    // rename), which replaces the inode and silently kills a direct file
+    // watch's inotify watch (re-arming it races the kernel's IN_IGNORED
+    // cleanup and can leave the watch permanently broken). A directory's
+    // inode is never replaced by a rename, so its watch survives. The
+    // directoryChanged signal is noisy (any write in ~/.config fires it), so
+    // filter by the watched file's mtime + size to avoid spurious repaints.
+    if (m_fileWatcher->addPath(QFileInfo(watchedFile).absolutePath())) {
+        m_fileMtime = QFileInfo(watchedFile).lastModified().toMSecsSinceEpoch();
+        m_fileSize = QFileInfo(watchedFile).size();
+        connect(m_fileWatcher, &QFileSystemWatcher::directoryChanged, this, [this, watchedFile]() {
+            const QFileInfo info(watchedFile);
+            const qint64 mtime = info.lastModified().toMSecsSinceEpoch();
+            const qint64 size = info.size();
+            if (mtime == m_fileMtime && size == m_fileSize) {
+                return;
+            }
+            m_fileMtime = mtime;
+            m_fileSize = size;
+            m_fileReloadTimer.start();
+        });
+    }
 
     // Debounce: an atomic write (write-to-tmp + rename) can produce several
-    // fileChanged events, and the DBus KConfigWatcher may fire on top of
+    // directoryChanged events, and the DBus KConfigWatcher may fire on top of
     // them. Coalesce everything into a single re-read + repaint.
     m_fileReloadTimer.setSingleShot(true);
     m_fileReloadTimer.setInterval(50);

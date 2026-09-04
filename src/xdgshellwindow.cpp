@@ -1463,6 +1463,14 @@ void XdgToplevelWindow::initialize()
     setShortcut(rules()->checkShortcut(initialShortcut(sessionData), true));
     setDecorationPolicy(rules()->checkDecorationPolicy(initialDecorationPolicy(sessionData), true));
     setExcludeFromCapture(rules()->checkExcludeFromCapture(initialExcludeFromCapture(sessionData), true));
+    // Screen rule: send the window to the output a window rule forces. init=true
+    // lets "Apply initially" take effect at spawn (not only "Force"); with no
+    // matching screen rule checkOutput returns the current output, so this is a
+    // no-op for everyone else. Skip when the output isn't determined yet (no
+    // position rule yet); the base applyWindowRules still applies "Force" later.
+    if (moveResizeOutput() != nullptr) {
+        sendToOutput(rules()->checkOutput(moveResizeOutput(), true));
+    }
 
     workspace()->rulebook()->discardUsed(this, false); // Remove Apply Now rules.
     updateWindowRules(Rules::All);

@@ -881,6 +881,12 @@ bool X11Window::manage(xcb_window_t w, bool isMapped)
     // sendSyntheticConfigureNotify(); // Done when setting mapping state
 
     applyWindowRules(); // Just in case
+    // Screen rule: apply the output with init=true so "Apply initially" works
+    // at spawn (the base applyWindowRules above uses init=false for its own
+    // sendToOutput). Geometry/output are already set by this point in manage().
+    if (moveResizeOutput() != nullptr) {
+        sendToOutput(rules()->checkOutput(moveResizeOutput(), true));
+    }
     workspace()->rulebook()->discardUsed(this, false); // Remove ApplyNow rules
     updateWindowRules(Rules::All); // Was blocked while !isManaged()
 
