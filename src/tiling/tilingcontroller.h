@@ -340,7 +340,7 @@ private:
     qint64 m_kdeglobalsSize = -1;
     // Debounce the color re-reads: editors and shell-integration daemons
     // often rewrite the file in two steps (write tmp + rename), which
-    // produces multiple fileChanged events in quick succession.
+    // produces multiple directoryChanged events in quick succession.
     QTimer m_colorReloadTimer;
     KConfigWatcher::Ptr m_kdeglobalsWatcher;
     KConfigWatcher::Ptr m_kwinrcWatcher;

@@ -166,7 +166,7 @@ TilingController::TilingController(Workspace *workspace)
     }
 
     // Debounce: a single Noctalia theme switch can fire multiple
-    // fileChanged events (write-to-tmp + rename produces two), and the
+    // directoryChanged events (write-to-tmp + rename produces two), and the
     // KConfigWatcher for kdeglobals can fire repeatedly during a kcmshell
     // save. Coalesce them into a single re-read + repaint.
     m_colorReloadTimer.setSingleShot(true);

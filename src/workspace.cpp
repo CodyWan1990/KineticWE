@@ -1075,6 +1075,26 @@ void Workspace::slotReconfigure()
     }
 }
 
+void Workspace::slotToggleTitleBars()
+{
+    // Mirrors the "Toggle title bars" window-defaults switch in Kinetic
+    // Settings: flip [Windows] DefaultDecorationPolicy between None (no title
+    // bar/frame) and ClientPreference (title bar shown when the client asks).
+    const DecorationPolicy current = options->defaultDecorationPolicy();
+    const DecorationPolicy next = current == DecorationPolicy::None
+        ? DecorationPolicy::ClientPreference
+        : DecorationPolicy::None;
+
+    KConfigGroup windows(kwinApp()->config(), QStringLiteral("Windows"));
+    windows.writeEntry(QStringLiteral("DefaultDecorationPolicy"), int(next));
+    kwinApp()->config()->sync();
+
+    // Debounced full reconfigure re-reads kineticwe.kwe, updates options and
+    // re-seeds every window's decoration base (the same path the settings
+    // page's Apply uses via its D-Bus requestReconfigure).
+    reconfigure();
+}
+
 void Workspace::slotCurrentDesktopChanged(VirtualDesktop *oldDesktop, VirtualDesktop *newDesktop, LogicalOutput *output)
 {
     updateWindowVisibilityAndActivateOnDesktopChange(newDesktop, output);
