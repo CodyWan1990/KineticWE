@@ -74,11 +74,14 @@ BASELINE_RPM_PKGS=(
 # Default session packages so a fresh install from TTY actually has: the
 # Breeze icon theme (breeze-icon-theme), the Breeze color schemes that the
 # session seeds (BreezeDark/BreezeLight — plasma-breeze-common), the Breeze
-# cursor theme, and a terminal the user can launch. Installed idempotently by
-# install_default_session_packages.
+# window decoration plugin (plasma-breeze) and its aurorae fallback so server-
+# side title bars actually render, the Breeze cursor theme, and a terminal the
+# user can launch. Installed idempotently by install_default_session_packages.
 DEFAULT_RPM_PKGS=(
     breeze-icon-theme
     plasma-breeze-common
+    plasma-breeze
+    aurorae
     breeze-cursor-theme
     alacritty
 )
