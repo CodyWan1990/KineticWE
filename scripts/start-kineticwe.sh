@@ -79,7 +79,7 @@ export PATH="$INSTALL_PREFIX/bin:$PATH"
 export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
 export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins:$INSTALL_PREFIX/lib64/plugins"
 export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
-export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-}"
+export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 # Traditional-WM Qt theming (Hyprland/Niri style): tell Qt apps to load the
 # qt5ct platform theme plugin, which reads ~/.config/qt5ct/qt5ct.conf and
 # applies the Noctalia color scheme. qt5ct serves both Qt5 and Qt6 apps.
