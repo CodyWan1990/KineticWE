@@ -8,7 +8,8 @@
 #   DROPPED for 2.0 (were KDE deps, no longer launched):
 #     - plasma-workspace.target / plasma-* services (kded6, ksmserver,
 #       kwallet-pam, polkit-agent, kcminit, restoresession, baloo, ...)
-#     - kbuildsycoca6
+#     - kbuildsycoca6 as a kded6 module (a one-shot rebuild now runs at login,
+#       see step 4f, so newly-installed apps' global shortcuts are discovered)
 #     - xdg-desktop-portal-kde           (replaced by the xdg-desktop-portal-kwe
 #                                         fork; the freedesktop frontend
 #                                         D-Bus-activates it on demand)
@@ -722,6 +723,21 @@ def main():
 if __name__ == "__main__":
     main()
 PY
+
+
+# ---------------------------------------------------------------------------
+# 4f. Rebuild the KSycoca service cache before the compositor starts. The
+#     embedded kglobalaccel daemon discovers apps that ship global shortcuts
+#     (e.g. Spectacle) through KSycoca (detectAppsWithShortcuts), so a cache
+#     that predates a newly-installed app means the app's keybinds never show
+#     up in Kinetic Settings -> Keybinds. Plasma kept this fresh via
+#     kbuildsycoca6, which KineticWE 2.0 dropped; a one-shot rebuild at login
+#     is cheap and re-syncs the cache with newly installed applications.
+#     --noincremental forces a full rebuild so a brand-new app is always seen.
+# ---------------------------------------------------------------------------
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    kbuildsycoca6 --noincremental 2>/dev/null || true
+fi
 
 
 # ---------------------------------------------------------------------------
