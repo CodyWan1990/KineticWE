@@ -25,11 +25,11 @@ namespace KWin
 
 namespace
 {
-constexpr int kDefaultGapLeft = 0;
-constexpr int kDefaultGapRight = 0;
-constexpr int kDefaultGapTop = 0;
-constexpr int kDefaultGapBottom = 0;
-constexpr int kDefaultGapBetween = 0;
+constexpr int kDefaultGapLeft = 10;
+constexpr int kDefaultGapRight = 10;
+constexpr int kDefaultGapTop = 10;
+constexpr int kDefaultGapBottom = 10;
+constexpr int kDefaultGapBetween = 10;
 } // namespace
 
 OutputGapOverride::OutputGapOverride(QString name, QString description, int gapLeft, int gapRight,

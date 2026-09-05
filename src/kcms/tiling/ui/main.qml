@@ -694,9 +694,7 @@ KCM.SimpleKCM {
                 Kirigami.FormData.label: i18n("Active border source:")
                 model: [
                     i18n("Custom color"),
-                    i18n("System accent"),
-                    i18n("Noctalia primary"),
-                    i18n("Noctalia accent")
+                    i18n("System accent")
                 ]
                 currentIndex: kcm.settings.tilingBorderColorSourceActive
                 onActivated: kcm.settings.tilingBorderColorSourceActive = currentIndex
@@ -727,10 +725,6 @@ KCM.SimpleKCM {
                     switch (kcm.settings.tilingBorderColorSourceActive) {
                     case 1:
                         return i18nc("@info", "Follows the system accent color.");
-                    case 2:
-                        return i18nc("@info", "Follows the Noctalia primary color.");
-                    case 3:
-                        return i18nc("@info", "Follows the Noctalia accent color.");
                     default:
                         return "";
                     }
@@ -746,9 +740,7 @@ KCM.SimpleKCM {
                 model: [
                     i18n("Custom color"),
                     i18n("System accent"),
-                    i18n("System accent (faded)"),
-                    i18n("Noctalia primary"),
-                    i18n("Noctalia accent")
+                    i18n("System accent (faded)")
                 ]
                 currentIndex: kcm.settings.tilingBorderColorSourceInactive
                 onActivated: kcm.settings.tilingBorderColorSourceInactive = currentIndex
@@ -781,10 +773,6 @@ KCM.SimpleKCM {
                         return i18nc("@info", "Follows the system accent color.");
                     case 2:
                         return i18nc("@info", "System accent at 50% alpha.");
-                    case 3:
-                        return i18nc("@info", "Follows the Noctalia primary color.");
-                    case 4:
-                        return i18nc("@info", "Follows the Noctalia accent color.");
                     default:
                         return "";
                     }

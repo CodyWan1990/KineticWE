@@ -15,11 +15,11 @@
     </entry>
     <entry name="borderSize" key="BorderSize" type="String">
       <label>Window border size</label>
-      <default>Normal</default>
+      <default>None</default>
     </entry>
     <entry name="borderSizeAuto" key="BorderSizeAuto" type="Bool">
       <label>Use theme's default window border size</label>
-      <default>true</default>
+      <default>false</default>
     </entry>
     <entry name="closeOnDoubleClickOnMenu" key="CloseOnDoubleClickOnMenu" type="Bool">
       <label>Close windows by double clicking the window menu button</label>

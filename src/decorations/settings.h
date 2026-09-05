@@ -55,7 +55,7 @@ private:
     QList<KDecoration3::DecorationButtonType> m_leftButtons;
     QList<KDecoration3::DecorationButtonType> m_rightButtons;
     KDecoration3::BorderSize m_borderSize;
-    bool m_autoBorderSize = true;
+    bool m_autoBorderSize = false;
     bool m_closeDoubleClickMenu = false;
     bool m_alwaysShowExcludeFromCapture = false;
     QFont m_font;

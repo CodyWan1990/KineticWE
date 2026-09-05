@@ -183,25 +183,25 @@ const std::vector<std::string>& TilingPage::borderModeLabels() {
 }
 
 const std::vector<std::string>& TilingPage::colorSourceActiveValues() {
-  static const std::vector<std::string> values{"Custom", "SystemAccent", "NoctaliaPrimary", "NoctaliaAccent"};
+  static const std::vector<std::string> values{"Custom", "SystemAccent"};
   return values;
 }
 
 const std::vector<std::string>& TilingPage::colorSourceActiveLabels() {
-  static const std::vector<std::string> labels{"Custom", "System accent", "Noctalia primary", "Noctalia accent"};
+  static const std::vector<std::string> labels{"Custom", "System accent"};
   return labels;
 }
 
 const std::vector<std::string>& TilingPage::colorSourceInactiveValues() {
   static const std::vector<std::string> values{
-      "Custom", "SystemAccent", "SystemAccentFaded", "NoctaliaPrimary", "NoctaliaAccent",
+      "Custom", "SystemAccent", "SystemAccentFaded",
   };
   return values;
 }
 
 const std::vector<std::string>& TilingPage::colorSourceInactiveLabels() {
   static const std::vector<std::string> labels{
-      "Custom", "System accent", "System accent (faded)", "Noctalia primary", "Noctalia accent",
+      "Custom", "System accent", "System accent (faded)",
   };
   return labels;
 }
@@ -260,7 +260,7 @@ const std::vector<TilingPage::Field>& TilingPage::fields() {
           .advanced = true,
           .maxValue = 1000.0,
           .integerValue = true,
-          .fallback = Value{0},
+          .fallback = Value{10},
       });
     }
     f.push_back(Field{
@@ -272,7 +272,7 @@ const std::vector<TilingPage::Field>& TilingPage::fields() {
         .pageGroup = "Gaps",
         .maxValue = 30.0,
         .integerValue = true,
-        .fallback = Value{0},
+        .fallback = Value{10},
     });
 
     // Gap Toggle ---------------------------------------------------------------

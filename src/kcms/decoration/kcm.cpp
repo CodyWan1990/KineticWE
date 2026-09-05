@@ -139,7 +139,7 @@ void KCMKWinDecoration::defaults()
 {
     KQuickManagedConfigModule::defaults();
 
-    setBorderSize(recommendedBorderSize());
+    setBorderSize(borderSizeIndexFromString(QStringLiteral("None")));
 
     m_leftButtonsModel->replace(Utils::buttonsFromString(settings()->buttonsOnLeft()));
     m_rightButtonsModel->replace(Utils::buttonsFromString(settings()->buttonsOnRight()));

@@ -26,7 +26,7 @@ namespace Decoration
 SettingsImpl::SettingsImpl(KDecoration3::DecorationSettings *parent)
     : QObject()
     , DecorationSettingsPrivateV2(parent)
-    , m_borderSize(KDecoration3::BorderSize::Normal)
+    , m_borderSize(KDecoration3::BorderSize::None)
 {
     readSettings();
 
@@ -161,9 +161,9 @@ void SettingsImpl::readSettings()
         Q_EMIT decorationSettings()->alwaysShowExcludeFromCaptureChanged(m_alwaysShowExcludeFromCapture);
     }
 
-    m_autoBorderSize = config.readEntry("BorderSizeAuto", true);
+    m_autoBorderSize = config.readEntry("BorderSizeAuto", false);
 
-    auto size = stringToSize(config.readEntry("BorderSize", QStringLiteral("Normal")));
+    auto size = stringToSize(config.readEntry("BorderSize", QStringLiteral("None")));
     if (m_autoBorderSize) {
         /* Falls back to Normal border size, if the plugin does not provide a valid recommendation. */
         size = stringToSize(Workspace::self()->decorationBridge()->recommendedBorderSize());

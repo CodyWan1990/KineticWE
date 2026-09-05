@@ -650,11 +650,11 @@ void TilingController::applyGapSettingsToOutput(LogicalOutput *output)
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
 
     // Defaults from the [Tiling] group.
-    const qreal defaultGapBetween = tilingGroup.readEntry("GapBetween", 0.0);
-    const int defaultGapLeft = tilingGroup.readEntry("GapLeft", 0);
-    const int defaultGapRight = tilingGroup.readEntry("GapRight", 0);
-    const int defaultGapTop = tilingGroup.readEntry("GapTop", 0);
-    const int defaultGapBottom = tilingGroup.readEntry("GapBottom", 0);
+    const qreal defaultGapBetween = tilingGroup.readEntry("GapBetween", 10.0);
+    const int defaultGapLeft = tilingGroup.readEntry("GapLeft", 10);
+    const int defaultGapRight = tilingGroup.readEntry("GapRight", 10);
+    const int defaultGapTop = tilingGroup.readEntry("GapTop", 10);
+    const int defaultGapBottom = tilingGroup.readEntry("GapBottom", 10);
 
     // Per-output override in the [Tiling][Output "name"] sub-group, if any.
     // Entries fall back to the defaults above when not present in the override.
