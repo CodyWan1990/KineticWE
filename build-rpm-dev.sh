@@ -9,26 +9,27 @@ set -euo pipefail
 #
 # Usage:
 #   ./build-rpm-dev.sh                          # Default: RPM build + extract for TTY testing
-#   ./build-rpm-dev.sh --quick                  # Quick cmake build (incremental, no RPM) — recommended
+#   ./build-rpm-dev.sh --binary                 # cmake build (incremental, no RPM)
+#   ./build-rpm-dev.sh --full                   # cmake build + install/activate Noctalia greeter
+#   ./build-rpm-dev.sh --kwin-only              # Incremental kwin-only build (no portal/shell)
+#   ./build-rpm-dev.sh --noct-only              # Incremental noctalia shell-only build
 #   ./build-rpm-dev.sh --install                # Same as default (alias)
-#   ./build-rpm-dev.sh --ostree                 # Build RPM + layer via rpm-ostree (needs reboot)
-#   ./build-rpm-dev.sh --ostree --reboot        # Build + ostree + reboot
-#   ./build-rpm-dev.sh --reset                  # Revert rpm-ostree override
 #   ./build-rpm-dev.sh --reset-local            # Remove dev files from TEST_PREFIX + login entry
-#   ./build-rpm-dev.sh --quick --no-session     # Skip installing the login-screen session entry
-#   ./build-rpm-dev.sh --install-host-deps      # Implies --quick; after the build, install any
+#   ./build-rpm-dev.sh --binary --no-session    # Skip installing the login-screen session entry
+#   ./build-rpm-dev.sh --install-host-deps      # Implies --binary; after the build, install any
 #                                               # missing host runtime deps the session needs,
 #                                               # plus the default session packages (Breeze icon/
-#                                               # cursor themes, color schemes, Alacritty) on a
+#                                               # cursor themes, color schemes, Qt5/Qt6 tools,
+#                                               # Xwayland, portal QML modules, Alacritty) on a
 #                                               # fresh host
 #
 # All build modes install into TEST_PREFIX so you can test with a single command.
 #
 # All build modes also install a "KineticWE-Dev" session entry for the login
 # screen (SDDM / plasma-login-manager) into /usr/local/share/wayland-sessions,
-# which is writable on rpm-ostree systems and searched by display managers,
-# while leaving the COPR stable install in /usr untouched. The entry just
-# points at $TEST_PREFIX/bin/start-kineticwe, so TTY testing is unchanged.
+# which display managers search while leaving the COPR stable install in /usr
+# untouched. The entry just points at $TEST_PREFIX/bin/start-kineticwe, so TTY
+# testing is unchanged.
 #
 # Environment variables:
 #   TEST_PREFIX     - Where to install for TTY testing (default: $HOME/.local)
@@ -47,9 +48,8 @@ RESULTS_DIR="${SPEC_DIR}/results"
 DISTROBOX_IMAGE="fedora:44"
 
 # Login-screen session entry for the dev build. /usr/local/share is in the
-# default session search path of SDDM / plasma-login-manager and is writable
-# on rpm-ostree systems (symlink to /var/usrlocal), so the entry survives
-# deployments without touching the COPR-managed /usr.
+# default session search path of SDDM / plasma-login-manager, so the entry
+# survives deployments without touching the COPR-managed /usr.
 SESSION_DIR="/usr/local/share/wayland-sessions"
 SESSION_DESKTOP="kineticwe-dev.desktop"
 
@@ -72,7 +72,7 @@ SPEC_VERSION=$(awk '/^Version:/ {print $2; exit}' "$SPEC_FILE")
 SPEC_RELEASE=$(awk '/^Release:/ {print $2; exit}' "$SPEC_FILE" | sed 's/%{?dist}//')
 PACKAGE=$(awk '/^Name:/ {print $2; exit}' "$SPEC_FILE")
 
-# Pinned KDE-source refs — the spec is the single source of truth. The quick
+# Pinned KDE-source refs — the spec is the single source of truth. The binary
 # build downloads these exact commits instead of cloning KDE master, whose
 # ECM/KF6 requirements drift ahead of the Fedora container (KConfig master
 # now requires ECM 6.29.0 while Fedora 44 ships ECM 6.28.0).
@@ -102,10 +102,6 @@ check_prereqs() {
     fi
     if ! command -v podman &>/dev/null && ! command -v docker &>/dev/null; then
         error "podman or docker is required but not found."
-        exit 1
-    fi
-    if ! command -v rpm-ostree &>/dev/null && [[ "${1:-}" == "ostree" ]]; then
-        error "rpm-ostree is required for --ostree but not found."
         exit 1
     fi
     if [[ ! -f "$SPEC_FILE" ]]; then
@@ -192,6 +188,17 @@ setup_distrobox() {
 }
 
 # ---------------------------------------------------------------------------
+# Verify the dev distrobox container exists (lightweight, for --*-only modes)
+# ---------------------------------------------------------------------------
+ensure_distrobox() {
+    if ! distrobox list 2>/dev/null | grep -w "$DISTROBOX_NAME" > /dev/null; then
+        error "Distrobox container '${DISTROBOX_NAME}' not found."
+        error "Run './build-rpm-dev.sh --binary' (or --full) once to create it."
+        exit 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Build RPMs inside the distrobox
 # ---------------------------------------------------------------------------
 build_rpms() {
@@ -257,12 +264,15 @@ build_rpms() {
 }
 
 # ---------------------------------------------------------------------------
-# Quick build: cmake directly inside the distrobox (no RPM)
+# Binary build: cmake directly inside the distrobox (no RPM)
 # ---------------------------------------------------------------------------
-quick_build() {
+binary_build() {
+    local build_portal="${1:-true}"
+    local build_shell="${2:-true}"
+    local incremental_kwin="${3:-false}"
     local build_dir="${SCRIPT_DIR}/build.rpm-quick"
 
-    step "Quick-building KineticWE in distrobox (prefix: ${TEST_PREFIX})..."
+    step "Building KineticWE in distrobox (prefix: ${TEST_PREFIX}; portal: ${build_portal}, shell: ${build_shell}, incremental: ${incremental_kwin})..."
 
     distrobox enter "$DISTROBOX_NAME" -- bash -c "
         set -euo pipefail
@@ -349,15 +359,19 @@ quick_build() {
         fi
         rm -rf "\$KCFG_TEST"
 
-        echo '[STEP] Configuring KineticWE...'
-        rm -rf '$build_dir'
-        cmake -B '$build_dir' -S . \\
-            -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
-            -DCMAKE_PREFIX_PATH='${TEST_PREFIX}' \\
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
-            -DBUILD_TESTING=OFF \\
-            -DKWIN_KCONFIG_COMPILER=\$KCFG_COMPILER_OVERRIDE \\
-            -DKWIN_BUILD_GLOBALSHORTCUTS=ON
+        if [[ '$incremental_kwin' == true && -d '$build_dir' ]]; then
+            echo '[STEP] Reusing existing KineticWE build dir (incremental)...'
+        else
+            echo '[STEP] Configuring KineticWE...'
+            rm -rf '$build_dir'
+            cmake -B '$build_dir' -S . \\
+                -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
+                -DCMAKE_PREFIX_PATH='${TEST_PREFIX}' \\
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
+                -DBUILD_TESTING=OFF \\
+                -DKWIN_KCONFIG_COMPILER=\$KCFG_COMPILER_OVERRIDE \\
+                -DKWIN_BUILD_GLOBALSHORTCUTS=ON
+        fi
 
         echo '[STEP] Building KineticWE...'
         cmake --build '$build_dir' --parallel \$(nproc)
@@ -370,39 +384,96 @@ quick_build() {
         # kf6-kiconthemes/kf6-kitemviews/kf6-kstatusnotifieritem/kf6-kio-filewidgets
         # devel packages in the distrobox (install them via the spec's
         # BuildRequires).
-        echo '[STEP] Building xdg-desktop-portal-kwe...'
-        PORTAL_BUILD=\$(mktemp -d /tmp/portal-build.XXXXXX)
-        cmake -B \"\$PORTAL_BUILD\" -S 'portal/xdg-desktop-portal-kwe' \\
-            -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
-            -DBUILD_TESTING=OFF
-        cmake --build \"\$PORTAL_BUILD\" --parallel \$(nproc)
-        cmake --install \"\$PORTAL_BUILD\"
-        rm -rf \"\$PORTAL_BUILD\"
+        if [[ '$build_portal' == true ]]; then
+            echo '[STEP] Building xdg-desktop-portal-kwe...'
+            PORTAL_BUILD=\$(mktemp -d /tmp/portal-build.XXXXXX)
+            cmake -B \"\$PORTAL_BUILD\" -S 'portal/xdg-desktop-portal-kwe' \\
+                -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
+                -DBUILD_TESTING=OFF
+            cmake --build \"\$PORTAL_BUILD\" --parallel \$(nproc)
+            cmake --install \"\$PORTAL_BUILD\"
+            rm -rf \"\$PORTAL_BUILD\"
+        fi
 
         # --- Phase 5: Build and install the Noctalia fork shell (noctalia-kwe)
         # (vendored at shell/noctalia) into the same prefix. The binary is
         # renamed to noctalia-kwe so the upstream noctalia package can coexist.
-        echo '[STEP] Building noctalia-kwe (Noctalia fork shell)...'
-        SHELL_BUILD='${SCRIPT_DIR}/build.rpm-quick-noctalia'
-        rm -rf \"\$SHELL_BUILD\"
-        meson setup \"\$SHELL_BUILD\" 'shell/noctalia' \\
-            --prefix='${TEST_PREFIX}' \\
-            --buildtype=debugoptimized \\
-            -Dtests=disabled
-        meson compile -C \"\$SHELL_BUILD\" --jobs \$(nproc)
-        meson install -C \"\$SHELL_BUILD\"
+        if [[ '$build_shell' == true ]]; then
+            echo '[STEP] Building noctalia-kwe (Noctalia fork shell)...'
+            SHELL_BUILD='${SCRIPT_DIR}/build.rpm-quick-noctalia'
+            rm -rf \"\$SHELL_BUILD\"
+            meson setup \"\$SHELL_BUILD\" 'shell/noctalia' \\
+                --prefix='${TEST_PREFIX}' \\
+                --buildtype=debugoptimized \\
+                -Dtests=disabled
+            meson compile -C \"\$SHELL_BUILD\" --jobs \$(nproc)
+            meson install -C \"\$SHELL_BUILD\"
+        fi
     "
 
     if [[ ! -x "$TEST_PREFIX/bin/kinetic-we" ]]; then
-        error "Quick build did not produce $TEST_PREFIX/bin/kinetic-we"
+        error "Binary build did not produce $TEST_PREFIX/bin/kinetic-we"
         exit 1
     fi
+    if [[ "$build_shell" == true ]] && [[ ! -x "$TEST_PREFIX/bin/noctalia-kwe" ]]; then
+        error "Binary build did not produce $TEST_PREFIX/bin/noctalia-kwe"
+        exit 1
+    fi
+    info "Binary build installed to $TEST_PREFIX"
+}
+
+# ---------------------------------------------------------------------------
+# KWin-only build: incremental cmake build of kinetic-we (no portal/shell)
+# ---------------------------------------------------------------------------
+kwin_only_build() {
+    binary_build false false true
+}
+
+# ---------------------------------------------------------------------------
+# Noctalia-only build: incremental meson build of shell/noctalia
+# ---------------------------------------------------------------------------
+noctalia_only_build() {
+    local shell_build="${SCRIPT_DIR}/build.rpm-quick-noctalia"
+
+    step "Building noctalia-kwe only (incremental)..."
+
+    distrobox enter "$DISTROBOX_NAME" -- bash -c "
+        set -euo pipefail
+
+        unset NIX_REMOTE
+        unset NIX_PATH
+        unset NIX_SSL_CERT_FILE
+        unset NIX_PROFILE
+        unset LD_LIBRARY_PATH
+        unset XDG_DATA_DIRS
+        unset PKG_CONFIG_PATH
+        export PATH='/usr/local/bin:/usr/bin:/bin'
+
+        cd '$SCRIPT_DIR'
+
+        if [[ ! -d '$shell_build' ]]; then
+            echo '[STEP] Configuring noctalia-kwe (fresh)...'
+            meson setup '$shell_build' 'shell/noctalia' \\
+                --prefix='${TEST_PREFIX}' \\
+                --buildtype=debugoptimized \\
+                -Dtests=disabled
+        else
+            echo '[STEP] Reusing existing noctalia-kwe build dir (incremental)...'
+        fi
+
+        echo '[STEP] Building noctalia-kwe...'
+        meson compile -C '$shell_build' --jobs \$(nproc)
+
+        echo '[STEP] Installing to ${TEST_PREFIX}...'
+        meson install -C '$shell_build'
+    "
+
     if [[ ! -x "$TEST_PREFIX/bin/noctalia-kwe" ]]; then
-        error "Quick build did not produce $TEST_PREFIX/bin/noctalia-kwe"
+        error "Noctalia-only build did not produce $TEST_PREFIX/bin/noctalia-kwe"
         exit 1
     fi
-    info "Quick build installed to $TEST_PREFIX"
+    info "Noctalia-only build installed to $TEST_PREFIX"
 }
 
 # ---------------------------------------------------------------------------
@@ -461,11 +532,7 @@ verify_host_deps() {
     done
     echo
     if [[ ${#pkgs[@]} -gt 0 ]]; then
-        if command -v rpm-ostree &>/dev/null; then
-            echo "  Install with: sudo rpm-ostree install ${pkgs[*]}   (then reboot)"
-        else
-            echo "  Install with: sudo dnf install ${pkgs[*]}"
-        fi
+        echo "  Install with: sudo dnf install ${pkgs[*]}"
     fi
     echo
     warn "The build succeeded but the session will fail to start until these"
@@ -474,10 +541,8 @@ verify_host_deps() {
 }
 
 # ---------------------------------------------------------------------------
-# Install quick-build startup script
+# Extract RPM contents to TEST_PREFIX for TTY testing
 # ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# Install RPM via rpm-ostree (for --ostree)
 extract_for_testing() {
     step "Extracting RPM contents to ${TEST_PREFIX} for TTY testing..."
     local rpm_file
@@ -542,9 +607,6 @@ extract_for_testing() {
 # ---------------------------------------------------------------------------
 # Install the single dev startup script for TTY testing
 # ---------------------------------------------------------------------------
-# Arguments:
-#   $1  - Layout type: "rpm" (default, binary at $TEST_PREFIX/usr/bin/) or
-#         "quick" (binary at $TEST_PREFIX/bin/)
 install_startup_script() {
     step "Installing dev startup script..."
 
@@ -557,7 +619,7 @@ install_startup_script() {
 
     # Generate the startup script from the template.
     # INSTALL_PREFIX points directly at TEST_PREFIX (no usr/ subdirectory).
-    # Both quick and RPM modes produce the same flat layout now.
+    # Both binary and RPM modes produce the same flat layout now.
     sed -e "s|@INSTALL_PREFIX@|$TEST_PREFIX|g" \
         "$SCRIPT_DIR/scripts/start-kineticwe.sh" \
         > "$TEST_PREFIX/bin/start-kineticwe"
@@ -642,57 +704,122 @@ install_dev_session_entry() {
 }
 
 # ---------------------------------------------------------------------------
-# Install via rpm-ostree (override replace)
+# Install and activate the Noctalia greeter (greetd + noctalia-greeter-git)
 # ---------------------------------------------------------------------------
-install_via_ostree() {
-    step "Preparing rpm-ostree override..."
-    local rpm_files
-    rpm_files=$(find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" \
-        ! -name '*.src.rpm' \
-        -printf '%p\n' 2>/dev/null | sort)
-    if [[ -z "$rpm_files" ]]; then
-        error "No binary RPMs found in $RESULTS_DIR"
+setup_noctalia_greeter() {
+    step "Setting up Noctalia greeter (lionheartp/Hyprland COPR)..."
+
+    # The greeter runs under greetd and is packaged in the LionHeartP COPR.
+    local copr_repo="/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:lionheartp:Hyprland.repo"
+    if [[ ! -f "$copr_repo" ]]; then
+        info "Enabling lionheartp/Hyprland COPR..."
+        sudo dnf -y copr enable lionheartp/Hyprland
+    else
+        info "lionheartp/Hyprland COPR already enabled."
+    fi
+
+    if ! command -v noctalia-greeter-session &>/dev/null || ! command -v greetd &>/dev/null; then
+        info "Installing noctalia-greeter-git and greetd..."
+        sudo dnf install -y noctalia-greeter-git greetd
+    else
+        info "noctalia-greeter and greetd already installed."
+    fi
+
+    local session_bin
+    session_bin=$(command -v noctalia-greeter-session)
+    if [[ -z "$session_bin" ]]; then
+        error "noctalia-greeter-session was not found after installation."
         exit 1
     fi
 
-    echo "The following RPMs will be layered:"
-    echo "$rpm_files" | while read -r f; do echo "  * $(basename "$f")"; done
-    echo
+    # Ensure the greeter user exists and can access DRM/input devices.
+    if ! id greeter &>/dev/null; then
+        info "Creating the greetd greeter user..."
+        sudo useradd -r -s /usr/bin/nologin -d /var/lib/noctalia-greeter -G video,input greeter
+    fi
+    sudo usermod -a -G video,input greeter
 
-    read -r -p "Proceed with rpm-ostree override replace? [y/N] " reply
-    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
-        warn "Install cancelled."
-        return 1
+    # Point greetd at the packaged session wrapper unless it already is.
+    local greetd_cfg="/etc/greetd/config.toml"
+    if [[ -f "$greetd_cfg" ]] && grep -q "noctalia-greeter-session" "$greetd_cfg"; then
+        info "greetd already configured to use noctalia-greeter-session."
+    else
+        info "Configuring greetd to launch the Noctalia greeter..."
+        local tmp_cfg
+        tmp_cfg=$(mktemp)
+        if [[ -f "$greetd_cfg" ]]; then
+            cp "$greetd_cfg" "$tmp_cfg"
+        else
+            cat > "$tmp_cfg" <<'EOF'
+[terminal]
+vt = 1
+
+[default_session]
+command = ""
+user = "greeter"
+EOF
+        fi
+
+        # Replace the command/user lines inside [default_session], or append
+        # the block when the file has none.
+        awk -v session="$session_bin" '
+            BEGIN { in_block = 0 }
+            /^\[default_session\]/ { in_block = 1; print; next }
+            /^\[/ { in_block = 0 }
+            in_block && /^[[:space:]]*command[[:space:]]*=/ {
+                print "command = \"" session "\""; next
+            }
+            in_block && /^[[:space:]]*user[[:space:]]*=/ {
+                print "user = \"greeter\""; next
+            }
+            { print }
+        ' "$tmp_cfg" > "$tmp_cfg.new"
+
+        if ! grep -q '^\[default_session\]' "$tmp_cfg.new"; then
+            printf '\n[default_session]\ncommand = "%s"\nuser = "greeter"\n' "$session_bin" >> "$tmp_cfg.new"
+        fi
+
+        sudo mkdir -p "$(dirname "$greetd_cfg")"
+        sudo install -m 0644 "$tmp_cfg.new" "$greetd_cfg"
+        rm -f "$tmp_cfg" "$tmp_cfg.new"
+        info "Wrote ${greetd_cfg}: default_session -> ${session_bin}"
     fi
 
-    info "Running: rpm-ostree override replace [${PACKAGE} RPMs]"
-    # shellcheck disable=SC2086
-    sudo rpm-ostree override replace $rpm_files
-
-    echo
-    info "Override applied. A new deployment has been created."
-}
-
-# ---------------------------------------------------------------------------
-# Reset rpm-ostree override (revert to COPR version)
-# ---------------------------------------------------------------------------
-reset_override() {
-    step "Resetting rpm-ostree override for kineticwe..."
-    if ! rpm-ostree override list 2>/dev/null | grep -q "${PACKAGE}"; then
-        info "No current override for ${PACKAGE} found."
-        return 0
+    # Run the packaged system setup: PAM patch, state dir, greeter.toml.
+    local setup_script="/usr/share/noctalia-greeter/setup_greeter_system.sh"
+    if [[ -x "$setup_script" ]]; then
+        info "Running Noctalia greeter system setup..."
+        sudo "$setup_script"
+    else
+        warn "Noctalia greeter setup script not found: $setup_script"
     fi
 
-    read -r -p "Reset kineticwe override back to COPR version? [y/N] " reply
-    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
-        warn "Reset cancelled."
-        return 1
+    # Boot into the graphical target so the display manager starts at boot.
+    if [[ "$(systemctl get-default)" != "graphical.target" ]]; then
+        info "Setting default boot target to graphical.target..."
+        sudo systemctl set-default graphical.target
+    else
+        info "Default boot target is already graphical.target."
     fi
 
-    sudo rpm-ostree override reset "${PACKAGE}"
-    echo
-    info "Override reset. Reboot to revert to the COPR version."
-    info "  sudo systemctl reboot"
+    # Make greetd the active login greeter unless it already is.
+    local current_dm
+    current_dm=$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null || true)
+    if [[ "$current_dm" == *greetd.service* ]]; then
+        info "greetd is already the active display manager."
+    else
+        if [[ -n "$current_dm" ]]; then
+            local current_unit
+            current_unit=$(basename "$current_dm")
+            info "Disabling current display manager: ${current_unit}"
+            sudo systemctl disable "$current_unit"
+        fi
+        info "Enabling greetd as the display manager..."
+        sudo systemctl enable greetd.service
+        echo
+        info "The Noctalia greeter is configured."
+        info "Log out or reboot to use it."
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -784,24 +911,6 @@ reset_local() {
     fi
 }
 
-# ---------------------------------------------------------------------------
-# Reboot prompt
-# ---------------------------------------------------------------------------
-prompt_reboot() {
-    echo
-    read -r -p "Reboot now to boot into the new deployment? [y/N] " reply
-    if [[ "$reply" =~ ^[Yy]$ ]]; then
-        info "Rebooting..."
-        sudo systemctl reboot
-    else
-        echo
-        info "You can reboot later:"
-        info "  sudo systemctl reboot"
-        echo
-        info "To check deployments:"
-        info "  rpm-ostree status"
-    fi
-}
 
 # ---------------------------------------------------------------------------
 # Print usage info
@@ -825,7 +934,7 @@ print_usage() {
         echo "  └─────────────────────────────────────────────────────┘"
     else
         echo "  No dev build found at $TEST_PREFIX"
-        echo "  (run ./build-rpm-dev.sh --quick first)"
+        echo "  (run ./build-rpm-dev.sh --binary first)"
     fi
     echo
 
@@ -854,24 +963,26 @@ print_usage() {
     echo
 
     info "Rebuild after making changes:"
-    info "  ./build-rpm-dev.sh --quick"
+    info "  ./build-rpm-dev.sh --binary"
+    echo
+
+    info "Full dev build with the Noctalia greeter (installs/activates it if needed):"
+    info "  ./build-rpm-dev.sh --full"
+    echo
+
+    info "Iterate on a single component (fast, incremental):"
+    info "  ./build-rpm-dev.sh --kwin-only    # kwin only"
+    info "  ./build-rpm-dev.sh --noct-only    # noctalia shell only"
     echo
 
     info "Build and auto-install any missing host runtime deps in one step:"
     info "  ./build-rpm-dev.sh --install-host-deps"
-    info "  (also installs the default session packages: Breeze icon/cursor themes, color schemes, Alacritty)"
+    info "  (also installs the default session packages: Breeze icon/cursor themes, color schemes, Qt5/Qt6 tools, Xwayland, portal QML modules, Alacritty)"
     echo
 
     if find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" ! -name '*.src.rpm' -print0 2>/dev/null | grep -qz .; then
         info "RPM packages:"
         find "$RESULTS_DIR" -type f -name "${PACKAGE}*.rpm" ! -name '*.src.rpm' -exec ls -lh {} \; 2>/dev/null | sed 's/^/  /'
-        echo
-        info "To layer via rpm-ostree (requires reboot):"
-        info "  ./build-rpm-dev.sh --ostree"
-        echo
-        info "To revert the ostree override:"
-        info "  ./build-rpm-dev.sh --reset"
-        echo
     fi
 
     info "To remove local dev files and restore pure COPR:"
@@ -888,33 +999,33 @@ print_usage() {
 # ---------------------------------------------------------------------------
 main() {
     local do_install=false
-    local do_ostree=false
-    local do_reboot=false
-    local do_reset=false
     local do_reset_local=false
-    local do_quick=false
+    local do_full=false
+    local do_binary=false
+    local do_kwin_only=false
+    local do_noct_only=false
     local do_install_host_deps=false
     local do_session=true
 
     for arg in "$@"; do
         case "$arg" in
             --install) do_install=true ;;
-            --ostree)  do_ostree=true ;;
-            --reboot)  do_reboot=true ;;
-            --reset)   do_reset=true ;;
             --reset-local) do_reset_local=true ;;
-            --quick)   do_quick=true ;;
+            --full)   do_full=true ;;
+            --binary) do_binary=true ;;
+            --kwin-only) do_kwin_only=true ;;
+            --noct-only) do_noct_only=true ;;
             --install-host-deps) do_install_host_deps=true ;;
             --no-session) do_session=false ;;
-            --help|-h) echo "Usage: $0 [--install] [--ostree] [--reboot] [--quick] [--install-host-deps] [--no-session] [--reset] [--reset-local]"; exit 0 ;;
+            --help|-h) echo "Usage: $0 [--install] [--full] [--binary] [--kwin-only] [--noct-only] [--install-host-deps] [--no-session] [--reset-local]"; exit 0 ;;
             *)         warn "Unknown option: $arg";;
         esac
     done
 
-    # --install-host-deps implies the quick build so the dev binaries exist to
-    # inspect for missing host libraries (it is a modifier, not a build mode).
+    # --install-host-deps implies the binary build so the dev binaries exist
+    # to inspect for missing host libraries (it is a modifier, not a build mode).
     if $do_install_host_deps; then
-        do_quick=true
+        do_binary=true
     fi
 
     if $do_reset_local; then
@@ -926,25 +1037,46 @@ main() {
         exit 0
     fi
 
-    if $do_reset; then
+    if $do_kwin_only; then
         echo "=========================================="
-        echo "  KineticWE RPM - Reset Override"
+        echo "  KineticWE KWin-Only Dev Build"
+        echo "  Install prefix: ${TEST_PREFIX}"
         echo "=========================================="
         echo
-        reset_override
+        check_prereqs
+        ensure_distrobox
+        kwin_only_build
         exit 0
     fi
 
-    if $do_quick; then
+    if $do_noct_only; then
         echo "=========================================="
-        echo "  KineticWE Quick Dev Build (no RPM)"
+        echo "  KineticWE Noctalia-Only Dev Build"
+        echo "  Install prefix: ${TEST_PREFIX}"
+        echo "=========================================="
+        echo
+        check_prereqs
+        ensure_distrobox
+        noctalia_only_build
+        exit 0
+    fi
+
+    if $do_full || $do_binary; then
+        local mode_name
+        if $do_full; then
+            mode_name="Full Dev Build (binaries + Noctalia greeter)"
+        else
+            mode_name="Binary Dev Build (no RPM)"
+        fi
+        echo "=========================================="
+        echo "  KineticWE ${mode_name}"
         echo "  Install prefix: ${TEST_PREFIX}"
         echo "=========================================="
         echo
 
         check_prereqs
         setup_distrobox
-        quick_build
+        binary_build
         if $do_install_host_deps; then
             step "Installing missing host runtime dependencies..."
             TEST_PREFIX="$TEST_PREFIX" "$SCRIPT_DIR/install-runtime-deps.sh"
@@ -953,6 +1085,9 @@ main() {
         install_startup_script
         if $do_session; then
             install_dev_session_entry
+        fi
+        if $do_full; then
+            setup_noctalia_greeter
         fi
         print_usage
         exit 0
@@ -976,24 +1111,6 @@ main() {
             install_dev_session_entry
         fi
         print_usage
-
-        if $do_ostree; then
-            echo
-            echo "=========================================="
-            echo "  Installing via rpm-ostree..."
-            echo "=========================================="
-            echo
-
-            if install_via_ostree; then
-                if $do_reboot; then
-                    prompt_reboot
-                else
-                    echo
-                    info "Run with --reboot to reboot after install,"
-                    info "or reboot manually: sudo systemctl reboot"
-                fi
-            fi
-        fi
         exit 0
     fi
 
@@ -1005,7 +1122,7 @@ main() {
     echo "=========================================="
     echo
 
-    check_prereqs "$@"
+    check_prereqs
     setup_distrobox
     build_rpms
     extract_for_testing
@@ -1015,24 +1132,6 @@ main() {
         install_dev_session_entry
     fi
     print_usage
-
-    if $do_ostree; then
-        echo
-        echo "=========================================="
-        echo "  Installing via rpm-ostree..."
-        echo "=========================================="
-        echo
-
-        if install_via_ostree; then
-            if $do_reboot; then
-                prompt_reboot
-            else
-                echo
-                info "Run with --reboot to reboot after install,"
-                info "or reboot manually: sudo systemctl reboot"
-            fi
-        fi
-    fi
 }
 
 main "$@"

@@ -167,6 +167,15 @@ const std::vector<WorkspacesPage::Field>& WorkspacesPage::fields() {
         .pageGroup = "Options",
         .fallback = Value{true},
     });
+    f.push_back(Field{
+        .group = "Effect-slide",
+        .key = "SlideBackground",
+        .title = "Slide desktop background",
+        .subtitle = "Also slides the wallpaper along with the windows while "
+                    "switching",
+        .pageGroup = "Options",
+        .fallback = Value{true},
+    });
     // On-screen display ------------------------------------------------------
     f.push_back(Field{
         .group = "Plugins",
@@ -373,6 +382,7 @@ bool WorkspacesPage::applyAll() {
   ensureLoaded();
   const bool hasConfig = !m_pending.empty();
   const bool hasWorkspaces = m_workspaceListDirty;
+  bool slideConfigChanged = false;
 
   // Compose the staged settings into the config model. The row layout is also
   // written here (see syncWorkspacesToCompositor for why).
@@ -380,6 +390,9 @@ bool WorkspacesPage::applyAll() {
     for (const auto& [path, value] : m_pending) {
       if (const Field* field = findField(path)) {
         writeValue(*field, value);
+        if (field->group == "Effect-slide") {
+          slideConfigChanged = true;
+        }
       }
     }
   }
@@ -415,6 +428,13 @@ bool WorkspacesPage::applyAll() {
   // was a settings value or a workspace-list edit).
   if (hasConfig || hasWorkspaces) {
     m_dbus.requestReconfigure();
+  }
+
+  // The full reconfigure re-reads the config file but does not re-read effect
+  // configs, so reload the Slide effect explicitly when its [Effect-slide]
+  // group changed (mirrors the upstream Slide KCM calling reconfigureEffect).
+  if (slideConfigChanged) {
+    m_dbus.reconfigureEffect("slide");
   }
   return true;
 }

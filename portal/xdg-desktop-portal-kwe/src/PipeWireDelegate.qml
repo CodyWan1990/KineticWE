@@ -10,8 +10,6 @@ import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import org.kde.pipewire as PipeWire
-import org.kde.taskmanager as TaskManager
-import org.kde.kitemmodels as ItemModels
 import org.kde.ki18n
 
 Kirigami.AbstractCard {
@@ -193,52 +191,6 @@ Kirigami.AbstractCard {
         id: outputItem
 
         ColumnLayout {
-            component Tasks: RowLayout {
-                id: tasksLayout
-
-                readonly property int cutoff: 4
-                readonly property int count: tasksModel.count
-                readonly property int hasOverflow: tasksModel.count > cutoff
-                readonly property int remainder: Math.max(0, tasksModel.count - cutoff)
-
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 0
-                implicitHeight: Kirigami.Units.gridUnit
-
-                property TaskManager.TasksModel tasksModel: TaskManager.TasksModel {
-                    filterByScreen: true
-                    screenGeometry: root.geometry
-                    sortMode: TaskManager.TasksModel.SortLastActivated
-                }
-
-                Repeater {
-                    model: ItemModels.KSortFilterProxyModel {
-                        sourceModel: tasksLayout.tasksModel
-                        filterRowCallback: row => row < tasksLayout.cutoff
-                    }
-                    delegate: Kirigami.Icon {
-                        required property var decoration
-                        implicitHeight: Kirigami.Units.gridUnit
-                        width: height
-                        source: decoration
-                    }
-                }
-
-                QQC2.Label {
-                    visible: text.length > 0
-                    color: Kirigami.Theme.disabledTextColor
-                    text: {
-                        if (tasksLayout.count === 0) {
-                            return KI18n.i18nc("@info:status", "No windows open")
-                        }
-                        if (!tasksLayout.hasOverflow) {
-                            return ""
-                        }
-                        return KI18n.i18nc("%1 is a number of elided icon entries", "+%1", tasksLayout.remainder)
-                    }
-                }
-            }
-
             component Heading : Kirigami.Heading {
                 level: 2
                 wrapMode: Text.Wrap
@@ -273,7 +225,6 @@ Kirigami.AbstractCard {
                         }
                         Selector {}
                     }
-                    Tasks {}
                 }
             }
 
@@ -289,9 +240,6 @@ Kirigami.AbstractCard {
                         Layout.alignment: Qt.AlignRight
                         maximumLineCount: undefined
                         lineHeight: 1.0 // no need to pretend it is two lines we have plenty of space
-                    }
-                    Tasks {
-                        Layout.alignment: Qt.AlignLeft
                     }
                     Item {
                         Layout.fillWidth: true

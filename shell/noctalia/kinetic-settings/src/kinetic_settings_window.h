@@ -3,6 +3,7 @@
 #include "kinetic-settings/src/appearance_page.h"
 #include "kinetic-settings/src/cursors_page.h"
 #include "kinetic-settings/src/default_apps_page.h"
+#include "kinetic-settings/src/desktop_effects_page.h"
 #include "kinetic-settings/src/display_page.h"
 #include "kinetic-settings/src/icons_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
@@ -76,6 +77,7 @@ private:
     AppearanceGlobalTheme,
     AppearanceIcons,
     AppearanceCursors,
+    DesktopEffects,
     WindowBehavior,
     Workspaces,
     Tiling,
@@ -120,6 +122,8 @@ private:
   [[nodiscard]] IconsPage::Callbacks iconsPageCallbacks();
   [[nodiscard]] CursorsPage::Filter cursorsFilter() const;
   [[nodiscard]] CursorsPage::Callbacks cursorsPageCallbacks();
+  [[nodiscard]] DesktopEffectsPage::Filter desktopEffectsFilter() const;
+  [[nodiscard]] DesktopEffectsPage::Callbacks desktopEffectsPageCallbacks();
   [[nodiscard]] DefaultAppsPage::Filter defaultAppsFilter() const;
   [[nodiscard]] DefaultAppsPage::Callbacks defaultAppsPageCallbacks();
   [[nodiscard]] DisplayPage::Filter displayFilter() const;
@@ -150,6 +154,7 @@ private:
   std::unique_ptr<AppearancePage> m_appearancePage;
   std::unique_ptr<IconsPage> m_iconsPage;
   std::unique_ptr<CursorsPage> m_cursorsPage;
+  std::unique_ptr<DesktopEffectsPage> m_desktopEffectsPage;
   std::unique_ptr<DefaultAppsPage> m_defaultAppsPage;
   std::unique_ptr<SelectDropdownPopup> m_selectPopup;
   // Non-null only while a keybind recorder is capturing (see updateKeyboardShortcutInhibit).

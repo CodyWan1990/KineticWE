@@ -11,9 +11,11 @@ namespace {
   const sdbus::ObjectPath kKwinPath{"/KWin"};
   const sdbus::ObjectPath kTilingPath{"/Tiling"};
   const sdbus::ObjectPath kVirtualDesktopsPath{"/VirtualDesktopManager"};
+  const sdbus::ObjectPath kEffectsPath{"/Effects"};
   constexpr auto kKwinInterface = "org.kde.KWin";
   constexpr auto kTilingInterface = "org.kde.KWin.Tiling";
   constexpr auto kVirtualDesktopsInterface = "org.kde.KWin.VirtualDesktopManager";
+  constexpr auto kEffectsInterface = "org.kde.kwin.Effects";
 
   const Logger kLog("kinetic-settings");
 
@@ -27,6 +29,33 @@ void CompositorDbus::requestReconfigure() {
     proxy->callMethod("reconfigure").onInterface("org.kde.KWin");
   } catch (const sdbus::Error& e) {
     kLog.warn("compositor reconfigure failed: {}", e.what());
+  }
+}
+
+void CompositorDbus::reconfigureEffect(const std::string& name) {
+  try {
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, kEffectsPath);
+    proxy->callMethod("reconfigureEffect").onInterface(kEffectsInterface).withArguments(name);
+  } catch (const sdbus::Error& e) {
+    kLog.warn("kwin reconfigureEffect failed: {}", e.what());
+  }
+}
+
+void CompositorDbus::loadEffect(const std::string& name) {
+  try {
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, kEffectsPath);
+    proxy->callMethod("loadEffect").onInterface(kEffectsInterface).withArguments(name);
+  } catch (const sdbus::Error& e) {
+    kLog.warn("kwin loadEffect failed: {}", e.what());
+  }
+}
+
+void CompositorDbus::unloadEffect(const std::string& name) {
+  try {
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, kEffectsPath);
+    proxy->callMethod("unloadEffect").onInterface(kEffectsInterface).withArguments(name);
+  } catch (const sdbus::Error& e) {
+    kLog.warn("kwin unloadEffect failed: {}", e.what());
   }
 }
 

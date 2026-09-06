@@ -7,7 +7,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import org.kde.taskmanager as TaskManager
 
 Kirigami.CardsLayout {
     id: root
@@ -45,7 +44,7 @@ Kirigami.CardsLayout {
             exclusive: false
             autoExclusive: exclusive
             checked: model.checked === Qt.Checked
-            nodeId: waylandItem.nodeId
+            nodeId: 0
             syntheticCount: {
                 let model = view.model.sourceModel
                 if (model instanceof OutputsModel) {
@@ -61,12 +60,6 @@ Kirigami.CardsLayout {
             highlighted: activeFocus
 
             Accessible.role: root.dialog.multiple ? Accessible.CheckBox : Accessible.Button
-
-            TaskManager.ScreencastingRequest {
-                id: waylandItem
-                outputName: delegate.model.name
-                uuid: delegate.model.Uuid
-            }
 
             // Only active if this is a multi-select dialog
             onToggled: {

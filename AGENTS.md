@@ -11,7 +11,7 @@ The user builds and tests locally on their own machine. An agent's job ends at
 "code is written and statically verified." Under no circumstances run anything
 that compiles, links, packages, installs, or launches binaries.
 
-Always let me know if I need to build just noctalia or the entire build with ./build-rpm-dev.sh --quick. 
+Always tell me the exact build command to run after changes: `./build-rpm-dev.sh --kwin-only` for kwin-only, `./build-rpm-dev.sh --noct-only` for noctalia-only, or `./build-rpm-dev.sh --binary` / `--full` for the full build.
 
 ### Forbidden — never run, in any form
 
@@ -19,7 +19,8 @@ Always let me know if I need to build just noctalia or the entire build with ./b
   `cargo build`, `npm run build` / `yarn build` / `pnpm build`, `nix build`,
   `makepkg`, `dpkg-buildpackage`, `debuild`, `rpmbuild`, `mock`, `copr-cli build`.
 - **Distrobox builds:** never run `build-deb-dev.sh`, `build-rpm-dev.sh`,
-  `build-kinetic-noctalia.sh`, `install-build-deps.sh`, `debian-deps.sh`, and
+  `build-kinetic-noctalia.sh` (superseded by `build-rpm-dev.sh --noct-only`),
+  `install-build-deps.sh`, `debian-deps.sh`, and
   never `distrobox enter` (or `podman`/`docker exec`) into a container to build.
   Distrobox containers are the user's build environment — hands off.
 - **User-owned build dirs:** `build/`, `build.deb-quick/`,
@@ -56,7 +57,7 @@ command to run locally instead.
 
 Always end with: (1) what changed and why, (2) which static checks were run and
 their results, (3) the exact build/test command for the user to run locally
-(e.g. `./build-rpm-dev.sh --quick` or `./build-kinetic-noctalia.sh`), and
+(e.g. `./build-rpm-dev.sh --kwin-only`, `./build-rpm-dev.sh --noct-only`, or `./build-rpm-dev.sh --binary` / `--full`), and
 (4) anything that could not be verified without a build.
 
 ---

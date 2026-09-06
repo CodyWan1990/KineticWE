@@ -177,6 +177,9 @@ void KineticSettingsWindow::open() {
   if (m_cursorsPage == nullptr) {
     m_cursorsPage = std::make_unique<CursorsPage>();
   }
+  if (m_desktopEffectsPage == nullptr) {
+    m_desktopEffectsPage = std::make_unique<DesktopEffectsPage>(*m_bus);
+  }
   if (m_defaultAppsPage == nullptr) {
     m_defaultAppsPage = std::make_unique<DefaultAppsPage>();
   }
@@ -188,6 +191,7 @@ void KineticSettingsWindow::open() {
   m_appearancePage->reloadFromDisk();
   m_iconsPage->reloadFromDisk();
   m_cursorsPage->reloadFromDisk();
+  m_desktopEffectsPage->reloadFromDisk();
   m_defaultAppsPage->reloadFromDisk();
   m_displayPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
@@ -537,6 +541,35 @@ CursorsPage::Callbacks KineticSettingsWindow::cursorsPageCallbacks() {
   };
 }
 
+DesktopEffectsPage::Filter KineticSettingsWindow::desktopEffectsFilter() const {
+  return DesktopEffectsPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+DesktopEffectsPage::Callbacks KineticSettingsWindow::desktopEffectsPageCallbacks() {
+  return DesktopEffectsPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_desktopEffectsPage != nullptr) {
+              m_desktopEffectsPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 DefaultAppsPage::Filter KineticSettingsWindow::defaultAppsFilter() const {
   return DefaultAppsPage::Filter{
       .searchQuery = m_searchQuery,
@@ -617,6 +650,9 @@ void KineticSettingsWindow::applyActivePage() {
   case ActivePage::AppearanceCursors:
     applied = m_cursorsPage != nullptr && m_cursorsPage->applyAll();
     break;
+  case ActivePage::DesktopEffects:
+    applied = m_desktopEffectsPage != nullptr && m_desktopEffectsPage->applyAll();
+    break;
   case ActivePage::Tiling:
     applied = m_tilingPage != nullptr && m_tilingPage->applyAll();
     break;
@@ -668,6 +704,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_cursorsPage->resetAll();
     }
     break;
+  case ActivePage::DesktopEffects:
+    if (m_desktopEffectsPage != nullptr) {
+      m_desktopEffectsPage->resetAll();
+    }
+    break;
   case ActivePage::Tiling:
     if (m_tilingPage != nullptr) {
       m_tilingPage->resetAll();
@@ -714,6 +755,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_iconsPage != nullptr && m_iconsPage->hasPending();
   case ActivePage::AppearanceCursors:
     return m_cursorsPage != nullptr && m_cursorsPage->hasPending();
+  case ActivePage::DesktopEffects:
+    return m_desktopEffectsPage != nullptr && m_desktopEffectsPage->hasPending();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && m_tilingPage->hasPending();
   case ActivePage::WindowRules:
@@ -740,6 +783,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_iconsPage != nullptr && !m_iconsPage->resettableKeyPaths().empty();
   case ActivePage::AppearanceCursors:
     return m_cursorsPage != nullptr && !m_cursorsPage->resettableKeyPaths().empty();
+  case ActivePage::DesktopEffects:
+    return m_desktopEffectsPage != nullptr && !m_desktopEffectsPage->resettableKeyPaths().empty();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && !m_tilingPage->resettableKeyPaths().empty();
   case ActivePage::WindowRules:
@@ -948,6 +993,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     addSubNav(ActivePage::AppearanceGlobalTheme, "palette", "Global Theme");
     addSubNav(ActivePage::AppearanceIcons, "apps", "Icons");
     addSubNav(ActivePage::AppearanceCursors, "mouse-2", "Cursors");
+    addSubNav(ActivePage::DesktopEffects, "sparkles", "Desktop Effects");
   }
 
   addCategory("Input & Output", m_inputOutputExpanded, [this]() {
@@ -1008,6 +1054,13 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
     if (m_cursorsPage != nullptr) {
       m_pageContainer->addChild(
           m_cursorsPage->build(uiScale(), renderer, cursorsFilter(), m_armedResetKeyPath, cursorsPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::DesktopEffects:
+    if (m_desktopEffectsPage != nullptr) {
+      m_pageContainer->addChild(
+          m_desktopEffectsPage->build(uiScale(), desktopEffectsFilter(), m_armedResetKeyPath, desktopEffectsPageCallbacks())
       );
     }
     break;

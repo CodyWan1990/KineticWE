@@ -10,7 +10,6 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
-import org.kde.kirigamiaddons.components as KirigamiComponents
 import org.kde.ki18n
 
 PortalDialog {
@@ -31,11 +30,12 @@ PortalDialog {
             Layout.fillHeight: true
         }
 
-        KirigamiComponents.Avatar {
+        Image {
             id: avatar
 
             readonly property int size: 8 * Kirigami.Units.gridUnit
 
+            fillMode: Image.PreserveAspectCrop
             Layout.preferredWidth: size
             Layout.preferredHeight: size
             Layout.alignment: Qt.AlignBottom | Qt.AlignHCenter

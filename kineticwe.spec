@@ -225,6 +225,15 @@ system kglobalacceld package (6.7.0 or older).
 %package -n xdg-desktop-portal-kwe
 Summary:        KineticWE portal backend (rebranded xdg-desktop-portal-kde)
 License:        LGPL-2.0-or-later
+Requires:       qt6-qtdeclarative
+Requires:       qt6-qt5compat
+Requires:       kf6-kirigami
+Requires:       kf6-kitemmodels
+Requires:       kf6-ki18n
+Requires:       kpipewire
+Requires:       kf6-kiconthemes
+Requires:       kf6-kcmutils
+Requires:       kf6-kdeclarative
 
 %description -n xdg-desktop-portal-kwe
 The xdg-desktop-portal backend for KineticWE sessions: a fork of KDE's

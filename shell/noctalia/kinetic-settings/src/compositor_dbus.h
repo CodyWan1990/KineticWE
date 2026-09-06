@@ -18,6 +18,18 @@ public:
   // Trigger a full compositor config reparse (KConfig reload + reconfigure).
   void requestReconfigure();
 
+  // Re-reads and re-applies a single effect's config
+  // (org.kde.kwin.Effects reconfigureEffect), used after editing an effect's
+  // [Effect-*] group in kineticwe.kwe.
+  void reconfigureEffect(const std::string& name);
+
+  // Loads/unloads an effect at runtime (org.kde.kwin.Effects loadEffect /
+  // unloadEffect). Used after toggling an effect's [Plugins] <name>Enabled key
+  // so the change applies live instead of waiting for the compositor's config
+  // watcher to notice the file write.
+  void loadEffect(const std::string& name);
+  void unloadEffect(const std::string& name);
+
   // Name of the compositor's active output (org.kde.KWin.activeOutputName),
   // e.g. "DP-1"; empty when the compositor can't be reached.
   [[nodiscard]] std::string activeOutputName();

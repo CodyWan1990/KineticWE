@@ -116,9 +116,20 @@ fi
 # Publish the pre-compositor session environment to D-Bus/systemd NOW so
 # D-Bus-activated services at startup see the KineticWE identity. XDG_CONFIG_HOME
 # is deliberately NOT published: services must keep the real config home.
-dbus-update-activation-environment --systemd \
+#
+# systemd is a hard dependency, so systemctl is always available;
+# dbus-update-activation-environment lives in dbus-tools and may be absent on
+# minimal images. Import into the systemd user manager directly so services
+# activated through SystemdService= units inherit the session identity even
+# without dbus-tools installed.
+systemctl --user import-environment \
     XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_DATA_DIRS \
     2>/dev/null || true
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd \
+        XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_DATA_DIRS \
+        2>/dev/null || true
+fi
 
 # ---------------------------------------------------------------------------
 # 4b. First-run config seeding: 2.0 relocated all compositor settings into
@@ -815,7 +826,23 @@ done
 # 6. Publish the full session environment to D-Bus / systemd
 # ---------------------------------------------------------------------------
 mkdir -p "$HOME/.local/share"
-dbus-update-activation-environment --systemd --all 2>/dev/null || true
+
+# The compositor's display sockets and Qt theming environment must reach the
+# systemd user manager: D-Bus services that activate through SystemdService=
+# units (Spectacle, portals, other KDE apps) inherit the user manager's
+# environment — not this script's — so without this they start with no
+# WAYLAND_DISPLAY/DISPLAY and without QT_QPA_PLATFORMTHEME (qt6ct serves the
+# qt5ct key, so that value is valid) and fall back to the unthemed default Qt
+# style. systemctl is always present; dbus-update-activation-environment lives
+# in dbus-tools, which is not a hard dependency.
+systemctl --user import-environment \
+    WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
+    XDG_SESSION_TYPE XDG_DATA_DIRS \
+    QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QML2_IMPORT_PATH LD_LIBRARY_PATH PATH \
+    2>/dev/null || true
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd --all 2>/dev/null || true
+fi
 
 # ---------------------------------------------------------------------------
 # 6b. Session target: pull graphical-session.target up (RefuseManualStart=yes,
