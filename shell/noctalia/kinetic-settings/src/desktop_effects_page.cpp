@@ -149,51 +149,106 @@ namespace {
 DesktopEffectsPage::DesktopEffectsPage(SessionBus& bus) : m_dbus(bus) {}
 
 // ---------------------------------------------------------------------------
-// Discovery: parse the installed builtin-effects metadata once and cache it.
+// Discovery: parse the installed builtin- and scripted-effect metadata once
+// and cache it.
 // ---------------------------------------------------------------------------
 
 std::vector<DesktopEffectsPage::Effect> DesktopEffectsPage::discoverEffects() {
   std::vector<Effect> effects;
   std::set<std::string> seen;
 
+  // Parses one effect metadata.json and appends it to `effects`. Does nothing
+  // when the file is not usable effect metadata or the effect was already
+  // discovered (dedup by plugin id, first wins in XDG priority order).
+  //
+  // `requireEffectPackage` selects the scripted-effect branch: those packages
+  // are KWin/Effect KPackages (KPackageStructure + X-Plasma-API), whereas
+  // builtin effects are plain KPlugin JSON files under builtin-effects/. Both
+  // share the KPlugin block, so parsing is shared.
+  const auto consumeJson = [&effects, &seen](
+      const fs::path& file, std::string fallbackName, bool requireEffectPackage) {
+    std::ifstream in(file);
+    if (!in.is_open()) {
+      return;
+    }
+
+    nlohmann::json meta;
+    try {
+      in >> meta;
+    } catch (const nlohmann::json::exception&) {
+      return;
+    }
+
+    const auto& plugin = meta.value("KPlugin", nlohmann::json::object());
+    if (plugin.empty()) {
+      return;
+    }
+
+    // Only scripted desktop effects (KWin/Effect packages, JS or QML/declarative)
+    // are listed here; plain KWin/Script packages are scripting infra and hidden.
+    if (requireEffectPackage) {
+      if (meta.value("KPackageStructure", std::string()) != "KWin/Effect") {
+        return;
+      }
+      const std::string api = meta.value("X-Plasma-API", std::string());
+      if (api != "javascript" && api != "declarativescript") {
+        return;
+      }
+    }
+
+    std::string name = plugin.value("Id", std::string());
+    if (name.empty()) {
+      name = std::move(fallbackName);
+    }
+    if (name.empty() || !seen.insert(name).second) {
+      return;
+    }
+
+    // internal is flagged either via the builtin-effect block or the scripted
+    // package's X-KWin-Internal key.
+    const bool internal = meta.value("org.kde.kwin.effect", nlohmann::json::object()).value("internal", false)
+                       || meta.value("X-KWin-Internal", false);
+
+    effects.push_back(Effect{
+        .name = name,
+        .title = plugin.value("Name", name),
+        .description = plugin.value("Description", std::string()),
+        .category = plugin.value("Category", std::string("Miscellaneous")),
+        .enabledByDefault = plugin.value("EnabledByDefault", false),
+        .internal = internal,
+    });
+  };
+
   for (const auto& dir : dataDirs()) {
-    const fs::path effectsDir = fs::path(dir) / "kwin-wayland" / "builtin-effects";
+    // Built-in (compiled) effects: kwin-wayland/builtin-effects/<name>.json
+    const fs::path builtinDir = fs::path(dir) / "kwin-wayland" / "builtin-effects";
     std::error_code ec;
-    fs::directory_iterator it(effectsDir, ec);
+    fs::directory_iterator it(builtinDir, ec);
     const fs::directory_iterator end;
     for (; !ec && it != end; it.increment(ec)) {
       if (!it->is_regular_file() || it->path().extension() != ".json") {
         continue;
       }
+      consumeJson(it->path(), it->path().stem().string(), /*requireEffectPackage=*/false);
+    }
 
-      std::ifstream in(it->path());
-      if (!in.is_open()) {
-        continue;
+    // Scripted effects: kwin-wayland/effects/<name>/metadata.json and
+    // kwin/effects/<name>/metadata.json (e.g. Geometry Change).
+    for (const char* sub : {"kwin-wayland/effects", "kwin/effects"}) {
+      const fs::path pkgRoot = fs::path(dir) / sub;
+      std::error_code ec2;
+      fs::directory_iterator pkgIt(pkgRoot, ec2);
+      const fs::directory_iterator pkgEnd;
+      for (; !ec2 && pkgIt != pkgEnd; pkgIt.increment(ec2)) {
+        if (!pkgIt->is_directory()) {
+          continue;
+        }
+        const fs::path metaFile = pkgIt->path() / "metadata.json";
+        if (!fs::is_regular_file(metaFile)) {
+          continue;
+        }
+        consumeJson(metaFile, pkgIt->path().filename().string(), /*requireEffectPackage=*/true);
       }
-
-      nlohmann::json meta;
-      try {
-        in >> meta;
-      } catch (const nlohmann::json::exception&) {
-        continue;
-      }
-
-      const std::string name = it->path().stem().string();
-      if (name.empty() || !seen.insert(name).second) {
-        continue;
-      }
-
-      const auto& plugin = meta.value("KPlugin", nlohmann::json::object());
-      const auto& effectInfo = meta.value("org.kde.kwin.effect", nlohmann::json::object());
-
-      effects.push_back(Effect{
-          .name = name,
-          .title = plugin.value("Name", name),
-          .description = plugin.value("Description", std::string()),
-          .category = plugin.value("Category", std::string("Miscellaneous")),
-          .enabledByDefault = plugin.value("EnabledByDefault", false),
-          .internal = effectInfo.value("internal", false),
-      });
     }
   }
 

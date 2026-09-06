@@ -1,0 +1,1 @@
+kwin_add_scripted_effect(kwin4_effect_geometry_change package)

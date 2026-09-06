@@ -968,13 +968,17 @@ void LockSurface::layoutScene(std::uint32_t width, std::uint32_t height) {
     if (const DesktopWidgetState* loginBox =
             lockscreen_login_box::findForOutput(m_config->config().lockscreenWidgets.widgets, m_outputKey);
         loginBox != nullptr) {
-      float cx = loginBox->cx;
-      float cy = loginBox->cy;
       // Fit height to visible chrome so disabling media/weather/sessions does not leave empty panel space.
       panelHeight = lockscreen_login_box::defaultPanelHeight(loginStyle.layout, showSession, showInfoConfigured);
       panelWidth = lockscreen_login_box::resolvePanelWidth(sw, loginBox->boxWidth, loginStyle.layout);
-      panelX = cx - panelWidth * 0.5F;
-      panelY = cy - panelHeight * 0.5F;
+      // The login box is conceptually centered in the lock surface. Ignore the
+      // persisted cx/cy: it is captured against the output geometry at the time it
+      // was stored, so it goes stale when an output is rotated/resized (e.g.
+      // portrait or ultrawide). The remap machinery cannot tell a stale default
+      // from a deliberate move, so a default login box is always centered in the
+      // live surface instead.
+      panelX = std::round((sw - panelWidth) * 0.5F);
+      panelY = std::max(Style::spaceLg, sh - panelHeight - 84.0F);
     }
   }
 
