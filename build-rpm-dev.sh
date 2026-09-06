@@ -704,10 +704,45 @@ install_dev_session_entry() {
 }
 
 # ---------------------------------------------------------------------------
+# Resolve the user greetd actually runs the greeter session as. Reads the
+# `user = "..."` line from [default_session] in /etc/greetd/config.toml; falls
+# back to the greetd package user, then the conventional 'greeter' user. The
+# script previously hardcoded 'greeter', which mismatched a config running as
+# 'greetd' and errored on usermod, aborting the whole --full build.
+# ---------------------------------------------------------------------------
+resolve_greeter_user() {
+    local cfg="/etc/greetd/config.toml"
+    local user=""
+    if [[ -f "$cfg" ]]; then
+        user=$(awk '
+            /^\[default_session\]/  { in_block=1; next }
+            /^\[/                   { in_block=0 }
+            in_block && /^[[:space:]]*user[[:space:]]*=/ {
+                sub(/^[[:space:]]*user[[:space:]]*=[[:space:]]*"/, "")
+                sub(/".*$/, "")
+                print; exit
+            }
+        ' "$cfg" 2>/dev/null || true)
+    fi
+    if [[ -z "$user" ]]; then
+        if id greetd &>/dev/null; then
+            user="greetd"
+        else
+            user="greeter"
+        fi
+    fi
+    printf '%s\n' "$user"
+}
+
+# ---------------------------------------------------------------------------
 # Install and activate the Noctalia greeter (greetd + noctalia-greeter-git)
 # ---------------------------------------------------------------------------
 setup_noctalia_greeter() {
     step "Setting up Noctalia greeter (lionheartp/Hyprland COPR)..."
+
+    # Refresh/cache sudo credentials up front so the many systemctl/dnf calls
+    # below need only a single password entry. Failure here is non-fatal.
+    sudo -v 2>/dev/null || warn "sudo not cached; you may be prompted more than once."
 
     # The greeter runs under greetd and is packaged in the LionHeartP COPR.
     local copr_repo="/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:lionheartp:Hyprland.repo"
@@ -729,15 +764,51 @@ setup_noctalia_greeter() {
     session_bin=$(command -v noctalia-greeter-session)
     if [[ -z "$session_bin" ]]; then
         error "noctalia-greeter-session was not found after installation."
-        exit 1
+        return 1
     fi
 
-    # Ensure the greeter user exists and can access DRM/input devices.
-    if ! id greeter &>/dev/null; then
-        info "Creating the greetd greeter user..."
-        sudo useradd -r -s /usr/bin/nologin -d /var/lib/noctalia-greeter -G video,input greeter
+    # Resolve the user greetd actually runs the greeter as ('greetd' on this
+    # host), then ensure that user exists and has DRM/input access. Idempotent
+    # and guarded so a failure warns instead of aborting the already-built full
+    # install.
+    local greeter_user
+    greeter_user=$(resolve_greeter_user)
+    info "Greeter session user: ${greeter_user}"
+
+    if ! id "$greeter_user" &>/dev/null; then
+        info "Creating greetd greeter user '${greeter_user}'..."
+        sudo useradd -r -s /usr/bin/nologin -d /var/lib/noctalia-greeter "$greeter_user" \
+            || warn "Could not create user '${greeter_user}'; the greeter may not start."
     fi
-    sudo usermod -a -G video,input greeter
+
+    # Grant DRM/input access only if the groups exist and the user is not
+    # already a member. Never fail the one-shot because a group is absent.
+    local -a need_groups=()
+    local grp
+    for grp in video input; do
+        if getent group "$grp" &>/dev/null; then
+            need_groups+=("$grp")
+        else
+            warn "Group '${grp}' does not exist; skipping (greeter may lack DRM/input access)."
+        fi
+    done
+    if [[ ${#need_groups[@]} -gt 0 ]] && id "$greeter_user" &>/dev/null; then
+        local user_groups
+        user_groups=$(id -Gn "$greeter_user" 2>/dev/null || true)
+        local -a add_groups=()
+        for grp in "${need_groups[@]}"; do
+            [[ " $user_groups " != *" $grp "* ]] && add_groups+=("$grp")
+        done
+        if [[ ${#add_groups[@]} -gt 0 ]]; then
+            local group_list
+            group_list=$(IFS=,; echo "${add_groups[*]}")
+            info "Adding '${greeter_user}' to groups: ${add_groups[*]}"
+            sudo usermod -a -G "$group_list" "$greeter_user" \
+                || warn "Could not add '${greeter_user}' to ${add_groups[*]}."
+        else
+            info "'${greeter_user}' is already in the required groups."
+        fi
+    fi
 
     # Point greetd at the packaged session wrapper unless it already is.
     local greetd_cfg="/etc/greetd/config.toml"
@@ -750,19 +821,19 @@ setup_noctalia_greeter() {
         if [[ -f "$greetd_cfg" ]]; then
             cp "$greetd_cfg" "$tmp_cfg"
         else
-            cat > "$tmp_cfg" <<'EOF'
+            cat > "$tmp_cfg" <<EOF
 [terminal]
 vt = 1
 
 [default_session]
 command = ""
-user = "greeter"
+user = "${greeter_user}"
 EOF
         fi
 
         # Replace the command/user lines inside [default_session], or append
         # the block when the file has none.
-        awk -v session="$session_bin" '
+        awk -v session="$session_bin" -v guser="$greeter_user" '
             BEGIN { in_block = 0 }
             /^\[default_session\]/ { in_block = 1; print; next }
             /^\[/ { in_block = 0 }
@@ -770,13 +841,13 @@ EOF
                 print "command = \"" session "\""; next
             }
             in_block && /^[[:space:]]*user[[:space:]]*=/ {
-                print "user = \"greeter\""; next
+                print "user = \"" guser "\""; next
             }
             { print }
         ' "$tmp_cfg" > "$tmp_cfg.new"
 
         if ! grep -q '^\[default_session\]' "$tmp_cfg.new"; then
-            printf '\n[default_session]\ncommand = "%s"\nuser = "greeter"\n' "$session_bin" >> "$tmp_cfg.new"
+            printf '\n[default_session]\ncommand = "%s"\nuser = "%s"\n' "$session_bin" "$greeter_user" >> "$tmp_cfg.new"
         fi
 
         sudo mkdir -p "$(dirname "$greetd_cfg")"
@@ -1087,7 +1158,18 @@ main() {
             install_dev_session_entry
         fi
         if $do_full; then
+            # The greeter is a post-build convenience: a failure here must not
+            # undo/abort the already-installed dev build, so run it with
+            # errexit temporarily off and merely warn on a non-zero result.
+            local greeter_rc
+            set +e
             setup_noctalia_greeter
+            greeter_rc=$?
+            set -e
+            if [[ $greeter_rc -ne 0 ]]; then
+                warn "Noctalia greeter setup did not complete cleanly; the dev build installed."
+                warn "Re-run './build-rpm-dev.sh --full' or configure the greeter separately."
+            fi
         fi
         print_usage
         exit 0
