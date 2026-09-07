@@ -360,18 +360,24 @@ binary_build() {
         rm -rf "\$KCFG_TEST"
 
         if [[ '$incremental_kwin' == true && -d '$build_dir' ]]; then
-            echo '[STEP] Reusing existing KineticWE build dir (incremental)...'
+            echo '[STEP] Reconfiguring existing KineticWE build dir (incremental)...'
         else
-            echo '[STEP] Configuring KineticWE...'
+            echo '[STEP] Configuring KineticWE (fresh)...'
             rm -rf '$build_dir'
-            cmake -B '$build_dir' -S . \\
-                -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
-                -DCMAKE_PREFIX_PATH='${TEST_PREFIX}' \\
-                -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
-                -DBUILD_TESTING=OFF \\
-                -DKWIN_KCONFIG_COMPILER=\$KCFG_COMPILER_OVERRIDE \\
-                -DKWIN_BUILD_GLOBALSHORTCUTS=ON
         fi
+
+        # Always (re)configure, even for incremental builds: the previous
+        # incremental path skipped this and left the cached
+        # KWIN_KCONFIG_COMPILER pointing at a now-deleted /tmp/kconfig-fix.*
+        # directory from an earlier run, breaking the next build with
+        # "No rule to make target .../kconfig_compiler_kf6".
+        cmake -B '$build_dir' -S . \\
+            -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
+            -DCMAKE_PREFIX_PATH='${TEST_PREFIX}' \\
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
+            -DBUILD_TESTING=OFF \\
+            -DKWIN_KCONFIG_COMPILER=\$KCFG_COMPILER_OVERRIDE \\
+            -DKWIN_BUILD_GLOBALSHORTCUTS=ON
 
         echo '[STEP] Building KineticWE...'
         cmake --build '$build_dir' --parallel \$(nproc)

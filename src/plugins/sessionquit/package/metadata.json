@@ -151,6 +151,6 @@
         "Name[zh_TW]": "離開工作階段"
     },
     "X-KDE-Ordering": 40,
-    "X-KWin-Internal": "true",
+    "X-KWin-Internal": true,
     "X-Plasma-API": "javascript"
 }

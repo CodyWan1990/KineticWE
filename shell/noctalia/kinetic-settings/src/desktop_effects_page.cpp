@@ -46,6 +46,34 @@ namespace {
     return kExcluded;
   }
 
+  // Reads a JSON boolean defensively. KDE effect metadata occasionally encodes
+  // booleans as strings (e.g. sessionquit's "X-KWin-Internal": "true"), which
+  // nlohmann would otherwise reject with a type error that crashes the page.
+  // Non-object inputs and anything that is neither boolean nor a recognizable
+  // "true"/"false" string fall back to `fallback`.
+  [[nodiscard]] bool readBool(const nlohmann::json& obj, std::string_view key, bool fallback = false) {
+    if (!obj.is_object()) {
+      return fallback;
+    }
+    const auto it = obj.find(std::string(key));
+    if (it == obj.end()) {
+      return fallback;
+    }
+    if (it->is_boolean()) {
+      return it->get<bool>();
+    }
+    if (it->is_string()) {
+      const std::string value = it->get<std::string>();
+      if (value == "true" || value == "1") {
+        return true;
+      }
+      if (value == "false" || value == "0") {
+        return false;
+      }
+    }
+    return fallback;
+  }
+
   // XDG data directories in priority order (user dirs first, /usr/share last),
   // mirroring theme_discovery's xdgDataDirs().
   [[nodiscard]] std::vector<std::string> dataDirs() {
@@ -205,16 +233,18 @@ std::vector<DesktopEffectsPage::Effect> DesktopEffectsPage::discoverEffects() {
     }
 
     // internal is flagged either via the builtin-effect block or the scripted
-    // package's X-KWin-Internal key.
-    const bool internal = meta.value("org.kde.kwin.effect", nlohmann::json::object()).value("internal", false)
-                       || meta.value("X-KWin-Internal", false);
+    // package's X-KWin-Internal key. Read defensively so a string-encoded
+    // boolean (e.g. sessionquit's "X-KWin-Internal": "true") cannot throw.
+    const auto& effectInfo = meta.value("org.kde.kwin.effect", nlohmann::json::object());
+    const bool internal = readBool(effectInfo, "internal", false)
+                       || readBool(meta, "X-KWin-Internal", false);
 
     effects.push_back(Effect{
         .name = name,
         .title = plugin.value("Name", name),
         .description = plugin.value("Description", std::string()),
         .category = plugin.value("Category", std::string("Miscellaneous")),
-        .enabledByDefault = plugin.value("EnabledByDefault", false),
+        .enabledByDefault = readBool(plugin, "EnabledByDefault", false),
         .internal = internal,
     });
   };
@@ -232,23 +262,24 @@ std::vector<DesktopEffectsPage::Effect> DesktopEffectsPage::discoverEffects() {
       consumeJson(it->path(), it->path().stem().string(), /*requireEffectPackage=*/false);
     }
 
-    // Scripted effects: kwin-wayland/effects/<name>/metadata.json and
-    // kwin/effects/<name>/metadata.json (e.g. Geometry Change).
-    for (const char* sub : {"kwin-wayland/effects", "kwin/effects"}) {
-      const fs::path pkgRoot = fs::path(dir) / sub;
-      std::error_code ec2;
-      fs::directory_iterator pkgIt(pkgRoot, ec2);
-      const fs::directory_iterator pkgEnd;
-      for (; !ec2 && pkgIt != pkgEnd; pkgIt.increment(ec2)) {
-        if (!pkgIt->is_directory()) {
-          continue;
-        }
-        const fs::path metaFile = pkgIt->path() / "metadata.json";
-        if (!fs::is_regular_file(metaFile)) {
-          continue;
-        }
-        consumeJson(metaFile, pkgIt->path().filename().string(), /*requireEffectPackage=*/true);
+    // Scripted effects bundled with KineticWE: kwin-wayland/effects/<name>/metadata.json
+    // (this includes Geometry Change). The sibling kwin/effects root is
+    // deliberately NOT scanned: that is the KWin/Effect KPackage install path
+    // used by third-party "Get New Effects" (KNewStuff) downloads, which are
+    // out of scope for this page.
+    const fs::path pkgRoot = fs::path(dir) / "kwin-wayland/effects";
+    std::error_code ec2;
+    fs::directory_iterator pkgIt(pkgRoot, ec2);
+    const fs::directory_iterator pkgEnd;
+    for (; !ec2 && pkgIt != pkgEnd; pkgIt.increment(ec2)) {
+      if (!pkgIt->is_directory()) {
+        continue;
       }
+      const fs::path metaFile = pkgIt->path() / "metadata.json";
+      if (!fs::is_regular_file(metaFile)) {
+        continue;
+      }
+      consumeJson(metaFile, pkgIt->path().filename().string(), /*requireEffectPackage=*/true);
     }
   }
 

@@ -16,8 +16,10 @@ class Node;
 
 // The Desktop Effects settings page: lists the compositor's desktop effects
 // (builtin effects discovered from kwin-wayland/builtin-effects/*.json plus
-// scripted KWin/Effect packages from kwin-wayland/effects and kwin/effects)
-// and lets the user toggle them on/off. Each effect maps to a [Plugins] <name>Enabled key
+// bundled scripted effects from kwin-wayland/effects) and lets the user toggle
+// them on/off. Third-party "Get New Effects" (KNewStuff) packages installed
+// under kwin/effects are intentionally not listed. Each effect maps to a
+// [Plugins] <name>Enabled key
 // in kineticwe.kwe; the compiled-in default and display metadata (title,
 // description, category) come from the effect's JSON metadata file.
 //
