@@ -23,6 +23,10 @@ class Node;
 // in kineticwe.kwe; the compiled-in default and display metadata (title,
 // description, category) come from the effect's JSON metadata file.
 //
+// Effects are grouped by a defined section order (see sectionOrder() in the
+// .cpp): the KineticWE "Animations" section holds window move/resize
+// animations (e.g. Geometry Change) and is shown right after "Appearance".
+//
 // Edits are STAGED like the other pages: toggles update an in-memory pending
 // map and nothing touches disk or the compositor until Apply. applyAll()
 // writes [Plugins] once and then tells the compositor to load/unload each
@@ -80,6 +84,7 @@ private:
     std::string category;
     bool enabledByDefault = false;
     bool internal = false;
+    std::string exclusiveGroup; // e.g. "toplevel-open-close-animation"; empty when not exclusive
   };
 
   // The discovered, sorted effect list (memoized).
@@ -103,6 +108,13 @@ private:
       Flex& parent, const Effect& effect, float scale, std::string_view armedResetKey,
       const Callbacks& callbacks
   );
+  // Renders one row (label + dropdown) for a mutually-exclusive effect group.
+  void addExclusiveGroupRow(
+      Flex& parent, const std::string& group, const std::vector<const Effect*>& members,
+      float scale, const Callbacks& callbacks
+  );
+  // Stages enabling exactly one member (or none) of an exclusive group.
+  void stageGroup(const std::vector<const Effect*>& members, const Effect* selected);
 
   CompositorDbus m_dbus;
   KineticweKwe m_config;

@@ -752,6 +752,21 @@ fi
 
 
 # ---------------------------------------------------------------------------
+# 4g. The compositor redirects XDG_CONFIG_HOME to the kineticwe root, so its
+#     QML theme stack (Kirigami/Plasma.Theme -> KColorScheme -> "kdeglobals")
+#     resolves kdeglobals inside the root — where none exists — and falls back
+#     to Breeze Light for the Overview/Grid View and other QML effects. The
+#     C++ side already opens the shared file by path (kineticweKdeGlobalsPath),
+#     but QML uses the standard config location. Symlink the shared kdeglobals
+#     into the root so both agree on the single source of truth. A symlink is
+#     not a mirror: atomic renames of the real file stay visible through it.
+# ---------------------------------------------------------------------------
+if [[ ! -e "$KWE_CONFIG_HOME/kdeglobals" && ! -L "$KWE_CONFIG_HOME/kdeglobals" ]]; then
+    ln -s "$KWE_REAL_CONFIG_HOME/kdeglobals" "$KWE_CONFIG_HOME/kdeglobals"
+fi
+
+
+# ---------------------------------------------------------------------------
 # 5. Start kinetic-we (the compositor) and wait for its Wayland socket.
 #    Only the compositor process gets XDG_CONFIG_HOME pointed at the kineticwe
 #    root (per-command env prefix); everything else in the session keeps the

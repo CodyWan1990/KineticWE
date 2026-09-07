@@ -1,0 +1,5 @@
+File=geometrychange.kcfg
+ClassName=GeometryChangeConfig
+NameSpace=KWin
+Singleton=true
+Mutators=true

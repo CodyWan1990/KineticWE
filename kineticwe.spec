@@ -167,6 +167,7 @@ BuildRequires:  stb_image_write-devel
 # Runtime dependencies (for the installed package)
 Requires:       qt6-qtbase
 Requires:       qt6-qtdeclarative
+Requires:       qt6-qt5compat
 Requires:       qt6-qtsvg
 Requires:       qt6-qtwayland
 Requires:       kf6-kglobalaccel

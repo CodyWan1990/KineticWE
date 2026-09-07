@@ -109,6 +109,16 @@ PORTAL_QML_PKGS=(
     kf6-kdeclarative
 )
 
+# QML runtime modules the compositor's built-in effects load (Overview/Grid
+# View, Window View, Tiles Editor). Resolved by the QML engine at runtime,
+# so ldd cannot see them; install them explicitly so grid view, overview,
+# window view and the tiling editor work on a fresh host.
+KWIN_QML_PKGS=(
+    plasma-milou          # org.kde.milou (Overview/Grid View search results)
+    libplasma             # org.kde.plasma.components / org.kde.plasma.extras
+    qt6-qt5compat         # Qt5Compat.GraphicalEffects (FastBlur)
+)
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -197,14 +207,15 @@ verify_resolved() {
 }
 
 # Install the default session packages (Breeze icon theme, Breeze cursor theme,
-# Qt5/Qt6 configuration tools, Xwayland, portal QML modules, Alacritty) on a
-# fresh host. Skips anything already installed, so re-runs are no-ops. This is
-# what makes a fresh-from-TTY install come up with icons, a cursor theme, Qt
-# theming, a working X server and a terminal instead of a bare desktop.
+# Qt5/Qt6 configuration tools, Xwayland, portal and compositor QML modules,
+# Alacritty) on a fresh host. Skips anything already installed, so re-runs are
+# no-ops. This is what makes a fresh-from-TTY install come up with icons, a
+# cursor theme, Qt theming, working grid view/overview/window view/tiling
+# editor effects, a working X server and a terminal instead of a bare desktop.
 install_default_session_packages() {
     local -a missing=()
     local pkg
-    for pkg in "${DEFAULT_RPM_PKGS[@]}" "${PORTAL_QML_PKGS[@]}"; do
+    for pkg in "${DEFAULT_RPM_PKGS[@]}" "${PORTAL_QML_PKGS[@]}" "${KWIN_QML_PKGS[@]}"; do
         if [[ "$PM" == dnf ]]; then
             if ! rpm -q "$pkg" &>/dev/null; then
                 missing+=("$pkg")
@@ -218,7 +229,7 @@ install_default_session_packages() {
         return 0
     fi
     echo
-    info "Fresh host: installing default session packages (Breeze icons, cursor theme, Qt tools, Xwayland, portal QML modules, terminal):"
+    info "Fresh host: installing default session packages (Breeze icons, cursor theme, Qt tools, Xwayland, portal/compositor QML modules, terminal):"
     printf '    %s\n' "${missing[@]}"
     if [[ "$PM" == dnf ]]; then
         sudo dnf install -y "${missing[@]}"

@@ -21,6 +21,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -172,6 +173,54 @@ namespace {
     });
   }
 
+  // The order in which effect categories are presented on the page. "Animations"
+  // is a KineticWE grouping for window move/resize animations (e.g. Geometry
+  // Change) and is shown right after "Appearance". Categories absent from this
+  // list sort last (preserving their alphabetical ordering).
+  const std::vector<std::string>& sectionOrder() {
+    static const std::vector<std::string> kOrder{
+        "Accessibility",
+        "Appearance",
+        "Animations",
+        "Focus",
+        "Show Desktop Animation",
+        "Tools",
+        "Virtual Desktop Switching Animation",
+        "Window Management",
+        "Window Open/Close Animation",
+    };
+    return kOrder;
+  }
+
+  [[nodiscard]] int sectionRank(const std::string& category) {
+    const auto& order = sectionOrder();
+    const auto it = std::find(order.begin(), order.end(), category);
+    if (it == order.end()) {
+      return static_cast<int>(order.size()); // unknown categories sort last
+    }
+    return static_cast<int>(std::distance(order.begin(), it));
+  }
+
+  // Human-readable labels for the mutually-exclusive effect groups.
+  struct GroupInfo {
+    std::string_view title;
+    std::string_view description;
+  };
+  [[nodiscard]] const GroupInfo* exclusiveGroupInfo(std::string_view group) {
+    static const std::map<std::string_view, GroupInfo> kGroups{
+        {"toplevel-open-close-animation", {"Open/Close Animation", "Animation for windows being opened or closed"}},
+        {"desktop-animations", {"Desktop Switching Animation", "Animation when switching virtual desktops"}},
+        {"minimize", {"Minimize Animation", "Animation when windows are minimized"}},
+        {"magnifiers", {"Magnifier", "Screen magnifier zoom effect"}},
+        {"show-desktop", {"Show Desktop Animation", "Animation for showing the desktop"}},
+    };
+    const auto it = kGroups.find(group);
+    if (it != kGroups.end()) {
+      return &it->second;
+    }
+    return nullptr;
+  }
+
 } // namespace
 
 DesktopEffectsPage::DesktopEffectsPage(SessionBus& bus) : m_dbus(bus) {}
@@ -239,6 +288,15 @@ std::vector<DesktopEffectsPage::Effect> DesktopEffectsPage::discoverEffects() {
     const bool internal = readBool(effectInfo, "internal", false)
                        || readBool(meta, "X-KWin-Internal", false);
 
+    // Effects can belong to a mutually-exclusive group (only one may be enabled
+    // at a time), e.g. the open/close or desktop-switching animations. KWin
+    // marks these with X-KWin-Exclusive-Category (scripted) or the
+    // org.kde.kwin.effect.exclusiveGroup key (builtin).
+    std::string exclusiveGroup = meta.value("X-KWin-Exclusive-Category", std::string());
+    if (exclusiveGroup.empty()) {
+      exclusiveGroup = effectInfo.value("exclusiveGroup", std::string());
+    }
+
     effects.push_back(Effect{
         .name = name,
         .title = plugin.value("Name", name),
@@ -246,6 +304,7 @@ std::vector<DesktopEffectsPage::Effect> DesktopEffectsPage::discoverEffects() {
         .category = plugin.value("Category", std::string("Miscellaneous")),
         .enabledByDefault = readBool(plugin, "EnabledByDefault", false),
         .internal = internal,
+        .exclusiveGroup = exclusiveGroup,
     });
   };
 
@@ -284,10 +343,15 @@ std::vector<DesktopEffectsPage::Effect> DesktopEffectsPage::discoverEffects() {
   }
 
   std::sort(effects.begin(), effects.end(), [](const Effect& a, const Effect& b) {
-    if (a.category != b.category) {
-      return a.category < b.category;
+    const int rankA = sectionRank(a.category);
+    const int rankB = sectionRank(b.category);
+    if (rankA != rankB) {
+      return rankA < rankB;
     }
-    return a.title < b.title;
+    if (a.title != b.title) {
+      return a.title < b.title;
+    }
+    return a.name < b.name;
   });
 
   return effects;
@@ -504,6 +568,97 @@ void DesktopEffectsPage::addEffectRow(
   parent.addChild(std::move(row));
 }
 
+void DesktopEffectsPage::addExclusiveGroupRow(
+    Flex& parent, const std::string& group, const std::vector<const Effect*>& members,
+    float scale, const Callbacks& callbacks
+) {
+  const GroupInfo* info = exclusiveGroupInfo(group);
+  const std::string title = info != nullptr ? std::string(info->title) : group;
+  const std::string description = info != nullptr ? std::string(info->description) : std::string();
+
+  // Dropdown options: a "None" entry (index 0) then one entry per member.
+  std::vector<std::string> options;
+  options.reserve(members.size() + 1);
+  options.push_back("None");
+  for (const Effect* member : members) {
+    options.push_back(member->title);
+  }
+
+  // The currently-enabled member (first one wins); index 0 means none.
+  std::size_t selectedIndex = 0;
+  for (std::size_t i = 0; i < members.size(); ++i) {
+    if (effectiveEnabled(*members[i])) {
+      selectedIndex = i + 1;
+      break;
+    }
+  }
+
+  auto titleRow = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+  });
+  titleRow->addChild(
+      makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold)
+  );
+  titleRow->addChild(ui::spacer());
+
+  auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
+  copy->addChild(std::move(titleRow));
+  if (!description.empty()) {
+    copy->addChild(ui::label({
+        .text = description,
+        .fontSize = Style::fontSizeCaption * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        .maxLines = kSettingDescriptionMaxLines,
+    }));
+  }
+
+  auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  actions->addChild(ui::select({
+      .options = std::move(options),
+      .selectedIndex = selectedIndex,
+      .fontSize = Style::fontSizeBody * scale,
+      .controlHeight = Style::controlHeightSm * scale,
+      .glyphSize = Style::fontSizeBody * scale,
+      .width = 150.0F * scale,
+      .height = Style::controlHeightSm * scale,
+      .onSelectionChanged = [this, members, callbacks](std::size_t index, std::string_view /*label*/) {
+        const Effect* selected = nullptr;
+        if (index > 0 && index <= members.size()) {
+          selected = members[index - 1];
+        }
+        stageGroup(members, selected);
+        if (callbacks.requestRebuild) {
+          callbacks.requestRebuild();
+        }
+      },
+  }));
+
+  auto row = ui::row(
+      {.align = FlexAlign::Center,
+       .justify = FlexJustify::SpaceBetween,
+       .gap = Style::spaceXs * scale,
+       .paddingV = 2.0F * scale,
+       .fillWidth = true}
+  );
+  row->addChild(std::move(copy));
+  row->addChild(std::move(actions));
+  parent.addChild(std::move(row));
+}
+
+void DesktopEffectsPage::stageGroup(const std::vector<const Effect*>& members, const Effect* selected) {
+  ensureLoaded();
+  for (const Effect* member : members) {
+    const bool value = (member == selected);
+    if (value == fileBackedEnabled(*member)) {
+      m_pending.erase(member->name);
+    } else {
+      m_pending[member->name] = value;
+    }
+  }
+}
+
 std::unique_ptr<Node> DesktopEffectsPage::build(
     float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
 ) {
@@ -527,9 +682,31 @@ std::unique_ptr<Node> DesktopEffectsPage::build(
       makeLabel("Desktop Effects", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
   ));
 
+  // Precompute mutually-exclusive groups that have >= 2 visible members so they
+  // can be rendered as a single dropdown instead of individual toggles.
+  std::map<std::string, std::vector<const Effect*>> exclusiveGroups;
+  std::set<std::string> groupedEffectNames;
+  for (const Effect* effect : visibleEffects()) {
+    if (effect->exclusiveGroup.empty()) {
+      continue;
+    }
+    exclusiveGroups[effect->exclusiveGroup].push_back(effect);
+  }
+  for (auto it = exclusiveGroups.begin(); it != exclusiveGroups.end();) {
+    if (it->second.size() < 2) {
+      it = exclusiveGroups.erase(it);
+    } else {
+      for (const Effect* member : it->second) {
+        groupedEffectNames.insert(member->name);
+      }
+      ++it;
+    }
+  }
+
   bool anyRows = false;
   bool firstGroup = true;
   std::string_view lastCategory;
+  std::string lastRenderedGroup;
   const auto addGroupHeader = [&](std::string_view title) {
     if (title.empty()) {
       return;
@@ -558,8 +735,16 @@ std::unique_ptr<Node> DesktopEffectsPage::build(
       lastCategory = effect->category;
       addGroupHeader(lastCategory);
     }
-    addEffectRow(*root, *effect, scale, armedResetKey, callbacks);
-    anyRows = true;
+    if (groupedEffectNames.contains(effect->name)) {
+      if (lastRenderedGroup != effect->exclusiveGroup) {
+        lastRenderedGroup = effect->exclusiveGroup;
+        addExclusiveGroupRow(*root, effect->exclusiveGroup, exclusiveGroups[effect->exclusiveGroup], scale, callbacks);
+        anyRows = true;
+      }
+    } else {
+      addEffectRow(*root, *effect, scale, armedResetKey, callbacks);
+      anyRows = true;
+    }
   }
 
   if (!anyRows) {

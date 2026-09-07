@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Category": "Animations",
+        "Description": "Animation for windows being moved or resized by programs or scripts",
+        "EnabledByDefault": true,
+        "Icon": "preferences-system-windows-effect-geometry-change",
+        "Id": "geometrychange",
+        "License": "GPLv3",
+        "Name": "Geometry Change",
+        "Version": "1.0"
+    },
+    "X-KDE-ConfigModule": "kwin_geometrychange_config"
+}
