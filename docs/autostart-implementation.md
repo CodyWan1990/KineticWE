@@ -8,7 +8,7 @@ Get the System Settings → Autostart KCM working with KineticWE. Currently the 
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| Autostart KCM (`kcm_autostart.so`) | `/usr/lib64/qt6/plugins/plasma/kcms/systemsettings/` | ✅ Installed (from `plasma-workspace`) |
+| Autostart KCM (`kcm_autostart.so`) | `/usr/lib64/qt6/plugins/plasma/kcms/systemsettings/` | ⚠️ From `plasma-workspace` (not a KineticWE dep; install separately if needed) |
 | User autostart dir | `~/.config/autostart/` | ✅ Writable |
 | System autostart dir | `/etc/xdg/autostart/` | ✅ Has entries |
 | `systemd-xdg-autostart-generator` | `/usr/lib/systemd/user-generators/` | ✅ Available |

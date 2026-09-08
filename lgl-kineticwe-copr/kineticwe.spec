@@ -141,11 +141,10 @@ BuildRequires:  nlohmann-json-devel
 BuildRequires:  stb_image_resize2-devel
 BuildRequires:  stb_image_write-devel
 
-Requires:       plasma-workspace
 Requires:       plasma-milou
 Requires:       aurorae
 Requires:       plasma-breeze
-Requires:       kscreen
+Requires:       breeze-icons
 Requires:       kineticwe-noctalia
 Requires:       xorg-x11-server-Xwayland
 Requires:       hwdata

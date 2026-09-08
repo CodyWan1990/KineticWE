@@ -180,11 +180,10 @@ Requires:       kwayland
 Requires:       kscreenlocker
 Requires:       knighttime
 Requires:       libplasma
-Requires:       plasma-workspace
 Requires:       plasma-milou
 Requires:       aurorae
 Requires:       plasma-breeze
-Requires:       kscreen
+Requires:       breeze-icons
 Requires:       qaccessibilityclient-qt6
 Requires:       xorg-x11-server-Xwayland
 Requires:       hwdata

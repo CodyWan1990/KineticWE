@@ -12,10 +12,13 @@ namespace {
   const sdbus::ObjectPath kTilingPath{"/Tiling"};
   const sdbus::ObjectPath kVirtualDesktopsPath{"/VirtualDesktopManager"};
   const sdbus::ObjectPath kEffectsPath{"/Effects"};
+  const sdbus::ObjectPath kInputDevicesPath{"/org/kde/KWin/InputDevice"};
   constexpr auto kKwinInterface = "org.kde.KWin";
   constexpr auto kTilingInterface = "org.kde.KWin.Tiling";
   constexpr auto kVirtualDesktopsInterface = "org.kde.KWin.VirtualDesktopManager";
   constexpr auto kEffectsInterface = "org.kde.kwin.Effects";
+  constexpr auto kInputDeviceManagerInterface = "org.kde.KWin.InputDeviceManager";
+  constexpr auto kInputDeviceInterface = "org.kde.KWin.InputDevice";
 
   const Logger kLog("kinetic-settings");
 
@@ -273,5 +276,98 @@ void CompositorDbus::setVirtualDesktopRows(std::uint32_t rows) {
     proxy->setProperty("rows").onInterface(kVirtualDesktopsInterface).toValue(rows);
   } catch (const sdbus::Error& e) {
     kLog.warn("kwin set rows failed: {}", e.what());
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Input devices (org.kde.KWin.InputDeviceManager / org.kde.KWin.InputDevice).
+// ---------------------------------------------------------------------------
+
+std::vector<CompositorDbus::InputDeviceInfo> CompositorDbus::inputDevices() {
+  std::vector<InputDeviceInfo> out;
+  try {
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, kInputDevicesPath);
+    std::vector<std::string> sysNames;
+    proxy->callMethod("ListPointers").onInterface(kInputDeviceManagerInterface).storeResultsTo(sysNames);
+    out.reserve(sysNames.size());
+    for (const auto& sysName : sysNames) {
+      InputDeviceInfo info;
+      info.sysName = sysName;
+      if (const auto name = inputDeviceString(sysName, "name"); name.has_value()) {
+        info.name = *name;
+      }
+      info.pointer = inputDeviceBool(sysName, "pointer").value_or(false);
+      info.touchpad = inputDeviceBool(sysName, "touchpad").value_or(false);
+      info.touch = inputDeviceBool(sysName, "touch").value_or(false);
+      info.vendor = inputDeviceUint(sysName, "vendor").value_or(0);
+      info.product = inputDeviceUint(sysName, "product").value_or(0);
+      if (info.name.empty()) {
+        info.name = sysName;
+      }
+      out.push_back(std::move(info));
+    }
+  } catch (const sdbus::Error& e) {
+    kLog.warn("kwin ListPointers failed: {}", e.what());
+  }
+  return out;
+}
+
+std::optional<bool> CompositorDbus::inputDeviceBool(std::string_view sysName, std::string_view property) {
+  try {
+    const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
+    return proxy->getProperty(std::string(property)).onInterface(kInputDeviceInterface).get<bool>();
+  } catch (const sdbus::Error& e) {
+    return std::nullopt;
+  }
+}
+
+std::optional<double> CompositorDbus::inputDeviceDouble(std::string_view sysName, std::string_view property) {
+  try {
+    const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
+    return proxy->getProperty(std::string(property)).onInterface(kInputDeviceInterface).get<double>();
+  } catch (const sdbus::Error& e) {
+    return std::nullopt;
+  }
+}
+
+std::optional<std::uint32_t> CompositorDbus::inputDeviceUint(std::string_view sysName, std::string_view property) {
+  try {
+    const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
+    return proxy->getProperty(std::string(property)).onInterface(kInputDeviceInterface).get<std::uint32_t>();
+  } catch (const sdbus::Error& e) {
+    return std::nullopt;
+  }
+}
+
+std::optional<std::string> CompositorDbus::inputDeviceString(std::string_view sysName, std::string_view property) {
+  try {
+    const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
+    return proxy->getProperty(std::string(property)).onInterface(kInputDeviceInterface).get<std::string>();
+  } catch (const sdbus::Error& e) {
+    return std::nullopt;
+  }
+}
+
+void CompositorDbus::setInputDeviceBool(std::string_view sysName, std::string_view property, bool value) {
+  try {
+    const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
+    proxy->setProperty(std::string(property)).onInterface(kInputDeviceInterface).toValue(value);
+  } catch (const sdbus::Error& e) {
+    kLog.warn("kwin set device property {} failed: {}", std::string(property), e.what());
+  }
+}
+
+void CompositorDbus::setInputDeviceDouble(std::string_view sysName, std::string_view property, double value) {
+  try {
+    const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
+    proxy->setProperty(std::string(property)).onInterface(kInputDeviceInterface).toValue(value);
+  } catch (const sdbus::Error& e) {
+    kLog.warn("kwin set device property {} failed: {}", std::string(property), e.what());
   }
 }

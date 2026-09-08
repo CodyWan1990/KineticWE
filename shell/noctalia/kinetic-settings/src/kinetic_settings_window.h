@@ -1,12 +1,15 @@
 #pragma once
 
+#include "kinetic-settings/src/animations_page.h"
 #include "kinetic-settings/src/appearance_page.h"
 #include "kinetic-settings/src/cursors_page.h"
 #include "kinetic-settings/src/default_apps_page.h"
 #include "kinetic-settings/src/desktop_effects_page.h"
 #include "kinetic-settings/src/display_page.h"
 #include "kinetic-settings/src/icons_page.h"
+#include "kinetic-settings/src/keyboard_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
+#include "kinetic-settings/src/pointing_devices_page.h"
 #include "kinetic-settings/src/tiling_page.h"
 #include "kinetic-settings/src/window_behavior_page.h"
 #include "kinetic-settings/src/window_rules_page.h"
@@ -77,11 +80,15 @@ private:
     AppearanceGlobalTheme,
     AppearanceIcons,
     AppearanceCursors,
+    Animations,
     DesktopEffects,
     WindowBehavior,
     Workspaces,
     Tiling,
     WindowRules,
+    Keyboard,
+    Mouse,
+    Touchpad,
     Keybinds,
     Displays,
     DefaultApps,
@@ -112,6 +119,12 @@ private:
   [[nodiscard]] WorkspacesPage::Callbacks workspacesPageCallbacks();
   [[nodiscard]] KeybindsPage::Filter keybindsFilter() const;
   [[nodiscard]] KeybindsPage::Callbacks keybindsPageCallbacks();
+  [[nodiscard]] KeyboardPage::Filter keyboardFilter() const;
+  [[nodiscard]] KeyboardPage::Callbacks keyboardPageCallbacks();
+  [[nodiscard]] PointingDevicesPage::Filter mouseFilter() const;
+  [[nodiscard]] PointingDevicesPage::Callbacks mousePageCallbacks();
+  [[nodiscard]] PointingDevicesPage::Filter touchpadFilter() const;
+  [[nodiscard]] PointingDevicesPage::Callbacks touchpadPageCallbacks();
   [[nodiscard]] WindowRulesPage::Filter windowRulesFilter() const;
   [[nodiscard]] WindowRulesPage::Callbacks windowRulesPageCallbacks();
   [[nodiscard]] WindowBehaviorPage::Filter windowBehaviorFilter() const;
@@ -124,6 +137,8 @@ private:
   [[nodiscard]] CursorsPage::Callbacks cursorsPageCallbacks();
   [[nodiscard]] DesktopEffectsPage::Filter desktopEffectsFilter() const;
   [[nodiscard]] DesktopEffectsPage::Callbacks desktopEffectsPageCallbacks();
+  [[nodiscard]] AnimationsPage::Filter animationsFilter() const;
+  [[nodiscard]] AnimationsPage::Callbacks animationsPageCallbacks();
   [[nodiscard]] DefaultAppsPage::Filter defaultAppsFilter() const;
   [[nodiscard]] DefaultAppsPage::Callbacks defaultAppsPageCallbacks();
   [[nodiscard]] DisplayPage::Filter displayFilter() const;
@@ -148,6 +163,9 @@ private:
   std::unique_ptr<TilingPage> m_tilingPage;
   std::unique_ptr<WorkspacesPage> m_workspacesPage;
   std::unique_ptr<KeybindsPage> m_keybindsPage;
+  std::unique_ptr<KeyboardPage> m_keyboardPage;
+  std::unique_ptr<PointingDevicesPage> m_mousePage;
+  std::unique_ptr<PointingDevicesPage> m_touchpadPage;
   std::unique_ptr<WindowRulesPage> m_windowRulesPage;
   std::unique_ptr<WindowBehaviorPage> m_windowBehaviorPage;
   std::unique_ptr<DisplayPage> m_displayPage;
@@ -155,6 +173,7 @@ private:
   std::unique_ptr<IconsPage> m_iconsPage;
   std::unique_ptr<CursorsPage> m_cursorsPage;
   std::unique_ptr<DesktopEffectsPage> m_desktopEffectsPage;
+  std::unique_ptr<AnimationsPage> m_animationsPage;
   std::unique_ptr<DefaultAppsPage> m_defaultAppsPage;
   std::unique_ptr<SelectDropdownPopup> m_selectPopup;
   // Non-null only while a keybind recorder is capturing (see updateKeyboardShortcutInhibit).

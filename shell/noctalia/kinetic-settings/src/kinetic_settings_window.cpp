@@ -154,6 +154,15 @@ void KineticSettingsWindow::open() {
   if (m_keybindsPage == nullptr) {
     m_keybindsPage = std::make_unique<KeybindsPage>(*m_bus, *m_customKeybinds);
   }
+  if (m_keyboardPage == nullptr) {
+    m_keyboardPage = std::make_unique<KeyboardPage>(*m_bus);
+  }
+  if (m_mousePage == nullptr) {
+    m_mousePage = std::make_unique<PointingDevicesPage>(*m_bus, PointingDevicesPage::Kind::Mouse);
+  }
+  if (m_touchpadPage == nullptr) {
+    m_touchpadPage = std::make_unique<PointingDevicesPage>(*m_bus, PointingDevicesPage::Kind::Touchpad);
+  }
   if (m_windowRulesPage == nullptr) {
     m_windowRulesPage = std::make_unique<WindowRulesPage>(*m_bus, *m_wayland);
   }
@@ -180,18 +189,25 @@ void KineticSettingsWindow::open() {
   if (m_desktopEffectsPage == nullptr) {
     m_desktopEffectsPage = std::make_unique<DesktopEffectsPage>(*m_bus);
   }
+  if (m_animationsPage == nullptr) {
+    m_animationsPage = std::make_unique<AnimationsPage>(*m_bus);
+  }
   if (m_defaultAppsPage == nullptr) {
     m_defaultAppsPage = std::make_unique<DefaultAppsPage>();
   }
   m_tilingPage->reloadFromDisk();
   m_workspacesPage->reloadFromDisk();
   m_keybindsPage->reloadFromDisk();
+  m_keyboardPage->reloadFromDisk();
+  m_mousePage->reloadFromDisk();
+  m_touchpadPage->reloadFromDisk();
   m_windowRulesPage->reloadFromDisk();
   m_windowBehaviorPage->reloadFromDisk();
   m_appearancePage->reloadFromDisk();
   m_iconsPage->reloadFromDisk();
   m_cursorsPage->reloadFromDisk();
   m_desktopEffectsPage->reloadFromDisk();
+  m_animationsPage->reloadFromDisk();
   m_defaultAppsPage->reloadFromDisk();
   m_displayPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
@@ -407,6 +423,93 @@ KeybindsPage::Callbacks KineticSettingsWindow::keybindsPageCallbacks() {
   };
 }
 
+KeyboardPage::Filter KineticSettingsWindow::keyboardFilter() const {
+  return KeyboardPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+KeyboardPage::Callbacks KineticSettingsWindow::keyboardPageCallbacks() {
+  return KeyboardPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_keyboardPage != nullptr) {
+              m_keyboardPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
+PointingDevicesPage::Filter KineticSettingsWindow::mouseFilter() const {
+  return PointingDevicesPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+PointingDevicesPage::Callbacks KineticSettingsWindow::mousePageCallbacks() {
+  return PointingDevicesPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_mousePage != nullptr) {
+              m_mousePage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
+PointingDevicesPage::Filter KineticSettingsWindow::touchpadFilter() const {
+  return PointingDevicesPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+PointingDevicesPage::Callbacks KineticSettingsWindow::touchpadPageCallbacks() {
+  return PointingDevicesPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_touchpadPage != nullptr) {
+              m_touchpadPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 WindowRulesPage::Filter KineticSettingsWindow::windowRulesFilter() const {
   return WindowRulesPage::Filter{
       .searchQuery = m_searchQuery,
@@ -570,6 +673,35 @@ DesktopEffectsPage::Callbacks KineticSettingsWindow::desktopEffectsPageCallbacks
   };
 }
 
+AnimationsPage::Filter KineticSettingsWindow::animationsFilter() const {
+  return AnimationsPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+AnimationsPage::Callbacks KineticSettingsWindow::animationsPageCallbacks() {
+  return AnimationsPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_animationsPage != nullptr) {
+              m_animationsPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 DefaultAppsPage::Filter KineticSettingsWindow::defaultAppsFilter() const {
   return DefaultAppsPage::Filter{
       .searchQuery = m_searchQuery,
@@ -650,6 +782,9 @@ void KineticSettingsWindow::applyActivePage() {
   case ActivePage::AppearanceCursors:
     applied = m_cursorsPage != nullptr && m_cursorsPage->applyAll();
     break;
+  case ActivePage::Animations:
+    applied = m_animationsPage != nullptr && m_animationsPage->applyAll();
+    break;
   case ActivePage::DesktopEffects:
     applied = m_desktopEffectsPage != nullptr && m_desktopEffectsPage->applyAll();
     break;
@@ -664,6 +799,15 @@ void KineticSettingsWindow::applyActivePage() {
     break;
   case ActivePage::Workspaces:
     applied = m_workspacesPage != nullptr && m_workspacesPage->applyAll();
+    break;
+  case ActivePage::Keyboard:
+    applied = m_keyboardPage != nullptr && m_keyboardPage->applyAll();
+    break;
+  case ActivePage::Touchpad:
+    applied = m_touchpadPage != nullptr && m_touchpadPage->applyAll();
+    break;
+  case ActivePage::Mouse:
+    applied = m_mousePage != nullptr && m_mousePage->applyAll();
     break;
   case ActivePage::Keybinds:
     applied = m_keybindsPage != nullptr && m_keybindsPage->applyAll();
@@ -704,6 +848,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_cursorsPage->resetAll();
     }
     break;
+  case ActivePage::Animations:
+    if (m_animationsPage != nullptr) {
+      m_animationsPage->resetAll();
+    }
+    break;
   case ActivePage::DesktopEffects:
     if (m_desktopEffectsPage != nullptr) {
       m_desktopEffectsPage->resetAll();
@@ -727,6 +876,21 @@ void KineticSettingsWindow::resetActivePage() {
   case ActivePage::Workspaces:
     if (m_workspacesPage != nullptr) {
       m_workspacesPage->resetAll();
+    }
+    break;
+  case ActivePage::Keyboard:
+    if (m_keyboardPage != nullptr) {
+      m_keyboardPage->resetAll();
+    }
+    break;
+  case ActivePage::Touchpad:
+    if (m_touchpadPage != nullptr) {
+      m_touchpadPage->resetAll();
+    }
+    break;
+  case ActivePage::Mouse:
+    if (m_mousePage != nullptr) {
+      m_mousePage->resetAll();
     }
     break;
   case ActivePage::Keybinds:
@@ -755,6 +919,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_iconsPage != nullptr && m_iconsPage->hasPending();
   case ActivePage::AppearanceCursors:
     return m_cursorsPage != nullptr && m_cursorsPage->hasPending();
+  case ActivePage::Animations:
+    return m_animationsPage != nullptr && m_animationsPage->hasPending();
   case ActivePage::DesktopEffects:
     return m_desktopEffectsPage != nullptr && m_desktopEffectsPage->hasPending();
   case ActivePage::Tiling:
@@ -765,6 +931,12 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_windowBehaviorPage != nullptr && m_windowBehaviorPage->hasPending();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && m_workspacesPage->hasPending();
+  case ActivePage::Keyboard:
+    return m_keyboardPage != nullptr && m_keyboardPage->hasPending();
+  case ActivePage::Touchpad:
+    return m_touchpadPage != nullptr && m_touchpadPage->hasPending();
+  case ActivePage::Mouse:
+    return m_mousePage != nullptr && m_mousePage->hasPending();
   case ActivePage::Keybinds:
     return m_keybindsPage != nullptr && m_keybindsPage->hasPending();
   case ActivePage::Displays:
@@ -783,6 +955,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_iconsPage != nullptr && !m_iconsPage->resettableKeyPaths().empty();
   case ActivePage::AppearanceCursors:
     return m_cursorsPage != nullptr && !m_cursorsPage->resettableKeyPaths().empty();
+  case ActivePage::Animations:
+    return m_animationsPage != nullptr && !m_animationsPage->resettableKeyPaths().empty();
   case ActivePage::DesktopEffects:
     return m_desktopEffectsPage != nullptr && !m_desktopEffectsPage->resettableKeyPaths().empty();
   case ActivePage::Tiling:
@@ -793,6 +967,12 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_windowBehaviorPage != nullptr && !m_windowBehaviorPage->resettableKeyPaths().empty();
   case ActivePage::Workspaces:
     return m_workspacesPage != nullptr && !m_workspacesPage->resettableKeyPaths().empty();
+  case ActivePage::Keyboard:
+    return m_keyboardPage != nullptr && !m_keyboardPage->resettableKeyPaths().empty();
+  case ActivePage::Touchpad:
+    return m_touchpadPage != nullptr && !m_touchpadPage->resettableKeyPaths().empty();
+  case ActivePage::Mouse:
+    return m_mousePage != nullptr && !m_mousePage->resettableKeyPaths().empty();
   case ActivePage::Keybinds:
     return m_keybindsPage != nullptr && !m_keybindsPage->resettableKeyPaths().empty();
   case ActivePage::Displays:
@@ -993,6 +1173,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     addSubNav(ActivePage::AppearanceGlobalTheme, "palette", "Global Theme");
     addSubNav(ActivePage::AppearanceIcons, "apps", "Icons");
     addSubNav(ActivePage::AppearanceCursors, "mouse-2", "Cursors");
+    addSubNav(ActivePage::Animations, "movie", "Animations");
     addSubNav(ActivePage::DesktopEffects, "sparkles", "Desktop Effects");
   }
 
@@ -1002,6 +1183,9 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     requestSceneRebuild();
   });
   if (m_inputOutputExpanded) {
+    addSubNav(ActivePage::Keyboard, "keyboard", "Keyboard");
+    addSubNav(ActivePage::Mouse, "mouse", "Mouse");
+    addSubNav(ActivePage::Touchpad, "mouse-2", "Touchpad");
     addSubNav(ActivePage::Keybinds, "keyboard", "Keybinds");
     addSubNav(ActivePage::Displays, "device-desktop", "Displays");
   }
@@ -1057,6 +1241,13 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
       );
     }
     break;
+  case ActivePage::Animations:
+    if (m_animationsPage != nullptr) {
+      m_pageContainer->addChild(
+          m_animationsPage->build(uiScale(), animationsFilter(), m_armedResetKeyPath, animationsPageCallbacks())
+      );
+    }
+    break;
   case ActivePage::DesktopEffects:
     if (m_desktopEffectsPage != nullptr) {
       m_pageContainer->addChild(
@@ -1101,6 +1292,27 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
           m_windowBehaviorPage->build(
               uiScale(), windowBehaviorFilter(), m_armedResetKeyPath, windowBehaviorPageCallbacks()
           )
+      );
+    }
+    break;
+  case ActivePage::Keyboard:
+    if (m_keyboardPage != nullptr) {
+      m_pageContainer->addChild(
+          m_keyboardPage->build(uiScale(), keyboardFilter(), m_armedResetKeyPath, keyboardPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::Touchpad:
+    if (m_touchpadPage != nullptr) {
+      m_pageContainer->addChild(
+          m_touchpadPage->build(uiScale(), touchpadFilter(), m_armedResetKeyPath, touchpadPageCallbacks())
+      );
+    }
+    break;
+  case ActivePage::Mouse:
+    if (m_mousePage != nullptr) {
+      m_pageContainer->addChild(
+          m_mousePage->build(uiScale(), mouseFilter(), m_armedResetKeyPath, mousePageCallbacks())
       );
     }
     break;

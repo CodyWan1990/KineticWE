@@ -94,12 +94,11 @@ from ELF metadata.
 
 Likely explicit runtime dependencies:
 
-- `plasma-workspace`
+- `breeze-icons`
 - `xorg-x11-server-Xwayland`
 - `xdg-desktop-portal`
 - `xdg-desktop-portal-kwe`
 - `hwdata`
-- `kscreen`
 - `aurorae`
 - `plasma-breeze`
 - `plasma-milou`

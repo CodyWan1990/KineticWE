@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kinetic-settings/src/compositor_dbus.h"
+#include "kinetic-settings/src/effects_catalog.h"
 #include "kinetic-settings/src/kineticwe_kwe.h"
 
 #include <cstddef>
@@ -15,17 +16,13 @@ class Flex;
 class Node;
 
 // The Desktop Effects settings page: lists the compositor's desktop effects
-// (builtin effects discovered from kwin-wayland/builtin-effects/*.json plus
-// bundled scripted effects from kwin-wayland/effects) and lets the user toggle
-// them on/off. Third-party "Get New Effects" (KNewStuff) packages installed
-// under kwin/effects are intentionally not listed. Each effect maps to a
-// [Plugins] <name>Enabled key
-// in kineticwe.kwe; the compiled-in default and display metadata (title,
-// description, category) come from the effect's JSON metadata file.
-//
-// Effects are grouped by a defined section order (see sectionOrder() in the
-// .cpp): the KineticWE "Animations" section holds window move/resize
-// animations (e.g. Geometry Change) and is shown right after "Appearance".
+// and lets the user toggle them on/off. Effect discovery is shared with the
+// Animations page via effects_catalog; this page shows every user-facing
+// effect EXCEPT the animation ones (animation-type selectors and the
+// move/resize "Geometry Change" effect, which live on the Animations page).
+// Each effect maps to a [Plugins] <name>Enabled key in kineticwe.kwe; the
+// compiled-in default and display metadata (title, description, category)
+// come from the effect's JSON metadata file.
 //
 // Edits are STAGED like the other pages: toggles update an in-memory pending
 // map and nothing touches disk or the compositor until Apply. applyAll()
@@ -77,24 +74,7 @@ public:
   }
 
 private:
-  struct Effect {
-    std::string name;        // plugin id, e.g. "blur" — also the [Plugins] key stem
-    std::string title;       // display name from JSON ("Blur")
-    std::string description;
-    std::string category;
-    bool enabledByDefault = false;
-    bool internal = false;
-    std::string exclusiveGroup; // e.g. "toplevel-open-close-animation"; empty when not exclusive
-  };
-
-  // The discovered, sorted effect list (memoized).
-  [[nodiscard]] static const std::vector<Effect>& effects();
-  [[nodiscard]] static std::vector<Effect> discoverEffects();
-  // Effects the page actually shows (non-internal, not on the exclusion list).
-  [[nodiscard]] static bool isVisible(const Effect& effect);
-  [[nodiscard]] static std::vector<const Effect*> visibleEffects();
-  [[nodiscard]] static std::string keyPath(const Effect& effect);
-  [[nodiscard]] static const Effect* findEffect(std::string_view keyPath);
+  using Effect = effects_catalog::Effect;
 
   void ensureLoaded();
   [[nodiscard]] bool fileBackedEnabled(const Effect& effect) const;

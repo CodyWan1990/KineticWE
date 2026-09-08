@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class SessionBus;
@@ -86,9 +88,7 @@ public:
   // Live virtual-desktop (workspace) state: desktops(), rows(). Reading a
   // failed/unreachable compositor yields an empty list / 0.
   [[nodiscard]] std::vector<VirtualDesktopInfo> virtualDesktops();
-  [[nodiscard]] std::uint32_t virtualDesktopRows();
-
-  // Creates a workspace at `position` (0-based, appends when it equals the
+  [[nodiscard]] std::uint32_t virtualDesktopRows();  // Creates a workspace at `position` (0-based, appends when it equals the
   // current count) with the given name. The compositor generates the id and
   // persists the change to the config file itself.
   void createDesktop(std::uint32_t position, const std::string& name);
@@ -99,6 +99,36 @@ public:
   // setRows does not call save(), so without this the layout would not survive
   // a restart.
   void setVirtualDesktopRows(std::uint32_t rows);
+
+  // Input devices. The compositor exposes its libinput devices over D-Bus
+  // (org.kde.KWin.InputDevice at /org/kde/KWin/InputDevice/<sysName>); the
+  // manager object lists them. Only the pointer-capable devices (which include
+  // touchpads) are enumerated here — that is what the Mouse settings page needs.
+  struct InputDeviceInfo {
+    std::string sysName;
+    std::string name;
+    bool pointer = false;
+    bool touchpad = false;
+    bool touch = false;
+    std::uint32_t vendor = 0;
+    std::uint32_t product = 0;
+  };
+
+  [[nodiscard]] std::vector<InputDeviceInfo> inputDevices();
+
+  // Typed read of one exported device property (org.kde.KWin.InputDevice).
+  // Returns std::nullopt when the compositor / device is unreachable or the
+  // property is absent.
+  [[nodiscard]] std::optional<bool> inputDeviceBool(std::string_view sysName, std::string_view property);
+  [[nodiscard]] std::optional<double> inputDeviceDouble(std::string_view sysName, std::string_view property);
+  [[nodiscard]] std::optional<std::uint32_t> inputDeviceUint(std::string_view sysName, std::string_view property);
+  [[nodiscard]] std::optional<std::string> inputDeviceString(std::string_view sysName, std::string_view property);
+
+  // Writes one device property. The compositor's setter persists the value to
+  // its input config and applies it to libinput live, so no reconfigure is
+  // needed afterwards.
+  void setInputDeviceBool(std::string_view sysName, std::string_view property, bool value);
+  void setInputDeviceDouble(std::string_view sysName, std::string_view property, double value);
 
 private:
   SessionBus& m_bus;
