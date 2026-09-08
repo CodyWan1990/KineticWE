@@ -8,6 +8,7 @@
 #include "ui/controls/flex.h"
 #include "ui/controls/glyph.h"
 #include "ui/controls/label.h"
+#include "ui/controls/select.h"
 #include "ui/controls/separator.h"
 #include "ui/controls/stepper.h"
 #include "ui/controls/toggle.h"
@@ -134,6 +135,16 @@ const std::vector<KeyboardPage::Field>& KeyboardPage::fields() {
           .step = 1,
           .valueSuffix = " repeats/s",
       },
+      Field{
+          .key = "NumLock",
+          .title = "Num lock",
+          .subtitle = "State of the Num Lock key when the session starts",
+          .isToggle = false,
+          .isSelect = true,
+          .selectValues = {0, 1, 2},   // ON, OFF, UNCHANGED (see src/xkb.cpp)
+          .selectLabels = {"On", "Off", "Leave unchanged"},
+          .fallback = Value{2},
+      },
   };
   return table;
 }
@@ -163,6 +174,9 @@ void KeyboardPage::ensureLoaded() {
 }
 
 KeyboardPage::Value KeyboardPage::fileBackedValue(const Field& field) const {
+  if (field.isSelect) {
+    return Value{m_config.readInt("Keyboard", field.key, std::get<int>(field.fallback))};
+  }
   if (field.isToggle) {
     const bool repeat = m_config.readString("Keyboard", field.key).value_or("repeat") == "repeat";
     return Value{repeat};
@@ -237,6 +251,16 @@ bool KeyboardPage::hasPending() const noexcept {
 }
 
 void KeyboardPage::writeValue(const Field& field, const Value& value) {
+  if (field.isSelect) {
+    const int setting = std::get<int>(value);
+    if (setting == std::get<int>(field.fallback)) {
+      // Back to the compositor default ("leave unchanged") keeps the file tidy.
+      m_config.removeKey("Keyboard", field.key);
+    } else {
+      m_config.setInt("Keyboard", field.key, setting);
+    }
+    return;
+  }
   if (field.isToggle) {
     const bool repeat = std::get<bool>(value);
     if (repeat == true) {
@@ -292,6 +316,31 @@ bool KeyboardPage::applyAll() {
 
 std::unique_ptr<Node>
 KeyboardPage::buildControl(const Field& field, float scale, const Callbacks& callbacks) {
+  if (field.isSelect) {
+    const int value = std::get<int>(effectiveValue(field));
+    const auto it = std::ranges::find(field.selectValues, value);
+    const bool known = it != field.selectValues.end();
+    const std::optional<std::size_t> selectedIndex =
+        known ? std::optional<std::size_t>{static_cast<std::size_t>(it - field.selectValues.begin())}
+              : std::nullopt;
+    return ui::select({
+        .options = field.selectLabels,
+        .selectedIndex = selectedIndex,
+        .clearSelection = !known,
+        .placeholder = known ? std::optional<std::string>{std::nullopt}
+                             : std::optional<std::string>{"Unknown value: " + std::to_string(value)},
+        .fontSize = Style::fontSizeBody * scale,
+        .controlHeight = Style::controlHeight * scale,
+        .glyphSize = Style::fontSizeBody * scale,
+        .width = 190.0F * scale,
+        .height = Style::controlHeight * scale,
+        .onSelectionChanged = [this, field, callbacks](std::size_t index, std::string_view /*label*/) {
+          if (index < field.selectValues.size()) {
+            stageAndRebuild(field, Value{field.selectValues[index]}, callbacks);
+          }
+        },
+    });
+  }
   if (field.isToggle) {
     const bool checked = std::get<bool>(effectiveValue(field));
     return ui::toggle({

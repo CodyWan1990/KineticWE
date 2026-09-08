@@ -202,6 +202,24 @@ const std::vector<std::string>& WindowBehaviorPage::maximizeButtonLabels() {
   static const std::vector<std::string> v{"Maximize", "Vertically maximize", "Horizontally maximize"};
   return v;
 }
+// The configurable title-bar buttons, matching the compositor's letter codes
+// (src/decorations/settings.cpp s_buttonNames) and the button labels used by the
+// stock KWin decoration KCM.
+const std::vector<WindowBehaviorPage::ButtonOption>& WindowBehaviorPage::buttonOptions() {
+  static const std::vector<ButtonOption> v{
+      {'M', "Window menu"},
+      {'N', "Application menu"},
+      {'S', "On all desktops"},
+      {'I', "Minimize"},
+      {'A', "Maximize"},
+      {'X', "Close"},
+      {'H', "Context help"},
+      {'B', "Keep below other windows"},
+      {'F', "Keep above other windows"},
+      {'E', "Hide from screenshots and screen recordings"},
+  };
+  return v;
+}
 
 const std::vector<WindowBehaviorPage::Field>& WindowBehaviorPage::fields() {
   static const std::vector<Field> table = [] {
@@ -442,6 +460,30 @@ const std::vector<WindowBehaviorPage::Field>& WindowBehaviorPage::fields() {
         .optionLabels = &maximizeButtonLabels(),
         .fallback = Value{std::string{"Maximize (horizontal only)"}},
     });
+    // Title Bar Buttons ------------------------------------------------------
+    // The compositor reads these from the [org.kde.kdecoration2] group
+    // (src/decorations/settings.cpp readDecorationButtons) as a run of single-
+    // letter button codes (M/I/A/X/S/F/B/H/E). Each side is one string field;
+    // the Buttons control renders a per-button toggle row that stages the
+    // recomposed string.
+    f.push_back(Field{
+        .group = "org.kde.kdecoration2",
+        .key = "ButtonsOnLeft",
+        .control = ControlKind::Buttons,
+        .title = "Left title bar buttons",
+        .subtitle = "Which buttons appear on the left side of the title bar",
+        .pageGroup = "Title Bar Buttons",
+        .fallback = Value{std::string{"MSE"}},
+    });
+    f.push_back(Field{
+        .group = "org.kde.kdecoration2",
+        .key = "ButtonsOnRight",
+        .control = ControlKind::Buttons,
+        .title = "Right title bar buttons",
+        .subtitle = "Which buttons appear on the right side of the title bar",
+        .pageGroup = "Title Bar Buttons",
+        .fallback = Value{std::string{"HIAX"}},
+    });
     return f;
   }();
   return table;
@@ -461,6 +503,31 @@ const WindowBehaviorPage::Field* WindowBehaviorPage::findField(std::string_view 
     }
   }
   return nullptr;
+}
+
+const WindowBehaviorPage::Field* WindowBehaviorPage::findButtonsField(std::string_view key) {
+  for (const auto& field : fields()) {
+    if (field.control == ControlKind::Buttons && field.key == key) {
+      return &field;
+    }
+  }
+  return nullptr;
+}
+
+std::string WindowBehaviorPage::toggleButton(std::string_view current, char letter, bool on) {
+  std::string out;
+  bool present = false;
+  for (const char c : current) {
+    if (c == letter) {
+      present = true;
+      continue;
+    }
+    out.push_back(c);
+  }
+  if (on && !present) {
+    out.push_back(letter);
+  }
+  return out;
 }
 
 WindowBehaviorPage::Value WindowBehaviorPage::defaultValue(const Field& field) {
@@ -713,8 +780,81 @@ WindowBehaviorPage::buildControl(const Field& field, float scale, const Callback
         },
     });
   }
+  case ControlKind::Buttons:
+    // Buttons fields are rendered by buildButtonsSection(), never through the
+    // generic row/control path.
+    break;
   }
   return ui::node({});
+}
+
+// The "Title Bar Buttons" section: two side-by-side columns (left / right), each
+// with a per-button toggle row plus a per-side Override badge and Reset. Toggling
+// a button edits one letter in that side's ButtonsOnLeft/ButtonsOnRight string via
+// stageAndRebuild, so the normal pending/Apply/reset machinery applies.
+std::unique_ptr<Node>
+WindowBehaviorPage::buildButtonsSection(
+    const Field& left, const Field& right, float scale, std::string_view armedResetKey, const Callbacks& callbacks
+) {
+  const auto buildSide = [&](const Field& side, std::string_view sideLabel) -> std::unique_ptr<Node> {
+    const std::string path = keyPath(side);
+    const bool isOverridden = overridden(side);
+
+    auto column = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * scale,
+        .flexGrow = 1.0F,
+    });
+
+    auto header = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .fillWidth = true,
+    });
+    header->addChild(makeLabel(
+        sideLabel, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+    ));
+    if (isOverridden) {
+      header->addChild(makeOverrideBadge(scale));
+      header->addChild(makeResetButton(path, armedResetKey == path, scale, callbacks));
+    }
+    header->addChild(ui::spacer());
+    column->addChild(std::move(header));
+
+    for (const auto& option : buttonOptions()) {
+      const std::string current = valueAsString(side, effectiveValue(side));
+      const bool checked = current.find(option.letter) != std::string::npos;
+
+      auto row = ui::row({
+          .align = FlexAlign::Center,
+          .justify = FlexJustify::SpaceBetween,
+          .gap = Style::spaceXs * scale,
+          .paddingV = 2.0F * scale,
+          .fillWidth = true,
+      });
+      row->addChild(ui::label({
+          .text = std::string(option.label),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+      }));
+      row->addChild(ui::toggle({
+          .checked = checked,
+          .scale = scale,
+          .onChange = [this, side, callbacks, letter = option.letter](bool on) {
+            const std::string sideString = valueAsString(side, effectiveValue(side));
+            stageAndRebuild(side, Value{toggleButton(sideString, letter, on)}, callbacks);
+          },
+      }));
+      column->addChild(std::move(row));
+    }
+    return column;
+  };
+
+  return ui::row({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceLg * scale,
+      .fillWidth = true,
+  }, buildSide(left, "Left side"), buildSide(right, "Right side"));
 }
 
 // One settings row in the exact Noctalia layout: bold title (+ Advanced badge)
@@ -816,7 +956,39 @@ std::unique_ptr<Node> WindowBehaviorPage::build(
     firstGroup = false;
   };
 
+  bool buttonsRendered = false;
   for (const auto& field : fields()) {
+    // The two Buttons fields are presented as a single side-by-side block, not as
+    // generic setting rows; render it once (on the first field) and skip both.
+    if (field.control == ControlKind::Buttons) {
+      if (!buttonsRendered) {
+        const Field* left = findButtonsField("ButtonsOnLeft");
+        const Field* right = findButtonsField("ButtonsOnRight");
+        if (left != nullptr && right != nullptr) {
+          bool sectionVisible = matchesFilter(*left, filter) || matchesFilter(*right, filter);
+          // The search field also matches individual button labels so searching
+          // "minimize" surfaces the Title Bar Buttons block.
+          if (!sectionVisible && !filter.searchQuery.empty()) {
+            for (const auto& option : buttonOptions()) {
+              if (StringUtils::containsInsensitive(option.label, filter.searchQuery)) {
+                sectionVisible = true;
+                break;
+              }
+            }
+          }
+          if (sectionVisible) {
+            if (field.pageGroup != lastGroup) {
+              lastGroup = field.pageGroup;
+              addGroupHeader(lastGroup);
+            }
+            root->addChild(buildButtonsSection(*left, *right, scale, armedResetKey, callbacks));
+            anyRows = true;
+          }
+        }
+        buttonsRendered = true;
+      }
+      continue;
+    }
     if (!matchesFilter(field, filter)) {
       continue;
     }

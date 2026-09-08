@@ -37,6 +37,14 @@ class WindowBehaviorPage {
 public:
   using Value = std::variant<bool, int, std::string>;
 
+  // One configurable title-bar button: the KDecoration letter code (the same
+  // single-run code the compositor reads in ButtonsOnLeft/ButtonsOnRight) and
+  // its user-facing label.
+  struct ButtonOption {
+    char letter;
+    std::string_view label;
+  };
+
   // Filters driven by the window chrome (search field, Advanced toggle,
   // Overridden toggle).
   struct Filter {
@@ -88,6 +96,7 @@ private:
     Toggle,
     Stepper,
     Select,
+    Buttons,
   };
 
   struct Field {
@@ -127,10 +136,17 @@ private:
   static const std::vector<std::string>& inactiveTitlebarLabels();
   static const std::vector<std::string>& maximizeButtonValues();
   static const std::vector<std::string>& maximizeButtonLabels();
+  // The configurable title-bar buttons, in display order (letter code + label).
+  static const std::vector<ButtonOption>& buttonOptions();
 
   [[nodiscard]] static Value defaultValue(const Field& field);
   [[nodiscard]] static std::string keyPath(const Field& field);
   [[nodiscard]] static const Field* findField(std::string_view keyPath);
+  // Finds the Buttons-typed field for a side key ("ButtonsOnLeft"/"ButtonsOnRight").
+  [[nodiscard]] static const Field* findButtonsField(std::string_view key);
+  // Inserts (on) or removes (off) a single letter in a button string, preserving
+  // the order of the other letters.
+  [[nodiscard]] static std::string toggleButton(std::string_view current, char letter, bool on);
   [[nodiscard]] static bool valuesEqual(const Field& field, const Value& a, const Value& b);
   [[nodiscard]] static bool equalsDefault(const Field& field, const Value& value);
   // Select helpers: map a stored Value to the string used to match an option
@@ -156,6 +172,13 @@ private:
 
   [[nodiscard]] std::unique_ptr<Node>
   buildControl(const Field& field, float scale, const Callbacks& callbacks);
+  // The dedicated "Title Bar Buttons" block: two side-by-side columns (left /
+  // right), each with a per-button toggle row plus a per-side Override badge and
+  // Reset. Both sides are edited via their ButtonsOnLeft/ButtonsOnRight fields.
+  [[nodiscard]] std::unique_ptr<Node>
+  buildButtonsSection(
+      const Field& left, const Field& right, float scale, std::string_view armedResetKey, const Callbacks& callbacks
+  );
   void addSettingRow(
       Flex& parent, const Field& field, float scale, std::string_view armedResetKey, const Callbacks& callbacks
   );

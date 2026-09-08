@@ -712,6 +712,13 @@ def main():
     _ensure(cfg("kineticwe.kwe"), "[Mouse]", "cursorTheme", "breeze_cursors")
     _ensure(cfg("kineticwe.kwe"), "[Mouse]", "cursorSize", "24")
 
+    # On NVIDIA proprietary drivers, the KWin blur effect is extremely
+    # CPU-heavy on the compositor while a blurred window is on screen, which
+    # makes the whole desktop slow. Disable blur by default there; users can
+    # re-enable it later in Kinetic Settings.
+    if os.path.exists("/proc/driver/nvidia/version"):
+        _ensure(cfg("kineticwe.kwe"), "[Plugins]", "blurEnabled", "false")
+
     # Shared Qt/KDE settings so apps see icons and the cursor and can open a
     # terminal.
     kde = os.path.join(real_config_home, "kdeglobals")

@@ -66,6 +66,9 @@ private:
     std::string_view title;
     std::string_view subtitle;
     bool isToggle = false;       // toggle; false = numeric stepper
+    bool isSelect = false;       // select (dropdown); takes precedence over isToggle/stepper
+    std::vector<int> selectValues;         // select: numeric value per option index
+    std::vector<std::string> selectLabels; // select: label per option index
     Value fallback;              // compositor's compiled-in default
     // Numeric fields (stepper):
     int minValue = 0;
