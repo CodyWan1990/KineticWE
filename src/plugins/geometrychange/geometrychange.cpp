@@ -8,7 +8,7 @@
 */
 
 // Based on the scripted kwin4_effect_geometry_change by Peter Fajdiga,
-// reimplemented as a native (compiled) effect.
+// reimplemented as a native (compiled) effect using AnimationEffect::animate().
 
 #include "geometrychange.h"
 
@@ -36,8 +36,6 @@ GeometryChangeEffect::GeometryChangeEffect()
     for (EffectWindow *window : windows) {
         slotWindowAdded(window);
     }
-
-    setVertexSnappingMode(RenderGeometry::VertexSnappingMode::None);
 }
 
 bool GeometryChangeEffect::supported()
@@ -59,68 +57,19 @@ void GeometryChangeEffect::reconfigure(ReconfigureFlags)
     }
 }
 
-void GeometryChangeEffect::prePaintScreen(ScreenPrePaintData &data)
+void GeometryChangeEffect::animationEnded(EffectWindow *w, AnimationEffect::Attribute a, uint meta)
 {
-    // Windows are transformed during the animation, so the whole screen must be
-    // repainted to avoid artefacts.
-    data.mask |= PAINT_SCREEN_WITH_TRANSFORMED_WINDOWS;
+    Q_UNUSED(a)
+    Q_UNUSED(meta)
 
-    effects->prePaintScreen(data);
-}
-
-void GeometryChangeEffect::prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data)
-{
-    auto it = m_animations.find(w);
-    if (it != m_animations.end()) {
-        it->timeLine.advance(view);
-        data.setTransformed();
-    }
-
-    effects->prePaintWindow(view, w, data);
-}
-
-void GeometryChangeEffect::apply(EffectWindow *w, int mask, WindowPaintData &data, WindowQuadList &quads)
-{
-    auto it = m_animations.constFind(w);
-    if (it == m_animations.constEnd()) {
+    auto it = m_animationInstances.find(w);
+    if (it == m_animationInstances.end()) {
         return;
     }
-
-    const qreal eased = it->timeLine.value(); // 0..1, easing applied
-    const qreal inv = 1.0 - eased;
-
-    data.setXTranslation(it->startTx * inv);
-    data.setYTranslation(it->startTy * inv);
-    data.setXScale(1.0 + (it->startSx - 1.0) * inv);
-    data.setYScale(1.0 + (it->startSy - 1.0) * inv);
-    (void)mask;
-    (void)quads;
-}
-
-void GeometryChangeEffect::postPaintScreen()
-{
-    auto it = m_animations.begin();
-    while (it != m_animations.end()) {
-        if (it->timeLine.done()) {
-            it.key()->setData(WindowForceBlurRole, QVariant());
-            unredirect(it.key());
-            it = m_animations.erase(it);
-        } else {
-            ++it;
-        }
+    if (--it.value() <= 0) {
+        w->setData(WindowForceBlurRole, QVariant());
+        m_animationInstances.erase(it);
     }
-
-    if (!m_animations.isEmpty()) {
-        effects->addRepaintFull();
-    }
-
-    // Call the next effect.
-    effects->postPaintScreen();
-}
-
-bool GeometryChangeEffect::isActive() const
-{
-    return !m_animations.isEmpty();
 }
 
 void GeometryChangeEffect::slotWindowAdded(EffectWindow *w)
@@ -141,7 +90,7 @@ void GeometryChangeEffect::slotWindowAdded(EffectWindow *w)
 
 void GeometryChangeEffect::slotWindowDeleted(EffectWindow *w)
 {
-    m_animations.remove(w);
+    m_animationInstances.remove(w);
     m_windowStates.remove(w);
 }
 
@@ -189,20 +138,28 @@ void GeometryChangeEffect::slotWindowFrameGeometryChanged(EffectWindow *w, const
 
     const qreal xDelta = newGeometry.x() - oldGeometry.x();
     const qreal yDelta = newGeometry.y() - oldGeometry.y();
+    const qreal widthDelta = newGeometry.width() - oldGeometry.width();
+    const qreal heightDelta = newGeometry.height() - oldGeometry.height();
     const qreal widthRatio = oldGeometry.width() / newGeometry.width();
     const qreal heightRatio = oldGeometry.height() / newGeometry.height();
 
-    GeometryChangeAnimation &animation = m_animations[w];
-    animation.startTx = -xDelta;
-    animation.startTy = -yDelta;
-    animation.startSx = widthRatio;
-    animation.startSy = heightRatio;
-    animation.timeLine = TimeLine(m_duration);
-    animation.timeLine.setEasingCurve(QEasingCurve::OutExpo);
-
-    redirect(w);
+    // Force a blur on the transformed window while it animates so its edges stay
+    // clean (mirrors the scripted effect). Track two live animations (translation
+    // + scale) so we can release the role once both finish.
+    m_animationInstances[w] += 2;
     w->setData(WindowForceBlurRole, true);
-    effects->addRepaintFull();
+
+    // Animate in the window's own surface, translating by the centre delta and
+    // scaling around the centre — the exact combination the scripted effect uses.
+    // This is driven by AnimationEffect, so no offscreen redirect is needed and
+    // the window stays crisp while it is resized into a tile.
+    const QEasingCurve curve(QEasingCurve::OutExpo);
+    animate(w, AnimationEffect::Translation, 0, m_duration,
+            FPx2(0.0, 0.0), curve, 0,
+            FPx2(-xDelta - widthDelta / 2.0, -yDelta - heightDelta / 2.0));
+    animate(w, AnimationEffect::Scale, 0, m_duration,
+            FPx2(1.0, 1.0), curve, 0,
+            FPx2(widthRatio, heightRatio));
 }
 
 void GeometryChangeEffect::slotWindowMaximizedStateAboutToChange(EffectWindow *w, bool horizontal, bool vertical)

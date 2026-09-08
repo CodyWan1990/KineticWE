@@ -9,9 +9,8 @@
 
 #pragma once
 
+#include "effect/animationeffect.h"
 #include "effect/effectwindow.h"
-#include "effect/offscreeneffect.h"
-#include "effect/timeline.h"
 
 #include <chrono>
 #include <QHash>
@@ -20,22 +19,21 @@
 namespace KWin
 {
 
-struct GeometryChangeAnimation
-{
-    TimeLine timeLine;
-    qreal startTx = 0.0;
-    qreal startTy = 0.0;
-    qreal startSx = 1.0;
-    qreal startSy = 1.0;
-};
-
 struct GeometryChangeWindowState
 {
     qint64 createdTimeMs = 0;
     bool maximizedAboutToChange = false;
 };
 
-class GeometryChangeEffect : public OffscreenEffect
+// Animated geometry changes for windows resized/moved by programs or scripts.
+//
+// Based on the scripted kwin4_effect_geometry_change by Peter Fajdiga, but
+// reimplemented natively. Unlike the earlier offscreen-redirect attempt, this
+// animates via AnimationEffect::animate() (Translation + Scale), the same
+// well-tested path the scripted effect uses. That avoids the artifacts that
+// arise from redirecting a window to an offscreen texture while it is being
+// resized/moved into a tile.
+class GeometryChangeEffect : public AnimationEffect
 {
     Q_OBJECT
 
@@ -43,10 +41,6 @@ public:
     GeometryChangeEffect();
 
     void reconfigure(ReconfigureFlags) override;
-    void prePaintScreen(ScreenPrePaintData &data) override;
-    void prePaintWindow(RenderView *view, EffectWindow *w, WindowPrePaintData &data) override;
-    void postPaintScreen() override;
-    bool isActive() const override;
 
     int requestedEffectChainPosition() const override
     {
@@ -56,7 +50,9 @@ public:
     static bool supported();
 
 protected:
-    void apply(EffectWindow *window, int mask, WindowPaintData &data, WindowQuadList &quads) override;
+    // Called by AnimationEffect whenever a per-window animation ends. We use it
+    // to release the WindowForceBlurRole we set while a window is transformed.
+    void animationEnded(EffectWindow *w, AnimationEffect::Attribute a, uint meta) override;
 
 private Q_SLOTS:
     void slotWindowAdded(EffectWindow *w);
@@ -73,7 +69,10 @@ private:
     std::chrono::milliseconds m_duration;
     QStringList m_excludedWindowClasses;
     QHash<EffectWindow *, GeometryChangeWindowState> m_windowStates;
-    QHash<EffectWindow *, GeometryChangeAnimation> m_animations;
+    // Live geometry-change animation count per window, used to release the
+    // WindowForceBlurRole once the last one finishes (mirrors the scripted
+    // effect's animationInstances counter).
+    QHash<EffectWindow *, int> m_animationInstances;
     bool m_userResizing = false;
 };
 

@@ -28,7 +28,15 @@ namespace {
   // also excludes (they are handled by other KCMs or are not user-facing).
   const std::set<std::string>& excludedEffects() {
     static const std::set<std::string> kExcluded{
-        "login", "logout", "fadingpopups", "slidingpopups", "slidingnotifications"};
+        "login", "logout", "fadingpopups", "slidingpopups", "slidingnotifications",
+        // Geometry Change was reimplemented as a native builtin effect
+        // ("geometrychange", Category=Animations, listed on the Animations
+        // page). The legacy scripted implementation it replaced
+        // ("kwin4_effect_geometry_change", Category=Appearance) can still be
+        // discovered in kwin-wayland/effects on installs that carried it over;
+        // hide it so the same feature is not presented twice with two
+        // independent toggles (and so it is not animated twice).
+        "kwin4_effect_geometry_change"};
     return kExcluded;
   }
 
