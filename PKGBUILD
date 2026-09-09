@@ -26,7 +26,9 @@ depends=(
     'noctalia-git'
     'plasma-workspace'
     'milou'
-    'aurorae'
+    # aurorae: built from pinned KDE master commit for ABI compat with our own
+    # kdecoration; the system aurorae package would fail to load.
+    # 'aurorae'
     'breeze'
     'kscreen'
     'systemsettings'
@@ -152,28 +154,32 @@ optdepends=(
 # On Arch, kwin-common/kwin-libs/kwin-wayland are bundled in 'kwin', but we
 # provide them virtually so packages that reference them see them satisfied.
 replaces=('kwin' 'kglobalacceld' 'kdecoration')
-provides=('kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'kwin' 'kwin-common' 'kwin-libs' 'kwin-wayland' 'xdg-desktop-portal-kwe')
-conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'xdg-desktop-portal-kde')
+provides=('kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'aurorae' 'kwin' 'kwin-common' 'kwin-libs' 'kwin-wayland' 'xdg-desktop-portal-kwe')
+conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'aurorae' 'xdg-desktop-portal-kde')
 
 
 # Source: kinetic-we from GitLab + kglobalacceld/kdecoration from KDE invent
 # kinetic-we is pinned to a commit (not a tag) to match the COPR 6.7.80-N
 # releases, which package master HEAD via `git archive`. Bump _commit and
 # reset pkgrel together on each upstream sync.
-# kglobalacceld and kdecoration are pinned to KDE master commits: kinetic-we
-# needs the post-6.7 KGlobalAccelD API and the KDecoration3::Style enum
-# (server-side drop shadows for CSD windows), neither of which is in a
-# released version yet. Bump both pins together with _commit on each sync.
+# kglobalacceld, kdecoration and aurorae are pinned to KDE master commits:
+# kinetic-we needs the post-6.7 KGlobalAccelD API, the KDecoration3::Style
+# enum (server-side drop shadows for CSD windows), and an aurorae plugin
+# compiled against our pinned kdecoration (ABI compatibility with distro-
+# packaged aurorae is not guaranteed). Bump all three pins together with
+# _commit on each sync.
 _commit=c368d2965b4392194d79080403d7e502fa9ae1e2
 _kglobalacceld_commit=5cc88399d8e2a7951798f85127e23f73f1fa0889
 _kdecoration_commit=d13049250c0ea1afc279aa8dc99243565c0d83e8
+_aurorae_commit=6d55109d6e768263653456b539fb25d6d0d3a3b9
 _sourcebase="$pkgname-$pkgver"
 source=(
     "$url/-/archive/$_commit/$pkgname-$_commit.tar.gz"
     "kglobalacceld::git+https://invent.kde.org/plasma/kglobalacceld.git#commit=$_kglobalacceld_commit"
     "kdecoration::git+https://invent.kde.org/plasma/kdecoration.git#commit=$_kdecoration_commit"
+    "aurorae::git+https://invent.kde.org/plasma/aurorae.git#commit=$_aurorae_commit"
 )
-sha256sums=('SKIP' 'SKIP' 'SKIP')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 prepare() {
     cd "$srcdir"
@@ -237,6 +243,29 @@ build() {
 
     DESTDIR="$srcdir/kga-staging" cmake --install kdecoration/build
 
+    # --- Phase 2.5: Build aurorae (pinned KDE master commit) ---
+    # KineticWE replaces the system kdecoration package with a newer build
+    # from a pinned commit. The distro-packaged aurorae plugin was compiled
+    # against the old kdecoration ABI and may fail to load. Build it from
+    # source against our own kdecoration so the KDecoration3 plugin is always
+    # ABI-compatible.
+    echo "==> Building aurorae (pinned KDE master commit)..."
+
+    mkdir -p aurorae/build
+    pushd aurorae/build
+
+    cmake .. \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_PREFIX_PATH="$srcdir/kga-staging/usr" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTING=OFF \
+        -Wno-dev
+
+    cmake --build . --parallel "$(nproc)"
+    popd
+
+    DESTDIR="$srcdir/kga-staging" cmake --install aurorae/build
+
     # --- Phase 3: Build kinetic-we ---
     echo "==> Building kinetic-we..."
 
@@ -277,6 +306,9 @@ package() {
     echo "==> Installing kdecoration..."
     DESTDIR="$pkgdir" cmake --install kdecoration/build
 
+    echo "==> Installing aurorae..."
+    DESTDIR="$pkgdir" cmake --install aurorae/build
+
     echo "==> Installing kinetic-we..."
     cd "$_sourcebase/build"
     DESTDIR="$pkgdir" cmake --install .
@@ -300,6 +332,10 @@ package() {
     rm -f "$pkgdir/usr/lib/libkdecorations3.so" 2>/dev/null || true
     rm -f "$pkgdir/usr/lib/libkdecorations3private.so" 2>/dev/null || true
 
+    # Strip aurorae development files (keep only runtime plugin + themes)
+    rm -rf "$pkgdir/usr/lib/cmake/Aurorae" 2>/dev/null || true
+    rm -rf "$pkgdir/usr/include/Aurorae" 2>/dev/null || true
+
     # Compatibility symlinks so Plasma can find the compositor (like COPR does)
     ln -s kinetic-we "$pkgdir/usr/bin/kwin_wayland"
     ln -s kinetic-we_wayland_wrapper "$pkgdir/usr/bin/kwin_wayland_wrapper"
@@ -318,6 +354,12 @@ package() {
     if [[ -d "$srcdir/kdecoration/LICENSES" ]]; then
         install -Dm644 "$srcdir/kdecoration/LICENSES/"* \
             -t "$pkgdir/usr/share/licenses/$pkgname-kdecoration/" 2>/dev/null || true
+    fi
+
+    # Install aurorae license
+    if [[ -d "$srcdir/aurorae/LICENSES" ]]; then
+        install -Dm644 "$srcdir/aurorae/LICENSES/"* \
+            -t "$pkgdir/usr/share/licenses/$pkgname-aurorae/" 2>/dev/null || true
     fi
 
     # Install the portal backend license

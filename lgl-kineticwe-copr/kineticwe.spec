@@ -1,9 +1,12 @@
 %global __cmake_in_source_build 0
-# Pinned KDE master commits. kinetic-we needs the post-6.7 KGlobalAccelD API and
-# the KDecoration3::Style enum (server-side drop shadows for CSD windows);
-# neither is in a released version yet. Bump both pins on each upstream sync.
+# Pinned KDE master commits. kinetic-we needs the post-6.7 KGlobalAccelD API,
+# the KDecoration3::Style enum (server-side drop shadows for CSD windows),
+# and an aurorae plugin compiled against our pinned kdecoration (ABI compat
+# with distro-packaged aurorae is not guaranteed). Bump all three pins on
+# each upstream sync.
 %{!?kglobalacceld_ref:%global kglobalacceld_ref 5cc88399d8e2a7951798f85127e23f73f1fa0889}
 %{!?kdecoration_ref:%global kdecoration_ref d13049250c0ea1afc279aa8dc99243565c0d83e8}
+%{!?aurorae_ref:%global aurorae_ref 6d55109d6e768263653456b539fb25d6d0d3a3b9}
 # kconfig_compiler from KConfig < 6.30 generates uncompilable setters for
 # enum-class kcfg entries (fixed in KConfig commit 41592cc, first released
 # in 6.30). Build the fixed compiler from this pinned KConfig commit and use
@@ -23,6 +26,7 @@ Source3:        kineticwe.desktop
 Source4:        kglobalacceld-mask.conf
 Source5:        kconfig-%{kconfig_compiler_ref}.tar.gz
 Source6:        kdecoration-%{kdecoration_ref}.tar.gz
+Source7:        aurorae-%{aurorae_ref}.tar.gz
 
 BuildRequires:  cmake
 BuildRequires:  ninja-build
@@ -142,7 +146,9 @@ BuildRequires:  stb_image_resize2-devel
 BuildRequires:  stb_image_write-devel
 
 Requires:       plasma-milou
-Requires:       aurorae
+# aurorae: built from pinned KDE master commit (Source7) for ABI compat with
+# our own kdecoration; do not require the distro package.
+# Requires:     aurorae
 Requires:       plasma-breeze
 Requires:       breeze-icons
 Requires:       kineticwe-noctalia
@@ -221,6 +227,10 @@ rm -rf ../kdecoration
 mkdir -p ../kdecoration
 tar xf %{SOURCE6} -C ../kdecoration --strip-components=1
 
+rm -rf ../aurorae
+mkdir -p ../aurorae
+tar xf %{SOURCE7} -C ../aurorae --strip-components=1
+
 rm -rf ../kconfig
 mkdir -p ../kconfig
 tar xf %{SOURCE5} -C ../kconfig --strip-components=1
@@ -256,6 +266,24 @@ cmake -S "${KDECO_SRC}" \
 cmake --build "${KDECO_BUILD}"
 
 DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${KDECO_BUILD}" --prefix %{_prefix}
+
+# Build aurorae (pinned KDE master commit) and stage it next to
+# kglobalacceld and kdecoration. The distro-packaged aurorae plugin was
+# compiled against the system kdecoration ABI and may fail to load with
+# our pinned build.
+AURORAE_SRC=%{_builddir}/aurorae
+AURORAE_BUILD=%{_builddir}/aurorae-build
+
+cmake -S "${AURORAE_SRC}" \
+    -B "${AURORAE_BUILD}" \
+    -GNinja \
+    -DCMAKE_INSTALL_PREFIX=%{_prefix} \
+    -DCMAKE_PREFIX_PATH="${KGA_TMP_PREFIX}%{_prefix}" \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_TESTING=OFF
+cmake --build "${AURORAE_BUILD}"
+
+DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${AURORAE_BUILD}" --prefix %{_prefix}
 
 # Build the fixed kconfig_compiler (build-time tool only, nothing is installed)
 KCFG_BUILD=%{_builddir}/kconfig-build
@@ -302,6 +330,7 @@ meson compile -C "${SHELL_BUILD}"
 KGA_BUILD=%{_builddir}/kglobalacceld-build
 DESTDIR=%{buildroot} cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 DESTDIR=%{buildroot} cmake --install %{_builddir}/kdecoration-build --prefix %{_prefix}
+DESTDIR=%{buildroot} cmake --install %{_builddir}/aurorae-build --prefix %{_prefix}
 %cmake_install
 DESTDIR=%{buildroot} cmake --install %{_builddir}/portal-build --prefix %{_prefix}
 DESTDIR=%{buildroot} meson install -C %{_builddir}/shell-build
@@ -329,6 +358,7 @@ rm -f %{buildroot}%{_includedir}/KF6/kdecoration3_version.h
 rm -rf %{buildroot}%{_includedir}/kwin
 rm -rf %{buildroot}%{_libdir}/cmake/KGlobalAccelD
 rm -rf %{buildroot}%{_libdir}/cmake/KDecoration3
+rm -rf %{buildroot}%{_libdir}/cmake/Aurorae
 rm -rf %{buildroot}%{_libdir}/cmake/KWin
 rm -rf %{buildroot}%{_libdir}/cmake/KWinDBusInterface
 rm -f %{buildroot}%{_libdir}/libKGlobalAccelD.so
@@ -348,7 +378,7 @@ systemctl daemon-reload 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 
 %files
-%license LICENSES/* ../kglobalacceld/LICENSES/* ../kdecoration/LICENSES/*
+%license LICENSES/* ../kglobalacceld/LICENSES/* ../kdecoration/LICENSES/* ../aurorae/LICENSES/*
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
 %{_bindir}/kwin_wayland
@@ -366,8 +396,10 @@ systemctl daemon-reload 2>/dev/null || true
 %{_qt6_plugindir}/kwin/
 %{_qt6_plugindir}/plasma/kcms/
 %{_qt6_plugindir}/kf6/packagestructure/
+%{_qt6_plugindir}/org.kde.kdecoration3/
 %{_qt6_qmldir}/org/kde/kwin/
 %{_libdir}/libexec/kwin*
+%{_libexecdir}/plasma-apply-aurorae
 %{_libdir}/kconf_update_bin/kwin*
 %{_datadir}/applications/kcm_*.desktop
 %{_datadir}/applications/org.kde.kwin.*.desktop
@@ -379,6 +411,7 @@ systemctl daemon-reload 2>/dev/null || true
 %{_datadir}/knsrcfiles/
 %{_datadir}/qlogging-categories6/
 %{_datadir}/kwin-wayland/
+%{_datadir}/kwin/aurorae/
 %{_datadir}/krunner/
 %{_datadir}/locale/
 %{_userunitdir}/plasma-kwin_wayland.service
