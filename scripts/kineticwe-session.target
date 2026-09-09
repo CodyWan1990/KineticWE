@@ -22,3 +22,14 @@ BindsTo=graphical-session.target
 Before=graphical-session.target
 Wants=graphical-session-pre.target
 After=graphical-session-pre.target
+
+# PipeWire media stack (screen capture + audio). Soft wants: the compositor's
+# screencast plugin and the xdg-desktop-portal-kwe backend need a live PipeWire
+# daemon and a session manager (wireplumber) to create/routethe capture node.
+# Soft wants are skipped without failing if a unit is not installed (e.g. a
+# minimal box that never installed pipewire), and are no-ops if already active.
+Wants=pipewire.socket
+Wants=pipewire.service
+Wants=wireplumber.service
+Wants=pipewire-pulse.socket
+Wants=pipewire-pulse.service

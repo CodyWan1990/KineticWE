@@ -21,7 +21,9 @@ set -euo pipefail
 # terminal. So in addition to the library resolution below it also installs
 # the default session packages: the Breeze icon theme, the Breeze color
 # schemes, the Breeze cursor theme, the Qt5/Qt6 configuration tools
-# (qt5ct / qt6ct), Xwayland, the portal's QML runtime modules, and Alacritty.
+# (qt5ct / qt6ct), Xwayland, the portal's QML runtime modules, the PipeWire
+# media stack (pipewire/wireplumber/pipewire-pulse — needed for screen capture
+# and audio), and Alacritty.
 # These installs are idempotent — any package the host already has is skipped.
 #
 # How it works:
@@ -117,6 +119,18 @@ KWIN_QML_PKGS=(
     plasma-milou          # org.kde.milou (Overview/Grid View search results)
     libplasma             # org.kde.plasma.components / org.kde.plasma.extras
     qt6-qt5compat         # Qt5Compat.GraphicalEffects (FastBlur)
+)
+
+# PipeWire media stack (screen capture + audio). The compositor's screencast
+# plugin and the portal backend need a live PipeWire daemon and a session
+# manager (wireplumber) to create and route the capture node. This list is for
+# a fresh Fedora host: unlike its dev machine (where these were installed and
+# enabled long ago) a cold box has only kpipewire (the Qt/DBus glue) and no
+# daemon/session-manager, so screensharing fails. Installed idempotently below.
+MEDIA_RPM_PKGS=(
+    pipewire
+    wireplumber
+    pipewire-pulse
 )
 
 RED='\033[0;31m'
@@ -215,7 +229,7 @@ verify_resolved() {
 install_default_session_packages() {
     local -a missing=()
     local pkg
-    for pkg in "${DEFAULT_RPM_PKGS[@]}" "${PORTAL_QML_PKGS[@]}" "${KWIN_QML_PKGS[@]}"; do
+    for pkg in "${DEFAULT_RPM_PKGS[@]}" "${PORTAL_QML_PKGS[@]}" "${KWIN_QML_PKGS[@]}" "${MEDIA_RPM_PKGS[@]}"; do
         if [[ "$PM" == dnf ]]; then
             if ! rpm -q "$pkg" &>/dev/null; then
                 missing+=("$pkg")

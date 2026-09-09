@@ -881,6 +881,20 @@ fi
 systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user start kineticwe-session.target 2>/dev/null || true
 
+# ---------------------------------------------------------------------------
+# 6bb. PipeWire media stack (screen capture + audio). The compositor's
+#      screencast plugin and the xdg-desktop-portal-kwe backend need a live
+#      PipeWire daemon and a session manager (wireplumber) to create and route
+#      the capture node. These are user units installed by the distro's
+#      pipewire/wireplumber packages; they are NOT enabled by default on a
+#      fresh "from nothing" install, so the dev machine (where they were
+#      enabled long ago) screenshares fine while a cold box does not. Starting
+#      them here is best-effort and idempotent: any unit that is already
+#      running is a no-op, and any unit that is not installed is skipped.
+# ---------------------------------------------------------------------------
+systemctl --user start pipewire.socket pipewire.service wireplumber.service \
+    pipewire-pulse.socket pipewire-pulse.service 2>/dev/null || true
+
 # 6c. Portals: start the freedesktop frontend so the KineticWE backend is
 #     selected and D-Bus-activated under our identity. The frontend matches
 #     XDG_CURRENT_DESKTOP=KineticWE against kineticwe-portals.conf
