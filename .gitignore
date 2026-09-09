@@ -36,6 +36,7 @@ result-*
 
 # User-only distrobox build scripts
 /build-rpm-dev.sh
+/build-arch-native.sh
 
 # Allow COPR build Makefiles
 !copr/Makefile
