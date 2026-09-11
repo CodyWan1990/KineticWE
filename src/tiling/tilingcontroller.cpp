@@ -18,6 +18,7 @@
 #include "tiles/columnslayoutengine.h"
 #include "tiles/layoutengine.h"
 #include "tiles/masterstacklayoutengine.h"
+#include "tiles/emergelayoutengine.h"
 #include "tiles/stackedlayoutengine.h"
 #include "tiles/monoclelayoutengine.h"
 #include "tiles/tilemanager.h"
@@ -36,7 +37,11 @@
 #include <QGuiApplication>
 #include <QPalette>
 #include <QStandardPaths>
+#include <QVariant>
 #include <QtGlobal>
+
+#include <array>
+#include <utility>
 
 namespace KWin
 {
@@ -57,10 +62,106 @@ std::unique_ptr<LayoutEngine> createLayoutEngine(LayoutEngine::LayoutKind kind, 
         return std::make_unique<AutoGridLayoutEngine>(parent);
     case LayoutEngine::LayoutKind::Columns:
         return std::make_unique<ColumnsLayoutEngine>(parent);
+    case LayoutEngine::LayoutKind::Emerge:
+        return std::make_unique<EmergeLayoutEngine>(parent);
     case LayoutEngine::LayoutKind::MasterStack:
     default:
         return std::make_unique<MasterStackLayoutEngine>(parent);
     }
+}
+
+// Canonical preset vocabulary for the Emerge layout. Kept in sync with the
+// KCM/kcfg default; a value out of (0,1] is dropped on read.
+const QList<qreal> kDefaultEmergePresets{1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0};
+
+QList<qreal> parseProportionList(const QStringList &entries)
+{
+    QList<qreal> result;
+    for (const QString &entry : entries) {
+        bool ok = false;
+        const qreal value = entry.trimmed().toDouble(&ok);
+        if (ok && value > 0.0 && value <= 1.0) {
+            result.append(value);
+        }
+    }
+    return result.isEmpty() ? kDefaultEmergePresets : result;
+}
+
+// An enum setting can be stored as the kcfg choice NAME (Kinetic Settings
+// writes strings) or as the integer index (a KDE KCM writes ints). Accept both
+// and fall back to @p fallback for anything unrecognised.
+int readEnumSetting(const KConfigGroup &group, const QString &key, const QStringList &names, int fallback)
+{
+    const QString value = group.readEntry(key, QString());
+    if (value.isEmpty()) {
+        return fallback;
+    }
+    const int byName = names.indexOf(value, 0, Qt::CaseInsensitive);
+    if (byName >= 0) {
+        return byName;
+    }
+    bool ok = false;
+    const int byIndex = value.toInt(&ok);
+    return ok ? byIndex : fallback;
+}
+
+// One-time migration of the Emerge layout's config keys from the pre-rename
+// "Scrolling*" names. Copies each old value onto the new key when the new one is
+// absent, then removes the old key so the config converges after one load.
+// Returns true when anything changed, so the caller can sync the file.
+bool migrateEmergeKeyNames(KConfigGroup &group)
+{
+    static const std::array<std::pair<const char *, const char *>, 3> kRenamedKeys{{
+        {"ScrollingAxis", "EmergeAxis"},
+        {"ScrollingPresetColumnWidths", "EmergePresetColumnWidths"},
+        {"ScrollingPresetWindowHeights", "EmergePresetWindowHeights"},
+    }};
+    bool changed = false;
+    for (const auto &[oldKey, newKey] : kRenamedKeys) {
+        const QString oldName = QString::fromLatin1(oldKey);
+        const QString newName = QString::fromLatin1(newKey);
+        if (!group.hasKey(oldName)) {
+            continue;
+        }
+        if (!group.hasKey(newName)) {
+            group.writeEntry(newName, group.readEntry(oldName, QVariant()));
+        }
+        group.deleteEntry(oldName);
+        changed = true;
+    }
+
+    // Also rename the persisted layout NAME, which lives in values rather than
+    // keys: EnabledLayouts (a list) and DefaultLayout (a string), plus the
+    // per-(desktop, output) override groups' DefaultLayout.
+    const QStringList enabled = group.readEntry(QStringLiteral("EnabledLayouts"), QStringList());
+    if (enabled.contains(QStringLiteral("Scrolling"))) {
+        QStringList renamed = enabled;
+        for (QString &name : renamed) {
+            if (name == QLatin1String("Scrolling")) {
+                name = QStringLiteral("Emerge");
+            }
+        }
+        group.writeEntry(QStringLiteral("EnabledLayouts"), renamed);
+        changed = true;
+    }
+    const auto maybeRenameLayoutValue = [&changed](KConfigGroup &owner) {
+        const QString value = owner.readEntry(QStringLiteral("DefaultLayout"), QString());
+        if (value.compare(QLatin1String("Scrolling"), Qt::CaseInsensitive) == 0) {
+            owner.writeEntry(QStringLiteral("DefaultLayout"), QStringLiteral("Emerge"));
+            changed = true;
+        }
+    };
+    maybeRenameLayoutValue(group);
+    const QStringList subGroups = group.groupList();
+    for (const QString &sub : subGroups) {
+        if (!sub.startsWith(QLatin1String("DesktopOutput "))) {
+            continue;
+        }
+        KConfigGroup subGroup(&group, sub);
+        maybeRenameLayoutValue(subGroup);
+    }
+
+    return changed;
 }
 
 } // namespace
@@ -83,7 +184,19 @@ TilingController::TilingController(Workspace *workspace)
     if (m_workspace) {
         connect(m_workspace, &Workspace::windowActivated, this, [this]() {
             updateBorders();
+            // Emerge strips follow focus: scroll to the newly activated
+            // window's column when it belongs to a strip. This runs AFTER
+            // activation (unlike addWindow, which precedes it), so it cannot
+            // fight a new window taking focus.
+            if (Window *win = m_workspace->activeWindow()) {
+                if (auto *sc = qobject_cast<EmergeLayoutEngine *>(layoutEngineForWindow(win))) {
+                    sc->focusWindow(win);
+                }
+            }
         });
+        // The active output's strip is what the D-Bus bridge reports, so a
+        // focus move between monitors republishes its viewport.
+        connect(m_workspace, &Workspace::activeOutputChanged, this, &TilingController::publishEmergeViewport);
     }
 
     // Hold long-lived KSharedConfig handles for the two config files we
@@ -212,6 +325,11 @@ void TilingController::reconfigure()
     KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
     KConfigGroup rulesGroup(config, QStringLiteral("TilingRules"));
 
+    // Rename the layout's config keys from the old "Scrolling*" names once.
+    if (migrateEmergeKeyNames(tilingGroup)) {
+        config->sync();
+    }
+
     const bool wasEnabled = m_enabled;
     m_enabled = tilingGroup.readEntry("Enabled", true);
     m_defaultLayout = LayoutEngine::layoutKindFromString(
@@ -220,7 +338,7 @@ void TilingController::reconfigure()
     // defines the cycle order used by cycleLayout().
     const QStringList previousEnabledLayouts = m_enabledLayouts;
     m_enabledLayouts = tilingGroup.readEntry("EnabledLayouts",
-        QStringList{QLatin1String("MasterStack"), QLatin1String("Stacked"), QLatin1String("CenterTile"), QLatin1String("Columns"), QLatin1String("Monocle"), QLatin1String("AutoGrid")});
+        QStringList{QLatin1String("MasterStack"), QLatin1String("Stacked"), QLatin1String("CenterTile"), QLatin1String("Columns"), QLatin1String("Monocle"), QLatin1String("AutoGrid"), QLatin1String("Emerge")});
     m_rules->load(rulesGroup);
 
     // Per-tile resize step. Weight units; see tilingcontroller.h. Clamped to
@@ -238,6 +356,18 @@ void TilingController::reconfigure()
     // unusably narrow columns.
     m_columnsMaxColumns = std::clamp(tilingGroup.readEntry("ColumnsMaxColumns", 3), 3, 5);
     applyMaxColumnsToEngines();
+
+    // Emerge strip layout. Axis and presets are global for now (per-monitor
+    // behaviour is a later addition); pushed to every live Emerge engine.
+    m_emergeAxis = std::clamp(readEnumSetting(tilingGroup, QStringLiteral("EmergeAxis"),
+                                                 {QStringLiteral("Auto"), QStringLiteral("Horizontal"), QStringLiteral("Vertical")}, 0), 0, 2);
+    m_emergePresetColumnWidths = parseProportionList(tilingGroup.readEntry(
+        "EmergePresetColumnWidths",
+        QStringList{QStringLiteral("0.333"), QStringLiteral("0.5"), QStringLiteral("0.667"), QStringLiteral("0.75"), QStringLiteral("1")}));
+    m_emergePresetWindowHeights = parseProportionList(tilingGroup.readEntry(
+        "EmergePresetWindowHeights",
+        QStringList{QStringLiteral("0.333"), QStringLiteral("0.5"), QStringLiteral("0.667"), QStringLiteral("0.75"), QStringLiteral("1")}));
+    applyEmergeSettingsToEngines();
 
     const QString borderModeString = tilingGroup.readEntry("TilingBorderMode", QStringLiteral("None"));
     if (borderModeString == QLatin1String("AllTiled")) {
@@ -299,6 +429,8 @@ void TilingController::reconfigure()
         }
         updateBorders();
     }
+
+    publishEmergeViewport();
 }
 
 void TilingController::initializeLayouts()
@@ -344,6 +476,12 @@ void TilingController::setupLayoutEngine(TileManager *manager, VirtualDesktop *d
 
     auto engine = createLayoutEngine(kind, manager);
     engine->setMaxColumns(m_columnsMaxColumns);
+    if (auto *sc = qobject_cast<EmergeLayoutEngine *>(engine.get())) {
+        configureEmergeEngine(sc);
+        // The widget points at the active output/desktop, so any strip reflow
+        // is a candidate republish; publishEmergeViewport() filters the rest.
+        connect(sc, &LayoutEngine::layoutChanged, this, &TilingController::publishEmergeViewport);
+    }
     if (kind == LayoutEngine::LayoutKind::CenterTile) {
         if (auto *ct = qobject_cast<CenterTileLayoutEngine *>(engine.get())) {
             // Apply the persisted last-used ratio so the user sees their
@@ -373,6 +511,34 @@ void TilingController::applyMaxColumnsToEngines()
             }
         }
     }
+}
+
+void TilingController::applyEmergeSettingsToEngines()
+{
+    if (!m_workspace) {
+        return;
+    }
+    for (LogicalOutput *output : m_workspace->outputs()) {
+        TileManager *manager = m_workspace->tileManager(output);
+        if (!manager) {
+            continue;
+        }
+        for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+            if (auto *sc = qobject_cast<EmergeLayoutEngine *>(manager->layoutEngine(desktop))) {
+                configureEmergeEngine(sc);
+            }
+        }
+    }
+}
+
+void TilingController::configureEmergeEngine(EmergeLayoutEngine *engine)
+{
+    if (!engine) {
+        return;
+    }
+    engine->setEmergePresetColumnWidths(m_emergePresetColumnWidths);
+    engine->setEmergePresetWindowHeights(m_emergePresetWindowHeights);
+    engine->setEmergeAxis(m_emergeAxis);
 }
 
 LayoutEngine::LayoutKind TilingController::globalDefaultLayoutKind() const
@@ -460,6 +626,11 @@ QList<LayoutEngine::LayoutKind> TilingController::enabledLayoutKinds() const
             result.append(LayoutEngine::LayoutKind::AutoGrid);
         } else if (name.compare(QLatin1String("Columns"), Qt::CaseInsensitive) == 0) {
             result.append(LayoutEngine::LayoutKind::Columns);
+        } else if (name.compare(QLatin1String("Emerge"), Qt::CaseInsensitive) == 0
+                   || name.compare(QLatin1String("Scrolling"), Qt::CaseInsensitive) == 0) {
+            // "Scrolling" is the layout's pre-rename name, still honored so an
+            // un-migrated config keeps the layout enabled.
+            result.append(LayoutEngine::LayoutKind::Emerge);
         }
     }
     if (result.isEmpty()) {
@@ -1169,6 +1340,36 @@ LayoutEngine *TilingController::activeLayoutEngine() const
     return manager->layoutEngine();
 }
 
+EmergeLayoutEngine *TilingController::activeEmergeLayoutEngine() const
+{
+    return qobject_cast<EmergeLayoutEngine *>(activeLayoutEngine());
+}
+
+void TilingController::publishEmergeViewport()
+{
+    if (!m_dbusInterface) {
+        return;
+    }
+
+    QString signature = QStringLiteral("none");
+    if (EmergeLayoutEngine *engine = activeEmergeLayoutEngine()) {
+        const EmergeViewportSnapshot snap = engine->viewportSnapshot();
+        signature = QString::number(snap.activeIndex);
+        for (int index : snap.columnsLeft) {
+            signature += QLatin1Char('L') + QString::number(index);
+        }
+        for (int index : snap.columnsRight) {
+            signature += QLatin1Char('R') + QString::number(index);
+        }
+    }
+
+    if (signature == m_lastEmergeViewportSignature) {
+        return;
+    }
+    m_lastEmergeViewportSignature = signature;
+    Q_EMIT m_dbusInterface->emergeViewportChanged();
+}
+
 LayoutEngine *TilingController::layoutEngineForWindow(Window *window, LogicalOutput **output, VirtualDesktop **desktop) const
 {
     if (!m_workspace || !window) {
@@ -1655,6 +1856,16 @@ void TilingController::expel()
     updateBorders();
 }
 
+void TilingController::switchPresetColumnWidth()
+{
+    LayoutEngine *engine = activeLayoutEngine();
+    if (!engine) {
+        return;
+    }
+    engine->switchPresetColumnWidth();
+    updateBorders();
+}
+
 void TilingController::setLayout(LayoutEngine::LayoutKind kind)
 {
     if (!m_workspace) {
@@ -1701,6 +1912,7 @@ void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *deskto
         // No engine yet — just create one in the requested kind.
         setupLayoutEngine(manager, desktop, kind);
         Q_EMIT m_dbusInterface->layoutChanged(LayoutEngine::layoutKindToString(kind));
+        publishEmergeViewport();
         return;
     }
 
@@ -1728,6 +1940,10 @@ void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *deskto
 
     auto engine = createLayoutEngine(kind, manager);
     engine->setMaxColumns(m_columnsMaxColumns);
+    if (auto *sc = qobject_cast<EmergeLayoutEngine *>(engine.get())) {
+        configureEmergeEngine(sc);
+        connect(sc, &LayoutEngine::layoutChanged, this, &TilingController::publishEmergeViewport);
+    }
     if (kind == LayoutEngine::LayoutKind::CenterTile) {
         if (auto *ct = qobject_cast<CenterTileLayoutEngine *>(engine.get())) {
             ct->setMasterRatio(m_lastCenterTileRatio);
@@ -1750,6 +1966,7 @@ void TilingController::setLayoutOn(LogicalOutput *output, VirtualDesktop *deskto
     }
 
     Q_EMIT m_dbusInterface->layoutChanged(LayoutEngine::layoutKindToString(kind));
+    publishEmergeViewport();
 }
 
 void TilingController::reconcileLayoutKinds()

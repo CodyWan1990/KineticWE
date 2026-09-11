@@ -1293,6 +1293,8 @@ namespace ui {
       }
       if (auto color = parseColor(desired, "color")) {
         label->setColor(*color);
+      } else if (m_defaultTextColor.has_value()) {
+        label->setColor(*m_defaultTextColor);
       }
       if (auto weight = parseFontWeight(desired)) {
         label->setFontWeight(*weight);
@@ -1323,6 +1325,8 @@ namespace ui {
       }
       if (auto color = parseColor(desired, "color")) {
         glyph->setColor(*color);
+      } else if (m_defaultGlyphColor.has_value()) {
+        glyph->setColor(*m_defaultGlyphColor);
       }
       return;
     }

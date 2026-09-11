@@ -1080,6 +1080,14 @@ void Workspace::initShortcuts()
             m_tilingController->expel();
         }
     }, true);
+    // Emerge layout: cycle the active column through the configured preset
+    // widths (EmergePresetColumnWidths). Left unbound by default so the user
+    // assigns it in the Shortcuts settings.
+    initShortcut("Tiling Switch Column Width Preset", i18n("Tiling Emerge: Switch Column Width Preset"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->switchPresetColumnWidth();
+        }
+    }, true);
     initShortcut("Tiling Toggle Floating", i18n("Tiling Toggle Floating"), Qt::META | Qt::Key_V, [this]() {
         if (m_tilingController) {
             m_tilingController->toggleFloating();

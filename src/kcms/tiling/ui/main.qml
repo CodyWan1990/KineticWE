@@ -153,6 +153,21 @@ KCM.SimpleKCM {
                 }
             }
 
+            QQC2.CheckBox {
+                id: enableEmerge
+                text: i18n("Emerge")
+                checked: kcm.settings.enabledLayouts.indexOf("Emerge") !== -1
+                onToggled: {
+                    let layouts = kcm.settings.enabledLayouts.slice();
+                    if (checked && layouts.indexOf("Emerge") === -1) {
+                        layouts.push("Emerge");
+                    } else if (!checked) {
+                        layouts = layouts.filter(l => l !== "Emerge");
+                    }
+                    kcm.settings.enabledLayouts = layouts;
+                }
+            }
+
             QQC2.Label {
                 visible: kcm.settings.enabledLayouts.length < 2
                 Kirigami.FormData.label: i18nc("@info", "Note:")
@@ -171,7 +186,8 @@ KCM.SimpleKCM {
                     { text: i18n("CenterTile"), value: "CenterTile" },
                     { text: i18n("Columns"), value: "Columns" },
                     { text: i18n("Monocle"), value: "Monocle" },
-                    { text: i18n("AutoGrid"), value: "AutoGrid" }
+                    { text: i18n("AutoGrid"), value: "AutoGrid" },
+                    { text: i18n("Emerge"), value: "Emerge" }
                 ]
                 textRole: "text"
                 valueRole: "value"
@@ -405,7 +421,8 @@ KCM.SimpleKCM {
                                             || seen[i] === "CenterTile"
                                             || seen[i] === "Columns"
                                             || seen[i] === "Monocle"
-                                            || seen[i] === "AutoGrid") {
+                                            || seen[i] === "AutoGrid"
+                                            || seen[i] === "Emerge") {
                                             opts.push({ text: seen[i], value: seen[i] });
                                         }
                                     }
@@ -610,7 +627,8 @@ KCM.SimpleKCM {
                                             || seen[i] === "CenterTile"
                                             || seen[i] === "Columns"
                                             || seen[i] === "Monocle"
-                                            || seen[i] === "AutoGrid") {
+                                            || seen[i] === "AutoGrid"
+                                            || seen[i] === "Emerge") {
                                             opts.push({ text: seen[i], value: seen[i] });
                                         }
                                     }

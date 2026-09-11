@@ -1325,6 +1325,9 @@ DisplayPage::build(float scale, const Filter& filter, std::string_view /*armedRe
   }
 
   if (m_backend.outputs().empty()) {
+    if (!filter.searchQuery.empty()) {
+      return nullptr;
+    }
     root->addChild(makeNotice(
         "No display outputs are available. Connect a display or use a compositor with output management support.",
         scale
@@ -1332,37 +1335,51 @@ DisplayPage::build(float scale, const Filter& filter, std::string_view /*armedRe
     return root;
   }
 
-  auto layoutCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .padding = Style::spaceMd * scale,
-      .fillWidth = true,
-      .configure = [scale](Flex& section) { section.setCardStyle(scale); },
-  });
-  layoutCard->addChild(makeLabel(
-      "Arrange displays", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
-  ));
-  layoutCard->addChild(makeLabel(
-      "Drag a display to move it. Edges snap together; changes are sent only after Apply.",
-      Style::fontSizeCaption * scale, colorSpecFromRole(ColorRole::OnSurfaceVariant)
-  ));
-  layoutCard->addChild(buildLayout(scale, callbacks));
-  root->addChild(std::move(layoutCard));
+  // The drag-and-drop arrangement card is not a searchable setting; hide it in
+  // global search so merged results only show the matching display fields.
+  if (filter.searchQuery.empty()) {
+    auto layoutCard = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .padding = Style::spaceMd * scale,
+        .fillWidth = true,
+        .configure = [scale](Flex& section) { section.setCardStyle(scale); },
+    });
+    layoutCard->addChild(makeLabel(
+        "Arrange displays", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+    ));
+    layoutCard->addChild(makeLabel(
+        "Drag a display to move it. Edges snap together; changes are sent only after Apply.",
+        Style::fontSizeCaption * scale, colorSpecFromRole(ColorRole::OnSurfaceVariant)
+    ));
+    layoutCard->addChild(buildLayout(scale, callbacks));
+    root->addChild(std::move(layoutCard));
+  }
 
   const auto* selected = findOutput(m_selectedOutput);
   if (selected == nullptr) {
+    if (!filter.searchQuery.empty()) {
+      return nullptr;
+    }
     root->addChild(makeNotice("Select a display to edit its settings.", scale));
     return root;
   }
   if (filter.showOverriddenOnly && m_pending.empty()) {
+    if (!filter.searchQuery.empty()) {
+      return nullptr;
+    }
     root->addChild(makeNotice("No display changes are pending.", scale));
     return root;
   }
   if (!filter.searchQuery.empty()
       && !containsInsensitive(outputTitle(*selected), filter.searchQuery)
-      && !containsInsensitive("display resolution HDR color scale rotation", filter.searchQuery)) {
-    root->addChild(makeNotice("No display settings match the current search.", scale));
-    return root;
+      && !containsInsensitive(
+          "display monitor output resolution refresh rate hdr color depth scale rotation sharpness brightness edr "
+          "primary orientation transform",
+          filter.searchQuery
+      )) {
+    // Global search drops pages with no hits, so don't render the notice.
+    return nullptr;
   }
   root->addChild(buildOutputDetails(*selected, scale, filter, callbacks));
   return root;

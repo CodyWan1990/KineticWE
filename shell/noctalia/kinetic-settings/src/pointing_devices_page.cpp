@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
 #include <format>
 #include <string>
 #include <string_view>
@@ -27,6 +28,11 @@
 namespace {
 
   constexpr Logger kLog("kinetic-settings");
+
+  // Page state (selected device per kind) inside the kineticwe config root.
+  std::filesystem::path pointingDevicesStatePath() {
+    return KineticweKwe::defaultPath().parent_path() / "kinetic-settings.kwe";
+  }
 
   // Matches upstream's settings description wrapping budget.
   constexpr int kSettingDescriptionMaxLines = 5;
@@ -94,7 +100,11 @@ namespace {
 
 } // namespace
 
-PointingDevicesPage::PointingDevicesPage(SessionBus& bus, Kind kind) : m_kind(kind), m_dbus(bus) {}
+PointingDevicesPage::PointingDevicesPage(SessionBus& bus, Kind kind) : m_kind(kind), m_dbus(bus) {
+  m_state.setPath(pointingDevicesStatePath());
+  m_state.load();
+  m_selectedDevice = m_state.readString("PointingDevices", m_kind == Kind::Mouse ? "Mouse" : "Touchpad").value_or("");
+}
 
 // ---------------------------------------------------------------------------
 // Schema: one entry per setting. Property names are the exact
@@ -157,8 +167,7 @@ const std::vector<PointingDevicesPage::Field>& PointingDevicesPage::fields() con
           .defaultProperty = "naturalScrollEnabledByDefault",
           .supportProperty = "supportsNaturalScroll",
           .title = "Natural scrolling",
-          .subtitle = "Scroll content in the same direction the fingers move, like "
-                      "a touchscreen",
+          .subtitle = "Reverse the mouse wheel's scroll direction",
           .pageGroup = "Scrolling",
           .isBool = true,
       },
@@ -434,6 +443,31 @@ bool PointingDevicesPage::applyAll() {
 }
 
 // ---------------------------------------------------------------------------
+// Device selection persistence.
+// ---------------------------------------------------------------------------
+
+std::string PointingDevicesPage::pickDefaultDevice() const {
+  if (m_devices.empty()) {
+    return {};
+  }
+  // Prefer the most feature-complete device (largest button set): a full mouse
+  // beats a keyboard's companion "Mouse" interface or a game-controller puck.
+  const auto it = std::max_element(m_devices.cbegin(), m_devices.cend(), [](const auto& a, const auto& b) {
+    return a.supportedButtons < b.supportedButtons;
+  });
+  return it->sysName;
+}
+
+void PointingDevicesPage::persistSelectedDevice() {
+  // Re-read first so the sibling page's saved key is not overwritten.
+  m_state.load();
+  m_state.setString("PointingDevices", m_kind == Kind::Mouse ? "Mouse" : "Touchpad", m_selectedDevice);
+  if (!m_state.save()) {
+    kLog.warn("kinetic-settings: failed to write {}", pointingDevicesStatePath().string());
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Controls + layout.
 // ---------------------------------------------------------------------------
 
@@ -476,6 +510,7 @@ void PointingDevicesPage::addDevicePicker(Flex& parent, float scale, const Callb
       .onSelectionChanged = [this, callbacks](std::size_t index, std::string_view /*label*/) {
         if (index < m_devices.size() && m_devices[index].sysName != m_selectedDevice) {
           m_selectedDevice = m_devices[index].sysName;
+          persistSelectedDevice();
           m_pending.clear();
           if (callbacks.requestRebuild) {
             callbacks.requestRebuild();
@@ -669,19 +704,22 @@ std::unique_ptr<Node> PointingDevicesPage::build(
 
   if (!m_devicesLoaded) {
     m_devices = m_dbus.inputDevices();
-    // Keep only devices of this page's kind. The compositor's ListPointers()
-    // returns every pointer-capable device (touchpads are pointers too), so the
-    // touchpad page filters to touchpads and the mouse page filters them out.
+    // Keep only real devices of this page's kind. The compositor's
+    // ListPointers() returns every pointer-capable device: touchpads, plus
+    // game-controller/keyboard companion interfaces (the Valve pucks also
+    // report a keyboard capability) and uinput/virtual devices. None of those
+    // is a mouse, so the mouse page keeps only pointer devices that are not
+    // touchpads, not keyboards and not virtual.
     m_devices.erase(
         std::remove_if(m_devices.begin(), m_devices.end(), [isTouchpad](const auto& d) {
-          return isTouchpad ? !d.touchpad : d.touchpad;
+          if (d.isVirtual) {
+            return true;
+          }
+          return isTouchpad ? !d.touchpad : (d.touchpad || d.keyboard);
         }),
         m_devices.end()
     );
     m_devicesLoaded = true;
-    if (m_selectedDevice.empty() && !m_devices.empty()) {
-      m_selectedDevice = m_devices.front().sysName;
-    }
   }
 
   auto root = ui::column({
@@ -703,7 +741,12 @@ std::unique_ptr<Node> PointingDevicesPage::build(
       makeLabel(pageTitle, Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
   ));
 
+  const bool searchActive = !filter.searchQuery.empty();
   if (m_devices.empty()) {
+    // Global search drops pages with no hits; a device-less page has none.
+    if (searchActive) {
+      return nullptr;
+    }
     root->addChild(makeLabel(
         isTouchpad ? "No touchpads detected." : "No mice detected.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)
@@ -711,7 +754,27 @@ std::unique_ptr<Node> PointingDevicesPage::build(
     return root;
   }
 
-  addDevicePicker(*root, scale, callbacks);
+  // Fall back to a sensible device when nothing is selected yet or the saved
+  // device is gone (e.g. unplugged).
+  const bool selectedPresent = std::any_of(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
+    return d.sysName == m_selectedDevice;
+  });
+  if (!selectedPresent) {
+    const bool hadSavedSelection = !m_selectedDevice.empty();
+    m_selectedDevice = pickDefaultDevice();
+    // Pin the first-run default so a later device addition cannot silently
+    // change it. A saved device that is merely unplugged is left untouched so
+    // it is restored when it comes back.
+    if (!hadSavedSelection) {
+      persistSelectedDevice();
+    }
+  }
+
+  // The device picker is page chrome, not a setting; hide it while searching so
+  // merged results only show the matching rows.
+  if (!searchActive) {
+    addDevicePicker(*root, scale, callbacks);
+  }
 
   const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
@@ -747,6 +810,9 @@ std::unique_ptr<Node> PointingDevicesPage::build(
   }
 
   if (!anyRows) {
+    if (searchActive) {
+      return nullptr;
+    }
     root->addChild(makeLabel(
         isTouchpad ? "No touchpad settings match the current filters."
                    : "No mouse settings match the current filters.",

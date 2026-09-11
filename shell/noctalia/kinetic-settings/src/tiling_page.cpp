@@ -148,14 +148,14 @@ TilingPage::TilingPage(SessionBus& bus) : m_bus(bus), m_dbus(bus) {}
 
 const std::vector<std::string>& TilingPage::layoutKindValues() {
   static const std::vector<std::string> values{
-      "MasterStack", "Stacked", "CenterTile", "Columns", "Monocle", "AutoGrid",
+      "MasterStack", "Stacked", "CenterTile", "Columns", "Monocle", "AutoGrid", "Emerge",
   };
   return values;
 }
 
 const std::vector<std::string>& TilingPage::layoutKindLabels() {
   static const std::vector<std::string> labels{
-      "MasterStack", "Stacked", "Center Tile", "Columns", "Monocle", "Auto Grid",
+      "MasterStack", "Stacked", "Center Tile", "Columns", "Monocle", "Auto Grid", "Emerge",
   };
   return labels;
 }
@@ -168,6 +168,7 @@ const std::vector<std::string>& TilingPage::layoutKindSubtitles() {
       "Windows are laid out side by side in a bounded number of columns",
       "One window fills the screen at a time; switch with shortcuts",
       "Windows are arranged in an even grid automatically",
+      "Windows form an endless strip that rises into view; open a window, it never resizes others",
   };
   return subtitles;
 }
@@ -202,6 +203,18 @@ const std::vector<std::string>& TilingPage::colorSourceInactiveValues() {
 const std::vector<std::string>& TilingPage::colorSourceInactiveLabels() {
   static const std::vector<std::string> labels{
       "Custom", "System accent", "System accent (faded)",
+  };
+  return labels;
+}
+
+const std::vector<std::string>& TilingPage::emergeAxisValues() {
+  static const std::vector<std::string> values{"Auto", "Horizontal", "Vertical"};
+  return values;
+}
+
+const std::vector<std::string>& TilingPage::emergeAxisLabels() {
+  static const std::vector<std::string> labels{
+      "Auto (from monitor shape)", "Horizontal", "Vertical",
   };
   return labels;
 }
@@ -411,6 +424,43 @@ const std::vector<TilingPage::Field>& TilingPage::fields() {
         .maxValue = 5.0,
         .integerValue = true,
         .fallback = Value{3},
+    });
+
+    // Emerge ---------------------------------------------------------------
+    f.push_back(Field{
+        .group = "Tiling",
+        .key = "EmergeAxis",
+        .control = ControlKind::Select,
+        .title = "Emerge: strip direction",
+        .subtitle = "Direction the Emerge layout's strip runs; Auto follows the monitor's shape",
+        .pageGroup = "Emerge",
+        .optionValues = &emergeAxisValues(),
+        .optionLabels = &emergeAxisLabels(),
+        .fallback = Value{std::string("Auto")},
+    });
+    f.push_back(Field{
+        .group = "Tiling",
+        .key = "EmergePresetColumnWidths",
+        .control = ControlKind::Text,
+        .title = "Emerge: column width presets",
+        .subtitle = "Fractions of the work area the column-width preset shortcut cycles through, "
+                    "separated by ; (e.g. 0.333;0.5;0.667;0.75;1)",
+        .pageGroup = "Emerge",
+        .placeholder = "0.333;0.5;0.667;0.75;1",
+        .controlWidth = 260.0F,
+        .fallback = Value{std::vector<std::string>{"0.333", "0.5", "0.667", "0.75", "1"}},
+    });
+    f.push_back(Field{
+        .group = "Tiling",
+        .key = "EmergePresetWindowHeights",
+        .control = ControlKind::Text,
+        .title = "Emerge: window height presets",
+        .subtitle = "Fractions of the work area used for stacked-tile heights, separated by ; "
+                    "(e.g. 0.333;0.5;0.667;0.75;1)",
+        .pageGroup = "Emerge",
+        .placeholder = "0.333;0.5;0.667;0.75;1",
+        .controlWidth = 260.0F,
+        .fallback = Value{std::vector<std::string>{"0.333", "0.5", "0.667", "0.75", "1"}},
     });
     // Window Rules -------------------------------------------------------------
     f.push_back(Field{
@@ -1527,6 +1577,11 @@ TilingPage::build(float scale, const Filter& filter, std::string_view armedReset
   }
 
   if (!anyRows) {
+    // Global search merges hits from every page and drops pages with none, so
+    // an empty page must not render its own empty-state notice.
+    if (!filter.searchQuery.empty()) {
+      return nullptr;
+    }
     root->addChild(makeLabel(
         "No settings match the current filters.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)

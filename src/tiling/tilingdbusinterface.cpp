@@ -6,6 +6,7 @@
 
 #include "tilingdbusinterface.h"
 
+#include "tiles/emergelayoutengine.h"
 #include "tiles/layoutengine.h"
 #include "tilingcontroller.h"
 
@@ -75,6 +76,50 @@ void TilingDBusInterface::toggleOuterGaps()
 {
     if (m_controller) {
         m_controller->toggleOuterGaps();
+    }
+}
+
+static QStringList columnIndices(const QList<int> &indices)
+{
+    QStringList out;
+    out.reserve(indices.size());
+    for (int index : indices) {
+        out.append(QString::number(index));
+    }
+    return out;
+}
+
+QStringList TilingDBusInterface::emergeColumnsLeft() const
+{
+    if (!m_controller) {
+        return {};
+    }
+    const EmergeLayoutEngine *engine = m_controller->activeEmergeLayoutEngine();
+    if (!engine) {
+        return {};
+    }
+    return columnIndices(engine->viewportSnapshot().columnsLeft);
+}
+
+QStringList TilingDBusInterface::emergeColumnsRight() const
+{
+    if (!m_controller) {
+        return {};
+    }
+    const EmergeLayoutEngine *engine = m_controller->activeEmergeLayoutEngine();
+    if (!engine) {
+        return {};
+    }
+    return columnIndices(engine->viewportSnapshot().columnsRight);
+}
+
+void TilingDBusInterface::focusEmergeColumn(int index)
+{
+    if (!m_controller) {
+        return;
+    }
+    if (EmergeLayoutEngine *engine = m_controller->activeEmergeLayoutEngine()) {
+        engine->focusColumn(index);
     }
 }
 

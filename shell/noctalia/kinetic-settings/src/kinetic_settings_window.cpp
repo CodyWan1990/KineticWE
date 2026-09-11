@@ -19,16 +19,22 @@
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
+#include "util/string_utils.h"
 #include "wayland/toplevel_surface.h"
 #include "wayland/wayland_connection.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <numbers>
 
 namespace {
 
   constexpr Logger kLog("kinetic-settings");
+
+  // Coalesces rapid typing into one cross-page rebuild. Global search builds
+  // every page, so rebuilding on each keystroke is noticeably wasteful.
+  constexpr auto kSearchDebounceInterval = std::chrono::milliseconds(120);
 
   constexpr float kWindowOutputFraction = 0.66F;
   constexpr float kGoldenRatio = std::numbers::phi_v<float>;
@@ -248,6 +254,9 @@ void KineticSettingsWindow::destroyWindow() {
   m_background = nullptr;
   m_pageContainer = nullptr;
   m_mainContainer = nullptr;
+  m_searchInput = nullptr;
+  m_focusSearchOnRebuild = false;
+  m_searchDebounceTimer.stop();
 
   // Fresh filters on the next open (Noctalia resets search + Overridden the
   // same way); the Advanced toggle keeps its session value.
@@ -983,6 +992,41 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
   return false;
 }
 
+bool KineticSettingsWindow::anyPageHasPending() const {
+  const auto pending = [](const auto& page) { return page != nullptr && page->hasPending(); };
+  return pending(m_tilingPage) || pending(m_workspacesPage) || pending(m_keybindsPage) || pending(m_keyboardPage)
+      || pending(m_mousePage) || pending(m_touchpadPage) || pending(m_windowRulesPage)
+      || pending(m_windowBehaviorPage) || pending(m_displayPage) || pending(m_appearancePage)
+      || pending(m_iconsPage) || pending(m_cursorsPage) || pending(m_desktopEffectsPage)
+      || pending(m_animationsPage) || pending(m_defaultAppsPage);
+}
+
+void KineticSettingsWindow::applyAllPages() {
+  const auto applyPending = [](auto& page) {
+    if (page != nullptr && page->hasPending()) {
+      (void)page->applyAll();
+    }
+  };
+  applyPending(m_tilingPage);
+  applyPending(m_workspacesPage);
+  applyPending(m_keybindsPage);
+  applyPending(m_keyboardPage);
+  applyPending(m_mousePage);
+  applyPending(m_touchpadPage);
+  applyPending(m_windowRulesPage);
+  applyPending(m_windowBehaviorPage);
+  applyPending(m_displayPage);
+  applyPending(m_appearancePage);
+  applyPending(m_iconsPage);
+  applyPending(m_cursorsPage);
+  applyPending(m_desktopEffectsPage);
+  applyPending(m_animationsPage);
+  applyPending(m_defaultAppsPage);
+  clearArmedResets();
+  // A page whose write failed keeps its staged edits and shows an on-page error.
+  requestSceneRebuild();
+}
+
 std::unique_ptr<Flex> KineticSettingsWindow::buildFilterRow(float scale) {
   auto filters = ui::row({
       .align = FlexAlign::Center,
@@ -992,6 +1036,7 @@ std::unique_ptr<Flex> KineticSettingsWindow::buildFilterRow(float scale) {
   });
 
   filters->addChild(ui::input({
+      .out = &m_searchInput,
       .value = m_searchQuery,
       .placeholder = i18n::tr("settings.window.search-placeholder"),
       .fontSize = Style::fontSizeBody * scale,
@@ -1001,9 +1046,21 @@ std::unique_ptr<Flex> KineticSettingsWindow::buildFilterRow(float scale) {
       .width = 320.0F * scale,
       .height = Style::controlHeight * scale,
       .onChange = [this](const std::string& value) {
+        const bool wasSearchActive = !m_searchQuery.empty();
         m_searchQuery = value;
         clearArmedResets();
-        requestContentRebuild();
+        if (wasSearchActive != !m_searchQuery.empty()) {
+          // Entering/leaving global search swaps the filter row (Reset button,
+          // Apply scope) and the sidebar highlight, so rebuild the whole scene
+          // and restore focus to the rebuilt search field.
+          m_searchDebounceTimer.stop();
+          m_focusSearchOnRebuild = true;
+          requestSceneRebuild();
+        } else {
+          // Typing within a query only re-filters the merged results; coalesce
+          // bursts so every key repeat doesn't rebuild all pages.
+          m_searchDebounceTimer.start(kSearchDebounceInterval, [this]() { requestContentRebuild(); });
+        }
       },
   }));
   filters->addChild(ui::spacer());
@@ -1038,7 +1095,7 @@ std::unique_ptr<Flex> KineticSettingsWindow::buildFilterRow(float scale) {
       },
   }));
 
-  if (activeHasResettableSettings()) {
+  if (m_searchQuery.empty() && activeHasResettableSettings()) {
     filters->addChild(ui::button({
         .text = i18n::tr(m_resetPageArmed ? "settings.window.reset-page-confirm" : "settings.window.reset-page"),
         .fontSize = Style::fontSizeCaption * scale,
@@ -1059,10 +1116,12 @@ std::unique_ptr<Flex> KineticSettingsWindow::buildFilterRow(float scale) {
     }));
   }
 
-  // Apply: flushes every staged edit on the active page with one file write
-  // (workspaces also D-Bus syncs the workspace list) + one compositor reload.
-  // Always visible; enabled only while there are unapplied changes.
-  const bool hasPending = activeHasPending();
+  // Apply: flushes the staged edits with one file write (workspaces also D-Bus
+  // syncs the workspace list) + one compositor reload. While a global search is
+  // active the results span pages, so Apply flushes every page with pending
+  // edits; otherwise it flushes only the active page. Always visible; enabled
+  // only while there are unapplied changes.
+  const bool hasPending = m_searchQuery.empty() ? activeHasPending() : anyPageHasPending();
   filters->addChild(ui::button({
       .text = "Apply",
       .fontSize = Style::fontSizeCaption * scale,
@@ -1072,7 +1131,13 @@ std::unique_ptr<Flex> KineticSettingsWindow::buildFilterRow(float scale) {
       .paddingV = Style::spaceXs * scale,
       .paddingH = Style::spaceMd * scale,
       .radius = Style::scaledRadiusMd(scale),
-      .onClick = [this]() { applyActivePage(); },
+      .onClick = [this]() {
+        if (m_searchQuery.empty()) {
+          applyActivePage();
+        } else {
+          applyAllPages();
+        }
+      },
   }));
 
   return filters;
@@ -1105,6 +1170,9 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   // whole scene (not just the content) is rebuilt.
   const auto selectPage = [this](ActivePage page) {
     m_activePage = page;
+    // Picking a page leaves global search (Noctalia clears the query the same
+    // way), so the page shows its full content rather than the merged results.
+    m_searchQuery.clear();
     clearArmedResets();
     requestSceneRebuild();
   };
@@ -1137,7 +1205,8 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   // Secondary nav rows: indented, compact, one per sub-page. Mirrors Noctalia's
   // settings_sidebar secondary nav ("paddingLeft = spaceLg").
   const auto addSubNav = [&](ActivePage page, std::string_view glyph, std::string_view text) {
-    const bool selected = m_activePage == page;
+    // No page is highlighted while global search results are shown.
+    const bool selected = m_searchQuery.empty() && m_activePage == page;
     nav->addChild(ui::button({
         .text = std::string(text),
         .glyph = std::string(glyph),
@@ -1214,44 +1283,84 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   return sidebarScroll;
 }
 
-void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
-  if (m_pageContainer == nullptr) {
-    return;
+std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
+  switch (page) {
+  case ActivePage::AppearanceGlobalTheme:
+    return "appearance global theme look and feel colors palette";
+  case ActivePage::AppearanceIcons:
+    return "appearance icons icon theme";
+  case ActivePage::AppearanceCursors:
+    return "appearance cursors cursor theme pointer size";
+  case ActivePage::Animations:
+    return "appearance animations animation speed effects";
+  case ActivePage::DesktopEffects:
+    return "appearance desktop effects blur wobbly";
+  case ActivePage::Keyboard:
+    return "input output keyboard input devices key repeat num lock";
+  case ActivePage::Mouse:
+    return "input output mouse pointer devices";
+  case ActivePage::Touchpad:
+    return "input output touchpad trackpad pointer devices";
+  case ActivePage::Keybinds:
+    return "input output keybinds keyboard shortcuts keys bindings";
+  case ActivePage::Displays:
+    return "input output displays display monitor screen";
+  case ActivePage::WindowBehavior:
+    return "window management window behavior focus raise";
+  case ActivePage::Workspaces:
+    return "window management workspaces virtual desktops";
+  case ActivePage::Tiling:
+    return "window management tiling tiles layout gaps";
+  case ActivePage::WindowRules:
+    return "window management window rules title bar opacity";
+  case ActivePage::DefaultApps:
+    return "system default apps applications browser terminal";
   }
-  removeAllChildren(*m_pageContainer);
-  switch (m_activePage) {
+  return {};
+}
+
+std::unique_ptr<Node> KineticSettingsWindow::buildPageNode(ActivePage page, Renderer& renderer) {
+  // Noctalia folds a section's name into every entry's search text, so a query
+  // like "keyboard" or "keybinds" surfaces the whole page. Mirror that: when
+  // the query names the page, build it with the query cleared (all rows shown).
+  const bool pageNamed =
+      !m_searchQuery.empty() && StringUtils::containsInsensitive(pageKeywords(page), m_searchQuery);
+  if (!pageNamed) {
+    return buildPageNodeWithQuery(page, renderer);
+  }
+  const std::string activeQuery = m_searchQuery;
+  m_searchQuery.clear();
+  auto node = buildPageNodeWithQuery(page, renderer);
+  m_searchQuery = activeQuery;
+  return node;
+}
+
+std::unique_ptr<Node> KineticSettingsWindow::buildPageNodeWithQuery(ActivePage page, Renderer& renderer) {
+  switch (page) {
   case ActivePage::AppearanceGlobalTheme:
     if (m_appearancePage != nullptr) {
-      m_pageContainer->addChild(
-          m_appearancePage->build(uiScale(), appearanceFilter(), m_armedResetKeyPath, appearancePageCallbacks())
-      );
+      return m_appearancePage->build(uiScale(), appearanceFilter(), m_armedResetKeyPath, appearancePageCallbacks());
     }
     break;
   case ActivePage::AppearanceIcons:
     if (m_iconsPage != nullptr) {
-      m_pageContainer->addChild(
-          m_iconsPage->build(uiScale(), renderer, iconsFilter(), m_armedResetKeyPath, iconsPageCallbacks())
-      );
+      return m_iconsPage->build(uiScale(), renderer, iconsFilter(), m_armedResetKeyPath, iconsPageCallbacks());
     }
     break;
   case ActivePage::AppearanceCursors:
     if (m_cursorsPage != nullptr) {
-      m_pageContainer->addChild(
-          m_cursorsPage->build(uiScale(), renderer, cursorsFilter(), m_armedResetKeyPath, cursorsPageCallbacks())
-      );
+      return m_cursorsPage->build(uiScale(), renderer, cursorsFilter(), m_armedResetKeyPath, cursorsPageCallbacks());
     }
     break;
   case ActivePage::Animations:
     if (m_animationsPage != nullptr) {
-      m_pageContainer->addChild(
-          m_animationsPage->build(uiScale(), animationsFilter(), m_armedResetKeyPath, animationsPageCallbacks())
-      );
+      return m_animationsPage->build(uiScale(), animationsFilter(), m_armedResetKeyPath, animationsPageCallbacks());
     }
     break;
   case ActivePage::DesktopEffects:
     if (m_desktopEffectsPage != nullptr) {
-      m_pageContainer->addChild(
-          m_desktopEffectsPage->build(uiScale(), desktopEffectsFilter(), m_armedResetKeyPath, desktopEffectsPageCallbacks())
+      return m_desktopEffectsPage->build(
+          uiScale(), desktopEffectsFilter(), m_armedResetKeyPath, desktopEffectsPageCallbacks()
       );
     }
     break;
@@ -1261,82 +1370,131 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
       // monitor list comes from the shell's Wayland connection (connector
       // names match the compositor's [Tiling][DesktopOutput <n>:<out>] keys).
       std::vector<std::string> outputs;
-      for (const auto& info : m_wayland->outputs()) {
-        if (!info.connectorName.empty()) {
-          outputs.push_back(info.connectorName);
+      if (m_wayland != nullptr) {
+        for (const auto& info : m_wayland->outputs()) {
+          if (!info.connectorName.empty()) {
+            outputs.push_back(info.connectorName);
+          }
         }
       }
       m_tilingPage->setConnectedOutputs(std::move(outputs));
-      m_pageContainer->addChild(
-          m_tilingPage->build(uiScale(), pageFilter(), m_armedResetKeyPath, tilingPageCallbacks())
-      );
+      return m_tilingPage->build(uiScale(), pageFilter(), m_armedResetKeyPath, tilingPageCallbacks());
     }
     break;
   case ActivePage::Workspaces:
     if (m_workspacesPage != nullptr) {
-      m_pageContainer->addChild(
-          m_workspacesPage->build(uiScale(), workspacesFilter(), m_armedResetKeyPath, workspacesPageCallbacks())
-      );
+      return m_workspacesPage->build(uiScale(), workspacesFilter(), m_armedResetKeyPath, workspacesPageCallbacks());
     }
     break;
   case ActivePage::WindowRules:
     if (m_windowRulesPage != nullptr) {
-      m_pageContainer->addChild(
-          m_windowRulesPage->build(uiScale(), windowRulesFilter(), windowRulesPageCallbacks())
-      );
+      return m_windowRulesPage->build(uiScale(), windowRulesFilter(), windowRulesPageCallbacks());
     }
     break;
   case ActivePage::WindowBehavior:
     if (m_windowBehaviorPage != nullptr) {
-      m_pageContainer->addChild(
-          m_windowBehaviorPage->build(
-              uiScale(), windowBehaviorFilter(), m_armedResetKeyPath, windowBehaviorPageCallbacks()
-          )
+      return m_windowBehaviorPage->build(
+          uiScale(), windowBehaviorFilter(), m_armedResetKeyPath, windowBehaviorPageCallbacks()
       );
     }
     break;
   case ActivePage::Keyboard:
     if (m_keyboardPage != nullptr) {
-      m_pageContainer->addChild(
-          m_keyboardPage->build(uiScale(), keyboardFilter(), m_armedResetKeyPath, keyboardPageCallbacks())
-      );
+      return m_keyboardPage->build(uiScale(), keyboardFilter(), m_armedResetKeyPath, keyboardPageCallbacks());
     }
     break;
   case ActivePage::Touchpad:
     if (m_touchpadPage != nullptr) {
-      m_pageContainer->addChild(
-          m_touchpadPage->build(uiScale(), touchpadFilter(), m_armedResetKeyPath, touchpadPageCallbacks())
-      );
+      return m_touchpadPage->build(uiScale(), touchpadFilter(), m_armedResetKeyPath, touchpadPageCallbacks());
     }
     break;
   case ActivePage::Mouse:
     if (m_mousePage != nullptr) {
-      m_pageContainer->addChild(
-          m_mousePage->build(uiScale(), mouseFilter(), m_armedResetKeyPath, mousePageCallbacks())
-      );
+      return m_mousePage->build(uiScale(), mouseFilter(), m_armedResetKeyPath, mousePageCallbacks());
     }
     break;
   case ActivePage::Keybinds:
     if (m_keybindsPage != nullptr) {
-      m_pageContainer->addChild(
-          m_keybindsPage->build(uiScale(), keybindsFilter(), keybindsPageCallbacks())
-      );
+      return m_keybindsPage->build(uiScale(), keybindsFilter(), keybindsPageCallbacks());
     }
     break;
   case ActivePage::Displays:
     if (m_displayPage != nullptr) {
-      m_pageContainer->addChild(
-          m_displayPage->build(uiScale(), displayFilter(), m_armedResetKeyPath, displayPageCallbacks())
-      );
+      return m_displayPage->build(uiScale(), displayFilter(), m_armedResetKeyPath, displayPageCallbacks());
     }
     break;
   case ActivePage::DefaultApps:
     if (m_defaultAppsPage != nullptr) {
-      m_pageContainer->addChild(
-          m_defaultAppsPage->build(uiScale(), defaultAppsFilter(), m_armedResetKeyPath, defaultAppsPageCallbacks())
+      return m_defaultAppsPage->build(
+          uiScale(), defaultAppsFilter(), m_armedResetKeyPath, defaultAppsPageCallbacks()
       );
     }
     break;
+  }
+  return nullptr;
+}
+
+void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
+  if (m_pageContainer == nullptr) {
+    return;
+  }
+  removeAllChildren(*m_pageContainer);
+  if (!m_searchQuery.empty()) {
+    // Global search: merge the matching settings of every page into one list.
+    rebuildSearchResults(renderer);
+    return;
+  }
+  if (auto node = buildPageNode(m_activePage, renderer); node != nullptr) {
+    m_pageContainer->addChild(std::move(node));
+  }
+}
+
+void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
+  // Mirrors the sidebar order so results read top-to-bottom by category. Pages
+  // return nullptr when nothing in them matches the query.
+  static constexpr ActivePage kSearchPageOrder[] = {
+      ActivePage::AppearanceGlobalTheme, ActivePage::AppearanceIcons,   ActivePage::AppearanceCursors,
+      ActivePage::Animations,            ActivePage::DesktopEffects,    ActivePage::Keyboard,
+      ActivePage::Mouse,                 ActivePage::Touchpad,          ActivePage::Keybinds,
+      ActivePage::Displays,              ActivePage::WindowBehavior,    ActivePage::Workspaces,
+      ActivePage::Tiling,                ActivePage::WindowRules,       ActivePage::DefaultApps,
+  };
+
+  // Icons and Cursors rescan the theme directories and decode a preview image
+  // per matching theme on every rebuild. A one-character query matches whole
+  // swathes of theme names, so skip those two pages until the query narrows.
+  const bool skipThemePages = m_searchQuery.size() < 2;
+
+  bool any = false;
+  for (const ActivePage page : kSearchPageOrder) {
+    if (skipThemePages && (page == ActivePage::AppearanceIcons || page == ActivePage::AppearanceCursors)) {
+      continue;
+    }
+    if (auto node = buildPageNode(page, renderer); node != nullptr) {
+      m_pageContainer->addChild(std::move(node));
+      any = true;
+    }
+  }
+
+  if (!any) {
+    const float scale = uiScale();
+    m_pageContainer->addChild(ui::column(
+        {.align = FlexAlign::Center,
+         .justify = FlexJustify::Center,
+         .gap = Style::spaceSm * scale,
+         .padding = Style::spaceLg * scale,
+         .fillWidth = true},
+        ui::label({
+            .text = i18n::tr("settings.window.no-results"),
+            .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        }),
+        ui::label({
+            .text = i18n::tr("settings.window.no-results-hint"),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        })
+    ));
   }
 }
 
@@ -1424,6 +1582,16 @@ void KineticSettingsWindow::buildScene(float width, float height) {
   m_mainContainer = static_cast<Flex*>(m_sceneRoot->addChild(std::move(main)));
   m_inputDispatcher.setSceneRoot(m_sceneRoot.get());
   m_surface->setSceneRoot(m_sceneRoot.get());
+
+  // Entering/leaving global search rebuilds the whole scene (the filter row's
+  // Apply/Reset and the sidebar highlight change); put the keyboard focus back
+  // in the search field so typing continues uninterrupted.
+  if (m_focusSearchOnRebuild) {
+    m_focusSearchOnRebuild = false;
+    if (m_searchInput != nullptr && m_searchInput->inputArea() != nullptr) {
+      m_inputDispatcher.setFocus(m_searchInput->inputArea());
+    }
+  }
 }
 
 

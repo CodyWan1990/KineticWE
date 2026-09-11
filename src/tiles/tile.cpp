@@ -178,6 +178,12 @@ RectF Tile::windowGeometry() const
     effectiveMargins.setBottom(m_relativeGeometry.bottom() < 1.0 ? m_gapBetween / 2.0 : m_gapMargins.bottom());
 
     const auto geom = absoluteGeometry();
+    // A scrolling tile may sit beyond the output edge; keep its true geometry
+    // instead of clipping it to the output (which would collapse an off-screen
+    // window to an empty rect). Bounded layouts never set the flag.
+    if (m_allowOffscreen) {
+        return geom - effectiveMargins;
+    }
     return geom.intersected(m_tiling->output()->geometryF()) - effectiveMargins;
 }
 
@@ -212,6 +218,16 @@ Qt::Edges Tile::anchors() const
 bool Tile::isRoot() const
 {
     return !m_parentTile;
+}
+
+bool Tile::allowOffscreen() const
+{
+    return m_allowOffscreen;
+}
+
+void Tile::setAllowOffscreen(bool allow)
+{
+    m_allowOffscreen = allow;
 }
 
 bool Tile::isLayout() const

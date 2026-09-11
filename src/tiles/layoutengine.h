@@ -42,6 +42,7 @@ public:
         Monocle = 3,
         AutoGrid = 4,
         Columns = 5,
+        Emerge = 6,
     };
 
     static QString layoutKindToString(LayoutKind kind);
@@ -180,14 +181,14 @@ public:
     virtual Window *primaryWindow() const = 0;
 
     /**
-     * Scrolling-layout support. Bounded layouts return false and ignore viewport.
+     * Emerge-layout support. Bounded layouts return false and ignore viewport.
      */
     virtual bool supportsViewport() const { return false; }
     virtual void setViewportOffset(qreal offset) { Q_UNUSED(offset) }
     virtual qreal viewportOffset() const { return 0.0; }
 
     /**
-     * Scrolling-specific column actions. No-op for non-scrolling layouts.
+     * Emerge-specific column actions. No-op for bounded layouts.
      */
     virtual void focusColumnLeft() {}
     virtual void focusColumnRight() {}

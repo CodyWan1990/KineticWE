@@ -95,6 +95,18 @@ public:
     bool isLayout() const;
     bool canBeRemoved() const;
 
+    /**
+     * Whether this tile may be positioned outside the output's [0,1] relative
+     * bounds. Off by default, so every bounded layout keeps the on-screen
+     * clamp it has always had. Only the scrolling layout opts in: its strip
+     * columns legitimately live beyond the output edge, and those windows must
+     * keep their true (off-screen) geometry rather than being clamped to a
+     * screen edge or clipped away. Honoured by CustomTile::setRelativeGeometry
+     * and Tile::windowGeometry.
+     */
+    bool allowOffscreen() const;
+    void setAllowOffscreen(bool allow);
+
     qreal padding() const;
     void setPadding(qreal padding);
 
@@ -190,6 +202,7 @@ protected:
     qreal m_padding = 4.0;
     qreal m_gapBetween = 0.0;
     QMarginsF m_gapMargins;
+    bool m_allowOffscreen = false;
 };
 
 } // namespace KWin

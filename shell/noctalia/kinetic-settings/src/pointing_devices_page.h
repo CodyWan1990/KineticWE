@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kinetic-settings/src/compositor_dbus.h"
+#include "kinetic-settings/src/kineticwe_kwe.h"
 
 #include <functional>
 #include <map>
@@ -106,8 +107,18 @@ private:
   );
   void addSectionHeader(Flex& parent, std::string_view title, bool& firstSection, float scale);
 
+  // The device to configure when nothing valid is selected/persisted: the most
+  // feature-complete real device (largest button set).
+  [[nodiscard]] std::string pickDefaultDevice() const;
+  // Writes the current selection to kinetic-settings.kwe so it survives a
+  // restart. Re-reads the file first so the sibling page's key is preserved.
+  void persistSelectedDevice();
+
   Kind m_kind;
   CompositorDbus m_dbus;
+  // Persisted page state (selected device per kind), stored in
+  // ~/.config/kineticwe/kinetic-settings.kwe.
+  KineticweKwe m_state;
   // sysName of the device being configured.
   std::string m_selectedDevice;
   // Cached device list of this kind (mice or touchpads).

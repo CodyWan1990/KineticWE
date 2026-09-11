@@ -10,12 +10,12 @@
       <default>true</default>
     </entry>
     <entry name="defaultLayout" key="DefaultLayout" type="String">
-      <label>Default layout used for new (output, desktop) pairs that do not have a per-monitor override. One of "MasterStack", "Stacked", "CenterTile", "Columns", "Monocle", or "AutoGrid".</label>
+      <label>Default layout used for new (output, desktop) pairs that do not have a per-monitor override. One of "MasterStack", "Stacked", "CenterTile", "Columns", "Monocle", "AutoGrid", or "Emerge".</label>
       <default>MasterStack</default>
     </entry>
     <entry name="enabledLayouts" key="EnabledLayouts" type="StringList">
-      <label>Layouts the user wants available for cycleLayout() and setLayout(). The list order also determines the cycle order. Options: MasterStack, Stacked, CenterTile, Columns, Monocle, AutoGrid.</label>
-      <default code="true">QStringList{QStringLiteral("MasterStack"), QStringLiteral("Stacked"), QStringLiteral("CenterTile"), QStringLiteral("Columns"), QStringLiteral("Monocle"), QStringLiteral("AutoGrid")}</default>
+      <label>Layouts the user wants available for cycleLayout() and setLayout(). The list order also determines the cycle order. Options: MasterStack, Stacked, CenterTile, Columns, Monocle, AutoGrid, Emerge.</label>
+      <default code="true">QStringList{QStringLiteral("MasterStack"), QStringLiteral("Stacked"), QStringLiteral("CenterTile"), QStringLiteral("Columns"), QStringLiteral("Monocle"), QStringLiteral("AutoGrid"), QStringLiteral("Emerge")}</default>
     </entry>
     <entry name="gapLeft" key="GapLeft" type="Int">
       <label>Gap between the left screen edge and tiles</label>
@@ -105,6 +105,23 @@
       <default>3</default>
       <min>3</min>
       <max>5</max>
+    </entry>
+    <entry name="emergeAxis" key="EmergeAxis" type="Enum">
+      <label>Direction the Emerge strip runs. Auto picks horizontal on a landscape output and vertical on a portrait one.</label>
+      <choices>
+        <choice name="Auto"/>
+        <choice name="Horizontal"/>
+        <choice name="Vertical"/>
+      </choices>
+      <default>Auto</default>
+    </entry>
+    <entry name="emergePresetColumnWidths" key="EmergePresetColumnWidths" type="StringList">
+      <label>Column-width presets cycled through by the Emerge layout, as fractions of the work area (0-1).</label>
+      <default code="true">QStringList{QStringLiteral("0.333"), QStringLiteral("0.5"), QStringLiteral("0.667"), QStringLiteral("0.75"), QStringLiteral("1")}</default>
+    </entry>
+    <entry name="emergePresetWindowHeights" key="EmergePresetWindowHeights" type="StringList">
+      <label>Stacked-tile height presets used by the Emerge layout, as fractions of the work area (0-1).</label>
+      <default code="true">QStringList{QStringLiteral("0.333"), QStringLiteral("0.5"), QStringLiteral("0.667"), QStringLiteral("0.75"), QStringLiteral("1")}</default>
     </entry>
   </group>
   <group name="TilingRules">

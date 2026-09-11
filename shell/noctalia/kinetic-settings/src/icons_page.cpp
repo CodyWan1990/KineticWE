@@ -381,7 +381,9 @@ std::unique_ptr<Node> IconsPage::build(
   });
 
   // The "System default" tile (empty value = no override).
-  const bool showSystem = !filter.showOverriddenOnly;
+  const bool searchActive = !filter.searchQuery.empty();
+  const bool showSystem = !filter.showOverriddenOnly
+      && (!searchActive || StringUtils::containsInsensitive("System default", filter.searchQuery));
   if (showSystem) {
     grid->addChild(buildTile(
         scale, renderer, "System default", {}, systemSelected,
@@ -406,7 +408,12 @@ std::unique_ptr<Node> IconsPage::build(
     anyTiles = true;
   }
 
-  if (!showSystem && !anyTiles) {
+  const bool anyThemes = showSystem || anyTiles;
+  if (!anyThemes) {
+    if (searchActive) {
+      // Global search drops pages with no hits.
+      return nullptr;
+    }
     root->addChild(makeLabel(
         "No icon themes match the current filters.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)

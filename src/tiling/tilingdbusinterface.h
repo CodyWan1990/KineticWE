@@ -36,8 +36,8 @@ public:
 public Q_SLOTS:
     /**
      * Layout kind string ("MasterStack", "Stacked", "CenterTile", "Monocle",
-     * "AutoGrid", "Columns") in effect for the active output's current
-     * desktop, or an empty string when native tiling is disabled.
+     * "AutoGrid", "Columns", "Emerge") in effect for the active output's
+     * current desktop, or an empty string when native tiling is disabled.
      */
     Q_SCRIPTABLE QString currentLayout() const;
 
@@ -71,6 +71,27 @@ public Q_SLOTS:
      */
     Q_SCRIPTABLE void toggleOuterGaps();
 
+    /**
+     * Column indices of the active output's current-desktop Emerge strip that
+     * sit fully off the leading (left/up) edge of the viewport, ordered from
+     * the farthest column to the nearest. Empty when the active layout is not
+     * Emerge or the strip is empty.
+     */
+    Q_SCRIPTABLE QStringList emergeColumnsLeft() const;
+
+    /**
+     * As emergeColumnsLeft(), for the columns fully off the trailing
+     * (right/down) edge, ordered from the nearest column to the farthest.
+     */
+    Q_SCRIPTABLE QStringList emergeColumnsRight() const;
+
+    /**
+     * Scroll the active output's Emerge strip to the column at @p index and
+     * focus its window. No-op when the active layout is not Emerge or the
+     * index is out of range.
+     */
+    Q_SCRIPTABLE void focusEmergeColumn(int index);
+
 Q_SIGNALS:
     /**
      * Emitted whenever any (output, desktop) layout engine changes kind,
@@ -84,6 +105,14 @@ Q_SIGNALS:
      * Emitted when the enabled-layouts whitelist changes in kwinrc.
      */
     void enabledLayoutsChanged(const QStringList &kinds);
+
+    /**
+     * Emitted whenever the active output's current-desktop Emerge strip
+     * reflows (window opened/closed, focus or view scroll). Consumers should
+     * re-query emergeColumnsLeft()/emergeColumnsRight() rather than assume the
+     * change applies to the output they last queried.
+     */
+    void emergeViewportChanged();
 
 private:
     TilingController *m_controller;

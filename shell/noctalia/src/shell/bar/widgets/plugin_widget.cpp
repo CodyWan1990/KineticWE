@@ -337,6 +337,10 @@ void PluginWidget::doLayout(Renderer& renderer, float containerWidth, float cont
     m_reconciler.setScale(contentScale());
     m_reconciler.setFontScale(fontScaleMultiplier());
     m_reconciler.setTextDefaults(labelFontFamily(), labelFontWeight());
+    // Match the imperative path: declarative label/glyph colors the tree leaves
+    // unset follow the widget's Color / Icon Color settings.
+    m_reconciler.setDefaultTextColor(widgetForegroundOr(colorSpecFromRole(ColorRole::OnSurface)));
+    m_reconciler.setDefaultGlyphColor(widgetIconColorOr(colorSpecFromRole(ColorRole::OnSurface)));
     (void)m_reconciler.reconcile(*m_uiHost, *m_tree, renderer);
     m_uiHost->layout(renderer);
     if (m_area)

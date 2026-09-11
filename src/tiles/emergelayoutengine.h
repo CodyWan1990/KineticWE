@@ -1,0 +1,239 @@
+/*
+    KWin - the KDE window manager
+    SPDX-FileCopyrightText: 2026 KWin Tiling Fork
+
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#pragma once
+
+#include "layoutengine.h"
+#include "tile.h"
+
+#include <QList>
+#include <QPointer>
+
+namespace KWin
+{
+
+class CustomTile;
+class RootTile;
+class Window;
+
+/**
+ * The Emerge layout: an endless strip of columns, modelled on the niri
+ * compositor (and ported from PlasmaZones' scrolling engine).
+ *
+ * Windows form an ordered list of COLUMNS on an unbounded strip; the screen is
+ * a viewport that slides along it. The one invariant everything here serves:
+ * inserting or removing a column NEVER resizes another column — only the
+ * viewport moves. Opening a window therefore does not re-divide the output the
+ * way a bounded tiling layout does.
+ *
+ * A column holds a stack of tiles; with EmergeColumnDisplay::Tabbed only the
+ * active tile is shown and the rest are parked off-view.
+ *
+ * Coordinates are relative to the output's client area: the main axis (along
+ * the strip) and the cross axis (within a column) each span [0,1]. The view is
+ * expressed as an offset along the main axis, kept through an anchor stored
+ * RELATIVE to the active column so that structural changes before the focus do
+ * not make the focused window drift.
+ */
+
+/** How a column resolves its main-axis extent. */
+enum class EmergeWidthKind {
+    Proportion, ///< fraction of the viewport
+    Fixed,      ///< absolute pixels
+    Preset,     ///< fraction snapped to the nearest preset-list entry
+};
+
+/** How a tile resolves its cross-axis extent within a column. */
+enum class EmergeHeightKind {
+    Auto,   ///< share of the leftover cross extent, by weight
+    Fixed,  ///< absolute pixels
+    Preset, ///< fraction snapped to the nearest preset-list entry
+};
+
+/** How a column presents its tiles. */
+enum class EmergeColumnDisplay {
+    Normal, ///< stacked across the cross axis; all tiles visible
+    Tabbed, ///< only the active tile is shown
+};
+
+struct EmergeColumnWidth
+{
+    EmergeWidthKind kind = EmergeWidthKind::Proportion;
+    qreal proportion = 1.0;
+    int fixedPx = 0;
+    qreal presetFraction = 0.5;
+};
+
+struct EmergeWindowHeight
+{
+    EmergeHeightKind kind = EmergeHeightKind::Auto;
+    qreal weight = 1.0;
+    int fixedPx = 0;
+    qreal presetFraction = 0.5;
+};
+
+/** One window in a column, together with the leaf that carries it. */
+struct EmergeTile
+{
+    QPointer<CustomTile> leaf;
+    EmergeWindowHeight height;
+};
+
+/** One column: a stack of tiles across the strip. */
+struct EmergeColumn
+{
+    QList<EmergeTile> tiles;
+    int activeTileIdx = 0;
+    /// The column's width. It only changes when the user cycles/resizes the
+    /// column; the view scrolls to keep the focused column visible, so an
+    /// out-of-focus column is pushed off-screen rather than resized.
+    EmergeColumnWidth width;
+    EmergeColumnDisplay display = EmergeColumnDisplay::Normal;
+};
+
+/**
+ * Read-only view of where the strip's viewport currently sits, for external
+ * consumers (the D-Bus bridge and, through it, the Noctalia bar widget).
+ * Columns that are only partly visible are in neither list.
+ */
+struct EmergeViewportSnapshot
+{
+    bool valid = false;      ///< false when there is no active column
+    int activeIndex = -1;    ///< focused column, -1 when the strip is empty
+    qreal viewOffset = 0.0;  ///< main-axis offset of the viewport's leading edge
+    QList<int> columnsLeft;  ///< columns fully before the viewport, farthest first
+    QList<int> columnsRight; ///< columns fully past the viewport, nearest first
+};
+
+class KWIN_EXPORT EmergeLayoutEngine : public LayoutEngine
+{
+    Q_OBJECT
+
+public:
+    explicit EmergeLayoutEngine(QObject *parent = nullptr);
+    ~EmergeLayoutEngine() override;
+
+    LayoutKind layoutKind() const override
+    {
+        return LayoutKind::Emerge;
+    }
+
+    void attach(RootTile *root) override;
+    void addWindow(Window *window) override;
+    void removeWindow(Window *window) override;
+    void moveWindow(Window *window, int delta) override;
+    void beginMoveWindow(Window *window) override;
+    bool endMoveWindow(Window *window, Window *target) override;
+    void cancelMoveWindow(Window *window) override;
+    void consumeWindow(Window *window) override;
+    void expelWindow(Window *window) override;
+    void pruneEmptyLeaves() override;
+    void reflow() override;
+
+    QList<Window *> windows() const override;
+    Window *primaryWindow() const override;
+    Window *windowInDirection(Window *from, FocusDirection direction) const override;
+
+    // Emerge surface (the hooks the base class already declares).
+    bool supportsViewport() const override
+    {
+        return true;
+    }
+    void setViewportOffset(qreal offset) override;
+    qreal viewportOffset() const override;
+
+    void focusColumnLeft() override;
+    void focusColumnRight() override;
+    void moveColumnLeft() override;
+    void moveColumnRight() override;
+    void switchPresetColumnWidth() override;
+
+    /// Scroll the strip to the column holding @p window, if it is a strip
+    /// tile. Called by TilingController when compositor focus changes, so the
+    /// view follows focus the way niri does.
+    void focusWindow(Window *window);
+
+    /// Snapshot of which columns sit fully off each edge of the viewport,
+    /// for the D-Bus bridge.
+    EmergeViewportSnapshot viewportSnapshot() const;
+
+    /// Scroll the strip to the column at @p index and focus its window.
+    /// No-op for an out-of-range index.
+    void focusColumn(int index);
+
+    bool supportsPerTileResize() const override
+    {
+        return true;
+    }
+    void adjustTileSize(Window *window, qreal weightDelta, Qt::Orientation axis) override;
+    void adjustColumnRatio(qreal delta) override;
+
+    // ── Config, pushed from TilingController ────────────────────────────────
+    void setEmergePresetColumnWidths(const QList<qreal> &presets);
+    void setEmergePresetWindowHeights(const QList<qreal> &presets);
+    /** 0 = auto (from output aspect), 1 = horizontal, 2 = vertical. */
+    void setEmergeAxis(int axis);
+
+private:
+    // Strip geometry (all in relative [0,1] units of the client area).
+    qreal resolveColumnExtentRel(const EmergeColumn &col) const;
+    qreal resolveColumnExtentRel(const EmergeColumnWidth &width) const;
+    void resolveCrossExtents(const EmergeColumn &col, QList<qreal> &out) const;
+    qreal columnStripPos(int index) const;
+    qreal stripExtent() const;
+    qreal viewOffset() const;
+    qreal clampedAnchorFor(int columnIndex, qreal anchor) const;
+    qreal focusAnchorFor(int targetIdx, int prevIdx, qreal oldViewOffset) const;
+    void setActiveColumn(int newIndex);
+    void focusAdjacentColumn(int delta);
+
+    RectF makeRect(qreal mainPos, qreal crossPos, qreal mainExtent, qreal crossExtent) const;
+    Qt::Orientation effectiveAxis() const;
+    qreal outputMainPx() const;
+    qreal outputCrossPx() const;
+
+    /// Place a tile: park it below every output when it is fully off-view,
+    /// clamp a straddler to the output edge, or lay it out normally.
+    void setTileRect(CustomTile *leaf, qreal mainPos, qreal crossPos, qreal mainExtent, qreal crossExtent,
+                     int unionBottom);
+    /// Move a tile to the region just below the union of all outputs, where no
+    /// monitor can draw it (no neighbour bleed on any multi-monitor layout).
+    void parkTile(CustomTile *leaf, qreal mainExtent, qreal crossExtent, int unionBottom);
+    /// Bottom edge (global) of the union of every output's geometry.
+    int unionBottomPx() const;
+    void ensureAxisShortcutRegistered();
+    QPointer<QAction> m_panAction;
+
+    int columnOfWindow(Window *window) const;
+    int tileIndexOfWindow(Window *window) const;
+    int totalLeafCount() const;
+    void rebalanceColumnWidths();
+    /// Scale every column up proportionally when the strip's total width would
+    /// fall below one viewport, so the screen is never left partly empty.
+    void normalizeWidthsToFill();
+
+    QPointer<RootTile> m_root;
+    QList<EmergeColumn> m_columns;
+    int m_activeColumnIdx = -1;
+
+    /// Active column's leading edge within the viewport (relative main units).
+    /// Stored active-relative so an insert/remove before the focus does not
+    /// move the focused column. The view offset is derived from it.
+    qreal m_viewAnchor = 0.0;
+
+    Qt::Orientation m_axis = Qt::Horizontal;
+
+    // Config (pushed from kwinrc via TilingController).
+    QList<qreal> m_presetColumnWidths{1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0};
+    QList<qreal> m_presetWindowHeights{1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0};
+    int m_axisSetting = 0; // 0 auto, 1 horizontal, 2 vertical
+
+    // Drag-move bookkeeping.
+    QPointer<CustomTile> m_moveSourceLeaf;
+};
+
+} // namespace KWin

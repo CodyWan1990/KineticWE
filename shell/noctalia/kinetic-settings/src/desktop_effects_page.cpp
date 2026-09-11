@@ -458,6 +458,11 @@ std::unique_ptr<Node> DesktopEffectsPage::build(
   }
 
   if (!anyRows) {
+    // Global search merges hits from every page and drops pages with none, so
+    // an empty page must not render its own empty-state notice.
+    if (!filter.searchQuery.empty()) {
+      return nullptr;
+    }
     root->addChild(makeLabel(
         "No effects match the current filters.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)

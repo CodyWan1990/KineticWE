@@ -299,6 +299,9 @@ std::vector<CompositorDbus::InputDeviceInfo> CompositorDbus::inputDevices() {
       info.pointer = inputDeviceBool(sysName, "pointer").value_or(false);
       info.touchpad = inputDeviceBool(sysName, "touchpad").value_or(false);
       info.touch = inputDeviceBool(sysName, "touch").value_or(false);
+      info.keyboard = inputDeviceBool(sysName, "keyboard").value_or(false);
+      info.isVirtual = inputDeviceBool(sysName, "isVirtual").value_or(false);
+      info.supportedButtons = inputDeviceInt(sysName, "supportedButtons").value_or(0);
       info.vendor = inputDeviceUint(sysName, "vendor").value_or(0);
       info.product = inputDeviceUint(sysName, "product").value_or(0);
       if (info.name.empty()) {
@@ -337,6 +340,16 @@ std::optional<std::uint32_t> CompositorDbus::inputDeviceUint(std::string_view sy
     const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
     auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
     return proxy->getProperty(std::string(property)).onInterface(kInputDeviceInterface).get<std::uint32_t>();
+  } catch (const sdbus::Error& e) {
+    return std::nullopt;
+  }
+}
+
+std::optional<int> CompositorDbus::inputDeviceInt(std::string_view sysName, std::string_view property) {
+  try {
+    const std::string devicePath = "/org/kde/KWin/InputDevice/" + std::string(sysName);
+    auto proxy = sdbus::createProxy(m_bus.connection(), kKwinBusName, sdbus::ObjectPath{devicePath});
+    return proxy->getProperty(std::string(property)).onInterface(kInputDeviceInterface).get<int>();
   } catch (const sdbus::Error& e) {
     return std::nullopt;
   }

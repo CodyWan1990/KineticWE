@@ -447,7 +447,9 @@ std::unique_ptr<Node> CursorsPage::build(
       .fillWidth = true,
   });
 
-  const bool showSystem = !filter.showOverriddenOnly;
+  const bool searchActive = !filter.searchQuery.empty();
+  const bool showSystem = !filter.showOverriddenOnly
+      && (!searchActive || StringUtils::containsInsensitive("System default", filter.searchQuery));
   if (showSystem) {
     grid->addChild(buildTile(
         scale, renderer, "System default", {}, systemSelected,
@@ -472,17 +474,27 @@ std::unique_ptr<Node> CursorsPage::build(
     anyTiles = true;
   }
 
-  if (!showSystem && !anyTiles) {
+  const bool anyThemes = showSystem || anyTiles;
+  const bool matchSize = !searchActive
+      || StringUtils::containsInsensitive("Cursor size", filter.searchQuery)
+      || StringUtils::containsInsensitive("size", filter.searchQuery);
+  if (!searchActive && !anyThemes) {
     root->addChild(makeLabel(
         "No cursor themes match the current filters.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)
     ));
   }
+  if (searchActive && !anyThemes && !matchSize) {
+    // Global search drops pages with no hits.
+    return nullptr;
+  }
 
   root->addChild(std::move(grid));
 
   // Cursor size selector.
-  root->addChild(ui::separator());
+  if (!searchActive || matchSize) {
+    root->addChild(ui::separator());
+  }
 
   auto sizeRow = ui::row({
       .align = FlexAlign::Center,
@@ -529,7 +541,9 @@ std::unique_ptr<Node> CursorsPage::build(
         }
       },
   }));
-  root->addChild(std::move(sizeRow));
+  if (!searchActive || matchSize) {
+    root->addChild(std::move(sizeRow));
+  }
 
   return root;
 }

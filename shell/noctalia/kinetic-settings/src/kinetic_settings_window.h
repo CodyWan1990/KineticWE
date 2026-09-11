@@ -15,6 +15,7 @@
 #include "kinetic-settings/src/window_rules_page.h"
 #include "kinetic-settings/src/workspaces_page.h"
 
+#include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "render/scene/input_dispatcher.h"
 #include "render/scene/node.h"
@@ -24,11 +25,13 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 class Box;
 class CustomKeybinds;
 class Flex;
+class Input;
 class RenderContext;
 class Renderer;
 class SelectDropdownPopup;
@@ -107,6 +110,17 @@ private:
   // Rebuilds the content area only. The renderer is required by the Icons and
   // Cursors pages to load preview images.
   void rebuildContent(Renderer& renderer);
+  // Builds one page with the current filters. Returns nullptr when the page is
+  // empty (only possible while a global search is active).
+  [[nodiscard]] std::unique_ptr<Node> buildPageNode(ActivePage page, Renderer& renderer);
+  // The page builder proper; buildPageNode wraps it to handle page-name matches.
+  [[nodiscard]] std::unique_ptr<Node> buildPageNodeWithQuery(ActivePage page, Renderer& renderer);
+  // Page name/category words folded into global search, mirroring Noctalia's
+  // per-section search text (so "keyboard" or "keybinds" surfaces the page).
+  [[nodiscard]] static std::string_view pageKeywords(ActivePage page);
+  // Merged cross-page results: builds every page with a match and stacks them,
+  // or shows the no-results message when nothing matches.
+  void rebuildSearchResults(Renderer& renderer);
   void clearArmedResets() noexcept;
 
   [[nodiscard]] std::unique_ptr<Flex> buildFilterRow(float scale);
@@ -149,6 +163,10 @@ private:
   void resetActivePage();
   [[nodiscard]] bool activeHasPending() const;
   [[nodiscard]] bool activeHasResettableSettings() const;
+  // True when any page has unapplied edits. While a global search is active the
+  // results span several pages, so Apply flushes all of them at once.
+  [[nodiscard]] bool anyPageHasPending() const;
+  void applyAllPages();
   [[nodiscard]] float uiScale() const noexcept { return m_uiScale; }
 
   WaylandConnection* m_wayland = nullptr;
@@ -196,6 +214,11 @@ private:
   // Filter-row chrome state. Search/Overridden reset when the window closes
   // (mirroring Noctalia); Advanced persists for the session.
   std::string m_searchQuery;
+  // Search input of the current filter row; used to restore keyboard focus after
+  // the full rebuild that entering/leaving global search triggers.
+  Input* m_searchInput = nullptr;
+  bool m_focusSearchOnRebuild = false;
+  Timer m_searchDebounceTimer;
   bool m_showAdvanced = false;
   bool m_showOverriddenOnly = false;
   // Two-stage reset confirmations: the per-setting armed row ("group.key")

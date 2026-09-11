@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ui/palette.h"
+
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -86,6 +88,11 @@ namespace ui {
       m_defaultFontFamily = std::move(fontFamily);
       m_defaultFontWeight = fontWeight;
     }
+    // Host colors for label/glyph nodes whose `color` prop is unset, so
+    // declarative text matches the host's imperative color (e.g. the bar's
+    // per-widget Color / Icon Color settings). Unset leaves the control default.
+    void setDefaultTextColor(std::optional<ColorSpec> color) { m_defaultTextColor = std::move(color); }
+    void setDefaultGlyphColor(std::optional<ColorSpec> color) { m_defaultGlyphColor = std::move(color); }
     // Compact control chrome for space-tight hosts (bar widgets): buttons drop
     // the settings-tier min-height/padding and hug their content instead.
     void setCompactControls(bool compact) { m_compactControls = compact; }
@@ -140,6 +147,8 @@ namespace ui {
     float m_fontScale = 1.0F;
     std::string m_defaultFontFamily;
     FontWeight m_defaultFontWeight; // initialized in the ctor (opaque enum here)
+    std::optional<ColorSpec> m_defaultTextColor;
+    std::optional<ColorSpec> m_defaultGlyphColor;
     bool m_compactControls = false;
     bool m_dragDropEnabled = false;
     // The node currently reporting hover, with the callback and key it opened

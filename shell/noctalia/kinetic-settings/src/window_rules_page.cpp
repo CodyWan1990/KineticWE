@@ -14,6 +14,7 @@
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
+#include "util/string_utils.h"
 
 #include <algorithm>
 #include <chrono>
@@ -1119,8 +1120,34 @@ bool WindowRulesPage::applyAll() {
 // ---- Build: page -----------------------------------------------------------
 
 std::unique_ptr<Node>
-WindowRulesPage::build(float scale, const Filter& /*filter*/, const Callbacks& callbacks) {
+WindowRulesPage::build(float scale, const Filter& filter, const Callbacks& callbacks) {
   ensureLoaded();
+
+  // Global search (non-empty query) renders this page only when something in it
+  // matches; matching rows are kept and the rest of the page is dropped.
+  const bool searchActive = !filter.searchQuery.empty();
+  const auto searchMatches = [&filter](std::string_view text) {
+    return StringUtils::containsInsensitive(text, filter.searchQuery);
+  };
+  const bool showToggleRow = !searchActive || searchMatches("Toggle title bars")
+      || searchMatches("Remove the title bar and frame on every window");
+  const bool showActiveOpacity =
+      !searchActive || searchMatches("Active opacity") || searchMatches("Opacity of the currently focused window");
+  const bool showInactiveOpacity =
+      !searchActive || searchMatches("Inactive opacity") || searchMatches("Opacity of background windows");
+  const bool showDefaultsCard = showToggleRow || showActiveOpacity || showInactiveOpacity;
+
+  ensureRulesLoaded();
+  bool showRulesSection = !searchActive || searchMatches("Window rules") || searchMatches("rules");
+  if (searchActive && !showRulesSection) {
+    showRulesSection = std::ranges::any_of(m_ruleList, [this, &searchMatches](const Rule& rule) {
+      return searchMatches(ruleDescription(rule));
+    });
+  }
+  if (searchActive && !showDefaultsCard && !showRulesSection) {
+    // Global search drops pages with no hits, so don't render an empty page.
+    return nullptr;
+  }
 
   auto root = ui::column({
       .align = FlexAlign::Stretch,
@@ -1160,68 +1187,78 @@ WindowRulesPage::build(float scale, const Filter& /*filter*/, const Callbacks& c
   }
 
   // Window defaults card ------------------------------------------------------
-  auto card = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .padding = Style::spaceMd * scale,
-      .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
-      .radius = Style::scaledRadiusMd(scale),
-      .fillWidth = true,
-  });
-  card->addChild(makeLabel(
-      "Window defaults", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold
-  ));
+  if (showDefaultsCard) {
+    auto card = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .padding = Style::spaceMd * scale,
+        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
+        .radius = Style::scaledRadiusMd(scale),
+        .fillWidth = true,
+    });
+    card->addChild(makeLabel(
+        "Window defaults", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold
+    ));
 
-  const bool hideTitleBars = effectiveHideTitleBars();
-  auto row = ui::row({
-      .align = FlexAlign::Center,
-      .justify = FlexJustify::SpaceBetween,
-      .gap = Style::spaceSm * scale,
-      .paddingV = 2.0F * scale,
-      .fillWidth = true,
-  });
-  auto copy = ui::column({
-      .align = FlexAlign::Start,
-      .gap = Style::spaceXs * scale,
-      .flexGrow = 1.0F,
-  });
-  copy->addChild(makeLabel(
-      "Toggle title bars", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
-  ));
-  copy->addChild(ui::label({
-      .text =
-          "Remove the title bar and frame on every window, unless a per-window "
-          "rule overrides it for a specific application.",
-      .fontSize = Style::fontSizeCaption * scale,
-      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      .maxLines = 4,
-  }));
-  row->addChild(std::move(copy));
-  row->addChild(ui::toggle({
-      .checked = hideTitleBars,
-      .scale = scale,
-      .onChange =
-          [this, callbacks](bool hide) {
-            stageHideTitleBars(hide, callbacks);
-          },
-  }));
-  card->addChild(std::move(row));
+    if (showToggleRow) {
+      const bool hideTitleBars = effectiveHideTitleBars();
+      auto row = ui::row({
+          .align = FlexAlign::Center,
+          .justify = FlexJustify::SpaceBetween,
+          .gap = Style::spaceSm * scale,
+          .paddingV = 2.0F * scale,
+          .fillWidth = true,
+      });
+      auto copy = ui::column({
+          .align = FlexAlign::Start,
+          .gap = Style::spaceXs * scale,
+          .flexGrow = 1.0F,
+      });
+      copy->addChild(makeLabel(
+          "Toggle title bars", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+      ));
+      copy->addChild(ui::label({
+          .text =
+              "Remove the title bar and frame on every window, unless a per-window "
+              "rule overrides it for a specific application.",
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 4,
+      }));
+      row->addChild(std::move(copy));
+      row->addChild(ui::toggle({
+          .checked = hideTitleBars,
+          .scale = scale,
+          .onChange =
+              [this, callbacks](bool hide) {
+                stageHideTitleBars(hide, callbacks);
+              },
+      }));
+      card->addChild(std::move(row));
+    }
 
-  card->addChild(buildDefaultsRow(
-      "Active opacity", "Opacity of the currently focused window.",
-      makePercentSlider(effectiveActiveOpacity(), [this, callbacks](int value) { stageActiveOpacity(value, callbacks); }, scale),
-      scale
-  ));
-  card->addChild(buildDefaultsRow(
-      "Inactive opacity", "Opacity of background windows.",
-      makePercentSlider(effectiveInactiveOpacity(), [this, callbacks](int value) { stageInactiveOpacity(value, callbacks); }, scale),
-      scale
-  ));
+    if (showActiveOpacity) {
+      card->addChild(buildDefaultsRow(
+          "Active opacity", "Opacity of the currently focused window.",
+          makePercentSlider(effectiveActiveOpacity(), [this, callbacks](int value) { stageActiveOpacity(value, callbacks); }, scale),
+          scale
+      ));
+    }
+    if (showInactiveOpacity) {
+      card->addChild(buildDefaultsRow(
+          "Inactive opacity", "Opacity of background windows.",
+          makePercentSlider(effectiveInactiveOpacity(), [this, callbacks](int value) { stageInactiveOpacity(value, callbacks); }, scale),
+          scale
+      ));
+    }
 
-  root->addChild(std::move(card));
+    root->addChild(std::move(card));
+  }
 
   // Per-window rules ----------------------------------------------------------
-  root->addChild(buildRulesSection(scale, callbacks));
+  if (showRulesSection) {
+    root->addChild(buildRulesSection(scale, callbacks));
+  }
 
   return root;
 }

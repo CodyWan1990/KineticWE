@@ -136,6 +136,8 @@ private:
   static const std::vector<std::string>& colorSourceActiveLabels();
   static const std::vector<std::string>& colorSourceInactiveValues();
   static const std::vector<std::string>& colorSourceInactiveLabels();
+  static const std::vector<std::string>& emergeAxisValues();
+  static const std::vector<std::string>& emergeAxisLabels();
   [[nodiscard]] static Value defaultValue(const Field& field);
   [[nodiscard]] static std::string keyPath(const Field& field);
   [[nodiscard]] static const Field* findField(std::string_view keyPath);

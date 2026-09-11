@@ -1022,6 +1022,11 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
   }
 
   if (m_components.empty() && m_addMode == AddMode::None) {
+    if (!filter.searchQuery.empty()) {
+      // No shortcut service means no searchable settings; drop the page from
+      // the merged results instead of repeating its error notice everywhere.
+      return nullptr;
+    }
     root->addChild(makeLabel(
         "The compositor's shortcut service is unavailable.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)
@@ -1035,6 +1040,43 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
   }
   if (m_addMode == AddMode::Command) {
     root->addChild(buildCommandForm(scale, callbacks));
+    return root;
+  }
+
+  // Global search: the normal layout is component-list + selected component's
+  // actions, which only surfaces matches in the selected component. Instead
+  // scan every component and list the matching actions, grouped by component.
+  if (!filter.searchQuery.empty()) {
+    bool anyRows = false;
+    for (const auto& component : m_components) {
+      std::vector<const KeybindDbus::Action*> matching;
+      for (const auto& action : component.actions) {
+        if (action.actionUnique.starts_with(kSessionActionPrefix)) {
+          continue;
+        }
+        if (matchesFilter(component, action, filter)) {
+          matching.push_back(&action);
+        }
+      }
+      if (matching.empty()) {
+        continue;
+      }
+      if (anyRows) {
+        root->addChild(ui::separator());
+      }
+      root->addChild(makeLabel(
+          component.friendlyName.empty() ? component.uniqueName : component.friendlyName,
+          Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
+      ));
+      for (const KeybindDbus::Action* action : matching) {
+        buildActionRow(*root, component, *action, scale, callbacks);
+      }
+      anyRows = true;
+    }
+    if (!anyRows) {
+      // Global search drops pages with no hits, so don't render the notice.
+      return nullptr;
+    }
     return root;
   }
 

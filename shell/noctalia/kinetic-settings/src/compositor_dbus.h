@@ -110,6 +110,14 @@ public:
     bool pointer = false;
     bool touchpad = false;
     bool touch = false;
+    // A device that also exposes a keyboard capability is not a plain mouse
+    // (Valve Steam Controller pucks, a keyboard's companion "Mouse" interface).
+    bool keyboard = false;
+    // uinput/virtual devices (e.g. ydotoold) have no physical scroll wheel.
+    bool isVirtual = false;
+    // Number of exported mouse buttons; used to prefer a full mouse over a
+    // keyboard/game-controller interface when picking the default device.
+    int supportedButtons = 0;
     std::uint32_t vendor = 0;
     std::uint32_t product = 0;
   };
@@ -122,6 +130,8 @@ public:
   [[nodiscard]] std::optional<bool> inputDeviceBool(std::string_view sysName, std::string_view property);
   [[nodiscard]] std::optional<double> inputDeviceDouble(std::string_view sysName, std::string_view property);
   [[nodiscard]] std::optional<std::uint32_t> inputDeviceUint(std::string_view sysName, std::string_view property);
+  // Same, for properties exported with the D-Bus `i` signature (supportedButtons).
+  [[nodiscard]] std::optional<int> inputDeviceInt(std::string_view sysName, std::string_view property);
   [[nodiscard]] std::optional<std::string> inputDeviceString(std::string_view sysName, std::string_view property);
 
   // Writes one device property. The compositor's setter persists the value to

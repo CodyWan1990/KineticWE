@@ -33,6 +33,8 @@ QString LayoutEngine::layoutKindToString(LayoutKind kind)
         return QStringLiteral("AutoGrid");
     case LayoutKind::Columns:
         return QStringLiteral("Columns");
+    case LayoutKind::Emerge:
+        return QStringLiteral("Emerge");
     }
     return QStringLiteral("MasterStack");
 }
@@ -52,6 +54,8 @@ QString LayoutEngine::layoutDisplayName(LayoutKind kind)
         return QStringLiteral("Auto Grid");
     case LayoutKind::Columns:
         return QStringLiteral("Columns");
+    case LayoutKind::Emerge:
+        return QStringLiteral("Emerge");
     }
     return QStringLiteral("Master & Stack");
 }
@@ -75,6 +79,15 @@ LayoutEngine::LayoutKind LayoutEngine::layoutKindFromString(const QString &name,
     }
     if (name.compare(QLatin1String("Columns"), Qt::CaseInsensitive) == 0) {
         return LayoutKind::Columns;
+    }
+    if (name.compare(QLatin1String("Emerge"), Qt::CaseInsensitive) == 0) {
+        return LayoutKind::Emerge;
+    }
+    // Legacy alias: the layout shipped under the name "Scrolling" before it was
+    // renamed, so old configs (EnabledLayouts / DefaultLayout / per-desktop
+    // overrides) still resolve.
+    if (name.compare(QLatin1String("Scrolling"), Qt::CaseInsensitive) == 0) {
+        return LayoutKind::Emerge;
     }
     return fallback;
 }

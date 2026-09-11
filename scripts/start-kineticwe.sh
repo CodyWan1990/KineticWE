@@ -231,7 +231,7 @@ done
 #     custom-action registration step in CustomKeybinds::initialize() finds
 #     no definitions to register. Keep both files in lockstep.
 # ---------------------------------------------------------------------------
-_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe custom-keybinds.kwe appearance.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
+_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe custom-keybinds.kwe appearance.kwe kinetic-settings.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
 for _entry in "$KWE_CONFIG_HOME"/* "$KWE_CONFIG_HOME"/.[!.]*; do
     [[ -e "$_entry" ]] || continue
     _name="${_entry##*/}"

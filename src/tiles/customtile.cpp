@@ -56,17 +56,21 @@ void CustomTile::setRelativeGeometry(const RectF &geom)
         return;
     }
 
-    RectF finalGeom = geom.intersected(RectF(0, 0, 1, 1));
+    // A scrolling tile may be positioned beyond the output edge, so it opts out
+    // of the on-screen clamp and the out-of-bounds refusal below (see
+    // Tile::allowOffscreen). Bounded layouts leave the flag clear and keep the
+    // historical behaviour byte-for-byte.
+    RectF finalGeom = m_allowOffscreen ? geom : geom.intersected(RectF(0, 0, 1, 1));
     finalGeom.setWidth(std::max(finalGeom.width(), minimumSize().width()));
     finalGeom.setHeight(std::max(finalGeom.height(), minimumSize().height()));
     // We couldn't set the minimum size and still remain in boundaries, do nothing
-    if (finalGeom.right() > 1 || finalGeom.bottom() > 1) {
+    if (!m_allowOffscreen && (finalGeom.right() > 1 || finalGeom.bottom() > 1)) {
         return;
     }
 
     auto *parentT = static_cast<CustomTile *>(parentTile());
 
-    if (!m_geometryLock && parentT && parentT->layoutDirection() != LayoutDirection::Floating) {
+    if (!m_allowOffscreen && !m_geometryLock && parentT && parentT->layoutDirection() != LayoutDirection::Floating) {
         m_geometryLock = true;
         if (finalGeom.left() != relativeGeometry().left()) {
             Tile *tile = nextTileAt(Qt::LeftEdge);
@@ -134,7 +138,7 @@ void CustomTile::setRelativeGeometry(const RectF &geom)
             }
         }
         m_geometryLock = false;
-    } else if (parentT && parentT->layoutDirection() == LayoutDirection::Floating) {
+    } else if (!m_allowOffscreen && parentT && parentT->layoutDirection() == LayoutDirection::Floating) {
         finalGeom = geom.intersected(parentT->relativeGeometry());
     }
 

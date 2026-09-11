@@ -29,6 +29,9 @@ namespace {
   const std::set<std::string>& excludedEffects() {
     static const std::set<std::string> kExcluded{
         "login", "logout", "fadingpopups", "slidingpopups", "slidingnotifications",
+        // KineticWE ships the full-screen ("Stretch") animation disabled and
+        // non-configurable, so it is not exposed on any page.
+        "fullscreen",
         // Geometry Change was reimplemented as a native builtin effect
         // ("geometrychange", Category=Animations, listed on the Animations
         // page). The legacy scripted implementation it replaced
@@ -305,7 +308,6 @@ const GroupInfo* exclusiveGroupInfo(std::string_view group) {
       {"toplevel-open-close-animation", {"Open/Close Animation", "Animation for windows being opened or closed"}},
       {"maximize", {"Maximize Animation", "Animation when windows are maximized or restored"}},
       {"minimize", {"Minimize Animation", "Animation when windows are minimized"}},
-      {"fullscreen", {"Full Screen Animation", "Animation when windows enter or leave fullscreen"}},
       {"magnifiers", {"Magnifier", "Screen magnifier zoom effect"}},
       {"show-desktop", {"Show Desktop Animation", "Animation for showing the desktop"}},
       {"desktop-animations", {"Workspace Switching Animation", "Animation when switching virtual desktops"}},
@@ -322,7 +324,6 @@ const std::set<std::string_view>& animationGroups() {
       "toplevel-open-close-animation",
       "maximize",
       "minimize",
-      "fullscreen",
       "show-desktop",
       "desktop-animations",
   };

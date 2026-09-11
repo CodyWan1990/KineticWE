@@ -28,6 +28,7 @@ namespace KWin
 
 class LayoutEngine;
 class LogicalOutput;
+class EmergeLayoutEngine;
 class TileManager;
 class TilingDBusInterface;
 class VirtualDesktop;
@@ -109,6 +110,12 @@ public:
     void expel();
 
     /**
+     * Emerge layout: cycle the active column through the configured preset
+     * widths. No-op for layouts without an Emerge strip.
+     */
+    void switchPresetColumnWidth();
+
+    /**
      * Per-tile resize actions. Routes to the active window's layout engine
      * and asks it to grow (@p grow == true) or shrink the active leaf along
      * the given @p axis. The delta is m_resizeStep (configurable via kwinrc).
@@ -186,6 +193,12 @@ public:
      */
     QList<LayoutEngine::LayoutKind> enabledLayoutKinds() const;
 
+    /**
+     * The active output's current-desktop layout engine when it is an Emerge
+     * strip, otherwise nullptr. Exposed for the D-Bus interface.
+     */
+    EmergeLayoutEngine *activeEmergeLayoutEngine() const;
+
     enum class BorderMode {
         None,
         AllTiled,
@@ -247,6 +260,10 @@ private:
     LayoutEngine::DropZone dropZoneForTarget(Window *target) const;
     /** Push m_columnsMaxColumns to every live layout engine. */
     void applyMaxColumnsToEngines();
+    /** Push the Emerge strip settings to every live Emerge engine. */
+    void applyEmergeSettingsToEngines();
+    /** Apply the cached Emerge settings to one engine. */
+    void configureEmergeEngine(EmergeLayoutEngine *engine);
     void addWindowToLayout(Window *window, LogicalOutput *output, VirtualDesktop *desktop);
     void removeWindowFromLayouts(Window *window);
     void migrateWindow(Window *window, LogicalOutput *newOutput, VirtualDesktop *newDesktop);
@@ -265,6 +282,13 @@ private:
 
     void setLayoutOn(LogicalOutput *output, VirtualDesktop *desktop, LayoutEngine::LayoutKind kind);
     void reconcileLayoutKinds();
+
+    /**
+     * Republish the active output's Emerge viewport over D-Bus when its
+     * off-view column lists changed. Connected to every live Emerge engine's
+     * layoutChanged() signal and called after layout/desktop switches.
+     */
+    void publishEmergeViewport();
 
     /** Show an on-screen notification for the given layout kind via
      *  org.kde.osdService (the Plasma OSD). No-op when the DBus service
@@ -292,6 +316,18 @@ private:
     // Configurable via kwinrc ("ColumnsMaxColumns", clamped to [3, 5] in
     // reconfigure()); pushed to every Columns engine via setMaxColumns().
     int m_columnsMaxColumns = 3;
+
+    // Last Emerge viewport signature published over D-Bus. Republishing is
+    // skipped when the off-view column lists are unchanged, so a busy strip
+    // (scroll/resize reflows) does not flood the bus.
+    QString m_lastEmergeViewportSignature = QStringLiteral("none");
+
+    // Emerge strip layout. Global for now; per-monitor behaviour is a later
+    // addition. Values are read in reconfigure() and pushed to every live
+    // Emerge engine via applyEmergeSettingsToEngines().
+    int m_emergeAxis = 0; // 0 auto, 1 horizontal, 2 vertical
+    QList<qreal> m_emergePresetColumnWidths;
+    QList<qreal> m_emergePresetWindowHeights;
     QStringList m_enabledLayouts;
     BorderMode m_borderMode = BorderMode::None;
     qreal m_borderThickness = 2.0;

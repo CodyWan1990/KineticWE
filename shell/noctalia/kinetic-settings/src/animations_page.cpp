@@ -562,14 +562,13 @@ std::unique_ptr<Node> AnimationsPage::build(
 
   // Fixed presentation order for the animation-type selectors: the
   // multi-effect (dropdown) groups first, then the single-effect (toggle)
-  // groups — Maximize and Full Screen — so the toggles sit together at the end.
+  // group — Maximize — so the toggles sit together at the end.
   static const std::vector<std::string_view> kGroupOrder{
       "toplevel-open-close-animation",
       "minimize",
       "show-desktop",
       "desktop-animations",
       "maximize",
-      "fullscreen",
   };
 
   for (const std::string_view group : kGroupOrder) {
@@ -627,6 +626,11 @@ std::unique_ptr<Node> AnimationsPage::build(
   }
 
   if (!anyRows) {
+    // Global search merges hits from every page and drops pages with none, so
+    // an empty page must not render its own empty-state notice.
+    if (!filter.searchQuery.empty()) {
+      return nullptr;
+    }
     root->addChild(makeLabel(
         "No animations match the current filters.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)

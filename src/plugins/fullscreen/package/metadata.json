@@ -89,7 +89,7 @@
         "Description[uk]": "Розтягування вікон під час входу до повноекранного режиму і виходу з нього",
         "Description[zh_CN]": "窗口进入/退出全屏模式时呈现拉伸动效",
         "Description[zh_TW]": "拉伸正在進入或離開全螢幕的視窗",
-        "EnabledByDefault": true,
+        "EnabledByDefault": false,
         "Icon": "preferences-system-windows-effect-fullscreen",
         "Id": "fullscreen",
         "License": "GPL",
