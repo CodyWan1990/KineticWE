@@ -178,6 +178,12 @@ std::string keyChordDisplayLabel(const KeyChord& chord) {
     }
     out += part;
   };
+  if ((chord.modifiers & KeyMod::Super) != 0) {
+    // Compositor global shortcuts call this key "Meta" (the Qt/KDE name); the
+    // shell's own keybinds never use it, so the label only appears for chords
+    // from external sources (e.g. Kinetic Settings).
+    appendPart("Meta");
+  }
   if ((chord.modifiers & KeyMod::Ctrl) != 0) {
     appendPart("Ctrl");
   }
@@ -186,12 +192,6 @@ std::string keyChordDisplayLabel(const KeyChord& chord) {
   }
   if ((chord.modifiers & KeyMod::Shift) != 0) {
     appendPart("Shift");
-  }
-  if ((chord.modifiers & KeyMod::Super) != 0) {
-    // Compositor global shortcuts call this key "Meta" (the Qt/KDE name); the
-    // shell's own keybinds never use it, so the label only appears for chords
-    // from external sources (e.g. Kinetic Settings).
-    appendPart("Meta");
   }
   appendPart(keyName);
   return out;

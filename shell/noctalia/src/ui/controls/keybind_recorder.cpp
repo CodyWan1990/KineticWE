@@ -50,6 +50,36 @@ namespace {
     }
   }
 
+  // Mirrors KDE's KKeySequenceRecorder::isShiftAsModifierAllowed(): Shift stays
+  // a modifier for letters, F-keys and the non-text keys (arrows, media, …),
+  // but not for keys whose shifted form is a different character (1 -> !,
+  // = -> +). For those the shifted keysym is recorded and Shift is dropped,
+  // which is how the compositor matches e.g. Meta+Shift+1 (as Meta+!).
+  [[nodiscard]] bool shiftAllowedAsModifier(std::uint32_t sym) noexcept {
+    if ((sym >= XKB_KEY_a && sym <= XKB_KEY_z) || (sym >= XKB_KEY_A && sym <= XKB_KEY_Z)) {
+      return true;
+    }
+    if (sym >= XKB_KEY_F1 && sym <= XKB_KEY_F35) {
+      return true;
+    }
+    switch (sym) {
+    // Printable keys for which Shift is still a usable modifier.
+    case XKB_KEY_space:
+    case XKB_KEY_Return:
+    case XKB_KEY_KP_Enter:
+    case XKB_KEY_Tab:
+    case XKB_KEY_ISO_Left_Tab:
+    case XKB_KEY_BackSpace:
+    case XKB_KEY_Escape:
+      return true;
+    default:
+      break;
+    }
+    // Non-text keys (arrows, navigation, media/launch, keypad, …) never change
+    // their keysym when Shift is held, so Shift is a real modifier there.
+    return !isPrintableKey(sym);
+  }
+
 } // namespace
 
 KeybindRecorder::KeybindRecorder() {
@@ -287,7 +317,13 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
     return;
   }
 
-  const std::uint32_t effectiveModifiers = m_pendingModifiers | modifiers;
+  std::uint32_t effectiveModifiers = m_pendingModifiers | modifiers;
+  // Shift is not a modifier for keys whose shifted form is a different
+  // character (1 -> !): record the symbol and drop Shift, matching
+  // KKeySequenceRecorder and the compositor's shortcut modifiers.
+  if ((effectiveModifiers & KeyMod::Shift) != 0 && !shiftAllowedAsModifier(sym)) {
+    effectiveModifiers &= ~KeyMod::Shift;
+  }
   const std::uint32_t cleanModifiers = m_superAllowed ? effectiveModifiers : (effectiveModifiers & ~KeyMod::Super);
   KeyChord chord{.sym = sym, .modifiers = cleanModifiers};
   m_chord = chord;
