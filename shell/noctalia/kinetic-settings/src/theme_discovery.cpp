@@ -77,6 +77,16 @@ namespace {
     return roots;
   }
 
+  // The Aurorae window decoration theme roots, in priority order (user dirs
+  // first). Downloads from the KDE Store install under aurorae/themes.
+  std::vector<std::string> decorationBaseDirs() {
+    std::vector<std::string> roots;
+    for (const auto& data : xdgDataDirs()) {
+      pushUniqueDir(roots, data + "/aurorae/themes");
+    }
+    return roots;
+  }
+
   // Reads Name= from the [Icon Theme] group of an index.theme file.
   std::string indexThemeName(const fs::path& indexTheme) {
     std::ifstream in(indexTheme);
@@ -102,6 +112,36 @@ namespace {
       if (line.starts_with("Name=")) {
         std::string value = StringUtils::trim(std::string_view(line).substr(5));
         return StringUtils::unquote(value);
+      }
+    }
+    return {};
+  }
+
+  // Reads Name= from the [Desktop Entry] group of a theme's metadata.desktop.
+  // Localized Name[xx]= keys are ignored.
+  std::string desktopEntryName(const fs::path& metadataDesktop) {
+    std::ifstream in(metadataDesktop);
+    if (!in.is_open()) {
+      return {};
+    }
+    bool inEntry = false;
+    std::string line;
+    while (std::getline(in, line)) {
+      while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
+        line.pop_back();
+      }
+      if (line.empty() || line.front() == '#') {
+        continue;
+      }
+      if (line.front() == '[') {
+        inEntry = (line == "[Desktop Entry]");
+        continue;
+      }
+      if (!inEntry) {
+        continue;
+      }
+      if (line.starts_with("Name=")) {
+        return StringUtils::unquote(StringUtils::trim(std::string_view(line).substr(5)));
       }
     }
     return {};
@@ -234,6 +274,82 @@ namespace {
   constexpr std::uint32_t kXcursorMagic = 0x72756358;  // "Xcur"
   constexpr std::uint32_t kXcursorImageType = 0xfffd0002;
 
+  // Launch `dir` in the user's default file manager. Resolves the handler for
+  // inode/directory from mimeapps.list (the file the Default Apps settings page
+  // writes) and launches it with the directory as argument, falling back to
+  // xdg-open. Shared by the Icons and Window Decorations folder buttons.
+  bool openDirectoryInFileManager(const std::string& dir) {
+    // The user's real config home — where mimeapps.list lives. The shell process
+    // keeps the real XDG_CONFIG_HOME, so this resolves to the shared location.
+    std::filesystem::path mimeapps;
+    if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg != nullptr && *xdg != '\0') {
+      mimeapps = std::filesystem::path(xdg) / "mimeapps.list";
+    } else if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+      mimeapps = std::filesystem::path(home) / ".config" / "mimeapps.list";
+    }
+
+    // Resolve the default handler id for inode/directory (e.g. "org.kde.dolphin").
+    std::string handlerId;
+    {
+      std::error_code ec;
+      std::ifstream in(mimeapps);
+      if (in.is_open()) {
+        bool inDefaultApps = false;
+        std::string line;
+        while (std::getline(in, line)) {
+          const std::string trimmed = StringUtils::trim(line);
+          if (trimmed.empty() || trimmed.front() == '#' || trimmed.front() == ';') {
+            continue;
+          }
+          if (trimmed.front() == '[') {
+            inDefaultApps = (trimmed == "[Default Applications]");
+            continue;
+          }
+          if (!inDefaultApps || !trimmed.starts_with("inode/directory=")) {
+            continue;
+          }
+          const std::string value = StringUtils::trim(std::string_view(trimmed).substr(16));
+          if (const std::size_t sep = value.find(';'); sep != std::string::npos) {
+            handlerId = value.substr(0, sep);
+          } else {
+            handlerId = value;
+          }
+          // mimeapps stores the id with the ".desktop" suffix; DesktopEntry::id is the stem.
+          if (handlerId.ends_with(".desktop")) {
+            handlerId.resize(handlerId.size() - 8);
+          }
+          break;
+        }
+      }
+    }
+
+    // Launch the resolved file manager with the directory as argument. The Exec
+    // field's %F/%U field codes are stripped by prepareCommand, so the directory
+    // is appended explicitly.
+    if (!handlerId.empty()) {
+      for (const DesktopEntry& entry : desktopEntries()) {
+        if (entry.id != handlerId) {
+          continue;
+        }
+        auto prepared = desktop_entry_launch::prepareCommand(entry.exec, entry.terminal);
+        if (prepared.has_value() && !prepared->args.empty()) {
+          std::vector<std::string> args = std::move(prepared->args);
+          args.push_back(dir);
+          return process::runAsync(args);
+        }
+        break;
+      }
+    }
+
+    // Fallback: let xdg-open resolve the handler (only useful when the running
+    // portal actually implements OpenURI; xdg-desktop-portal-kwe does not, so on
+    // KineticWE this path is effectively dead — kept for other environments).
+    if (process::commandExists("xdg-open")) {
+      return process::runAsync(std::vector<std::string>{"xdg-open", dir});
+    }
+    return false;
+  }
+
 } // namespace
 
 namespace theme_discovery {
@@ -244,6 +360,69 @@ std::vector<ThemeInfo> iconThemes() {
 
 std::vector<ThemeInfo> cursorThemes() {
   return discover(true);
+}
+
+std::vector<DecorationThemeInfo> decorationThemes() {
+  std::vector<DecorationThemeInfo> out;
+  std::vector<std::string> seen; // first root wins (user dirs are enumerated first)
+  for (const auto& base : decorationBaseDirs()) {
+    std::error_code ec;
+    if (!fs::is_directory(base, ec)) {
+      continue;
+    }
+    for (const auto& entry : fs::directory_iterator(base, ec)) {
+      if (!entry.is_directory(ec)) {
+        continue;
+      }
+      const fs::path dir = entry.path();
+      const std::string name = dir.filename().string();
+      if (name.empty() || name.front() == '.' || std::ranges::contains(seen, name)) {
+        continue;
+      }
+      seen.push_back(name);
+      std::string display = desktopEntryName(dir / "metadata.desktop");
+      if (display.empty()) {
+        display = name;
+      }
+      out.push_back(DecorationThemeInfo{.name = name, .displayName = std::move(display), .path = dir.string()});
+    }
+  }
+  std::ranges::sort(out, [](const auto& a, const auto& b) {
+    return StringUtils::naturalCaseInsensitiveLess(a.displayName, b.displayName);
+  });
+  return out;
+}
+
+std::string decorationRootPath() {
+  // User-owned dir first (that's where downloaded themes are installed).
+  const std::vector<std::string> roots = decorationBaseDirs();
+  std::error_code ec;
+  for (const std::string& root : roots) {
+    if (fs::is_directory(root, ec)) {
+      return root;
+    }
+  }
+  if (!roots.empty()) {
+    return roots.front();
+  }
+  return {};
+}
+
+bool openDecorationRoot() {
+  const std::vector<std::string> roots = decorationBaseDirs();
+  if (roots.empty()) {
+    return false;
+  }
+  // Prefer the user's own themes dir (downloads land there); create it so the
+  // folder opens even before anything has been installed.
+  const std::string userDir = roots.front();
+  std::error_code ec;
+  fs::create_directories(userDir, ec);
+  const std::string dir = fs::is_directory(userDir, ec) ? userDir : decorationRootPath();
+  if (dir.empty()) {
+    return false;
+  }
+  return openDirectoryInFileManager(dir);
 }
 
 std::string iconRootPath() {
@@ -266,77 +445,7 @@ bool openIconRoot() {
   if (dir.empty()) {
     return false;
   }
-
-  // The user's real config home — where mimeapps.list lives (the file the
-  // Default Apps settings page writes). The shell process keeps the real
-  // XDG_CONFIG_HOME, so this resolves to the shared config location.
-  std::filesystem::path mimeapps;
-  if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg != nullptr && *xdg != '\0') {
-    mimeapps = std::filesystem::path(xdg) / "mimeapps.list";
-  } else if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
-    mimeapps = std::filesystem::path(home) / ".config" / "mimeapps.list";
-  }
-
-  // Resolve the default handler id for inode/directory (e.g. "org.kde.dolphin").
-  std::string handlerId;
-  {
-    std::error_code ec;
-    std::ifstream in(mimeapps);
-    if (in.is_open()) {
-      bool inDefaultApps = false;
-      std::string line;
-      while (std::getline(in, line)) {
-        const std::string trimmed = StringUtils::trim(line);
-        if (trimmed.empty() || trimmed.front() == '#' || trimmed.front() == ';') {
-          continue;
-        }
-        if (trimmed.front() == '[') {
-          inDefaultApps = (trimmed == "[Default Applications]");
-          continue;
-        }
-        if (!inDefaultApps || !trimmed.starts_with("inode/directory=")) {
-          continue;
-        }
-        const std::string value = StringUtils::trim(std::string_view(trimmed).substr(16));
-        if (const std::size_t sep = value.find(';'); sep != std::string::npos) {
-          handlerId = value.substr(0, sep);
-        } else {
-          handlerId = value;
-        }
-        // mimeapps stores the id with the ".desktop" suffix; DesktopEntry::id is the stem.
-        if (handlerId.ends_with(".desktop")) {
-          handlerId.resize(handlerId.size() - 8);
-        }
-        break;
-      }
-    }
-  }
-
-  // Launch the resolved file manager with the directory as argument. The Exec
-  // field's %F/%U field codes are stripped by prepareCommand, so the directory
-  // is appended explicitly.
-  if (!handlerId.empty()) {
-    for (const DesktopEntry& entry : desktopEntries()) {
-      if (entry.id != handlerId) {
-        continue;
-      }
-      auto prepared = desktop_entry_launch::prepareCommand(entry.exec, entry.terminal);
-      if (prepared.has_value() && !prepared->args.empty()) {
-        std::vector<std::string> args = std::move(prepared->args);
-        args.push_back(dir);
-        return process::runAsync(args);
-      }
-      break;
-    }
-  }
-
-  // Fallback: let xdg-open resolve the handler (only useful when the running
-  // portal actually implements OpenURI; xdg-desktop-portal-kwe does not, so on
-  // KineticWE this path is effectively dead — kept for other environments).
-  if (process::commandExists("xdg-open")) {
-    return process::runAsync(std::vector<std::string>{"xdg-open", dir});
-  }
-  return false;
+  return openDirectoryInFileManager(dir);
 }
 
 std::string resolveIconInTheme(const std::string& themePath, const std::string& iconName) {

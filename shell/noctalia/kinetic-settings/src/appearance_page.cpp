@@ -1,8 +1,13 @@
 #include "appearance_page.h"
 
+#include "kinetic-settings/src/theme_discovery.h"
+
 #include "core/log.h"
 #include "core/process/process.h"
+#include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
+#include "net/url_open.h"
+#include "render/core/renderer.h"
 #include "theme/color.h"
 #include "theme/fixed_palette.h"
 #include "theme/kde_color_scheme.h"
@@ -10,6 +15,7 @@
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/glyph.h"
+#include "ui/controls/image.h"
 #include "ui/controls/label.h"
 #include "ui/controls/select.h"
 #include "ui/controls/separator.h"
@@ -32,6 +38,14 @@ namespace {
 
   constexpr int kSettingDescriptionMaxLines = 5;
   constexpr float kDefaultControlWidth = 190.0F;
+  // Window decoration tiles (a wider tile than the Icons page so the
+  // decoration preview reads like a window).
+  constexpr float kDecorationTileWidth = 200.0F;
+  constexpr float kDecorationTileHeight = 150.0F;
+  constexpr float kDecorationPreviewWidth = 168.0F;
+  constexpr float kDecorationPreviewHeight = 96.0F;
+  // The KDE Store category for window decorations.
+  constexpr std::string_view kDecorationStoreUrl = "https://store.kde.org/browse?cat=717&ord=latest";
 
   // The Appearance page persists to its own portable appearance.kwe (not the
   // compositor's kineticwe.kwe), so a theme choice travels with the rest of
@@ -75,6 +89,28 @@ namespace {
 
   [[nodiscard]] std::string joinKeyPath(std::string_view group, std::string_view key) {
     return std::string(group) + '.' + std::string(key);
+  }
+
+  // A representative preview image for a decoration theme: a bundled preview
+  // image when present, otherwise the theme's decoration SVG (which reads as a
+  // simple window titlebar for many themes), otherwise empty (generic glyph).
+  [[nodiscard]] std::string decorationPreviewFile(const std::string& themePath) {
+    if (themePath.empty()) {
+      return {};
+    }
+    std::error_code ec;
+    const std::filesystem::path dir(themePath);
+    for (const char* name : {"preview.png", "preview.jpg", "preview.jpeg", "preview.svg"}) {
+      const std::filesystem::path candidate = dir / name;
+      if (std::filesystem::is_regular_file(candidate, ec)) {
+        return candidate.string();
+      }
+    }
+    const std::filesystem::path decoration = dir / "decoration.svg";
+    if (std::filesystem::is_regular_file(decoration, ec)) {
+      return decoration.string();
+    }
+    return {};
   }
 
   // The user's real config home ($XDG_CONFIG_HOME, else ~/.config). This is
@@ -263,6 +299,8 @@ const AppearancePage::Field* AppearancePage::findField(std::string_view path) {
   return nullptr;
 }
 
+AppearancePage::AppearancePage(SessionBus& bus) : m_dbus(bus) {}
+
 bool AppearancePage::equalsDefault(const Field& field, const Value& value) {
   return valuesEqual(field, value, defaultValue(field));
 }
@@ -276,6 +314,9 @@ void AppearancePage::ensureLoaded() {
   if (!m_loaded) {
     m_config.setPath(appearanceKwePath());
     m_config.load();
+    // The window decorations live in the compositor's kineticwe.kwe (the file
+    // the compositor reads), not in the portable appearance.kwe.
+    m_decorationsConfig.load();
     m_loaded = true;
     kLog.info("appearance ensureLoaded: path={}", m_config.path().string());
   }
@@ -385,54 +426,63 @@ void AppearancePage::stageAndRebuild(const Field& field, const Value& value, con
 }
 
 bool AppearancePage::applyAll() {
-  kLog.info("appearance applyAll: pending={}", m_pending.size());
-  if (m_pending.empty()) {
+  ensureLoaded();
+  const bool hasAppearance = !m_pending.empty();
+  const bool hasDecoration = m_pendingDecoration.has_value();
+  if (!hasAppearance && !hasDecoration) {
     return true;
   }
-  ensureLoaded();
-  kLog.info("appearance applyAll: config path={}", m_config.path().string());
-  for (const auto& [path, value] : m_pending) {
-    if (const Field* field = findField(path)) {
-      writeValue(*field, value);
-      kLog.info(
-          "appearance applyAll: wrote field group={} key={}", field->group, field->key
-      );
-    }
-  }
-  if (const auto v = m_config.readString("Appearance", "GlobalTheme"); v.has_value()) {
-    kLog.info("appearance applyAll: in-memory GlobalTheme after write={}", *v);
-  } else {
-    kLog.info("appearance applyAll: in-memory GlobalTheme after write=ABSENT");
-  }
-  if (!m_config.save()) {
-    m_errorNotice = "Failed to write appearance.kwe. Your changes were kept; try Apply again.";
-    kLog.warn("kinetic-settings: failed to write {}", m_config.path().string());
-    return false;
-  }
-  {
-    std::error_code ec;
-    const auto size = std::filesystem::file_size(m_config.path(), ec);
-    kLog.info(
-        "appearance applyAll: saved, file_size={} (error={})", ec ? -1 : static_cast<long long>(size),
-        ec ? ec.message() : std::string("none")
-    );
-  }
 
-  // Regenerate kdeglobals from the effective Global Theme selection every time
-  // Apply runs. Using the effective value (not just the persisted key) means
-  // the noctalia-generated scheme is applied even when the theme equals the
-  // default (Breeze Dark), e.g. on a fresh install.
-  if (const Field* themeField = findField("Appearance.GlobalTheme"); themeField != nullptr) {
-    const auto themeValue = effectiveValue(*themeField);
-    std::string error;
-    if (!applyTheme(std::get<std::string>(themeValue), &error)) {
-      m_errorNotice = "Failed to apply the theme: " + error;
-      kLog.warn("kinetic-settings: failed to apply theme: {}", error);
+  if (hasAppearance) {
+    kLog.info("appearance applyAll: pending={}", m_pending.size());
+    kLog.info("appearance applyAll: config path={}", m_config.path().string());
+    for (const auto& [path, value] : m_pending) {
+      if (const Field* field = findField(path)) {
+        writeValue(*field, value);
+        kLog.info("appearance applyAll: wrote field group={} key={}", field->group, field->key);
+      }
+    }
+    if (const auto v = m_config.readString("Appearance", "GlobalTheme"); v.has_value()) {
+      kLog.info("appearance applyAll: in-memory GlobalTheme after write={}", *v);
+    } else {
+      kLog.info("appearance applyAll: in-memory GlobalTheme after write=ABSENT");
+    }
+    if (!m_config.save()) {
+      m_errorNotice = "Failed to write appearance.kwe. Your changes were kept; try Apply again.";
+      kLog.warn("kinetic-settings: failed to write {}", m_config.path().string());
       return false;
     }
+    {
+      std::error_code ec;
+      const auto size = std::filesystem::file_size(m_config.path(), ec);
+      kLog.info(
+          "appearance applyAll: saved, file_size={} (error={})", ec ? -1 : static_cast<long long>(size),
+          ec ? ec.message() : std::string("none")
+      );
+    }
+
+    // Regenerate kdeglobals from the effective Global Theme selection every time
+    // Apply runs. Using the effective value (not just the persisted key) means
+    // the noctalia-generated scheme is applied even when the theme equals the
+    // default (Breeze Dark), e.g. on a fresh install.
+    if (const Field* themeField = findField("Appearance.GlobalTheme"); themeField != nullptr) {
+      const auto themeValue = effectiveValue(*themeField);
+      std::string error;
+      if (!applyTheme(std::get<std::string>(themeValue), &error)) {
+        m_errorNotice = "Failed to apply the theme: " + error;
+        kLog.warn("kinetic-settings: failed to apply theme: {}", error);
+        return false;
+      }
+    }
+  }
+
+  // Window decorations apply from the same Apply button (kineticwe.kwe).
+  if (hasDecoration && !applyDecoration(*m_pendingDecoration)) {
+    return false;
   }
 
   m_pending.clear();
+  m_pendingDecoration.reset();
   m_errorNotice.clear();
   return true;
 }
@@ -633,16 +683,21 @@ bool AppearancePage::applyTheme(std::string_view theme, std::string* error) {
 
 std::vector<std::string> AppearancePage::resettableKeyPaths() const {
   std::vector<std::string> paths;
-  paths.reserve(fields().size());
+  paths.reserve(fields().size() + 1);
   for (const auto& field : fields()) {
     paths.push_back(keyPath(field));
   }
+  paths.push_back(decorationKeyPath());
   return paths;
 }
 
 void AppearancePage::resetKeyPath(std::string_view path) {
   if (const Field* field = findField(path)) {
     stage(*field, defaultValue(*field));
+    return;
+  }
+  if (path == decorationKeyPath()) {
+    stageDecoration(defaultDecoration());
   }
 }
 
@@ -650,6 +705,66 @@ void AppearancePage::resetAll() {
   for (const auto& field : fields()) {
     stage(field, defaultValue(field));
   }
+  stageDecoration(defaultDecoration());
+}
+
+// ---------------------------------------------------------------------------
+// Window Decorations (inline section). Stored in the compositor's
+// kineticwe.kwe [org.kde.kdecoration2]; Breeze is the compiled-in default.
+// ---------------------------------------------------------------------------
+
+AppearancePage::DecorationSelection AppearancePage::defaultDecoration() {
+  return DecorationSelection{.library = "org.kde.breeze", .theme = "Breeze"};
+}
+
+AppearancePage::DecorationSelection AppearancePage::fileBackedDecoration() const {
+  return DecorationSelection{
+      .library = m_decorationsConfig.readString("org.kde.kdecoration2", "library").value_or("org.kde.breeze"),
+      .theme = m_decorationsConfig.readString("org.kde.kdecoration2", "theme").value_or("Breeze"),
+  };
+}
+
+AppearancePage::DecorationSelection AppearancePage::effectiveDecoration() const {
+  return m_pendingDecoration.value_or(fileBackedDecoration());
+}
+
+bool AppearancePage::overriddenDecoration() const {
+  return !(effectiveDecoration() == defaultDecoration());
+}
+
+void AppearancePage::stageDecoration(const DecorationSelection& selection) {
+  ensureLoaded();
+  if (selection == fileBackedDecoration()) {
+    m_pendingDecoration.reset();
+  } else {
+    m_pendingDecoration = selection;
+  }
+}
+
+void AppearancePage::stageDecorationAndRebuild(const DecorationSelection& selection, const Callbacks& callbacks) {
+  stageDecoration(selection);
+  if (callbacks.requestRebuild) {
+    callbacks.requestRebuild();
+  }
+}
+
+bool AppearancePage::applyDecoration(const DecorationSelection& selection) {
+  // Reload first so edits applied from other pages in the meantime are kept.
+  m_decorationsConfig.load();
+  if (selection == defaultDecoration()) {
+    m_decorationsConfig.removeKey("org.kde.kdecoration2", "library");
+    m_decorationsConfig.removeKey("org.kde.kdecoration2", "theme");
+  } else {
+    m_decorationsConfig.setString("org.kde.kdecoration2", "library", selection.library);
+    m_decorationsConfig.setString("org.kde.kdecoration2", "theme", selection.theme);
+  }
+  if (!m_decorationsConfig.save()) {
+    m_errorNotice = "Failed to write kineticwe.kwe. Your changes were kept; try Apply again.";
+    kLog.warn("kinetic-settings: failed to write {}", m_decorationsConfig.path().string());
+    return false;
+  }
+  m_dbus.requestReconfigure();
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -681,6 +796,79 @@ namespace {
           }
         },
     });
+  }
+
+  // One window-decoration tile: preview (bundled image or decoration.svg) + a
+  // name label, with the shared selected/hover styling of the Icons page.
+  [[nodiscard]] std::unique_ptr<Node> buildDecorationTile(
+      float scale, Renderer& renderer, const std::string& displayName, const std::string& themePath, bool selected,
+      std::function<void()> onClick
+  ) {
+    const float tileW = kDecorationTileWidth * scale;
+    const float tileH = kDecorationTileHeight * scale;
+    const float previewW = kDecorationPreviewWidth * scale;
+    const float previewH = kDecorationPreviewHeight * scale;
+
+    Flex* cardBody = nullptr;
+    auto card = ui::column({
+        .out = &cardBody,
+        .align = FlexAlign::Center,
+        .justify = FlexJustify::Center,
+        .gap = Style::spaceXs * scale,
+        .padding = Style::spaceXs * scale,
+        .fill = selected ? colorSpecFromRole(ColorRole::Primary, 0.15F) : colorSpecFromRole(ColorRole::SurfaceVariant),
+        .radius = Style::scaledRadiusMd(scale),
+        .border = selected ? colorSpecFromRole(ColorRole::Primary) : clearColorSpec(),
+        .borderWidth = selected ? Style::emphasizedBorderWidth : 0.0F,
+        .width = tileW,
+        .height = tileH,
+    });
+
+    const std::string previewPath = decorationPreviewFile(themePath);
+    if (!previewPath.empty()) {
+      auto img = ui::image({
+          .fit = ImageFit::Contain,
+          .width = previewW,
+          .height = previewH,
+      });
+      img->setSourceFile(renderer, previewPath, static_cast<int>(previewW * 2), true);
+      card->addChild(std::move(img));
+    } else {
+      card->addChild(ui::glyph({
+          .glyph = "window",
+          .glyphSize = previewH,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      }));
+    }
+
+    card->addChild(ui::label({
+        .text = displayName,
+        .fontSize = Style::fontSizeCaption * scale,
+        .fontWeight = selected ? FontWeight::Bold : FontWeight::Normal,
+        .color = colorSpecFromRole(ColorRole::OnSurface),
+        .maxWidth = (kDecorationTileWidth - Style::spaceSm * 2.0F) * scale,
+        .maxLines = 1,
+        .ellipsize = TextEllipsize::End,
+    }));
+
+    auto tile = ui::inputArea({
+        .cursorShape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+        .width = tileW,
+        .height = tileH,
+        .onEnter = [cardBody](const InputArea::PointerData&) {
+          if (cardBody != nullptr) {
+            cardBody->setBorder(colorSpecFromRole(ColorRole::Hover), Style::borderWidth);
+          }
+        },
+        .onLeave = [cardBody]() {
+          if (cardBody != nullptr) {
+            cardBody->clearBorder();
+          }
+        },
+        .onClick = [onClick = std::move(onClick)](const InputArea::PointerData&) { onClick(); },
+    });
+    tile->addChild(std::move(card));
+    return tile;
   }
 
 } // namespace
@@ -758,8 +946,103 @@ void AppearancePage::addSettingRow(
   parent.addChild(std::move(row));
 }
 
+std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
+    float scale, Renderer& renderer, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
+) {
+  struct Tile {
+    std::string displayName;
+    std::string path;
+    DecorationSelection selection;
+  };
+
+  // Breeze is the compiled-in default; every discovered Aurorae theme is
+  // applied through the org.kde.kwin.aurorae.v2 plugin with the
+  // __aurorae__svg__<Name> theme id.
+  std::vector<Tile> tiles;
+  tiles.push_back(Tile{.displayName = "Breeze", .path = {}, .selection = defaultDecoration()});
+  for (const auto& theme : theme_discovery::decorationThemes()) {
+    tiles.push_back(Tile{
+        .displayName = theme.displayName,
+        .path = theme.path,
+        .selection =
+            DecorationSelection{.library = "org.kde.kwin.aurorae.v2", .theme = "__aurorae__svg__" + theme.name},
+    });
+  }
+
+  const bool searchActive = !filter.searchQuery.empty();
+  const bool sectionTitleMatches =
+      searchActive && StringUtils::containsInsensitive("Window Decorations", filter.searchQuery);
+  const DecorationSelection current = effectiveDecoration();
+
+  std::vector<const Tile*> visible;
+  for (const auto& tile : tiles) {
+    const bool selected = tile.selection == current;
+    if (filter.showOverriddenOnly && !selected) {
+      continue;
+    }
+    if (searchActive && !sectionTitleMatches
+        && !StringUtils::containsInsensitive(tile.displayName, filter.searchQuery)) {
+      continue;
+    }
+    visible.push_back(&tile);
+  }
+  if (visible.empty()) {
+    return nullptr;
+  }
+
+  auto section = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale, .fillWidth = true});
+
+  // Action row: store link + folder button, then the override/reset controls.
+  auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
+  header->addChild(ui::button({
+      .text = "Get New…",
+      .glyph = "external-link",
+      .fontSize = Style::fontSizeCaption * scale,
+      .glyphSize = Style::fontSizeBody * scale,
+      .variant = ButtonVariant::Ghost,
+      .tooltip = "Browse window decorations on store.kde.org",
+      .minHeight = Style::controlHeightSm * scale,
+      .paddingV = Style::spaceXs * scale,
+      .paddingH = Style::spaceSm * scale,
+      .radius = Style::scaledRadiusMd(scale),
+      .onClick = []() { (void)net::openInBrowser(std::string(kDecorationStoreUrl)); },
+  }));
+  header->addChild(ui::button({
+      .glyph = "folder-open",
+      .glyphSize = Style::fontSizeBody * scale,
+      .variant = ButtonVariant::Ghost,
+      .tooltip = "Open the window decorations folder",
+      .minHeight = Style::controlHeightSm * scale,
+      .padding = Style::spaceXs * scale,
+      .radius = Style::scaledRadiusMd(scale),
+      .onClick = []() { (void)theme_discovery::openDecorationRoot(); },
+  }));
+  header->addChild(ui::spacer());
+  if (overriddenDecoration()) {
+    header->addChild(makeOverrideBadge(scale));
+    header->addChild(makeResetButton(decorationKeyPath(), armedResetKey == decorationKeyPath(), scale, callbacks));
+  }
+  section->addChild(std::move(header));
+
+  auto grid = ui::row({
+      .align = FlexAlign::Start,
+      .wrap = true,
+      .gap = Style::spaceMd * scale,
+      .fillWidth = true,
+  });
+  for (const Tile* tile : visible) {
+    const bool selected = tile->selection == current;
+    grid->addChild(buildDecorationTile(
+        scale, renderer, tile->displayName, tile->path, selected,
+        [this, selection = tile->selection, callbacks]() { stageDecorationAndRebuild(selection, callbacks); }
+    ));
+  }
+  section->addChild(std::move(grid));
+  return section;
+}
+
 std::unique_ptr<Node> AppearancePage::build(
-    float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
+    float scale, Renderer& renderer, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
 ) {
   ensureLoaded();
 
@@ -825,6 +1108,15 @@ std::unique_ptr<Node> AppearancePage::build(
       addGroupHeader(lastGroup);
     }
     addSettingRow(*root, field, scale, armedResetKey, callbacks);
+    anyRows = true;
+  }
+
+  // Window Decorations live inline on this page, under the Global Theme
+  // selector, using the same tile grid as the Icons page.
+  if (auto decorations = buildDecorationsSection(scale, renderer, filter, armedResetKey, callbacks);
+      decorations != nullptr) {
+    addGroupHeader("Window Decorations");
+    root->addChild(std::move(decorations));
     anyRows = true;
   }
 

@@ -184,7 +184,7 @@ void KineticSettingsWindow::open() {
     });
   }
   if (m_appearancePage == nullptr) {
-    m_appearancePage = std::make_unique<AppearancePage>();
+    m_appearancePage = std::make_unique<AppearancePage>(*m_bus);
   }
   if (m_iconsPage == nullptr) {
     m_iconsPage = std::make_unique<IconsPage>();
@@ -1333,7 +1333,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
 std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
   switch (page) {
   case ActivePage::AppearanceGlobalTheme:
-    return "appearance global theme look and feel colors palette";
+    return "appearance global theme look and feel colors palette window decorations decoration";
   case ActivePage::AppearanceIcons:
     return "appearance icons icon theme";
   case ActivePage::AppearanceCursors:
@@ -1388,7 +1388,9 @@ std::unique_ptr<Node> KineticSettingsWindow::buildPageNodeWithQuery(ActivePage p
   switch (page) {
   case ActivePage::AppearanceGlobalTheme:
     if (m_appearancePage != nullptr) {
-      return m_appearancePage->build(uiScale(), appearanceFilter(), m_armedResetKeyPath, appearancePageCallbacks());
+      return m_appearancePage->build(
+          uiScale(), renderer, appearanceFilter(), m_armedResetKeyPath, appearancePageCallbacks()
+      );
     }
     break;
   case ActivePage::AppearanceIcons:
@@ -1517,14 +1519,17 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
       ActivePage::Accessibility,
   };
 
-  // Icons and Cursors rescan the theme directories and decode a preview image
-  // per matching theme on every rebuild. A one-character query matches whole
-  // swathes of theme names, so skip those two pages until the query narrows.
+  // Global Theme (window decoration previews), Icons and Cursors rescan the
+  // theme directories and decode a preview image per matching entry on every
+  // rebuild. A one-character query matches whole swathes of theme names, so
+  // skip those pages until the query narrows.
   const bool skipThemePages = m_searchQuery.size() < 2;
 
   bool any = false;
   for (const ActivePage page : kSearchPageOrder) {
-    if (skipThemePages && (page == ActivePage::AppearanceIcons || page == ActivePage::AppearanceCursors)) {
+    if (skipThemePages
+        && (page == ActivePage::AppearanceGlobalTheme || page == ActivePage::AppearanceIcons
+            || page == ActivePage::AppearanceCursors)) {
       continue;
     }
     if (auto node = buildPageNode(page, renderer); node != nullptr) {

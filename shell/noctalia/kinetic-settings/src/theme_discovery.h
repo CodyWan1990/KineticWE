@@ -21,12 +21,36 @@ struct ThemeInfo {
   std::string path;        // absolute path to the theme directory
 };
 
+// An installed window decoration theme. Only Aurorae themes are discovered
+// (the kind downloadable from store.kde.org category 717); their directory name
+// is the theme id used with the Aurorae KDecoration plugin.
+struct DecorationThemeInfo {
+  std::string name;        // theme directory name (Aurorae theme id)
+  std::string displayName; // Name= from metadata.desktop, fallback to directory name
+  std::string path;        // absolute path to the theme directory
+};
+
 // All installed icon themes, sorted by display name (case-insensitive).
 // Each entry's path is the theme's root directory.
 [[nodiscard]] std::vector<ThemeInfo> iconThemes();
 
 // All installed cursor themes, sorted by display name (case-insensitive).
   [[nodiscard]] std::vector<ThemeInfo> cursorThemes();
+
+  // All installed Aurorae window decoration themes, sorted by display name
+  // (case-insensitive). Each path is the theme's directory under
+  // `<data dir>/aurorae/themes/`.
+  [[nodiscard]] std::vector<DecorationThemeInfo> decorationThemes();
+
+  // The window decoration themes root directory (where downloaded themes are
+  // installed), preferring the user's own dir (`~/.local/share/aurorae/themes`)
+  // and falling back to the first existing system root. Empty when nothing can
+  // be resolved.
+  [[nodiscard]] std::string decorationRootPath();
+
+  // Creates (if needed) the user's Aurorae themes directory and opens it in the
+  // default file manager. Returns true when a launch was attempted.
+  bool openDecorationRoot();
 
   // The XDG icon theme root directory (where icon and cursor themes live),
   // preferring the user's own theme dir (~/.local/share/icons, ~/.icons) and
