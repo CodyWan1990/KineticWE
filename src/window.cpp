@@ -478,7 +478,10 @@ void Window::setActive(bool act)
     }
     m_active = act;
 
-    setOpacity(m_active ? rules()->checkOpacityActive(opacity()) : rules()->checkOpacityInactive(opacity()));
+    // Seed from the compositor-wide active/inactive opacity defaults so a focus
+    // change restores them; a matching opacityactive/opacityinactive window
+    // rule still wins via checkOpacity* (see also applyWindowRules()).
+    setOpacity(m_active ? rules()->checkOpacityActive(options->defaultActiveOpacity()) : rules()->checkOpacityInactive(options->defaultInactiveOpacity()));
 
     if (!m_active) {
         cancelAutoRaise();

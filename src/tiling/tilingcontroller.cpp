@@ -1980,7 +1980,19 @@ void TilingController::reconcileLayoutKinds()
             continue;
         }
         for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+            if (!desktop) {
+                continue;
+            }
+            // Only rebuild the engine when the *configured* default actually
+            // changed. An unrelated reconfigure (e.g. toggling title bars)
+            // must not discard a runtime layout switch made with setLayout()
+            // or cycleLayout().
             const LayoutEngine::LayoutKind kind = resolveLayoutKind(output, desktop);
+            const QString key = output->name() + QLatin1Char(':') + QString::number(desktop->x11DesktopNumber());
+            if (m_reconciledLayoutKinds.contains(key) && m_reconciledLayoutKinds.value(key) == kind) {
+                continue;
+            }
+            m_reconciledLayoutKinds.insert(key, kind);
             setLayoutOn(output, desktop, kind);
         }
     }

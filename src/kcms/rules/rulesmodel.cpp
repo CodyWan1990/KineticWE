@@ -17,8 +17,10 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QIcon>
 #include <QQmlEngine>
+#include <QScreen>
 #include <QTimer>
 
 #include <KColorSchemeManager>
@@ -515,9 +517,20 @@ void RulesModel::populateRuleList()
 #endif
 
     addRule(new RuleItem(QLatin1StringView("screen"),
-                         RulePolicy::SetRule, RuleItem::Integer,
+                         RulePolicy::SetRule, RuleItem::Option,
                          i18n("Screen"), i18n("Size & Position"),
-                         QIcon::fromTheme("osd-shutd-screen")));
+                         QIcon::fromTheme("osd-shutd-screen")))->setOptionsData(screenModelData());
+
+    // The screen rule stores the output's connector name, which is stable
+    // across output reordering. Refresh the available options as outputs come
+    // and go so the rule editor always lists the connected screens.
+    auto updateScreens = [this]() {
+        m_rules["screen"]->setOptionsData(screenModelData());
+        const QModelIndex index = indexOf("screen");
+        Q_EMIT dataChanged(index, index, {OptionsModelRole});
+    };
+    connect(qGuiApp, &QGuiApplication::screenAdded, this, updateScreens);
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, updateScreens);
 
     addRule(new RuleItem(QLatin1StringView("fullscreen"),
                          RulePolicy::SetRule, RuleItem::Boolean,
@@ -908,6 +921,21 @@ QList<OptionsModel::Data> RulesModel::colorSchemesModelData() const
             QFileInfo(index.data(Qt::UserRole).toString()).baseName(),
             index.data(Qt::DisplayRole).toString(),
             index.data(Qt::DecorationRole).value<QIcon>()};
+    }
+
+    return modelData;
+}
+
+QList<OptionsModel::Data> RulesModel::screenModelData() const
+{
+    QList<OptionsModel::Data> modelData;
+
+    const QList<QScreen *> screens = qGuiApp->screens();
+    for (const QScreen *screen : screens) {
+        modelData << OptionsModel::Data{
+            screen->name(),
+            screen->name(),
+        };
     }
 
     return modelData;

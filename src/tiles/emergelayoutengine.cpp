@@ -1176,6 +1176,74 @@ void EmergeLayoutEngine::adjustTileSize(Window *window, qreal weightDelta, Qt::O
     reflow();
 }
 
+void EmergeLayoutEngine::interactiveResizeEnded(Window *window, const RectF &before, const RectF &after,
+                                                Qt::Edge edge, const QSizeF &outputSize)
+{
+    if (!window || before.size() == QSizeF() || after.size() == QSizeF() || outputSize.width() <= 0.0
+        || outputSize.height() <= 0.0) {
+        return;
+    }
+    const int c = columnOfWindow(window);
+    if (c < 0) {
+        return;
+    }
+
+    const bool horizontal = m_axis == Qt::Horizontal;
+    const bool mainAxisEdge = horizontal ? (edge == Qt::LeftEdge || edge == Qt::RightEdge)
+                                         : (edge == Qt::TopEdge || edge == Qt::BottomEdge);
+    if (!mainAxisEdge) {
+        // Cross axis: the per-tile height stack handles it.
+        LayoutEngine::interactiveResizeEnded(window, before, after, edge, outputSize);
+        return;
+    }
+
+    // Main axis: the drag moves the divider between this column and its
+    // neighbour on the dragged side. Trading the width between just those two
+    // keeps the strip's total extent constant, so a drag never reveals an
+    // off-screen column (which would show three at once) and never leaves empty
+    // space.
+    qreal delta = 0.0;
+    if (horizontal) {
+        delta = (edge == Qt::RightEdge) ? (after.right() - before.right()) / outputSize.width()
+                                        : (before.left() - after.left()) / outputSize.width();
+    } else {
+        delta = (edge == Qt::BottomEdge) ? (after.bottom() - before.bottom()) / outputSize.height()
+                                         : (before.top() - after.top()) / outputSize.height();
+    }
+    if (qFuzzyIsNull(delta)) {
+        return;
+    }
+
+    const bool leadingDrag = horizontal ? (edge == Qt::LeftEdge) : (edge == Qt::TopEdge);
+    int neighbour = leadingDrag ? (c - 1) : (c + 1);
+    if (neighbour < 0 || neighbour >= m_columns.size()) {
+        neighbour = leadingDrag ? (c + 1) : (c - 1);
+    }
+    if (neighbour < 0 || neighbour >= m_columns.size()) {
+        // A lone column simply fills the viewport.
+        reflow();
+        return;
+    }
+
+    const qreal selfOld = resolveColumnExtentRel(m_columns.at(c));
+    const qreal neighbourOld = resolveColumnExtentRel(m_columns.at(neighbour));
+    const qreal selfTarget = qBound(MinColumnExtent, selfOld + delta, qreal(1.0));
+    // The neighbour absorbs the opposite change, clamped so it stays valid; the
+    // self width is re-derived from the clamped neighbour so the pair's total is
+    // preserved exactly.
+    const qreal neighbourTarget = qBound(MinColumnExtent, neighbourOld - (selfTarget - selfOld), qreal(1.0));
+    const qreal actual = neighbourOld - neighbourTarget;
+
+    const qreal oldViewOffset = viewOffset();
+    m_activeColumnIdx = c;
+    m_columns[c].width = EmergeColumnWidth{};
+    m_columns[c].width.proportion = selfOld + actual;
+    m_columns[neighbour].width = EmergeColumnWidth{};
+    m_columns[neighbour].width.proportion = neighbourTarget;
+    m_viewAnchor = focusAnchorFor(c, c, oldViewOffset);
+    reflow();
+}
+
 // ── Relayout ────────────────────────────────────────────────────────────────
 
 void EmergeLayoutEngine::reflow()

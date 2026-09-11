@@ -163,7 +163,7 @@ public:
     bool applyOpacityInactive(qreal &s) const;
     bool applyIgnoreGeometry(bool &ignore, bool init) const;
     bool applyDesktops(QList<VirtualDesktop *> &desktops, bool init) const;
-    bool applyScreen(int &desktop, bool init) const;
+    bool applyScreen(LogicalOutput *&output, bool init) const;
     bool applyActivity(QStringList &activity, bool init) const;
     bool applyMaximizeVert(MaximizeMode &mode, bool init) const;
     bool applyMaximizeHoriz(MaximizeMode &mode, bool init) const;
@@ -249,7 +249,7 @@ private:
     SetRule ignoregeometryrule;
     QStringList desktops;
     SetRule desktopsrule;
-    int screen;
+    QString screen;
     SetRule screenrule;
     QStringList activity;
     SetRule activityrule;

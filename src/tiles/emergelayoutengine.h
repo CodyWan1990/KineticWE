@@ -171,6 +171,8 @@ public:
     }
     void adjustTileSize(Window *window, qreal weightDelta, Qt::Orientation axis) override;
     void adjustColumnRatio(qreal delta) override;
+    void interactiveResizeEnded(Window *window, const RectF &before, const RectF &after, Qt::Edge edge,
+                                const QSizeF &outputSize) override;
 
     // ── Config, pushed from TilingController ────────────────────────────────
     void setEmergePresetColumnWidths(const QList<qreal> &presets);

@@ -18,112 +18,241 @@
 namespace KWin
 {
 
+namespace
+{
+// The Keybinds settings page shows one section per kglobalaccel component, so
+// each group of actions below registers under its own component name.
+const QString s_noctaliaComponent = QStringLiteral("noctalia");
+const QString s_noctaliaDisplay = QStringLiteral("Noctalia");
+const QString s_audioComponent = QStringLiteral("audio");
+const QString s_audioDisplay = QStringLiteral("Audio");
+const QString s_mediaUiComponent = QStringLiteral("media-ui");
+const QString s_mediaUiDisplay = QStringLiteral("Media & UI");
+} // namespace
+
 NoctaliaSettings::NoctaliaSettings(QObject *parent)
     : QObject(parent)
 {
     // Session & Shell
-    registerShortcut(QStringLiteral("NoctaliaReloadConfig"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaReloadConfig"),
                      i18n("Reload Noctalia Config"),
                      {QStringLiteral("msg"), QStringLiteral("config-reload")});
 
-    registerProcessAction(QStringLiteral("NoctaliaRestartShell"),
+    registerProcessAction(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaRestartShell"),
                           i18n("Restart Noctalia Shell"),
                           {QStringLiteral("pkill"), QStringLiteral("-x"), QStringLiteral("noctalia-kwe")},
                           QKeySequence(Qt::META | Qt::ALT | Qt::Key_R));
 
-    registerShortcut(QStringLiteral("NoctaliaToggleSettings"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleSettings"),
                      i18n("Toggle Noctalia Settings"),
                      {QStringLiteral("msg"), QStringLiteral("settings-toggle")});
 
-    registerShortcut(QStringLiteral("NoctaliaWindowSwitcher"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaWindowSwitcher"),
                      i18n("Open Noctalia Window Switcher"),
                      {QStringLiteral("msg"), QStringLiteral("window-switcher")},
                      QKeySequence(Qt::ALT | Qt::Key_Tab));
 
-    registerShortcut(QStringLiteral("NoctaliaSessionLock"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaSessionLock"),
                      i18n("Lock Session"),
                      {QStringLiteral("msg"), QStringLiteral("session"), QStringLiteral("lock")},
                      QKeySequence(Qt::META | Qt::Key_L));
 
-    registerShortcut(QStringLiteral("NoctaliaSessionLogout"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaSessionLogout"),
                      i18n("Log Out"),
                      {QStringLiteral("msg"), QStringLiteral("session"), QStringLiteral("logout")});
 
-    registerShortcut(QStringLiteral("NoctaliaSessionSuspend"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaSessionSuspend"),
                      i18n("Suspend"),
                      {QStringLiteral("msg"), QStringLiteral("session"), QStringLiteral("suspend")});
 
-    registerShortcut(QStringLiteral("NoctaliaSessionReboot"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaSessionReboot"),
                      i18n("Reboot"),
                      {QStringLiteral("msg"), QStringLiteral("session"), QStringLiteral("reboot")});
 
-    registerShortcut(QStringLiteral("NoctaliaSessionShutdown"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaSessionShutdown"),
                      i18n("Shut Down"),
                      {QStringLiteral("msg"), QStringLiteral("session"), QStringLiteral("shutdown")});
 
     // Surfaces - Panels
-    registerShortcut(QStringLiteral("NoctaliaToggleBar"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleBar"),
                      i18n("Toggle Bar"),
                      {QStringLiteral("msg"), QStringLiteral("bar-toggle")});
 
-    registerShortcut(QStringLiteral("NoctaliaToggleLauncher"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleLauncher"),
                      i18n("Toggle Launcher"),
                      {QStringLiteral("msg"), QStringLiteral("panel-toggle"), QStringLiteral("launcher")});
 
-    registerShortcut(QStringLiteral("NoctaliaToggleControlCenter"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleControlCenter"),
                      i18n("Toggle Control Center"),
                      {QStringLiteral("msg"), QStringLiteral("panel-toggle"), QStringLiteral("control-center")});
 
-    registerShortcut(QStringLiteral("NoctaliaToggleSessionMenu"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleSessionMenu"),
                      i18n("Toggle Session Menu"),
                      {QStringLiteral("msg"), QStringLiteral("panel-toggle"), QStringLiteral("session")});
 
-    registerShortcut(QStringLiteral("NoctaliaToggleClipboard"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleClipboard"),
                      i18n("Toggle Clipboard"),
                      {QStringLiteral("msg"), QStringLiteral("panel-toggle"), QStringLiteral("clipboard")});
 
-    registerShortcut(QStringLiteral("NoctaliaToggleWallpaperPicker"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleWallpaperPicker"),
                      i18n("Toggle Wallpaper Picker"),
                      {QStringLiteral("msg"), QStringLiteral("panel-toggle"), QStringLiteral("wallpaper")});
 
     // Surfaces - Dock
-    registerShortcut(QStringLiteral("NoctaliaDockShow"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaDockShow"),
                      i18n("Show Dock"),
                      {QStringLiteral("msg"), QStringLiteral("dock-show")});
 
-    registerShortcut(QStringLiteral("NoctaliaDockHide"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaDockHide"),
                      i18n("Hide Dock"),
                      {QStringLiteral("msg"), QStringLiteral("dock-hide")});
 
-    registerShortcut(QStringLiteral("NoctaliaDockToggle"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaDockToggle"),
                      i18n("Toggle Dock"),
                      {QStringLiteral("msg"), QStringLiteral("dock-toggle")});
 
-    registerShortcut(QStringLiteral("NoctaliaDockReload"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaDockReload"),
                      i18n("Reload Dock"),
                      {QStringLiteral("msg"), QStringLiteral("dock-reload")});
 
     // Wallpaper & Theme
-    registerShortcut(QStringLiteral("NoctaliaWallpaperRandom"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaWallpaperRandom"),
                      i18n("Random Wallpaper"),
                      {QStringLiteral("msg"), QStringLiteral("wallpaper-random")});
 
-    registerShortcut(QStringLiteral("NoctaliaToggleThemeMode"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleThemeMode"),
                      i18n("Toggle Theme Mode"),
                      {QStringLiteral("msg"), QStringLiteral("theme-mode-toggle")});
 
-    registerShortcut(QStringLiteral("NoctaliaApplyTemplates"),
+    registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaApplyTemplates"),
                      i18n("Apply Templates"),
                      {QStringLiteral("msg"), QStringLiteral("templates-apply")});
+
+    registerAudioShortcuts();
+    registerMediaUiShortcuts();
+}
+
+// Speaker and microphone volume, backed by the shell's PipeWire service. The
+// standard hardware keys are bound by default so the volume keys work out of
+// the box; the user can rebind or clear them like any other shortcut.
+void NoctaliaSettings::registerAudioShortcuts()
+{
+    registerShortcut(s_audioComponent, s_audioDisplay, QStringLiteral("AudioVolumeUp"),
+                     i18n("Volume Up"),
+                     {QStringLiteral("msg"), QStringLiteral("volume-up")},
+                     QKeySequence(Qt::Key_VolumeUp));
+
+    registerShortcut(s_audioComponent, s_audioDisplay, QStringLiteral("AudioVolumeDown"),
+                     i18n("Volume Down"),
+                     {QStringLiteral("msg"), QStringLiteral("volume-down")},
+                     QKeySequence(Qt::Key_VolumeDown));
+
+    registerShortcut(s_audioComponent, s_audioDisplay, QStringLiteral("AudioVolumeMute"),
+                     i18n("Mute"),
+                     {QStringLiteral("msg"), QStringLiteral("volume-mute")},
+                     QKeySequence(Qt::Key_VolumeMute));
+
+    registerShortcut(s_audioComponent, s_audioDisplay, QStringLiteral("AudioMicMute"),
+                     i18n("Mute Microphone"),
+                     {QStringLiteral("msg"), QStringLiteral("mic-mute")},
+                     QKeySequence(Qt::Key_MicMute));
+
+    registerShortcut(s_audioComponent, s_audioDisplay, QStringLiteral("AudioMicVolumeUp"),
+                     i18n("Microphone Volume Up"),
+                     {QStringLiteral("msg"), QStringLiteral("mic-volume-up")},
+                     QKeySequence(Qt::Key_MicVolumeUp));
+
+    registerShortcut(s_audioComponent, s_audioDisplay, QStringLiteral("AudioMicVolumeDown"),
+                     i18n("Microphone Volume Down"),
+                     {QStringLiteral("msg"), QStringLiteral("mic-volume-down")},
+                     QKeySequence(Qt::Key_MicVolumeDown));
+}
+
+// MPRIS transport plus user-facing shell actions. The transport keys are bound
+// by default; the notification, clipboard, screenshot and wallpaper actions
+// start unbound because there is no universal key for them.
+void NoctaliaSettings::registerMediaUiShortcuts()
+{
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPlayPause"),
+                     i18n("Play / Pause"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("toggle")},
+                     QKeySequence(Qt::Key_MediaPlay));
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPlay"),
+                     i18n("Play"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("play")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPause"),
+                     i18n("Pause"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("pause")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiStop"),
+                     i18n("Stop"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("stop")},
+                     QKeySequence(Qt::Key_MediaStop));
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiNextTrack"),
+                     i18n("Next Track"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("next")},
+                     QKeySequence(Qt::Key_MediaNext));
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPreviousTrack"),
+                     i18n("Previous Track"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("previous")},
+                     QKeySequence(Qt::Key_MediaPrevious));
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiNextPlayer"),
+                     i18n("Next Player"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("next-player")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPreviousPlayer"),
+                     i18n("Previous Player"),
+                     {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("previous-player")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiToggleDnd"),
+                     i18n("Toggle Do Not Disturb"),
+                     {QStringLiteral("msg"), QStringLiteral("notification-dnd-toggle")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiClearNotifications"),
+                     i18n("Clear Notifications"),
+                     {QStringLiteral("msg"), QStringLiteral("notification-clear-active")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiClearNotificationHistory"),
+                     i18n("Clear Notification History"),
+                     {QStringLiteral("msg"), QStringLiteral("notification-clear-history")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiClearClipboard"),
+                     i18n("Clear Clipboard History"),
+                     {QStringLiteral("msg"), QStringLiteral("clipboard-clear")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiScreenshotRegion"),
+                     i18n("Region Screenshot"),
+                     {QStringLiteral("msg"), QStringLiteral("screenshot-region")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiScreenshotFullscreen"),
+                     i18n("Fullscreen Screenshot"),
+                     {QStringLiteral("msg"), QStringLiteral("screenshot-fullscreen")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiAnnotate"),
+                     i18n("Annotate Screen"),
+                     {QStringLiteral("msg"), QStringLiteral("annotate")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiNextWallpaper"),
+                     i18n("Next Wallpaper"),
+                     {QStringLiteral("msg"), QStringLiteral("wallpaper-next")});
+
+    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPreviousWallpaper"),
+                     i18n("Previous Wallpaper"),
+                     {QStringLiteral("msg"), QStringLiteral("wallpaper-previous")});
 }
 
 NoctaliaSettings::~NoctaliaSettings() = default;
 
-void NoctaliaSettings::registerShortcut(const QString &id, const QString &description, const QStringList &args, const QKeySequence &defaultShortcut)
+void NoctaliaSettings::registerShortcut(const QString &component, const QString &componentDisplayName, const QString &id, const QString &description, const QStringList &args, const QKeySequence &defaultShortcut)
 {
     QAction *action = new QAction(this);
-    action->setProperty("componentName", QStringLiteral("noctalia"));
-    action->setProperty("componentDisplayName", QStringLiteral("Noctalia"));
+    action->setProperty("componentName", component);
+    action->setProperty("componentDisplayName", componentDisplayName);
     action->setObjectName(id);
     action->setText(description);
 
@@ -140,11 +269,11 @@ void NoctaliaSettings::registerShortcut(const QString &id, const QString &descri
     m_actions.append(action);
 }
 
-void NoctaliaSettings::registerProcessAction(const QString &id, const QString &description, const QStringList &command, const QKeySequence &defaultShortcut)
+void NoctaliaSettings::registerProcessAction(const QString &component, const QString &componentDisplayName, const QString &id, const QString &description, const QStringList &command, const QKeySequence &defaultShortcut)
 {
     QAction *action = new QAction(this);
-    action->setProperty("componentName", QStringLiteral("noctalia"));
-    action->setProperty("componentDisplayName", QStringLiteral("Noctalia"));
+    action->setProperty("componentName", component);
+    action->setProperty("componentDisplayName", componentDisplayName);
     action->setObjectName(id);
     action->setText(description);
 

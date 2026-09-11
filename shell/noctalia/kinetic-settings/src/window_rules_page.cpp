@@ -782,13 +782,27 @@ WindowRulesPage::buildRuleFieldRow(std::size_t ruleIndex, const RuleField& field
           label = "Monitor " + std::to_string(i + 1);
         }
         labels.push_back(std::move(label));
-        values.push_back(std::to_string(i));
+        // Store the connector name (e.g. "DP-1"): unlike the output index it
+        // stays valid when monitors are reordered or hotplugged.
+        values.push_back(output.connectorName);
       }
       std::optional<std::size_t> selected;
       for (std::size_t i = 0; i < values.size(); ++i) {
         if (values[i] == currentValue) {
           selected = i;
           break;
+        }
+      }
+      if (!selected && !currentValue.empty()) {
+        // Backward compatibility: rules saved before connector names were
+        // stored held a positional output index (e.g. "1"). Map it to the
+        // matching entry so the editor shows the right monitor.
+        try {
+          const auto legacyIndex = static_cast<std::size_t>(std::stoul(currentValue));
+          if (legacyIndex < outputs.size()) {
+            selected = legacyIndex + 1; // +1 for the leading "Default monitor"
+          }
+        } catch (...) {
         }
       }
       controls->addChild(ui::select({

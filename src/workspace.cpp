@@ -953,10 +953,23 @@ void Workspace::addWaylandWindow(Window *window)
     }
 
     if (window->isPlaceable() && !window->isPlaced() && window->tilingState().mode != TilingState::Mode::Tiled) {
-        const RectF area = clientArea(PlacementArea, window, activeOutput());
+        // Place on the output the window currently belongs to. A Monitor
+        // ("screen") window rule moves the window in
+        // XdgToplevelWindow::initialize(), and that move does not mark the
+        // window as placed; using the active output here would override the
+        // rule for floating windows.
+        const LogicalOutput *output = window->output() ? window->output() : activeOutput();
+        const RectF area = clientArea(PlacementArea, window, output);
         if (const auto placement = m_placement->place(window, area)) {
             window->place(*placement);
         }
+        // The placement policy can still pick a different output than the one
+        // assigned by a Monitor rule (e.g. "Under mouse" places under the
+        // cursor). Re-apply the screen rule afterwards so it always wins,
+        // mirroring how X11Window::manage() applies it after placement. This is
+        // a no-op when no screen rule matches.
+        window->sendToOutput(window->rules()->checkOutput(
+            window->moveResizeOutput() ? window->moveResizeOutput() : activeOutput(), true));
     }
     addToStack(window);
 

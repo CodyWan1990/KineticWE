@@ -613,6 +613,15 @@ Deferred (Phase C+, needs your go-ahead):
   making the `Meta+Shift+Arrow` swap binds work.
 - **Shift+Meta+scroll** pans the strip (avoids the VDM's `Meta+scroll`).
 
+**Revision 14 (this session):**
+- **Main-axis mouse resize is now a divider.** New `interactiveResizeEnded()`
+  override trades width between the dragged column and the neighbour on the
+  dragged side, keeping the strip's total extent constant. Previously a
+  narrower drag shrank the total, the view clamp scrolled left and an off-screen
+  column peeked in (three visible at once); now the visible set stays at two and
+  off-screen columns stay off-screen. The cross axis still delegates to the base
+  per-tile stack behaviour.
+
 **Revision 13 (this session):**
 - **Trimmed the Emerge settings.** Removed the center-focused-column and
   center-short-columns options (niri-isms that do not apply here) and the

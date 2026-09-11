@@ -34,31 +34,29 @@ namespace {
   // Per-window shortcuts (Window Close, Move, ...) are per-instance, not
   // rebindable globals; hide them like the KDE Shortcuts KCM.
   constexpr std::string_view kSessionActionPrefix = "_k_session:";
-  // Components whose binds stay active but are not shown in the page. Only
-  // components that have no meaning outside a Plasma session are hidden:
-  // "ActivityManager" is the KGlobalAccel component registered by the upstream
-  // plasma-desktop activity KCM (friendly name "Activity Manager"). The
-  // compositor plans to drop activity support entirely (docs/kineticwe-2.0.md,
-  // Phase 6) and kactivitymanagerd is already blocked from autostarting, so its
-  // keybinds have no backing service and are not surfaced here. "plasmashell"
-  // is the Plasma shell itself, likewise meaningless on KineticWE. "ksmserver"
-  // (friendly name "Session Management") exposes Plasma's own power/lock/logout
-  // actions, which KineticWE satisfies through Noctalia (panel power menu,
-  // lockscreen, drawer) — surfacing them here only invites binding a chord that
-  // doesn't do what the Plasma action would, so it is hidden.
-  //
-  // Regular apps (Konsole, Dolphin, ...) are NOT hidden: their binds live in
-  // the daemon's config and can silently hold a chord the user wants (e.g. a
-  // stale Ctrl+Alt+T left by a previous Plasma install). Surfacing them lets
-  // the user see and clear/rebind them instead of being surprised by an
-  // invisible conflict.
-  const std::vector<std::string>& hiddenComponents() {
-    static const std::vector<std::string> kHidden{
-        "ActivityManager",
-        "plasmashell",
-        "ksmserver",
+  // Components the page surfaces. The keybinds list is deliberately an
+  // allow-list of KineticWE-owned components rather than a deny-list of
+  // everything else: the daemon exposes one component per registered shortcut
+  // owner, which on a real session includes Plasma services ("Audio Volume",
+  // "Display Configuration", "Keyboard Layout Switcher", "Media Controller",
+  // "System Monitor", "Touchpad", "ActivityManager", "plasmashell",
+  // "ksmserver") and per-application components (Konsole, Dolphin, Ghostty,
+  // KCalc, Spectacle, ...). None of those are backed by KineticWE config — they
+  // read kwinrc / Plasma configs, not kineticwe.kwe — so editing them here
+  // presents binds that KineticWE neither owns nor themes. Only the compositor
+  // ("kwin"), the shell ("noctalia"), the shell-backed "audio" / "media-ui"
+  // action groups (registered by the compositor, see src/noctaliasettings.cpp)
+  // and the user's own Applications / Custom Commands actions are shown.
+  const std::vector<std::string>& visibleComponents() {
+    static const std::vector<std::string> kVisible{
+        "kwin",
+        "noctalia",
+        "audio",
+        "media-ui",
+        std::string(CustomKeybinds::kAppsComponent),
+        std::string(CustomKeybinds::kCommandsComponent),
     };
-    return kHidden;
+    return kVisible;
   }
 
   [[nodiscard]] bool isHiddenComponent(std::string_view uniqueName) {
@@ -67,8 +65,8 @@ namespace {
       std::ranges::replace(form, '.', '_');
       return form;
     };
-    return std::ranges::any_of(hiddenComponents(), [&](const std::string& hidden) {
-      return uniqueName == hidden || underscoreForm() == hidden;
+    return std::ranges::none_of(visibleComponents(), [&](const std::string& visible) {
+      return uniqueName == visible || underscoreForm() == visible;
     });
   }
 

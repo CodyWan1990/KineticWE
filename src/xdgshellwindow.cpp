@@ -1448,7 +1448,10 @@ void XdgToplevelWindow::initialize()
         resize(forcedSize);
     }
 
-    setOpacity(rules()->checkOpacityInactive(opacity()));
+    // Seed from the compositor-wide inactive opacity default; unlike X11, a
+    // Wayland window never runs applyWindowRules() at spawn, so this is the
+    // value it keeps until it is (de)activated or the config is reloaded.
+    setOpacity(rules()->checkOpacityInactive(options->defaultInactiveOpacity()));
     maximize(rules()->checkMaximize(initialMaximizeMode(sessionData), true));
     setFullScreen(rules()->checkFullScreen(initialFullScreenMode(sessionData), true));
     setOnActivities(rules()->checkActivity(initialActivities(sessionData), true));

@@ -407,6 +407,14 @@ private:
     // covering the output. Populated in addWindowToLayout(), consumed (and
     // cleared) in onWindowClassChanged(), and cleaned up in onWindowRemoved().
     QHash<Window *, RectF> m_preTileGeometry;
+
+    // Last configured layout kind per "<output>:<desktop number>", as resolved
+    // from kineticwe.kwe by reconcileLayoutKinds(). Reconfigure uses this to
+    // tell an *intentional* default-layout change (resolved kind differs ->
+    // apply it) from an unrelated reconfigure (resolved kind unchanged ->
+    // leave the engine alone, preserving runtime setLayout()/cycleLayout()
+    // switches).
+    QHash<QString, LayoutEngine::LayoutKind> m_reconciledLayoutKinds;
 };
 
 } // namespace KWin

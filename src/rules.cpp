@@ -538,9 +538,9 @@ bool Rules::update(Window *c, int selection)
         desktops = c->desktopIds();
     }
     if NOW_REMEMBER (Screen, screen) {
-        const int index = workspace()->outputs().indexOf(c->output());
-        updated = updated || screen != index;
-        screen = index;
+        const QString name = c->output() ? c->output()->name() : QString();
+        updated = updated || screen != name;
+        screen = name;
     }
     if NOW_REMEMBER (Activity, activity) {
         updated = updated || activity != c->activities();
@@ -669,7 +669,30 @@ APPLY_FORCE_RULE(minsize, MinSize, QSizeF)
 APPLY_FORCE_RULE(maxsize, MaxSize, QSizeF)
 APPLY_RULE(ignoregeometry, IgnoreGeometry, bool)
 
-APPLY_RULE(screen, Screen, int)
+bool Rules::applyScreen(LogicalOutput *&output, bool init) const
+{
+    if (checkSetRule(screenrule, init)) {
+        // The screen rule stores the output's connector name (e.g. "DP-1"),
+        // which is stable across output reordering, unlike a positional index.
+        if (LogicalOutput *match = workspace()->findOutput(screen)) {
+            output = match;
+        } else {
+            // Backward compatibility: rules written before connector names were
+            // stored keep a positional index (e.g. "screen=1"). Resolve it
+            // against the current output list so those rules keep working until
+            // the KCM rewrites them with a connector name.
+            bool isIndex = false;
+            const int index = screen.toInt(&isIndex);
+            if (isIndex) {
+                if (LogicalOutput *legacy = workspace()->outputs().value(index)) {
+                    output = legacy;
+                }
+            }
+        }
+    }
+    return checkSetStop(screenrule);
+}
+
 APPLY_RULE(activity, Activity, QStringList)
 APPLY_FORCE_RULE(layer, Layer, enum Layer)
 
@@ -893,14 +916,12 @@ LogicalOutput *WindowRules::checkOutput(LogicalOutput *output, bool init) const
     if (rules.isEmpty()) {
         return output;
     }
-    int ret = workspace()->outputs().indexOf(output);
     for (Rules *rule : rules) {
-        if (rule->applyScreen(ret, init)) {
+        if (rule->applyScreen(output, init)) {
             break;
         }
     }
-    LogicalOutput *ruleOutput = workspace()->outputs().value(ret);
-    return ruleOutput ? ruleOutput : output;
+    return output;
 }
 
 CHECK_RULE(Minimize, bool)
