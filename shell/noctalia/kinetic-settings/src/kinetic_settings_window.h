@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kinetic-settings/src/accessibility_page.h"
 #include "kinetic-settings/src/animations_page.h"
 #include "kinetic-settings/src/appearance_page.h"
 #include "kinetic-settings/src/cursors_page.h"
@@ -95,6 +96,7 @@ private:
     Keybinds,
     Displays,
     DefaultApps,
+    Accessibility,
   };
 
   void destroyWindow();
@@ -157,6 +159,8 @@ private:
   [[nodiscard]] DefaultAppsPage::Callbacks defaultAppsPageCallbacks();
   [[nodiscard]] DisplayPage::Filter displayFilter() const;
   [[nodiscard]] DisplayPage::Callbacks displayPageCallbacks();
+  [[nodiscard]] AccessibilityPage::Filter accessibilityFilter() const;
+  [[nodiscard]] AccessibilityPage::Callbacks accessibilityPageCallbacks();
   void confirmResetPage();
   // Routes the filter row's Apply/Reset Page to the active page.
   void applyActivePage();
@@ -193,6 +197,7 @@ private:
   std::unique_ptr<DesktopEffectsPage> m_desktopEffectsPage;
   std::unique_ptr<AnimationsPage> m_animationsPage;
   std::unique_ptr<DefaultAppsPage> m_defaultAppsPage;
+  std::unique_ptr<AccessibilityPage> m_accessibilityPage;
   std::unique_ptr<SelectDropdownPopup> m_selectPopup;
   // Non-null only while a keybind recorder is capturing (see updateKeyboardShortcutInhibit).
   zwp_keyboard_shortcuts_inhibitor_v1* m_shortcutInhibitor = nullptr;

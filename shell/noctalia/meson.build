@@ -1002,6 +1002,7 @@ _noctalia_sources = files(
   'src/theme/cli.cpp',
   'src/ipc/cli.cpp',
   'kinetic-settings/src/kineticwe_kwe.cpp',
+  'kinetic-settings/src/accessibility_page.cpp',
   'kinetic-settings/src/compositor_dbus.cpp',
   'kinetic-settings/src/display_backend.cpp',
   'kinetic-settings/src/display_page.cpp',
