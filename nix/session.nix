@@ -89,6 +89,10 @@ export KDE_SESSION_VERSION=6
 export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
 export XDG_DATA_DIRS="@kwin_share@:${dl}{XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+# The compositor runs with XDG_CONFIG_HOME pointed at the kineticwe config
+# root; user apps launched from this payload (noctalia, portals, ...) must
+# read the REAL config home, so reset it here.
+export XDG_CONFIG_HOME="${dl}HOME/.config"
 
 # KWin exports WAYLAND_DISPLAY and DISPLAY (XWayland) before launching this
 # payload; the fallback guards against the payload being started other ways.
@@ -171,8 +175,50 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP KDE_SESSION_VERSION KDE_FULL_SESSION XDG_MENU_PREFIX XDG_DATA_DIRS 2>/dev/null || true
 fi
 
-log "Launching: ${dl}KINETIC_WE --xwayland --no-lockscreen --exit-with-session ${dl}STARTUP_PAYLOAD"
-exec "${dl}KINETIC_WE" --xwayland --no-lockscreen --exit-with-session "${dl}STARTUP_PAYLOAD"
+# --- Config root + one-time kwinrc migration (mirror scripts/start-kineticwe.sh) ---
+# 2.0 renamed the compositor's main KConfig to kineticwe.kwe and (in the
+# standalone launcher) reads it from a dedicated root via a per-process
+# XDG_CONFIG_HOME redirect. The Nix launcher must do the same, or existing
+# ~/.config/kwinrc settings (floating rules, active-window border, effects)
+# are silently dropped.
+KWE_CONFIG_HOME="${dl}HOME/.config/kineticwe"
+if [[ "${dl}{XDG_CONFIG_HOME:-}" == "${dl}KWE_CONFIG_HOME" ]]; then
+    export KWE_REAL_CONFIG_HOME="${dl}HOME/.config"
+else
+    export KWE_REAL_CONFIG_HOME="${dl}{XDG_CONFIG_HOME:-${dl}HOME/.config}"
+fi
+mkdir -p "${dl}KWE_CONFIG_HOME"
+
+# First login: carry kwinrc (+ merged legacy rc files) into the config root.
+if [[ ! -e "${dl}KWE_CONFIG_HOME/kineticwe.kwe" ]]; then
+    if [[ -e "${dl}KWE_REAL_CONFIG_HOME/kwinrc" ]]; then
+        cp "${dl}KWE_REAL_CONFIG_HOME/kwinrc" "${dl}KWE_CONFIG_HOME/kineticwe.kwe"
+    fi
+    if [[ -e "${dl}KWE_REAL_CONFIG_HOME/kwinrulesrc" ]]; then
+        cp "${dl}KWE_REAL_CONFIG_HOME/kwinrulesrc" "${dl}KWE_CONFIG_HOME/rules.kwe"
+    fi
+    for _legacy in kaccessrc kcminputrc kxkbrc klaunchrc plasmarc; do
+        if [[ -e "${dl}KWE_REAL_CONFIG_HOME/${dl}_legacy" ]]; then
+            cat "${dl}KWE_REAL_CONFIG_HOME/${dl}_legacy" >> "${dl}KWE_CONFIG_HOME/kineticwe.kwe"
+        fi
+    done
+fi
+
+# Fold a flat ~/.config/kineticwe.kwe (from earlier Nix builds) into the root.
+if [[ -e "${dl}KWE_REAL_CONFIG_HOME/kineticwe.kwe" ]]; then
+    if [[ ! -e "${dl}KWE_CONFIG_HOME/kineticwe.kwe" ]]; then
+        cp "${dl}KWE_REAL_CONFIG_HOME/kineticwe.kwe" "${dl}KWE_CONFIG_HOME/kineticwe.kwe"
+    fi
+    rm -f "${dl}KWE_REAL_CONFIG_HOME/kineticwe.kwe"
+fi
+
+# Shared kdeglobals: expose the real one inside the root (single source of truth).
+if [[ -e "${dl}KWE_REAL_CONFIG_HOME/kdeglobals" ]]; then
+    ln -sf "${dl}KWE_REAL_CONFIG_HOME/kdeglobals" "${dl}KWE_CONFIG_HOME/kdeglobals" 2>/dev/null || true
+fi
+
+log "Launching: ${dl}KINETIC_WE --xwayland --no-lockscreen --exit-with-session ${dl}STARTUP_PAYLOAD (XDG_CONFIG_HOME=${dl}KWE_CONFIG_HOME)"
+exec XDG_CONFIG_HOME="${dl}KWE_CONFIG_HOME" "${dl}KINETIC_WE" --xwayland --no-lockscreen --exit-with-session "${dl}STARTUP_PAYLOAD"
 SCRIPTEOF
     chmod +x "$out/bin/start-kineticwe"
 
