@@ -7,6 +7,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -25,7 +26,9 @@ class Node;
 //     exclusive group), plus the magnifier's [Effect-magnifier] region size.
 //   * Shake Pointer    — the [Effect-shakecursor] keys.
 //
-// Each subcategory has an enable toggle backed by [Plugins] <name>Enabled.
+// Each subcategory has an enable toggle backed by [Plugins] <name>Enabled —
+// except Zoom & Magnifier, which uses an exclusive mode selector (full-screen
+// Zoom vs region Magnifier, the "magnifiers" group).
 // Edits are STAGED (in-memory) and only reach kineticwe.kwe when the window's
 // Apply button calls applyAll(); applyAll then reloads/unloads the effect for
 // enable changes and calls reconfigureEffect() for the [Effect-*] groups, the
@@ -64,7 +67,9 @@ public:
   void resetAll();
 
   // True while unapplied (staged) edits exist — drives the window's Apply button.
-  [[nodiscard]] bool hasPending() const noexcept { return !m_pending.empty(); }
+  [[nodiscard]] bool hasPending() const noexcept {
+    return !m_pending.empty() || m_pendingZoomMode.has_value();
+  }
 
   // Writes every staged edit to kineticwe.kwe, then applies it live: load/
   // unloadEffect() for [Plugins] enable toggles and reconfigureEffect() for the
@@ -77,12 +82,28 @@ public:
   void reloadFromDisk() noexcept {
     m_loaded = false;
     m_pending.clear();
+    m_pendingZoomMode.reset();
   }
 
 private:
   enum class Category {
     ZoomAndMagnifier,
     ShakePointer,
+  };
+
+  // The Zoom & Magnifier subcategory is one exclusive group: either the
+  // full-screen Zoom effect or the region Magnifier effect is enabled.
+  enum class ZoomMode {
+    FullScreen,
+    MagnifyRegion,
+  };
+
+  // Which Zoom mode(s) a setting applies to. Shared keys live in [Effect-zoom]
+  // and are read by both effects; the rest are effect-specific.
+  enum class ZoomScope {
+    Both,
+    FullScreen,
+    MagnifyRegion,
   };
 
   enum class ControlKind {
@@ -101,6 +122,8 @@ private:
     std::string_view title;
     std::string_view subtitle;
     bool advanced = false;
+    // Full-screen-only or magnify-region-only visibility (Both = always shown).
+    ZoomScope scope = ZoomScope::Both;
     // Slider/stepper bounds (steppers cast to int).
     double minValue = 0.0;
     double maxValue = 100.0;
@@ -150,11 +173,31 @@ private:
       Flex& parent, const Field& field, float scale, std::string_view armedResetKey, const Callbacks& callbacks
   );
 
+  // --- Zoom mode (exclusive full-screen / magnify-region selector) ---------
+  [[nodiscard]] static bool effectEnabledDefault(std::string_view effect, bool fallback);
+  [[nodiscard]] static ZoomMode defaultZoomMode();
+  [[nodiscard]] static std::string zoomModeKeyPath() { return "Plugins.zoomMode"; }
+  [[nodiscard]] ZoomMode fileBackedZoomMode() const;
+  [[nodiscard]] ZoomMode effectiveZoomMode() const;
+  [[nodiscard]] bool zoomModeOverridden() const;
+  // Whether a setting is relevant for the effective zoom mode.
+  [[nodiscard]] bool modeAllows(const Field& field) const;
+  [[nodiscard]] bool zoomModeMatchesFilter(const Filter& filter) const;
+  // Stages a mode; clears the staged value when it matches disk.
+  void stageZoomMode(ZoomMode mode);
+  void stageZoomModeAndRebuild(ZoomMode mode, const Callbacks& callbacks);
+  // Writes both [Plugins] enable keys for the mode (or removes them at default).
+  void writeZoomMode(ZoomMode mode);
+  [[nodiscard]] std::unique_ptr<Node>
+  buildZoomModeRow(float scale, std::string_view armedResetKey, const Callbacks& callbacks);
+
   CompositorDbus m_dbus;
   KineticweKwe m_config;
   bool m_loaded = false;
   // Edits staged by the controls, keyed by "group.key"; flushed by applyAll().
   std::map<std::string, Value> m_pending;
+  // Staged full-screen vs magnify-region choice (the [Plugins] enable pair).
+  std::optional<ZoomMode> m_pendingZoomMode;
   // Selected subcategory (left-hand list).
   Category m_selectedCategory = Category::ZoomAndMagnifier;
 };

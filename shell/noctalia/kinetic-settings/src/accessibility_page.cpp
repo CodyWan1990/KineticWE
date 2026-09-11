@@ -156,8 +156,9 @@ std::string_view AccessibilityPage::categoryTitle(Category category) {
 std::string_view AccessibilityPage::categoryDescription(Category category) {
   switch (category) {
   case Category::ZoomAndMagnifier:
-    return "Magnify the desktop: the full-screen Zoom effect, or the region Magnifier. "
-           "Both are toggled with a shortcut (see Keybinds).";
+    return "Magnify the whole screen or a movable region under the pointer. Choose the "
+           "zoom type below; only one is active at a time. Activate it with the Zoom "
+           "shortcuts on the Keybinds page.";
   case Category::ShakePointer:
     return "Enlarge the pointer when it is quickly shaken back and forth.";
   }
@@ -191,17 +192,11 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
     std::vector<Field> f;
 
     // Zoom & Magnifier ------------------------------------------------------
-    f.push_back(Field{
-        .category = Category::ZoomAndMagnifier,
-        .group = "Plugins",
-        .key = "zoomEnabled",
-        .control = ControlKind::Toggle,
-        .title = "Enable Zoom",
-        .subtitle = "Turn on the full-screen desktop magnifier. Activate it with the "
-                    "Zoom shortcuts on the Keybinds page.",
-        .fallback = Value{enabledDefault("zoom")},
-        .effectName = "zoom",
-    });
+    // The full-screen Zoom effect and the region Magnifier effect form the
+    // "magnifiers" exclusive group, so there is no on/off toggle for either:
+    // the mode selector (buildZoomModeRow) enables exactly one. Fields are
+    // tagged with the mode they apply to; shared [Effect-zoom] keys are read by
+    // both effects.
     f.push_back(Field{
         .category = Category::ZoomAndMagnifier,
         .group = "Effect-zoom",
@@ -209,6 +204,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .control = ControlKind::Slider,
         .title = "Zoom factor",
         .subtitle = "How much each zoom step magnifies the desktop.",
+        .scope = ZoomScope::Both,
         .minValue = 1.0,
         .maxValue = 10.0,
         .step = 0.1,
@@ -223,6 +219,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .control = ControlKind::Select,
         .title = "Pointer tracking",
         .subtitle = "How the magnified view follows the pointer.",
+        .scope = ZoomScope::FullScreen,
         .optionValues = &mouseTrackingValues(),
         .optionLabels = &mouseTrackingLabels(),
         .fallback = Value{0},
@@ -235,6 +232,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .control = ControlKind::Toggle,
         .title = "Track the focused window",
         .subtitle = "Center the magnified view on the window that has keyboard focus.",
+        .scope = ZoomScope::FullScreen,
         .fallback = Value{false},
         .effectName = "zoom",
     });
@@ -245,6 +243,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .control = ControlKind::Toggle,
         .title = "Track the text caret",
         .subtitle = "Keep the magnified view centered on the text cursor while typing.",
+        .scope = ZoomScope::FullScreen,
         .fallback = Value{false},
         .effectName = "zoom",
     });
@@ -256,6 +255,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .title = "Show pixel grid at zoom level",
         .subtitle = "Draw a grid between pixels once the zoom level reaches this value.",
         .advanced = true,
+        .scope = ZoomScope::FullScreen,
         .minValue = 1.0,
         .maxValue = 50.0,
         .step = 1.0,
@@ -270,6 +270,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .control = ControlKind::Toggle,
         .title = "Sharpen screen content while zoomed in",
         .subtitle = "Use a pattern upscaler so magnified content stays crisp.",
+        .scope = ZoomScope::FullScreen,
         .fallback = Value{true},
         .effectName = "zoom",
     });
@@ -282,6 +283,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .subtitle = "Hold these modifiers while scrolling to zoom (for example "
                     "\"Meta+Control\"). Accepted keys: Meta, Ctrl/Control, Alt, Shift.",
         .advanced = true,
+        .scope = ZoomScope::Both,
         .fallback = Value{std::string{"Meta+Control"}},
         .effectName = "zoom",
     });
@@ -293,6 +295,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .title = "Focus tracking delay",
         .subtitle = "How long focus must rest in one place before the view follows it.",
         .advanced = true,
+        .scope = ZoomScope::FullScreen,
         .minValue = 0.0,
         .maxValue = 2000.0,
         .step = 50.0,
@@ -308,6 +311,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .title = "Move factor",
         .subtitle = "How fast the view scrolls when panning the magnified area.",
         .advanced = true,
+        .scope = ZoomScope::FullScreen,
         .minValue = 1.0,
         .maxValue = 50.0,
         .step = 1.0,
@@ -322,6 +326,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .control = ControlKind::Stepper,
         .title = "Magnify region width",
         .subtitle = "Width of the region magnified by the Magnifier effect.",
+        .scope = ZoomScope::MagnifyRegion,
         .minValue = 1.0,
         .maxValue = 5000.0,
         .step = 10.0,
@@ -336,6 +341,7 @@ const std::vector<AccessibilityPage::Field>& AccessibilityPage::fields() {
         .control = ControlKind::Stepper,
         .title = "Magnify region height",
         .subtitle = "Height of the region magnified by the Magnifier effect.",
+        .scope = ZoomScope::MagnifyRegion,
         .minValue = 1.0,
         .maxValue = 5000.0,
         .step = 10.0,
@@ -552,18 +558,121 @@ void AccessibilityPage::stageAndRebuild(const Field& field, const Value& value, 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Zoom mode: the "magnifiers" exclusive group (full-screen Zoom vs Magnify
+// region). Exactly one of the two effects is enabled.
+// ---------------------------------------------------------------------------
+
+bool AccessibilityPage::effectEnabledDefault(std::string_view effect, bool fallback) {
+  if (const effects_catalog::Effect* e = effects_catalog::findEffect(effect)) {
+    return e->enabledByDefault;
+  }
+  return fallback;
+}
+
+AccessibilityPage::ZoomMode AccessibilityPage::defaultZoomMode() {
+  // Upstream defaults: zoom enabled, magnifier disabled.
+  if (effectEnabledDefault("magnifier", false) && !effectEnabledDefault("zoom", true)) {
+    return ZoomMode::MagnifyRegion;
+  }
+  return ZoomMode::FullScreen;
+}
+
+AccessibilityPage::ZoomMode AccessibilityPage::fileBackedZoomMode() const {
+  const bool zoomOn = m_config.readBool("Plugins", "zoomEnabled", effectEnabledDefault("zoom", true));
+  const bool magnifierOn = m_config.readBool("Plugins", "magnifierEnabled", effectEnabledDefault("magnifier", false));
+  // The group is exclusive, so the magnifier only wins when it is on and zoom
+  // is explicitly off; anything else is full-screen zoom.
+  return (magnifierOn && !zoomOn) ? ZoomMode::MagnifyRegion : ZoomMode::FullScreen;
+}
+
+AccessibilityPage::ZoomMode AccessibilityPage::effectiveZoomMode() const {
+  return m_pendingZoomMode.value_or(fileBackedZoomMode());
+}
+
+bool AccessibilityPage::zoomModeOverridden() const {
+  return effectiveZoomMode() != defaultZoomMode();
+}
+
+bool AccessibilityPage::modeAllows(const Field& field) const {
+  if (field.category != Category::ZoomAndMagnifier) {
+    return true;
+  }
+  switch (field.scope) {
+  case ZoomScope::Both:
+    return true;
+  case ZoomScope::FullScreen:
+    return effectiveZoomMode() == ZoomMode::FullScreen;
+  case ZoomScope::MagnifyRegion:
+    return effectiveZoomMode() == ZoomMode::MagnifyRegion;
+  }
+  return true;
+}
+
+bool AccessibilityPage::zoomModeMatchesFilter(const Filter& filter) const {
+  if (filter.showOverriddenOnly && !zoomModeOverridden()) {
+    return false;
+  }
+  if (!filter.searchQuery.empty()) {
+    const auto matches = [&filter](std::string_view text) {
+      return StringUtils::containsInsensitive(text, filter.searchQuery);
+    };
+    if (!matches("Zoom type") && !matches("Full screen") && !matches("Magnify region")
+        && !matches(categoryTitle(Category::ZoomAndMagnifier))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void AccessibilityPage::stageZoomMode(ZoomMode mode) {
+  ensureLoaded();
+  if (mode == fileBackedZoomMode()) {
+    m_pendingZoomMode.reset();
+  } else {
+    m_pendingZoomMode = mode;
+  }
+}
+
+void AccessibilityPage::stageZoomModeAndRebuild(ZoomMode mode, const Callbacks& callbacks) {
+  stageZoomMode(mode);
+  if (callbacks.requestRebuild) {
+    callbacks.requestRebuild();
+  }
+}
+
+void AccessibilityPage::writeZoomMode(ZoomMode mode) {
+  const bool zoomOn = mode == ZoomMode::FullScreen;
+  const bool magnifierOn = mode == ZoomMode::MagnifyRegion;
+  if (zoomOn == effectEnabledDefault("zoom", true)) {
+    m_config.removeKey("Plugins", "zoomEnabled");
+  } else {
+    m_config.setBool("Plugins", "zoomEnabled", zoomOn);
+  }
+  if (magnifierOn == effectEnabledDefault("magnifier", false)) {
+    m_config.removeKey("Plugins", "magnifierEnabled");
+  } else {
+    m_config.setBool("Plugins", "magnifierEnabled", magnifierOn);
+  }
+}
+
 std::vector<std::string> AccessibilityPage::resettableKeyPaths() const {
   std::vector<std::string> paths;
-  paths.reserve(fields().size());
+  paths.reserve(fields().size() + 1);
   for (const auto& field : fields()) {
     paths.push_back(keyPath(field));
   }
+  paths.push_back(zoomModeKeyPath());
   return paths;
 }
 
 void AccessibilityPage::resetKeyPath(std::string_view path) {
   if (const Field* field = findField(path)) {
     stage(*field, defaultValue(*field));
+    return;
+  }
+  if (path == zoomModeKeyPath()) {
+    stageZoomMode(defaultZoomMode());
   }
 }
 
@@ -571,11 +680,12 @@ void AccessibilityPage::resetAll() {
   for (const auto& field : fields()) {
     stage(field, defaultValue(field));
   }
+  stageZoomMode(defaultZoomMode());
 }
 
 bool AccessibilityPage::applyAll() {
   ensureLoaded();
-  if (m_pending.empty()) {
+  if (m_pending.empty() && !m_pendingZoomMode.has_value()) {
     return true;
   }
 
@@ -597,6 +707,16 @@ bool AccessibilityPage::applyAll() {
     }
   }
 
+  // The zoom mode toggles the exclusive magnifiers group: enable the selected
+  // effect and disable the other.
+  if (m_pendingZoomMode.has_value()) {
+    writeZoomMode(*m_pendingZoomMode);
+    touchedEffects.insert("zoom");
+    touchedEffects.insert("magnifier");
+    enableChanges["zoom"] = (*m_pendingZoomMode == ZoomMode::FullScreen);
+    enableChanges["magnifier"] = (*m_pendingZoomMode == ZoomMode::MagnifyRegion);
+  }
+
   if (!m_config.save()) {
     kLog.warn("kinetic-settings: failed to write {}", KineticweKwe::defaultPath().string());
     return false;
@@ -616,6 +736,7 @@ bool AccessibilityPage::applyAll() {
   }
 
   m_pending.clear();
+  m_pendingZoomMode.reset();
   return true;
 }
 
@@ -824,6 +945,55 @@ std::unique_ptr<Node> AccessibilityPage::buildCategoryList(float scale, const Ca
   return list;
 }
 
+std::unique_ptr<Node> AccessibilityPage::buildZoomModeRow(
+    float scale, std::string_view armedResetKey, const Callbacks& callbacks
+) {
+  const ZoomMode mode = effectiveZoomMode();
+
+  auto titleRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
+  titleRow->addChild(makeLabel(
+      "Zoom type", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+  ));
+  titleRow->addChild(ui::spacer());
+
+  auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
+  copy->addChild(std::move(titleRow));
+  copy->addChild(ui::label({
+      .text = "Magnify either the whole screen or a movable region under the pointer. "
+              "Only one is active at a time.",
+      .fontSize = Style::fontSizeCaption * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      .maxLines = kSettingDescriptionMaxLines,
+  }));
+
+  auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  if (zoomModeOverridden()) {
+    actions->addChild(makeOverrideBadge(scale));
+    actions->addChild(makeResetButton(zoomModeKeyPath(), armedResetKey == zoomModeKeyPath(), scale, callbacks));
+  }
+  actions->addChild(ui::segmented({
+      .options = std::vector<ui::SegmentedOption>{
+          ui::SegmentedOption{.label = "Full screen"}, ui::SegmentedOption{.label = "Magnify region"}
+      },
+      .selectedIndex = mode == ZoomMode::FullScreen ? std::size_t{0} : std::size_t{1},
+      .scale = scale,
+      .onChange = [this, callbacks](std::size_t index) {
+        stageZoomModeAndRebuild(index == 0 ? ZoomMode::FullScreen : ZoomMode::MagnifyRegion, callbacks);
+      },
+  }));
+
+  auto row = ui::row(
+      {.align = FlexAlign::Center,
+       .justify = FlexJustify::SpaceBetween,
+       .gap = Style::spaceXs * scale,
+       .paddingV = 2.0F * scale,
+       .fillWidth = true}
+  );
+  row->addChild(std::move(copy));
+  row->addChild(std::move(actions));
+  return row;
+}
+
 std::unique_ptr<Node> AccessibilityPage::build(
     float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
 ) {
@@ -855,11 +1025,15 @@ std::unique_ptr<Node> AccessibilityPage::build(
     for (const Category category : categories()) {
       std::vector<const Field*> matching;
       for (const auto& field : fields()) {
-        if (field.category == category && matchesFilter(field, filter)) {
+        if (field.category != category || !modeAllows(field)) {
+          continue;
+        }
+        if (matchesFilter(field, filter)) {
           matching.push_back(&field);
         }
       }
-      if (matching.empty()) {
+      const bool modeRow = category == Category::ZoomAndMagnifier && zoomModeMatchesFilter(filter);
+      if (matching.empty() && !modeRow) {
         continue;
       }
       if (anyRows) {
@@ -869,6 +1043,9 @@ std::unique_ptr<Node> AccessibilityPage::build(
           categoryTitle(category), Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary),
           FontWeight::Bold
       ));
+      if (modeRow) {
+        root->addChild(buildZoomModeRow(scale, armedResetKey, callbacks));
+      }
       for (const Field* field : matching) {
         addSettingRow(*root, *field, scale, armedResetKey, callbacks);
       }
@@ -913,8 +1090,12 @@ std::unique_ptr<Node> AccessibilityPage::build(
   }
 
   bool anyRows = false;
+  if (m_selectedCategory == Category::ZoomAndMagnifier && zoomModeMatchesFilter(filter)) {
+    settings->addChild(buildZoomModeRow(scale, armedResetKey, callbacks));
+    anyRows = true;
+  }
   for (const auto& field : fields()) {
-    if (field.category != m_selectedCategory) {
+    if (field.category != m_selectedCategory || !modeAllows(field)) {
       continue;
     }
     if (!matchesFilter(field, filter)) {
