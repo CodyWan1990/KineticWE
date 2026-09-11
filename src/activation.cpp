@@ -23,6 +23,7 @@
 #endif
 #include "input.h"
 #include "layershellv1window.h"
+#include "pointer_input.h"
 #include "rules.h"
 #include "useractions.h"
 #include "virtualdesktops.h"
@@ -490,6 +491,7 @@ void Workspace::switchToOutput(LogicalOutput *output)
     if (!options->focusPolicyIsReasonable()) {
         return;
     }
+    const bool outputChanged = output != activeOutput();
     closeActivePopup();
     VirtualDesktop *desktop = VirtualDesktopManager::self()->currentDesktop(output);
     Window *get_focus = m_focusChain->getForActivation(desktop, output);
@@ -500,6 +502,9 @@ void Workspace::switchToOutput(LogicalOutput *output)
         requestFocus(get_focus);
     }
     setActiveOutput(output);
+    if (outputChanged && options->isWarpPointerOnScreenSwitch()) {
+        input()->pointer()->warp(output->geometryF().center());
+    }
 }
 
 // basically the same like allowWindowActivation(), this time allowing

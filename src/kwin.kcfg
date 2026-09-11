@@ -103,6 +103,9 @@
         <entry name="SeparateScreenFocus" type="Bool">
             <default>true</default>
         </entry>
+        <entry name="WarpPointerOnScreenSwitch" type="Bool">
+            <default>false</default>
+        </entry>
         <entry name="RollOverDesktops" type="Bool">
             <default>false</default>
         </entry>

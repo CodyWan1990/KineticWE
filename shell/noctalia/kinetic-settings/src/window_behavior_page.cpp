@@ -327,6 +327,16 @@ const std::vector<WindowBehaviorPage::Field>& WindowBehaviorPage::fields() {
         .pageGroup = "Focus",
         .fallback = Value{true},
     });
+    f.push_back(Field{
+        .group = "Windows",
+        .key = "WarpPointerOnScreenSwitch",
+        .title = "Move pointer when switching screens",
+        .subtitle = "Warp the pointer to the center of the screen focused by "
+                    "the Switch to Screen shortcuts, instead of leaving it on "
+                    "the previous screen",
+        .pageGroup = "Focus",
+        .fallback = Value{false},
+    });
     // Titlebar Actions -------------------------------------------------------
     f.push_back(Field{
         .group = "Windows",

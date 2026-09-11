@@ -96,6 +96,10 @@ class KWIN_EXPORT Options : public QObject
      * Whether to see Xinerama screens separately for focus (in Alt+Tab, when activating next client)
      */
     Q_PROPERTY(bool separateScreenFocus READ isSeparateScreenFocus WRITE setSeparateScreenFocus NOTIFY separateScreenFocusChanged)
+    /**
+     * Whether the pointer is moved to the center of a screen when a "Switch to Screen" shortcut focuses it
+     */
+    Q_PROPERTY(bool warpPointerOnScreenSwitch READ isWarpPointerOnScreenSwitch WRITE setWarpPointerOnScreenSwitch NOTIFY warpPointerOnScreenSwitchChanged)
     Q_PROPERTY(PlacementPolicy placement READ placement WRITE setPlacement NOTIFY placementChanged)
     Q_PROPERTY(ActivationDesktopPolicy activationDesktopPolicy READ activationDesktopPolicy WRITE setActivationDesktopPolicy NOTIFY activationDesktopPolicyChanged)
     Q_PROPERTY(bool focusPolicyIsReasonable READ focusPolicyIsReasonable NOTIFY focusPolicyIsResonableChanged)
@@ -324,6 +328,14 @@ public:
     bool isSeparateScreenFocus() const
     {
         return m_separateScreenFocus;
+    }
+
+    /**
+     * Whether the pointer is moved to the center of a screen when a "Switch to Screen" shortcut focuses it
+     */
+    bool isWarpPointerOnScreenSwitch() const
+    {
+        return m_warpPointerOnScreenSwitch;
     }
 
     PlacementPolicy placement() const
@@ -702,6 +714,7 @@ public:
     void setAutoRaiseInterval(int autoRaiseInterval);
     void setDelayFocusInterval(int delayFocusInterval);
     void setSeparateScreenFocus(bool separateScreenFocus);
+    void setWarpPointerOnScreenSwitch(bool warpPointerOnScreenSwitch);
     void setPlacement(PlacementPolicy placement);
     void setActivationDesktopPolicy(ActivationDesktopPolicy activationDesktopPolicy);
     void setBorderSnapZone(int borderSnapZone);
@@ -883,6 +896,7 @@ Q_SIGNALS:
     void autoRaiseIntervalChanged();
     void delayFocusIntervalChanged();
     void separateScreenFocusChanged(bool);
+    void warpPointerOnScreenSwitchChanged(bool);
     void placementChanged();
     void activationDesktopPolicyChanged();
     void borderSnapZoneChanged();
@@ -945,6 +959,7 @@ private:
     int m_autoRaiseInterval;
     int m_delayFocusInterval;
     bool m_separateScreenFocus;
+    bool m_warpPointerOnScreenSwitch;
     PlacementPolicy m_placement;
     ActivationDesktopPolicy m_activationDesktopPolicy;
     int m_borderSnapZone;

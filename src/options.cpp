@@ -39,6 +39,7 @@ Options::Options(QObject *parent)
     , m_autoRaiseInterval(0)
     , m_delayFocusInterval(0)
     , m_separateScreenFocus(true)
+    , m_warpPointerOnScreenSwitch(false)
     , m_placement(PlacementNone)
     , m_activationDesktopPolicy(Options::defaultActivationDesktopPolicy())
     , m_borderSnapZone(0)
@@ -237,6 +238,15 @@ void Options::setSeparateScreenFocus(bool separateScreenFocus)
     }
     m_separateScreenFocus = separateScreenFocus;
     Q_EMIT separateScreenFocusChanged(m_separateScreenFocus);
+}
+
+void Options::setWarpPointerOnScreenSwitch(bool warpPointerOnScreenSwitch)
+{
+    if (m_warpPointerOnScreenSwitch == warpPointerOnScreenSwitch) {
+        return;
+    }
+    m_warpPointerOnScreenSwitch = warpPointerOnScreenSwitch;
+    Q_EMIT warpPointerOnScreenSwitchChanged(m_warpPointerOnScreenSwitch);
 }
 
 void Options::setPlacement(PlacementPolicy placement)
@@ -752,6 +762,7 @@ void Options::syncFromKcfgc()
     setFocusPolicy(m_settings->focusPolicy());
     setNextFocusPrefersMouse(m_settings->nextFocusPrefersMouse());
     setSeparateScreenFocus(m_settings->separateScreenFocus());
+    setWarpPointerOnScreenSwitch(m_settings->warpPointerOnScreenSwitch());
     setRollOverDesktops(m_settings->rollOverDesktops());
     setPerOutputVirtualDesktops(m_settings->perOutputVirtualDesktops());
     setFocusStealingPreventionLevel(FocusStealingPreventionLevel(m_settings->focusStealingPreventionLevel()));
