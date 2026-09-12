@@ -168,11 +168,40 @@ void NoctaliaSettings::registerAudioShortcuts()
                      QKeySequence(Qt::Key_MicVolumeDown));
 }
 
+void NoctaliaSettings::unregisterRemovedMediaUiShortcuts()
+{
+    // KineticWE used to surface Noctalia's region/fullscreen screenshot
+    // commands under Media & UI. Screenshots belong to Spectacle now, so the
+    // actions are no longer registered. The daemon re-creates them from the
+    // [media-ui] group of an existing kglobalshortcutsrc at startup, so they
+    // have to be purged explicitly. This runs after KGlobalAccelD::init() has
+    // loaded that config: the compositor creates Input (and its
+    // GlobalShortcutsManager) before the Workspace constructs NoctaliaSettings.
+    // setShortcut() with empty chords under NoAutoloading marks the action as
+    // known and keeps .desktop autoloading from resurrecting it;
+    // removeAllShortcuts() then makes the daemon drop it and rewrite the group
+    // without the stale keys.
+    const QStringList removed{
+        QStringLiteral("MediaUiScreenshotRegion"),
+        QStringLiteral("MediaUiScreenshotFullscreen"),
+    };
+    for (const QString &actionName : removed) {
+        QAction action;
+        action.setObjectName(actionName);
+        action.setProperty("componentName", s_mediaUiComponent);
+        action.setProperty("componentDisplayName", s_mediaUiDisplay);
+        KGlobalAccel::self()->setShortcut(&action, {QKeySequence()}, KGlobalAccel::NoAutoloading);
+        KGlobalAccel::self()->removeAllShortcuts(&action);
+    }
+}
+
 // MPRIS transport plus user-facing shell actions. The transport keys are bound
-// by default; the notification, clipboard, screenshot and wallpaper actions
-// start unbound because there is no universal key for them.
+// by default; the notification, clipboard and wallpaper actions start unbound
+// because there is no universal key for them.
 void NoctaliaSettings::registerMediaUiShortcuts()
 {
+    unregisterRemovedMediaUiShortcuts();
+
     registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPlayPause"),
                      i18n("Play / Pause"),
                      {QStringLiteral("msg"), QStringLiteral("media"), QStringLiteral("toggle")},
@@ -224,14 +253,6 @@ void NoctaliaSettings::registerMediaUiShortcuts()
     registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiClearClipboard"),
                      i18n("Clear Clipboard History"),
                      {QStringLiteral("msg"), QStringLiteral("clipboard-clear")});
-
-    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiScreenshotRegion"),
-                     i18n("Region Screenshot"),
-                     {QStringLiteral("msg"), QStringLiteral("screenshot-region")});
-
-    registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiScreenshotFullscreen"),
-                     i18n("Fullscreen Screenshot"),
-                     {QStringLiteral("msg"), QStringLiteral("screenshot-fullscreen")});
 
     registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiAnnotate"),
                      i18n("Annotate Screen"),

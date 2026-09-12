@@ -41,18 +41,25 @@ namespace {
   // "Display Configuration", "Keyboard Layout Switcher", "Media Controller",
   // "System Monitor", "Touchpad", "ActivityManager", "plasmashell",
   // "ksmserver") and per-application components (Konsole, Dolphin, Ghostty,
-  // KCalc, Spectacle, ...). None of those are backed by KineticWE config — they
-  // read kwinrc / Plasma configs, not kineticwe.kwe — so editing them here
-  // presents binds that KineticWE neither owns nor themes. Only the compositor
-  // ("kwin"), the shell ("noctalia"), the shell-backed "audio" / "media-ui"
-  // action groups (registered by the compositor, see src/noctaliasettings.cpp)
-  // and the user's own Applications / Custom Commands actions are shown.
+  // KCalc, ...). None of those are backed by KineticWE config — they read
+  // kwinrc / Plasma configs, not kineticwe.kwe — so editing them here presents
+  // binds that KineticWE neither owns nor themes. The compositor ("kwin"), the
+  // shell ("noctalia"), the shell-backed "audio" / "media-ui" action groups
+  // (registered by the compositor, see src/noctaliasettings.cpp), Spectacle and
+  // the user's own Applications / Custom Commands actions are shown.
+  //
+  // Spectacle is the one per-application component surfaced on purpose: it owns
+  // screenshots, and KineticWE ships its actions unbound so the user can bind
+  // them here (the compositor clears the .desktop defaults; see
+  // GlobalShortcutsManager::clearSpectacleDefaults). Its component unique name
+  // is the desktop-file storage id, not the friendly "Spectacle" name.
   const std::vector<std::string>& visibleComponents() {
     static const std::vector<std::string> kVisible{
         "kwin",
         "noctalia",
         "audio",
         "media-ui",
+        "org.kde.spectacle.desktop",
         std::string(CustomKeybinds::kAppsComponent),
         std::string(CustomKeybinds::kCommandsComponent),
     };

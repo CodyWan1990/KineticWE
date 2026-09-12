@@ -28,10 +28,15 @@ private:
     void registerShortcut(const QString &component, const QString &componentDisplayName, const QString &id, const QString &description, const QStringList &args, const QKeySequence &defaultShortcut = QKeySequence());
     void registerProcessAction(const QString &component, const QString &componentDisplayName, const QString &id, const QString &description, const QStringList &command, const QKeySequence &defaultShortcut = QKeySequence());
     // Audio (volume / microphone) and Media & UI (playback transport plus
-    // notification, clipboard, screenshot and wallpaper commands) grouped as
-    // their own Keybinds sections, each wired to the shell's `noctalia-kwe msg`
-    // IPC commands.
+    // notification, clipboard and wallpaper commands) grouped as their own
+    // Keybinds sections, each wired to the shell's `noctalia-kwe msg` IPC
+    // commands.
     void registerAudioShortcuts();
+    // Drops the region/fullscreen screenshot actions an older KineticWE
+    // registered under Media & UI (screenshots now belong to Spectacle). The
+    // daemon reloads them from kglobalshortcutsrc, so they must be removed, not
+    // merely left unregistered. Called from registerMediaUiShortcuts().
+    void unregisterRemovedMediaUiShortcuts();
     void registerMediaUiShortcuts();
     QList<QAction *> m_actions;
 };

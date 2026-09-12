@@ -798,6 +798,94 @@ namespace {
     });
   }
 
+  // A drawn window mock used when a decoration ships no preview image. The
+  // compiled-in Breeze decoration has no artwork on disk (only the
+  // org.kde.breeze plugin), so there is nothing to render; drawing a titlebar
+  // and content area keeps the tile reading as a window thumbnail instead of a
+  // generic glyph. Palette roles make it track the active scheme, the way KDE
+  // renders its live decoration previews with the current colors.
+  [[nodiscard]] std::unique_ptr<Flex> buildDecorationMockPreview(float scale) {
+    constexpr float kTitlebarHeight = 24.0F;
+    constexpr float kButtonSize = 9.0F;
+    constexpr float kContentBarHeight = 6.0F;
+
+    auto buttons = ui::row({.align = FlexAlign::Center, .gap = Style::spaceXs * scale});
+    const ColorSpec buttonFills[] = {
+        colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.55F),
+        colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.55F),
+        colorSpecFromRole(ColorRole::Error, 0.85F),
+    };
+    for (const ColorSpec& fill : buttonFills) {
+      buttons->addChild(ui::row({
+          .fill = fill,
+          .radius = (kButtonSize * scale) / 2.0F,
+          .width = kButtonSize * scale,
+          .height = kButtonSize * scale,
+      }));
+    }
+
+    auto titlebar = ui::row(
+        {
+            .align = FlexAlign::Center,
+            .justify = FlexJustify::SpaceBetween,
+            .paddingH = Style::spaceSm * scale,
+            .fill = colorSpecFromRole(ColorRole::SurfaceVariant),
+            // Matches the outer radius so the titlebar corners align with the
+            // window frame (Flex clipping is rectangular, not rounded).
+            .radius = Style::scaledRadiusMd(scale),
+            .width = kDecorationPreviewWidth * scale,
+            .height = kTitlebarHeight * scale,
+        },
+        ui::row({
+            .fill = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.5F),
+            .radius = (5.0F * scale) / 2.0F,
+            .width = 46.0F * scale,
+            .height = 5.0F * scale,
+        }),
+        std::move(buttons)
+    );
+
+    auto content = ui::column(
+        {
+            .align = FlexAlign::Start,
+            .gap = Style::spaceXs * scale,
+            .padding = Style::spaceSm * scale,
+            .fill = clearColorSpec(),
+            .fillWidth = true,
+            .flexGrow = 1.0F,
+        },
+        ui::row({
+            .fill = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.28F),
+            .radius = (kContentBarHeight * scale) / 2.0F,
+            .width = 88.0F * scale,
+            .height = kContentBarHeight * scale,
+        }),
+        ui::row({
+            .fill = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.18F),
+            .radius = (kContentBarHeight * scale) / 2.0F,
+            .width = 62.0F * scale,
+            .height = kContentBarHeight * scale,
+        })
+    );
+
+    return ui::column(
+        {
+            .align = FlexAlign::Stretch,
+            .justify = FlexJustify::Start,
+            .gap = 0.0F,
+            .fill = colorSpecFromRole(ColorRole::Surface),
+            .radius = Style::scaledRadiusMd(scale),
+            .border = colorSpecFromRole(ColorRole::Outline),
+            .borderWidth = Style::borderWidth,
+            .clipChildren = true,
+            .width = kDecorationPreviewWidth * scale,
+            .height = kDecorationPreviewHeight * scale,
+        },
+        std::move(titlebar),
+        std::move(content)
+    );
+  }
+
   // One window-decoration tile: preview (bundled image or decoration.svg) + a
   // name label, with the shared selected/hover styling of the Icons page.
   [[nodiscard]] std::unique_ptr<Node> buildDecorationTile(
@@ -834,11 +922,7 @@ namespace {
       img->setSourceFile(renderer, previewPath, static_cast<int>(previewW * 2), true);
       card->addChild(std::move(img));
     } else {
-      card->addChild(ui::glyph({
-          .glyph = "window",
-          .glyphSize = previewH,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      }));
+      card->addChild(buildDecorationMockPreview(scale));
     }
 
     card->addChild(ui::label({

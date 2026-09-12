@@ -18,12 +18,12 @@ class SessionBus;
 
 // The Keybinds settings page: edits global shortcuts of the KineticWE-owned
 // components registered in the embedded kglobalaccel daemon (kwin, noctalia,
-// the compositor-registered audio / media-ui action groups, and the user's
-// Applications / Custom Commands actions) live over D-Bus, and keeps a
+// the compositor-registered audio / media-ui action groups, Spectacle, and the
+// user's Applications / Custom Commands actions) live over D-Bus, and keeps a
 // portable mirror of the overridden binds in
-// ~/.config/kineticwe/keybinds.kwe (see KeybindsKwe). Components owned by
-// Plasma services or individual applications are not surfaced: KineticWE does
-// not manage or theme their config. The page mirrors the
+// ~/.config/kineticwe/keybinds.kwe (see KeybindsKwe). Other components owned
+// by Plasma services or individual applications are not surfaced: KineticWE
+// does not manage or theme their config. The page mirrors the
 // Noctalia settings content layout like the Workspaces/Tiling pages: a glyph +
 // title header, a component list on the left (like the KDE Shortcuts KCM) and
 // the selected component's actions on the right, each with a chord recorder
