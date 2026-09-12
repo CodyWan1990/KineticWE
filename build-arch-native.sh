@@ -13,11 +13,17 @@ set -euo pipefail
 #   ./build-arch-native.sh --full                  # cmake build + install/activate Noctalia greeter
 #   ./build-arch-native.sh --kwin-only             # Incremental kwin-only build (no portal/shell)
 #   ./build-arch-native.sh --noct-only             # Incremental noctalia shell-only build
-#   ./build-arch-native.sh --install-host-deps     # Implies --binary; installs missing host runtime
-#                                                  # deps + default session packages
+#   ./build-arch-native.sh --install-host-deps     # Deprecated alias for --binary: host runtime
+#                                                  # deps are now installed unconditionally
 #   ./build-arch-native.sh --no-session            # Skip installing the login-screen session entry
 #   ./build-arch-native.sh --reset-local           # Remove dev files from TEST_PREFIX + session entry
 #   ./build-arch-native.sh --clean-deps            # Remove build-only dependencies
+#
+# Every build mode that installs the compositor (default, --binary, --full,
+# --kwin-only) installs any missing host runtime dependencies, including the
+# QML modules the built-in effects need (Overview/Grid View, Window View,
+# Tiles Editor) plus the default session packages. `--noct-only` is shell-only
+# and leaves host deps alone.
 #
 # All build modes install into TEST_PREFIX so you can test with a single command.
 #
@@ -132,11 +138,33 @@ PORTAL_QML_PKGS=(
     kdeclarative
 )
 
-# QML runtime modules compositor effects load
+# QML runtime modules compositor effects load. Arch package names: the Milou
+# QML module ships in `milou` (Fedora calls it plasma-milou). These are hard
+# runtime requirements: without them the effect's QML fails to load and
+# Overview/Grid View come up blank.
 KWIN_QML_PKGS=(
-    plasma-milou
+    milou
     libplasma
     qt6-5compat
+    kirigami
+    ksvg
+    kcmutils
+    kitemmodels
+)
+
+# QML modules the built-in effects import, as paths relative to a Qt QML
+# import root. ldd cannot see QML modules, so verify_qml_modules() checks
+# these by path and reports the Arch package that provides each one.
+EFFECT_QML_MODULES=(
+    org/kde/milou
+    org/kde/plasma/components
+    org/kde/plasma/extras
+    org/kde/plasma/core
+    Qt5Compat/GraphicalEffects
+    org/kde/kirigami
+    org/kde/ksvg
+    org/kde/kcmutils
+    org/kde/kitemmodels
 )
 
 # PipeWire media stack (screen capture + audio). The compositor's screencast
@@ -535,10 +563,91 @@ noctalia_only_build() {
 }
 
 # ---------------------------------------------------------------------------
+# QML runtime module verification
+# ---------------------------------------------------------------------------
+
+# Map a QML module path to the Arch package that ships it (for the error
+# message only).
+qml_module_package() {
+    case "$1" in
+        org/kde/milou)               echo milou ;;
+        org/kde/plasma/*)            echo libplasma ;;
+        Qt5Compat/GraphicalEffects)  echo qt6-5compat ;;
+        org/kde/kirigami)            echo kirigami ;;
+        org/kde/ksvg)                echo ksvg ;;
+        org/kde/kcmutils)            echo kcmutils ;;
+        org/kde/kitemmodels)         echo kitemmodels ;;
+        *)                           echo "$1" ;;
+    esac
+}
+
+# QML import roots searched on the host (dev prefix first, then the system Qt).
+qml_import_roots() {
+    local -a roots=(
+        "${TEST_PREFIX}/lib64/qt6/qml"
+        "${TEST_PREFIX}/lib/qt6/qml"
+        /usr/lib64/qt6/qml
+        /usr/lib/qt6/qml
+    )
+    local root
+    for root in "${roots[@]}"; do
+        [[ -d "$root" ]] && printf '%s\n' "$root"
+    done
+}
+
+# Hard gate: every QML module the compositor's built-in effects import must be
+# present. A missing module never fails ldd; it only shows up at runtime as a
+# blank Overview/Grid View, so check it explicitly and fail loudly.
+verify_qml_modules() {
+    local -a roots=()
+    mapfile -t roots < <(qml_import_roots)
+    if [[ ${#roots[@]} -eq 0 ]]; then
+        warn "No Qt QML import roots found; cannot verify effect QML modules."
+        return 0
+    fi
+
+    local -a missing_modules=()
+    local -a missing_pkgs=()
+    local module root found pkg
+    for module in "${EFFECT_QML_MODULES[@]}"; do
+        found=false
+        for root in "${roots[@]}"; do
+            if [[ -e "$root/$module/qmldir" || -e "$root/$module" ]]; then
+                found=true
+                break
+            fi
+        done
+        if ! $found; then
+            missing_modules+=("$module")
+            pkg=$(qml_module_package "$module")
+            missing_pkgs+=("$pkg")
+        fi
+    done
+
+    if [[ ${#missing_modules[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    error "Missing QML modules required by Overview/Grid View (and other effects):"
+    local i
+    for i in "${!missing_modules[@]}"; do
+        error "    ${missing_modules[$i]} (${missing_pkgs[$i]})"
+    done
+    local -a unique_pkgs
+    mapfile -t unique_pkgs < <(printf '%s\n' "${missing_pkgs[@]}" | sort -u)
+    error "Install with: sudo pacman -S ${unique_pkgs[*]}"
+    return 1
+}
+
+# ---------------------------------------------------------------------------
 # Verify host runtime dependencies of the installed dev binaries
 # ---------------------------------------------------------------------------
 verify_host_deps() {
     step "Verifying host runtime dependencies..."
+
+    if ! verify_qml_modules; then
+        exit 1
+    fi
 
     local -a binaries=(
         "$TEST_PREFIX/bin/kinetic-we"
@@ -1035,6 +1144,9 @@ main() {
         esac
     done
 
+    # --install-host-deps is a deprecated alias for --binary: host runtime deps
+    # (including the effect QML modules) are now installed in every build mode
+    # that installs the compositor.
     if $do_install_host_deps; then
         do_binary=true
     fi
@@ -1065,6 +1177,11 @@ main() {
         echo
         check_prereqs
         kwin_only_build
+        # Effect QML modules (Overview/Grid View, Window View, Tiles Editor)
+        # are hard runtime requirements that ldd cannot see, so install and
+        # verify them even on an incremental kwin-only build.
+        install_host_deps_arch
+        verify_host_deps
         exit 0
     fi
 
@@ -1098,9 +1215,7 @@ main() {
             install_greeter_deps
         fi
         binary_build
-        if $do_install_host_deps; then
-            install_host_deps_arch
-        fi
+        install_host_deps_arch
         verify_host_deps
         install_startup_script
         if $do_session; then
@@ -1131,6 +1246,7 @@ main() {
     check_prereqs
     install_build_deps
     binary_build
+    install_host_deps_arch
     verify_host_deps
     install_startup_script
     if $do_session; then

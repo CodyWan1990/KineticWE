@@ -767,8 +767,11 @@ fi
 #     but QML uses the standard config location. Symlink the shared kdeglobals
 #     into the root so both agree on the single source of truth. A symlink is
 #     not a mirror: atomic renames of the real file stay visible through it.
+#     Only link when the real file exists: on a minimal host that has no seeded
+#     color scheme yet (no BreezeDark.colors, so step 4e is a no-op) a dangling
+#     symlink is worse than leaving the root without a kdeglobals at all.
 # ---------------------------------------------------------------------------
-if [[ ! -e "$KWE_CONFIG_HOME/kdeglobals" && ! -L "$KWE_CONFIG_HOME/kdeglobals" ]]; then
+if [[ -e "$KWE_REAL_CONFIG_HOME/kdeglobals" && ! -e "$KWE_CONFIG_HOME/kdeglobals" && ! -L "$KWE_CONFIG_HOME/kdeglobals" ]]; then
     ln -s "$KWE_REAL_CONFIG_HOME/kdeglobals" "$KWE_CONFIG_HOME/kdeglobals"
 fi
 

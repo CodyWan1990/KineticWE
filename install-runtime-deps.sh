@@ -114,11 +114,32 @@ PORTAL_QML_PKGS=(
 # QML runtime modules the compositor's built-in effects load (Overview/Grid
 # View, Window View, Tiles Editor). Resolved by the QML engine at runtime,
 # so ldd cannot see them; install them explicitly so grid view, overview,
-# window view and the tiling editor work on a fresh host.
+# window view and the tiling editor work on a fresh host. These are hard
+# requirements: without them the effect's QML fails to load and the overlay
+# comes up blank/black.
 KWIN_QML_PKGS=(
     plasma-milou          # org.kde.milou (Overview/Grid View search results)
-    libplasma             # org.kde.plasma.components / org.kde.plasma.extras
+    libplasma             # org.kde.plasma.components / extras / core
     qt6-qt5compat         # Qt5Compat.GraphicalEffects (FastBlur)
+    kf6-kirigami          # org.kde.kirigami (Overview, Window Heap, Tiles Editor)
+    kf6-ksvg              # org.kde.ksvg (WindowHeapDelegate, Tiles Editor, OSD)
+    kf6-kcmutils          # org.kde.kcmutils (Overview search UI)
+    kf6-kitemmodels       # org.kde.kitemmodels (Tiles Editor)
+)
+
+# QML modules the built-in effects import, as paths relative to a Qt QML
+# import root. ldd cannot see QML modules, so verify_qml_modules() checks
+# these by path and reports the Fedora package that provides each one.
+EFFECT_QML_MODULES=(
+    org/kde/milou
+    org/kde/plasma/components
+    org/kde/plasma/extras
+    org/kde/plasma/core
+    Qt5Compat/GraphicalEffects
+    org/kde/kirigami
+    org/kde/ksvg
+    org/kde/kcmutils
+    org/kde/kitemmodels
 )
 
 # PipeWire media stack (screen capture + audio). The compositor's screencast
@@ -220,6 +241,85 @@ verify_resolved() {
     [[ ${#missing_libs[@]} -eq 0 ]]
 }
 
+# Map a QML module path to the Fedora package that ships it (used only for the
+# error message; on Debian the module path is still accurate).
+qml_module_package() {
+    case "$1" in
+        org/kde/milou)               echo plasma-milou ;;
+        org/kde/plasma/*)            echo libplasma ;;
+        Qt5Compat/GraphicalEffects)  echo qt6-qt5compat ;;
+        org/kde/kirigami)            echo kf6-kirigami ;;
+        org/kde/ksvg)                echo kf6-ksvg ;;
+        org/kde/kcmutils)            echo kf6-kcmutils ;;
+        org/kde/kitemmodels)         echo kf6-kitemmodels ;;
+        *)                           echo "$1" ;;
+    esac
+}
+
+# QML import roots searched on the host (dev prefix first, then the system Qt).
+qml_import_roots() {
+    local -a roots=(
+        "${TEST_PREFIX}/lib64/qt6/qml"
+        "${TEST_PREFIX}/lib/qt6/qml"
+        /usr/lib64/qt6/qml
+        /usr/lib/qt6/qml
+        /usr/lib/x86_64-linux-gnu/qt6/qml
+        /usr/local/lib64/qt6/qml
+    )
+    local root
+    for root in "${roots[@]}"; do
+        [[ -d "$root" ]] && printf '%s\n' "$root"
+    done
+}
+
+# Hard gate: every QML module the compositor's built-in effects import must be
+# present. A missing module never fails ldd; it only shows up at runtime as a
+# blank Overview/Grid View, so check it explicitly and fail loudly.
+verify_qml_modules() {
+    local -a roots=()
+    mapfile -t roots < <(qml_import_roots)
+    if [[ ${#roots[@]} -eq 0 ]]; then
+        warn "No Qt QML import roots found; cannot verify effect QML modules."
+        return 0
+    fi
+
+    local -a missing_modules=()
+    local -a missing_pkgs=()
+    local module root found pkg
+    for module in "${EFFECT_QML_MODULES[@]}"; do
+        found=false
+        for root in "${roots[@]}"; do
+            if [[ -e "$root/$module/qmldir" || -e "$root/$module" ]]; then
+                found=true
+                break
+            fi
+        done
+        if ! $found; then
+            missing_modules+=("$module")
+            pkg=$(qml_module_package "$module")
+            missing_pkgs+=("$pkg")
+        fi
+    done
+
+    if [[ ${#missing_modules[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    error "Missing QML modules required by Overview/Grid View (and other effects):"
+    local i
+    for i in "${!missing_modules[@]}"; do
+        error "    ${missing_modules[$i]} (${missing_pkgs[$i]})"
+    done
+    if [[ "$PM" == dnf ]]; then
+        local -a unique_pkgs
+        mapfile -t unique_pkgs < <(printf '%s\n' "${missing_pkgs[@]}" | sort -u)
+        error "Install with: sudo dnf install ${unique_pkgs[*]}"
+    else
+        error "Install the packages providing the modules above."
+    fi
+    return 1
+}
+
 # Install the default session packages (Breeze icon theme, Breeze cursor theme,
 # Qt5/Qt6 configuration tools, Xwayland, portal and compositor QML modules,
 # Alacritty) on a fresh host. Skips anything already installed, so re-runs are
@@ -242,13 +342,18 @@ install_default_session_packages() {
         info "Default session packages already installed."
         return 0
     fi
+    # Some packages appear in more than one list (e.g. kf6-kirigami is needed by
+    # both the portal dialogs and the compositor effects); de-duplicate them so
+    # the install command and its output stay clean.
+    local -a unique_missing
+    mapfile -t unique_missing < <(printf '%s\n' "${missing[@]}" | sort -u)
     echo
     info "Fresh host: installing default session packages (Breeze icons, cursor theme, Qt tools, Xwayland, portal/compositor QML modules, terminal):"
-    printf '    %s\n' "${missing[@]}"
+    printf '    %s\n' "${unique_missing[@]}"
     if [[ "$PM" == dnf ]]; then
-        sudo dnf install -y "${missing[@]}"
+        sudo dnf install -y "${unique_missing[@]}"
     else
-        sudo apt-get install -y "${missing[@]}"
+        sudo apt-get install -y "${unique_missing[@]}"
     fi
     info "Default session packages installed."
 }
@@ -257,6 +362,14 @@ main() {
     detect_pkgmgr
 
     install_default_session_packages
+
+    # Hard gate: the effect QML modules must resolve even though ldd cannot
+    # see them. install_default_session_packages() installs KWIN_QML_PKGS on
+    # Fedora; a miss here means the session would come up with a blank
+    # Overview/Grid View, so fail now with the exact command instead.
+    if ! verify_qml_modules; then
+        exit 1
+    fi
 
     local has_binaries=false binary
     for binary in "${DEV_BINARIES[@]}"; do
