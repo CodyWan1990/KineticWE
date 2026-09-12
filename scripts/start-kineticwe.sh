@@ -79,7 +79,18 @@ mkdir -p "$KWE_CONFIG_HOME"
 export PATH="$INSTALL_PREFIX/bin:$PATH"
 export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
 export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins:$INSTALL_PREFIX/lib64/plugins"
-export QML2_IMPORT_PATH="$INSTALL_PREFIX/lib64/qt6/qml"
+# QML import roots. ECM installs KWin's private QML modules
+# (org.kde.kwin.private.effects -- WindowHeap/WindowHeapDelegate, imported by
+# Overview/Grid View -- and org.kde.kwin.private.kdecoration) under
+# KDE_INSTALL_QMLDIR = lib64/qml, while the rest of the KDE/Qt QML stack lives
+# under lib64/qt6/qml. Both roots must be on the import path or the private
+# effects module fails to resolve and Overview/Grid View come up blank on a
+# fresh install. The KDE root comes first so a fresh build wins over any stale
+# copy left under qt6/qml by an older install. QML_IMPORT_PATH is the Qt 6
+# name; QML2_IMPORT_PATH is the legacy name the session already exported (Qt 6
+# still honors it) -- keep both in sync.
+export QML_IMPORT_PATH="$INSTALL_PREFIX/lib64/qml:$INSTALL_PREFIX/lib64/qt6/qml"
+export QML2_IMPORT_PATH="$QML_IMPORT_PATH"
 export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 # Traditional-WM Qt theming (Hyprland/Niri style): tell Qt apps to load the
 # qt5ct platform theme plugin, which reads ~/.config/qt5ct/qt5ct.conf and
@@ -863,7 +874,8 @@ mkdir -p "$HOME/.local/share"
 systemctl --user import-environment \
     WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
     XDG_SESSION_TYPE XDG_DATA_DIRS \
-    QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QML2_IMPORT_PATH LD_LIBRARY_PATH PATH \
+    QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QML_IMPORT_PATH QML2_IMPORT_PATH \
+    LD_LIBRARY_PATH PATH \
     2>/dev/null || true
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd --all 2>/dev/null || true
