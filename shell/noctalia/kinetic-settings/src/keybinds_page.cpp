@@ -44,8 +44,8 @@ namespace {
   // KCalc, ...). None of those are backed by KineticWE config — they read
   // kwinrc / Plasma configs, not kineticwe.kwe — so editing them here presents
   // binds that KineticWE neither owns nor themes. The compositor ("kwin"), the
-  // shell ("noctalia"), the shell-backed "audio" / "media-ui" action groups
-  // (registered by the compositor, see src/noctaliasettings.cpp), Spectacle and
+  // shell ("noctalia"), the shell-backed "audio" / "media-ui" / "brightness"
+  // action groups (registered by the compositor, see src/noctaliasettings.cpp), Spectacle and
   // the user's own Applications / Custom Commands actions are shown.
   //
   // Spectacle is the one per-application component surfaced on purpose: it owns
@@ -59,6 +59,7 @@ namespace {
         "noctalia",
         "audio",
         "media-ui",
+        "brightness",
         "org.kde.spectacle.desktop",
         std::string(CustomKeybinds::kAppsComponent),
         std::string(CustomKeybinds::kCommandsComponent),

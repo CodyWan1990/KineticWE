@@ -28,6 +28,8 @@ const QString s_audioComponent = QStringLiteral("audio");
 const QString s_audioDisplay = QStringLiteral("Audio");
 const QString s_mediaUiComponent = QStringLiteral("media-ui");
 const QString s_mediaUiDisplay = QStringLiteral("Media & UI");
+const QString s_brightnessComponent = QStringLiteral("brightness");
+const QString s_brightnessDisplay = QStringLiteral("Brightness");
 } // namespace
 
 NoctaliaSettings::NoctaliaSettings(QObject *parent)
@@ -130,6 +132,7 @@ NoctaliaSettings::NoctaliaSettings(QObject *parent)
 
     registerAudioShortcuts();
     registerMediaUiShortcuts();
+    registerBrightnessShortcuts();
 }
 
 // Speaker and microphone volume, backed by the shell's PipeWire service. The
@@ -265,6 +268,35 @@ void NoctaliaSettings::registerMediaUiShortcuts()
     registerShortcut(s_mediaUiComponent, s_mediaUiDisplay, QStringLiteral("MediaUiPreviousWallpaper"),
                      i18n("Previous Wallpaper"),
                      {QStringLiteral("msg"), QStringLiteral("wallpaper-previous")});
+}
+
+void NoctaliaSettings::registerBrightnessShortcuts()
+{
+    // Monitor brightness
+    registerShortcut(s_brightnessComponent, s_brightnessDisplay, QStringLiteral("BrightnessUp"),
+                     i18n("Brightness Up"),
+                     {QStringLiteral("msg"), QStringLiteral("brightness-up")},
+                     QKeySequence(Qt::Key_MonBrightnessUp));
+
+    registerShortcut(s_brightnessComponent, s_brightnessDisplay, QStringLiteral("BrightnessDown"),
+                     i18n("Brightness Down"),
+                     {QStringLiteral("msg"), QStringLiteral("brightness-down")},
+                     QKeySequence(Qt::Key_MonBrightnessDown));
+
+    // Keyboard backlight
+    registerShortcut(s_brightnessComponent, s_brightnessDisplay, QStringLiteral("KeyboardBacklightUp"),
+                     i18n("Keyboard Backlight Up"),
+                     {QStringLiteral("msg"), QStringLiteral("keyboard-backlight-up")},
+                     QKeySequence(Qt::Key_KeyboardBrightnessUp));
+
+    registerShortcut(s_brightnessComponent, s_brightnessDisplay, QStringLiteral("KeyboardBacklightDown"),
+                     i18n("Keyboard Backlight Down"),
+                     {QStringLiteral("msg"), QStringLiteral("keyboard-backlight-down")},
+                     QKeySequence(Qt::Key_KeyboardBrightnessDown));
+
+    registerShortcut(s_brightnessComponent, s_brightnessDisplay, QStringLiteral("KeyboardBacklightToggle"),
+                     i18n("Toggle Keyboard Backlight"),
+                     {QStringLiteral("msg"), QStringLiteral("keyboard-backlight-toggle")});
 }
 
 NoctaliaSettings::~NoctaliaSettings() = default;

@@ -38,6 +38,9 @@ private:
     // merely left unregistered. Called from registerMediaUiShortcuts().
     void unregisterRemovedMediaUiShortcuts();
     void registerMediaUiShortcuts();
+    // Monitor brightness and keyboard backlight, backed by the shell's
+    // brightness service. Standard laptop function keys are bound by default.
+    void registerBrightnessShortcuts();
     QList<QAction *> m_actions;
 };
 
