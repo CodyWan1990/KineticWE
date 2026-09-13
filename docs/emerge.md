@@ -600,6 +600,33 @@ Deferred (Phase C+, needs your go-ahead):
 
 ## 12. Revision history
 
+**Revision 16 (this session):**
+- **Expelled columns are `0.5` wide.** `expelWindow()` created its new
+  `EmergeColumn` with the struct default (`proportion = 1.0`), so the expelled
+  window's column came out full-width and dwarfed its neighbours. It now uses
+  the shared `DefaultColumnExtent = 0.5`, matching `rebalanceColumnWidths()`'s
+  multi-column default. (A lone full-width source column is left at `1.0`; only
+  the new column is normalised.)
+
+**Revision 15 (this session):**
+- **Drop-into-column + working consume/expel.** `EmergeLayoutEngine` now
+  overrides `endMoveWindowOnZone()`: dropping a dragged window on the top or
+  bottom quarter of a target inserts it into the target's column above/below
+  (same-column drops reorder), while the middle keeps the existing swap. The
+  inserted `EmergeTile` keeps its leaf and height intent, the source column is
+  closed if it empties, and the detached dragged window is re-adopted into its
+  new slot. `beginMoveWindow()` now records the source column/tile alongside the
+  leaf (like `ColumnsLayoutEngine`) so the drop can locate the source tile
+  without searching.
+- **Consume/expel follow the view.** Both verbs moved the window structurally
+  but left `m_activeColumnIdx`/`m_viewAnchor` untouched, so the consumed/expelled
+  window could land off-screen while the view stayed put (and, because the
+  focused window did not change, `focusWindow()` was never called to scroll to
+  it) — looking like a no-op or a vanishing window. Both now set the target/new
+  column active, update its `activeTileIdx`, and re-anchor via
+  `focusAnchorFor()` so the view follows the moved window. Expel remains
+  uncapped (no `maxColumns` limit in Emerge).
+
 **Phase A + B (initial):**
 - Engine, `LayoutKind`, config wiring, KCM, off-screen parking below union of outputs.
 

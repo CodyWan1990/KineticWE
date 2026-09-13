@@ -151,7 +151,7 @@ EFFECT_QML_MODULES=(
 MEDIA_RPM_PKGS=(
     pipewire
     wireplumber
-    pipewire-pulse
+    pipewire-pulseaudio
 )
 
 RED='\033[0;31m'

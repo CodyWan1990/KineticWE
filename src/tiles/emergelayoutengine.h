@@ -128,6 +128,7 @@ public:
     void moveWindow(Window *window, int delta) override;
     void beginMoveWindow(Window *window) override;
     bool endMoveWindow(Window *window, Window *target) override;
+    bool endMoveWindowOnZone(Window *window, Window *target, DropZone zone) override;
     void cancelMoveWindow(Window *window) override;
     void consumeWindow(Window *window) override;
     void expelWindow(Window *window) override;
@@ -234,8 +235,12 @@ private:
     QList<qreal> m_presetWindowHeights{1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0};
     int m_axisSetting = 0; // 0 auto, 1 horizontal, 2 vertical
 
-    // Drag-move bookkeeping.
+    // Drag-move bookkeeping. The source column/tile indices are captured at
+    // drag start (like ColumnsLayoutEngine) so endMoveWindowOnZone() can locate
+    // the source tile after KWin has detached the dragged window.
     QPointer<CustomTile> m_moveSourceLeaf;
+    int m_moveSourceColumn = -1;
+    int m_moveSourceTile = -1;
 };
 
 } // namespace KWin
