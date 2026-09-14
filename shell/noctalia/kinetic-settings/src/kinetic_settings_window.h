@@ -3,6 +3,7 @@
 #include "kinetic-settings/src/accessibility_page.h"
 #include "kinetic-settings/src/animations_page.h"
 #include "kinetic-settings/src/appearance_page.h"
+#include "kinetic-settings/src/autostart_page.h"
 #include "kinetic-settings/src/cursors_page.h"
 #include "kinetic-settings/src/default_apps_page.h"
 #include "kinetic-settings/src/desktop_effects_page.h"
@@ -97,6 +98,7 @@ private:
     Displays,
     DefaultApps,
     Accessibility,
+    Autostart,
   };
 
   void destroyWindow();
@@ -161,6 +163,8 @@ private:
   [[nodiscard]] DisplayPage::Callbacks displayPageCallbacks();
   [[nodiscard]] AccessibilityPage::Filter accessibilityFilter() const;
   [[nodiscard]] AccessibilityPage::Callbacks accessibilityPageCallbacks();
+  [[nodiscard]] AutostartPage::Filter autostartFilter() const;
+  [[nodiscard]] AutostartPage::Callbacks autostartPageCallbacks();
   void confirmResetPage();
   // Routes the filter row's Apply/Reset Page to the active page.
   void applyActivePage();
@@ -198,6 +202,7 @@ private:
   std::unique_ptr<AnimationsPage> m_animationsPage;
   std::unique_ptr<DefaultAppsPage> m_defaultAppsPage;
   std::unique_ptr<AccessibilityPage> m_accessibilityPage;
+  std::unique_ptr<AutostartPage> m_autostartPage;
   std::unique_ptr<SelectDropdownPopup> m_selectPopup;
   // Non-null only while a keybind recorder is capturing (see updateKeyboardShortcutInhibit).
   zwp_keyboard_shortcuts_inhibitor_v1* m_shortcutInhibitor = nullptr;

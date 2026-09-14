@@ -1,5 +1,6 @@
 #include "kinetic_settings_module.h"
 
+#include "kinetic-settings/src/autostart.h"
 #include "kinetic-settings/src/custom_keybinds.h"
 #include "kinetic-settings/src/keybinds_kwe.h"
 #include "kinetic-settings/src/kinetic_settings_window.h"
@@ -38,6 +39,9 @@ void KineticSettingsModule::initialize(
   // failure is not fatal — the session keeps its live binds and the user can
   // re-run the import (`noctalia-kwe msg keybinds-import`).
   importKeybinds();
+  // Start the user's XDG autostart entries (~/.config/autostart). Runs once
+  // per session; a supervised shell restart is a no-op.
+  autostart::launchAll();
 }
 
 void KineticSettingsModule::importKeybinds() {

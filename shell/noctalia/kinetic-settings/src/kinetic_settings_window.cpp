@@ -204,6 +204,9 @@ void KineticSettingsWindow::open() {
   if (m_accessibilityPage == nullptr) {
     m_accessibilityPage = std::make_unique<AccessibilityPage>(*m_bus);
   }
+  if (m_autostartPage == nullptr) {
+    m_autostartPage = std::make_unique<AutostartPage>();
+  }
   m_tilingPage->reloadFromDisk();
   m_workspacesPage->reloadFromDisk();
   m_keybindsPage->reloadFromDisk();
@@ -219,6 +222,7 @@ void KineticSettingsWindow::open() {
   m_animationsPage->reloadFromDisk();
   m_defaultAppsPage->reloadFromDisk();
   m_accessibilityPage->reloadFromDisk();
+  m_autostartPage->reloadFromDisk();
   m_displayPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
@@ -805,6 +809,21 @@ AccessibilityPage::Callbacks KineticSettingsWindow::accessibilityPageCallbacks()
   };
 }
 
+AutostartPage::Filter KineticSettingsWindow::autostartFilter() const {
+  return AutostartPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+AutostartPage::Callbacks KineticSettingsWindow::autostartPageCallbacks() {
+  return AutostartPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+  };
+}
+
 void KineticSettingsWindow::confirmResetPage() {
   clearArmedResets();
   resetActivePage();
@@ -862,6 +881,9 @@ void KineticSettingsWindow::applyActivePage() {
     break;
   case ActivePage::Accessibility:
     applied = m_accessibilityPage != nullptr && m_accessibilityPage->applyAll();
+    break;
+  case ActivePage::Autostart:
+    // The page writes on change; there is nothing to flush.
     break;
   }
   if (applied) {
@@ -958,6 +980,8 @@ void KineticSettingsWindow::resetActivePage() {
       m_accessibilityPage->resetAll();
     }
     break;
+  case ActivePage::Autostart:
+    break;
   }
 }
 
@@ -995,6 +1019,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_defaultAppsPage != nullptr && m_defaultAppsPage->hasPending();
   case ActivePage::Accessibility:
     return m_accessibilityPage != nullptr && m_accessibilityPage->hasPending();
+  case ActivePage::Autostart:
+    return false;
   }
   return false;
 }
@@ -1033,6 +1059,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_defaultAppsPage != nullptr && !m_defaultAppsPage->resettableKeyPaths().empty();
   case ActivePage::Accessibility:
     return m_accessibilityPage != nullptr && !m_accessibilityPage->resettableKeyPaths().empty();
+  case ActivePage::Autostart:
+    return false;
   }
   return false;
 }
@@ -1043,7 +1071,8 @@ bool KineticSettingsWindow::anyPageHasPending() const {
       || pending(m_mousePage) || pending(m_touchpadPage) || pending(m_windowRulesPage)
       || pending(m_windowBehaviorPage) || pending(m_displayPage) || pending(m_appearancePage)
       || pending(m_iconsPage) || pending(m_cursorsPage) || pending(m_desktopEffectsPage)
-      || pending(m_animationsPage) || pending(m_defaultAppsPage) || pending(m_accessibilityPage);
+      || pending(m_animationsPage) || pending(m_defaultAppsPage) || pending(m_accessibilityPage)
+      || pending(m_autostartPage);
 }
 
 void KineticSettingsWindow::applyAllPages() {
@@ -1068,6 +1097,7 @@ void KineticSettingsWindow::applyAllPages() {
   applyPending(m_animationsPage);
   applyPending(m_defaultAppsPage);
   applyPending(m_accessibilityPage);
+  applyPending(m_autostartPage);
   clearArmedResets();
   // A page whose write failed keeps its staged edits and shows an on-page error.
   requestSceneRebuild();
@@ -1324,6 +1354,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   });
   if (m_systemExpanded) {
     addSubNav(ActivePage::DefaultApps, "apps", "Default Apps");
+    addSubNav(ActivePage::Autostart, "rocket", "Autostart");
     addSubNav(ActivePage::Accessibility, "accessible", "Accessibility");
   }
 
@@ -1364,6 +1395,8 @@ std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
     return "system default apps applications browser terminal";
   case ActivePage::Accessibility:
     return "system accessibility zoom magnifier shake pointer cursor a11y";
+  case ActivePage::Autostart:
+    return "system autostart startup login session applications commands";
   }
   return {};
 }
@@ -1488,6 +1521,11 @@ std::unique_ptr<Node> KineticSettingsWindow::buildPageNodeWithQuery(ActivePage p
       );
     }
     break;
+  case ActivePage::Autostart:
+    if (m_autostartPage != nullptr) {
+      return m_autostartPage->build(uiScale(), autostartFilter(), autostartPageCallbacks());
+    }
+    break;
   }
   return nullptr;
 }
@@ -1516,7 +1554,7 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
       ActivePage::Mouse,                 ActivePage::Touchpad,          ActivePage::Keybinds,
       ActivePage::Displays,              ActivePage::WindowBehavior,    ActivePage::Workspaces,
       ActivePage::Tiling,                ActivePage::WindowRules,       ActivePage::DefaultApps,
-      ActivePage::Accessibility,
+      ActivePage::Accessibility,         ActivePage::Autostart,
   };
 
   // Global Theme (window decoration previews), Icons and Cursors rescan the

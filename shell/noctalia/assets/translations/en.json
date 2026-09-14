@@ -1275,6 +1275,19 @@
       "conflict-prompt": "{keybind} is already bound to {action} in {component}. Replace the existing binding?",
       "conflict-replace": "Replace"
     },
+    "autostart": {
+      "add": "Add",
+      "add-application": "Add Application…",
+      "add-custom-command": "Add Custom Command…",
+      "app-picker-empty": "No applications found.",
+      "app-picker-placeholder": "Search applications…",
+      "app-picker-title": "Pick an application to autostart:",
+      "cancel": "Cancel",
+      "command-form-title": "Enter the shell command to run at login:",
+      "command-placeholder": "e.g. alacritty",
+      "empty": "No applications are set to autostart.",
+      "remove": "Remove from autostart"
+    },
     "navigation": {
       "groups": {
         "accessibility": "Accessibility",
