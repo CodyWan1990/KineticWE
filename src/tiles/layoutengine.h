@@ -100,13 +100,20 @@ public:
      *
      * Swap        — the cursor was over the middle of the target; the dragged
      *               window and the target trade places (classic behaviour).
-     * InsertAbove — the cursor was over the top zone of the target; the
-     *               dragged window joins the target's column above it.
-     * InsertBelow — the cursor was over the bottom zone of the target; the
-     *               dragged window joins the target's column below it.
+     * InsertLeft  — the cursor was over the left zone of the target.
+     * InsertRight — the cursor was over the right zone of the target.
+     * InsertAbove — the cursor was over the top zone of the target.
+     * InsertBelow — the cursor was over the bottom zone of the target.
+     *
+     * The four insert zones are interpreted by each layout in its own terms:
+     * order-based layouts read Left/Above as "before the target" and
+     * Right/Below as "after"; column-based layouts add a new adjacent column
+     * for Left/Right and stack into the target's column for Above/Below.
      */
     enum class DropZone {
         Swap,
+        InsertLeft,
+        InsertRight,
         InsertAbove,
         InsertBelow,
     };
@@ -114,14 +121,34 @@ public:
     /**
      * Drop-zone aware variant of endMoveWindow(). Called when an interactive
      * move ends and the controller knows which zone of the target window the
-     * cursor was released over. Engines that do not distinguish drop zones
-     * simply fall back to endMoveWindow().
+     * cursor was released over. Tries insertWindow() first, then falls back to
+     * endMoveWindow() so engines that do not distinguish zones keep working.
      * Returns true if the engine handled the window.
      */
     virtual bool endMoveWindowOnZone(Window *window, Window *target, DropZone zone)
     {
-        Q_UNUSED(zone)
+        if (insertWindow(window, target, zone)) {
+            return true;
+        }
         return endMoveWindow(window, target);
+    }
+
+    /**
+     * Drop-zone aware insertion of a window that is already part of this
+     * engine — or was, and is currently detached by an interactive drag.
+     *
+     * Moves @p window so it sits adjacent to @p target in the requested
+     * direction, with the other windows shifting accordingly. Unlike
+     * endMoveWindow() this does not depend on beginMoveWindow() bookkeeping,
+     * so it also works for a window that was just adopted from another
+     * output/desktop.
+     *
+     * Returns true if the engine handled the window.
+     */
+    virtual bool insertWindow(Window *window, Window *target, DropZone zone)
+    {
+        Q_UNUSED(window) Q_UNUSED(target) Q_UNUSED(zone)
+        return false;
     }
 
     /**

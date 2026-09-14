@@ -140,6 +140,51 @@ bool MonocleLayoutEngine::endMoveWindow(Window *window, Window *target)
     return true;
 }
 
+bool MonocleLayoutEngine::insertWindow(Window *window, Window *target, DropZone zone)
+{
+    if (!window || !target || window == target) {
+        return false;
+    }
+
+    // A real interactive drag detaches the window from its leaf, so recover it
+    // from the leaf remembered in beginMoveWindow() before locating it.
+    if (indexOfWindow(window) < 0) {
+        if (!m_moveSourceLeaf || !m_leaves.contains(m_moveSourceLeaf)
+            || !m_moveSourceLeaf->windows().isEmpty()) {
+            return false;
+        }
+        m_moveSourceLeaf->manage(window);
+    }
+
+    const int srcIdx = indexOfWindow(window);
+    const int targetIdx = indexOfWindow(target);
+    if (srcIdx < 0 || targetIdx < 0) {
+        return false;
+    }
+
+    m_moveSourceLeaf = nullptr;
+    m_moveSourceIndex = -1;
+
+    if (zone == DropZone::Swap) {
+        // All leaves overlap; only the z-order changes, so a plain move matches
+        // the original endMoveWindow() behaviour.
+        m_leaves.move(srcIdx, targetIdx);
+        reflow();
+        return true;
+    }
+
+    // Left/Above insert before the target in the cycle order; Right/Below
+    // after it. The other windows shift.
+    const bool after = (zone == DropZone::InsertRight || zone == DropZone::InsertBelow);
+    int insertAt = after ? targetIdx + 1 : targetIdx;
+    if (srcIdx < insertAt) {
+        insertAt -= 1;
+    }
+    m_leaves.move(srcIdx, insertAt);
+    reflow();
+    return true;
+}
+
 void MonocleLayoutEngine::cancelMoveWindow(Window *window)
 {
     Q_UNUSED(window)

@@ -645,22 +645,40 @@ bool ColumnsLayoutEngine::endMoveWindow(Window *window, Window *target)
     return true;
 }
 
-bool ColumnsLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, DropZone zone)
+bool ColumnsLayoutEngine::insertWindow(Window *window, Window *target, DropZone zone)
 {
-    if (zone == DropZone::Swap || !target || target == window) {
-        return endMoveWindow(window, target);
+    if (!window || !target || target == window) {
+        return false;
     }
 
-    QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;
-    const int srcCol = m_moveSourceColumn;
-    const int srcRow = m_moveSourceRow;
-    m_moveSourceLeaf.clear();
-    m_moveSourceColumn = -1;
-    m_moveSourceRow = -1;
+    // Locate the source leaf. A managed window (e.g. just adopted from another
+    // output) is found directly; a window detached by an interactive drag is
+    // recovered from the bookkeeping captured in beginMoveWindow().
+    QPointer<CustomTile> sourceLeaf;
+    int srcCol = -1;
+    int srcRow = -1;
+    if (const int c = columnOfWindow(window); c >= 0) {
+        srcCol = c;
+        for (int r = 0; r < m_columns[c].leaves.size(); ++r) {
+            if (m_columns[c].leaves[r] && m_columns[c].leaves[r]->windows().contains(window)) {
+                srcRow = r;
+                sourceLeaf = m_columns[c].leaves[r];
+                break;
+            }
+        }
+    } else if (m_moveSourceLeaf) {
+        sourceLeaf = m_moveSourceLeaf;
+        srcCol = m_moveSourceColumn;
+        srcRow = m_moveSourceRow;
+    }
 
-    if (!sourceLeaf || srcCol < 0 || srcCol >= m_columns.size()
-        || srcRow < 0 || srcRow >= m_columns[srcCol].leaves.size()
-        || m_columns[srcCol].leaves[srcRow] != sourceLeaf) {
+    const bool sourceValid = sourceLeaf && srcCol >= 0 && srcCol < m_columns.size()
+        && srcRow >= 0 && srcRow < m_columns[srcCol].leaves.size()
+        && m_columns[srcCol].leaves[srcRow] == sourceLeaf;
+    if (!sourceValid) {
+        m_moveSourceLeaf.clear();
+        m_moveSourceColumn = -1;
+        m_moveSourceRow = -1;
         return false;
     }
 
@@ -668,6 +686,9 @@ bool ColumnsLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, Dr
     const auto [targetCol0, targetRow0] = columnAndRowOfWindow(target);
     if (targetCol0 < 0) {
         // The target vanished mid-drag; restore the window to its source.
+        m_moveSourceLeaf.clear();
+        m_moveSourceColumn = -1;
+        m_moveSourceRow = -1;
         if (!sourceLeaf->windows().contains(window)) {
             sourceLeaf->manage(window);
         }
@@ -677,8 +698,50 @@ bool ColumnsLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, Dr
     int targetCol = targetCol0;
     int targetRow = targetRow0;
 
-    // Detach the dragged window's leaf from its column. The leaf itself is
-    // moved into the target column, so the window stays managed throughout.
+    m_moveSourceLeaf.clear();
+    m_moveSourceColumn = -1;
+    m_moveSourceRow = -1;
+
+    if (zone == DropZone::Swap) {
+        CustomTile *targetLeaf = m_columns[targetCol].leaves[targetRow];
+        targetLeaf->unmanage(target);
+        targetLeaf->manage(window);
+        sourceLeaf->manage(target);
+        reflow();
+        return true;
+    }
+
+    // Left/Right: give the dragged window its own column on that side of the
+    // target's column. Only possible below the column cap; at the cap we fall
+    // through to stacking into the target's column instead.
+    if ((zone == DropZone::InsertLeft || zone == DropZone::InsertRight)
+        && m_columns.size() < m_maxColumns) {
+        m_columns[srcCol].leaves.removeAt(srcRow);
+        const qreal weight = m_columns[srcCol].weights.takeAt(srcRow);
+        if (m_columns[srcCol].leaves.isEmpty()) {
+            removeColumn(srcCol);
+            if (srcCol < targetCol) {
+                targetCol -= 1;
+            }
+        }
+        Column newColumn;
+        newColumn.leaves.append(sourceLeaf);
+        newColumn.weights.append(weight);
+        newColumn.width = 0.0; // placeholder; rebalanced below
+        const int insertCol = (zone == DropZone::InsertLeft) ? targetCol : targetCol + 1;
+        m_columns.insert(insertCol, newColumn);
+        rebalanceColumnWidths();
+        if (!sourceLeaf->windows().contains(window)) {
+            sourceLeaf->manage(window);
+        }
+        reflow();
+        return true;
+    }
+
+    // Above/Below (or Left/Right at the cap): join the target's column. Detach
+    // the dragged window's leaf first; the leaf itself moves, so the window
+    // stays managed throughout.
+    const bool after = (zone == DropZone::InsertRight || zone == DropZone::InsertBelow);
     m_columns[srcCol].leaves.removeAt(srcRow);
     m_columns[srcCol].weights.removeAt(srcRow);
 
@@ -695,7 +758,7 @@ bool ColumnsLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, Dr
         targetRow -= 1;
     }
 
-    const int insertRow = (zone == DropZone::InsertAbove) ? targetRow : targetRow + 1;
+    const int insertRow = after ? targetRow + 1 : targetRow;
     m_columns[targetCol].leaves.insert(insertRow, sourceLeaf);
     m_columns[targetCol].weights.insert(insertRow, m_defaultWeight);
     // A real interactive drag detaches the window from its tile on the first

@@ -67,7 +67,7 @@ public:
     void moveWindow(Window *window, int delta) override;
     void beginMoveWindow(Window *window) override;
     bool endMoveWindow(Window *window, Window *target) override;
-    bool endMoveWindowOnZone(Window *window, Window *target, DropZone zone) override;
+    bool insertWindow(Window *window, Window *target, DropZone zone) override;
     void cancelMoveWindow(Window *window) override;
     void consumeWindow(Window *window) override;
     void expelWindow(Window *window) override;

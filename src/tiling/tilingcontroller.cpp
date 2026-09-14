@@ -1675,7 +1675,29 @@ void TilingController::onWindowMoveFinished(Window *window)
             // onWindowDesktopsChanged()/migrateWindow() would have done if the
             // move had not been in progress.
             context.engine->cancelMoveWindow(window);
+
+            // Resolve the drop target on the destination BEFORE adopting the
+            // window: while it is detached it is not part of the destination
+            // engine, so the cursor hit-test finds the window underneath
+            // instead of the dragged one shadowing it.
+            Window *target = nullptr;
+            LayoutEngine::DropZone zone = LayoutEngine::DropZone::Swap;
+            if (TileManager *manager = m_workspace->tileManager(currentOutput)) {
+                if (LayoutEngine *destEngine = manager->layoutEngine(currentDesktop)) {
+                    target = windowUnderCursorInEngine(destEngine);
+                    zone = target ? dropZoneForTarget(target) : LayoutEngine::DropZone::Swap;
+                }
+            }
+
             addWindowToLayout(window, currentOutput, currentDesktop);
+
+            // Place the window where it was dropped instead of appending it to
+            // the end of the destination layout.
+            if (target) {
+                if (LayoutEngine *destEngine = layoutEngineForWindow(window)) {
+                    destEngine->insertWindow(window, target, zone);
+                }
+            }
             window->setGeometryRestore(context.originalGeometryRestore);
             return;
         }
@@ -1773,18 +1795,25 @@ LayoutEngine::DropZone TilingController::dropZoneForTarget(Window *target) const
         return LayoutEngine::DropZone::Swap;
     }
     const RectF geometry = target->frameGeometry();
-    if (geometry.height() <= 0) {
+    if (geometry.width() <= 0 || geometry.height() <= 0) {
         return LayoutEngine::DropZone::Swap;
     }
     const QPointF pos = Cursors::self()->mouse()->pos();
-    const qreal relativeY = (pos.y() - geometry.top()) / geometry.height();
-    if (relativeY < 0.25) {
-        return LayoutEngine::DropZone::InsertAbove;
+    // Cursor offset from the target's centre, normalised to -1..1 on each axis.
+    const qreal dx = (pos.x() - geometry.center().x()) / (geometry.width() / 2.0);
+    const qreal dy = (pos.y() - geometry.center().y()) / (geometry.height() / 2.0);
+
+    // The middle of the window swaps; the edge the cursor is nearest to wins.
+    // A horizontal/vertical tie goes to the horizontal edge so a horizontal
+    // strip (Columns/Emerge) reads as left/right naturally.
+    constexpr qreal deadZone = 0.5;
+    if (qAbs(dx) < deadZone && qAbs(dy) < deadZone) {
+        return LayoutEngine::DropZone::Swap;
     }
-    if (relativeY > 0.75) {
-        return LayoutEngine::DropZone::InsertBelow;
+    if (qAbs(dx) >= qAbs(dy)) {
+        return dx < 0.0 ? LayoutEngine::DropZone::InsertLeft : LayoutEngine::DropZone::InsertRight;
     }
-    return LayoutEngine::DropZone::Swap;
+    return dy < 0.0 ? LayoutEngine::DropZone::InsertAbove : LayoutEngine::DropZone::InsertBelow;
 }
 
 void TilingController::promoteToMaster()

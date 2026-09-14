@@ -283,6 +283,69 @@ bool CenterTileLayoutEngine::endMoveWindow(Window *window, Window *target)
     return true;
 }
 
+bool CenterTileLayoutEngine::insertWindow(Window *window, Window *target, DropZone zone)
+{
+    if (!window || !target || window == target) {
+        return false;
+    }
+
+    // Recover a window detached by an interactive drag from its remembered leaf.
+    if (indexOfWindow(window) < 0) {
+        const bool leafKnown = m_moveSourceLeaf
+            && (m_leftLeaves.contains(m_moveSourceLeaf) || m_masterLeaves.contains(m_moveSourceLeaf)
+                || m_rightLeaves.contains(m_moveSourceLeaf));
+        if (!leafKnown || !m_moveSourceLeaf->windows().isEmpty()) {
+            return false;
+        }
+        m_moveSourceLeaf->manage(window);
+    }
+
+    const int srcIdx = indexOfWindow(window);
+    const int targetIdx = indexOfWindow(target);
+    if (srcIdx < 0 || targetIdx < 0) {
+        return false;
+    }
+
+    QList<QPointer<CustomTile>> flatLeaves = m_leftLeaves + m_masterLeaves + m_rightLeaves;
+    QList<qreal> flatWeights = m_leftWeights + m_masterWeights + m_rightWeights;
+    const int leftCount = m_leftLeaves.count();
+    const int masterCount = m_masterLeaves.count();
+
+    m_moveSourceLeaf.clear();
+    m_moveSourceColumn = -1;
+    m_moveSourceColumnIndex = -1;
+
+    if (zone == DropZone::Swap) {
+        CustomTile *srcLeaf = flatLeaves[srcIdx];
+        CustomTile *targetLeaf = flatLeaves[targetIdx];
+        targetLeaf->unmanage(target);
+        targetLeaf->manage(window);
+        srcLeaf->manage(target);
+        reflow();
+        return true;
+    }
+
+    // Left/Above = before the target in the flat (left/master/right) order;
+    // Right/Below = after it. Re-split at the same per-column counts so a
+    // window that crosses into a region joins that column.
+    const bool after = (zone == DropZone::InsertRight || zone == DropZone::InsertBelow);
+    int insertAt = after ? targetIdx + 1 : targetIdx;
+    if (srcIdx < insertAt) {
+        insertAt -= 1;
+    }
+    flatLeaves.move(srcIdx, insertAt);
+    flatWeights.move(srcIdx, insertAt);
+
+    m_leftLeaves = flatLeaves.mid(0, leftCount);
+    m_leftWeights = flatWeights.mid(0, leftCount);
+    m_masterLeaves = flatLeaves.mid(leftCount, masterCount);
+    m_masterWeights = flatWeights.mid(leftCount, masterCount);
+    m_rightLeaves = flatLeaves.mid(leftCount + masterCount);
+    m_rightWeights = flatWeights.mid(leftCount + masterCount);
+    reflow();
+    return true;
+}
+
 void CenterTileLayoutEngine::cancelMoveWindow(Window *window)
 {
     QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;

@@ -198,6 +198,60 @@ bool MasterStackLayoutEngine::endMoveWindow(Window *window, Window *target)
     return true;
 }
 
+bool MasterStackLayoutEngine::insertWindow(Window *window, Window *target, DropZone zone)
+{
+    if (!window || !target || window == target) {
+        return false;
+    }
+
+    // Recover a window detached by an interactive drag from its remembered leaf.
+    if (indexOfWindow(window) < 0) {
+        if (!m_moveSourceLeaf || !m_leaves.contains(m_moveSourceLeaf)
+            || !m_moveSourceLeaf->windows().isEmpty()) {
+            return false;
+        }
+        m_moveSourceLeaf->manage(window);
+    }
+
+    const int srcIdx = indexOfWindow(window);
+    const int targetIdx = indexOfWindow(target);
+    if (srcIdx < 0 || targetIdx < 0) {
+        return false;
+    }
+
+    m_moveSourceLeaf.clear();
+    m_moveSourceIndex = -1;
+
+    if (zone == DropZone::Swap) {
+        CustomTile *srcLeaf = m_leaves[srcIdx];
+        CustomTile *targetLeaf = m_leaves[targetIdx];
+        targetLeaf->unmanage(target);
+        targetLeaf->manage(window);
+        srcLeaf->manage(target);
+        reflow();
+        return true;
+    }
+
+    // The leaf weight list is stored split into master and stack halves; build
+    // the flat list, move the weight with the leaf, then re-split at the same
+    // master count so the invariant (parallel to m_leaves) holds.
+    QList<qreal> flatWeights = m_masterWeights + m_stackWeights;
+    const int masterCount = m_masterWeights.count();
+
+    // Left/Above = before the target in layout order; Right/Below = after it.
+    const bool after = (zone == DropZone::InsertRight || zone == DropZone::InsertBelow);
+    int insertAt = after ? targetIdx + 1 : targetIdx;
+    if (srcIdx < insertAt) {
+        insertAt -= 1;
+    }
+    m_leaves.move(srcIdx, insertAt);
+    flatWeights.move(srcIdx, insertAt);
+    m_masterWeights = flatWeights.mid(0, masterCount);
+    m_stackWeights = flatWeights.mid(masterCount);
+    reflow();
+    return true;
+}
+
 void MasterStackLayoutEngine::cancelMoveWindow(Window *window)
 {
     QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;

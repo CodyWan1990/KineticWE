@@ -66,6 +66,11 @@ struct EmergeColumnWidth
     qreal proportion = 1.0;
     int fixedPx = 0;
     qreal presetFraction = 0.5;
+    /// True once the user explicitly set this width (preset cycle, ratio key or
+    /// gesture, or an edge drag). A user-set width survives window add/remove
+    /// and focus changes; only never-touched ("default") columns are
+    /// re-defaulted when the column count changes.
+    bool userSet = false;
 };
 
 struct EmergeWindowHeight
@@ -128,7 +133,7 @@ public:
     void moveWindow(Window *window, int delta) override;
     void beginMoveWindow(Window *window) override;
     bool endMoveWindow(Window *window, Window *target) override;
-    bool endMoveWindowOnZone(Window *window, Window *target, DropZone zone) override;
+    bool insertWindow(Window *window, Window *target, DropZone zone) override;
     void cancelMoveWindow(Window *window) override;
     void consumeWindow(Window *window) override;
     void expelWindow(Window *window) override;
@@ -236,8 +241,8 @@ private:
     int m_axisSetting = 0; // 0 auto, 1 horizontal, 2 vertical
 
     // Drag-move bookkeeping. The source column/tile indices are captured at
-    // drag start (like ColumnsLayoutEngine) so endMoveWindowOnZone() can locate
-    // the source tile after KWin has detached the dragged window.
+    // drag start (like ColumnsLayoutEngine) so insertWindow() can locate the
+    // source tile after KWin has detached the dragged window.
     QPointer<CustomTile> m_moveSourceLeaf;
     int m_moveSourceColumn = -1;
     int m_moveSourceTile = -1;

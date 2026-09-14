@@ -600,6 +600,44 @@ Deferred (Phase C+, needs your go-ahead):
 
 ## 12. Revision history
 
+**Revision 18 (this session):**
+- **Drops now land where released — in every layout, on every output.** A
+  cross-output/desktop drag used to always append the window to the end of the
+  destination layout (`addWindowToLayout()` → `addWindow()`), and only
+  Columns/Emerge honoured a drop zone on the same output. Added
+  `LayoutEngine::insertWindow(window, target, zone)` with implementations in all
+  seven engines; the base `endMoveWindowOnZone()` now tries it first and falls
+  back to `endMoveWindow()`. This applies on the same output too, so every
+  layout now supports position-aware drops.
+- **Directional drop zones.** `DropZone` gained `InsertLeft` / `InsertRight`, and
+  `TilingController::dropZoneForTarget()` now uses the cursor's nearest edge
+  (2D, with a central dead-zone for `Swap`) instead of Y-only top/bottom. A
+  horizontal strip therefore reads left/right naturally.
+- **Per-layout meaning.** Order-based layouts (Monocle, AutoGrid, Stacked,
+  MasterStack, Center Tile) read Left/Above as "before the target" and
+  Right/Below as "after", shifting the other windows. Columns/Emerge keep
+  stacking into the target's column for Above/Below and add a new adjacent
+  column for Left/Right.
+- The cross-output/desktop branch resolves the drop target on the destination
+  engine *before* adopting the window (while it is detached it cannot shadow the
+  target), then calls `insertWindow()` after `addWindowToLayout()`.
+
+**Revision 17 (this session):**
+- **User-set column widths now persist across window open/close and focus
+  changes.** `rebalanceColumnWidths()` unconditionally reset every column to the
+  default whenever a window was added or removed, so opening a new window
+  clobbered a width the user had cycled/dragged (e.g. a full-width Marvel Rivals
+  snapped back to `0.5`). `EmergeColumnWidth` gained a `userSet` flag, set by the
+  explicit paths — preset cycle, `adjustColumnRatio()`, the main-axis
+  `adjustTileSize()`, and `interactiveResizeEnded()` (both dragged column and the
+  neighbour it trades width with). `rebalanceColumnWidths()` now only re-defaults
+  columns that were never touched, and `normalizeWidthsToFill()` preserves the
+  flag across its rescale. A lone column is never flagged, since it always fills
+  the viewport (cycling it is a visual no-op); this keeps the first-column-full /
+  subsequent-`0.5` default when the second window opens. This restores the
+  documented invariant ("inserting or removing a column NEVER resizes another
+  column"), which `rebalanceColumnWidths()` had been violating.
+
 **Revision 16 (this session):**
 - **Expelled columns are `0.5` wide.** `expelWindow()` created its new
   `EmergeColumn` with the struct default (`proportion = 1.0`), so the expelled

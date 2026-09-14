@@ -694,17 +694,29 @@ bool EmergeLayoutEngine::endMoveWindow(Window *window, Window *target)
     return true;
 }
 
-bool EmergeLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, DropZone zone)
+bool EmergeLayoutEngine::insertWindow(Window *window, Window *target, DropZone zone)
 {
-    // The middle of the target is still a plain swap; only the top/bottom zones
-    // join the target's column.
-    if (zone == DropZone::Swap || !target || target == window) {
-        return endMoveWindow(window, target);
+    if (!window || !target || target == window) {
+        return false;
     }
 
-    QPointer<CustomTile> sourceLeaf = m_moveSourceLeaf;
-    int srcCol = m_moveSourceColumn;
-    int srcTile = m_moveSourceTile;
+    // Locate the source tile: directly when the window is managed (e.g. just
+    // adopted from another output), otherwise via beginMoveWindow() bookkeeping
+    // (a real drag detaches the window from its tile).
+    QPointer<CustomTile> sourceLeaf;
+    int srcCol = -1;
+    int srcTile = -1;
+    if (const int c = columnOfWindow(window); c >= 0) {
+        srcCol = c;
+        srcTile = tileIndexOfWindow(window);
+        if (srcTile >= 0) {
+            sourceLeaf = m_columns[c].tiles.at(srcTile).leaf;
+        }
+    } else if (m_moveSourceLeaf) {
+        sourceLeaf = m_moveSourceLeaf;
+        srcCol = m_moveSourceColumn;
+        srcTile = m_moveSourceTile;
+    }
 
     if (!sourceLeaf) {
         m_moveSourceColumn = -1;
@@ -714,8 +726,7 @@ bool EmergeLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, Dro
 
     // The recorded indices are usually authoritative, but fall back to a search
     // in case an unrelated reflow moved the source tile mid-drag. Locating the
-    // tile is what makes the insertion possible; if it is gone, hand the drop
-    // to the swap path so the window is at least restored.
+    // tile is what makes the insertion possible.
     const bool indicesValid = srcCol >= 0 && srcCol < m_columns.size() && srcTile >= 0
         && srcTile < m_columns[srcCol].tiles.size() && m_columns[srcCol].tiles.at(srcTile).leaf == sourceLeaf;
     if (!indicesValid) {
@@ -731,6 +742,8 @@ bool EmergeLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, Dro
             }
         }
         if (!found) {
+            // Nothing to insert relative to; let the swap path at least restore
+            // the window to its source slot (uses the still-set bookkeeping).
             return endMoveWindow(window, target);
         }
     }
@@ -753,11 +766,67 @@ bool EmergeLayoutEngine::endMoveWindowOnZone(Window *window, Window *target, Dro
 
     // Capture the pre-move view offset so the re-anchor below is relative to
     // where the strip already was; the drop then scrolls only as far as needed
-    // to keep the target column visible instead of lurching.
+    // to keep the target visible instead of lurching.
     const int prevActive = m_activeColumnIdx;
     const qreal oldViewOffset = viewOffset();
 
-    // Detach the dragged tile (leaf + height intent) from its source column.
+    if (zone == DropZone::Swap) {
+        CustomTile *targetLeaf = m_columns[targetCol].tiles.at(targetTile).leaf;
+        m_moveSourceLeaf.clear();
+        m_moveSourceColumn = -1;
+        m_moveSourceTile = -1;
+        if (targetLeaf && targetLeaf != sourceLeaf) {
+            // Exchange the two windows between their leaves; the leaves stay
+            // put, so a detached dragged window is re-adopted rather than left
+            // homeless.
+            targetLeaf->unmanage(target);
+            targetLeaf->manage(window);
+            sourceLeaf->manage(target);
+            m_activeColumnIdx = targetCol;
+            m_viewAnchor = columnStripPos(m_activeColumnIdx) - oldViewOffset;
+        } else if (!sourceLeaf->windows().contains(window)) {
+            sourceLeaf->manage(window);
+        }
+        reflow();
+        return true;
+    }
+
+    if (zone == DropZone::InsertLeft || zone == DropZone::InsertRight) {
+        // Left/Right: give the dragged tile its own new column on the requested
+        // side of the target's column (a lone source column is simply moved).
+        EmergeTile tile = m_columns[srcCol].tiles.takeAt(srcTile);
+        if (m_columns[srcCol].activeTileIdx >= m_columns[srcCol].tiles.size()) {
+            m_columns[srcCol].activeTileIdx = qMax(0, m_columns[srcCol].tiles.size() - 1);
+        }
+        if (m_columns[srcCol].tiles.isEmpty()) {
+            m_columns.removeAt(srcCol);
+            if (srcCol < targetCol) {
+                targetCol -= 1;
+            }
+        }
+
+        EmergeColumn column;
+        column.tiles.append(tile);
+        column.activeTileIdx = 0;
+        column.width.proportion = DefaultColumnExtent;
+        const int insertCol = (zone == DropZone::InsertLeft) ? targetCol : targetCol + 1;
+        m_columns.insert(insertCol, column);
+
+        m_moveSourceLeaf.clear();
+        m_moveSourceColumn = -1;
+        m_moveSourceTile = -1;
+
+        if (!sourceLeaf->windows().contains(window)) {
+            sourceLeaf->manage(window);
+        }
+        m_activeColumnIdx = insertCol;
+        m_viewAnchor = focusAnchorFor(m_activeColumnIdx, prevActive, oldViewOffset);
+        reflow();
+        return true;
+    }
+
+    // Above/Below: join the target's column. Detach the dragged tile (leaf +
+    // height intent) from its source column.
     EmergeTile tile = m_columns[srcCol].tiles.takeAt(srcTile);
 
     // Same-column reorder: removing the source shifted the target up.
@@ -807,6 +876,11 @@ void EmergeLayoutEngine::rebalanceColumnWidths()
     // Cycling changes a single column's width; nothing else is resized.
     const qreal defined = (n == 1) ? 1.0 : DefaultColumnExtent;
     for (EmergeColumn &col : m_columns) {
+        // A width the user set by hand persists across window add/remove and
+        // focus changes; only never-touched columns pick up the default again.
+        if (col.width.userSet) {
+            continue;
+        }
         col.width = EmergeColumnWidth{};
         col.width.proportion = defined;
     }
@@ -826,8 +900,13 @@ void EmergeLayoutEngine::normalizeWidthsToFill()
     const qreal scale = 1.0 / total;
     for (EmergeColumn &col : m_columns) {
         const qreal scaled = resolveColumnExtentRel(col) * scale;
+        // Keep the user-set marker across the rescale, so a column that was
+        // widened to fill the screen is not later treated as an untouched
+        // default and reset underneath the user.
+        const bool userSet = col.width.userSet;
         col.width = EmergeColumnWidth{};
         col.width.proportion = qBound(MinColumnExtent, scaled, qreal(1.0));
+        col.width.userSet = userSet;
     }
 }
 
@@ -1238,6 +1317,11 @@ void EmergeLayoutEngine::switchPresetColumnWidth()
     const qreal oldViewOffset = viewOffset();
     m_columns[m_activeColumnIdx].width = EmergeColumnWidth{};
     m_columns[m_activeColumnIdx].width.proportion = m_presetColumnWidths.at(idx);
+    // A lone column always fills the viewport, so cycling it is a visual no-op;
+    // flagging it would wrongly keep it full once a second column opens.
+    if (m_columns.size() > 1) {
+        m_columns[m_activeColumnIdx].width.userSet = true;
+    }
     m_viewAnchor = focusAnchorFor(m_activeColumnIdx, m_activeColumnIdx, oldViewOffset);
     reflow();
 }
@@ -1251,6 +1335,9 @@ void EmergeLayoutEngine::adjustColumnRatio(qreal delta)
     const qreal oldViewOffset = viewOffset();
     m_columns[m_activeColumnIdx].width = EmergeColumnWidth{};
     m_columns[m_activeColumnIdx].width.proportion = qBound(MinColumnExtent, current + delta, qreal(1.0));
+    if (m_columns.size() > 1) {
+        m_columns[m_activeColumnIdx].width.userSet = true;
+    }
     m_viewAnchor = focusAnchorFor(m_activeColumnIdx, m_activeColumnIdx, oldViewOffset);
     reflow();
 }
@@ -1274,6 +1361,9 @@ void EmergeLayoutEngine::adjustTileSize(Window *window, qreal weightDelta, Qt::O
         const qreal oldViewOffset = viewOffset();
         m_columns[c].width = EmergeColumnWidth{};
         m_columns[c].width.proportion = qBound(MinColumnExtent, current + weightDelta, qreal(1.0));
+        if (m_columns.size() > 1) {
+            m_columns[c].width.userSet = true;
+        }
         m_activeColumnIdx = c;
         m_viewAnchor = focusAnchorFor(c, c, oldViewOffset);
         reflow();
@@ -1373,8 +1463,10 @@ void EmergeLayoutEngine::interactiveResizeEnded(Window *window, const RectF &bef
     m_activeColumnIdx = c;
     m_columns[c].width = EmergeColumnWidth{};
     m_columns[c].width.proportion = selfOld + actual;
+    m_columns[c].width.userSet = true;
     m_columns[neighbour].width = EmergeColumnWidth{};
     m_columns[neighbour].width.proportion = neighbourTarget;
+    m_columns[neighbour].width.userSet = true;
     m_viewAnchor = focusAnchorFor(c, c, oldViewOffset);
     reflow();
 }

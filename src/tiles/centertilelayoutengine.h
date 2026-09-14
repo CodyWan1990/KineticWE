@@ -62,6 +62,7 @@ public:
     void moveWindow(Window *window, int delta) override;
     void beginMoveWindow(Window *window) override;
     bool endMoveWindow(Window *window, Window *target) override;
+    bool insertWindow(Window *window, Window *target, DropZone zone) override;
     void cancelMoveWindow(Window *window) override;
     void reflow() override;
     void pruneEmptyLeaves() override;
