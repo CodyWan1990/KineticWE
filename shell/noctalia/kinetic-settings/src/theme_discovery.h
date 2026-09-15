@@ -28,6 +28,14 @@ struct DecorationThemeInfo {
   std::string name;        // theme directory name (Aurorae theme id)
   std::string displayName; // Name= from metadata.desktop, fallback to directory name
   std::string path;        // absolute path to the theme directory
+  // Titlebar layout from the theme's own <name>rc (Aurorae's configrc), used by
+  // Kinetic Settings to draw a faithful window preview. The defaults mirror
+  // Aurorae's when the rc omits the keys: centered title, no side buttons, and
+  // a 24px titlebar.
+  std::string titleAlignment = "center"; // [General] TitleAlignment, lowercased
+  std::string leftButtons;               // [General] LeftButtons (KDE button letters)
+  std::string rightButtons;              // [General] RightButtons
+  int titlebarHeight = 24;               // [Layout] TitleHeight + TitleEdgeTop + TitleEdgeBottom
 };
 
 // All installed icon themes, sorted by display name (case-insensitive).
@@ -41,6 +49,12 @@ struct DecorationThemeInfo {
   // (case-insensitive). Each path is the theme's directory under
   // `<data dir>/aurorae/themes/`.
   [[nodiscard]] std::vector<DecorationThemeInfo> decorationThemes();
+
+  // Path to a theme's button artwork for a KDE/Aurorae button letter
+  // (X close, I minimize, A maximize, H help, S alldesktops, F keepabove,
+  // B keepbelow). Empty when the letter has no artwork or the theme ships none
+  // (only uncompressed .svg is resolved; .svgz archives are skipped).
+  [[nodiscard]] std::string decorationButtonFile(const std::string& themePath, char letter);
 
   // The window decoration themes root directory (where downloaded themes are
   // installed), preferring the user's own dir (`~/.local/share/aurorae/themes`)

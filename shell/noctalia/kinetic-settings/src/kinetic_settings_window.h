@@ -82,7 +82,7 @@ private:
   // Sidebar/secondary nav pages, grouped under the collapsible categories.
   enum class ActivePage {
     // Appearance category (alphabetically first).
-    AppearanceGlobalTheme,
+    AppearanceTitleBars,
     AppearanceIcons,
     AppearanceCursors,
     Animations,
@@ -212,7 +212,7 @@ private:
   Flex* m_mainContainer = nullptr;
 
   // Active secondary page and which sidebar categories are expanded.
-  ActivePage m_activePage = ActivePage::AppearanceGlobalTheme;
+  ActivePage m_activePage = ActivePage::AppearanceTitleBars;
   bool m_windowManagementExpanded = true;
   bool m_inputOutputExpanded = true;
   bool m_appearanceExpanded = true;

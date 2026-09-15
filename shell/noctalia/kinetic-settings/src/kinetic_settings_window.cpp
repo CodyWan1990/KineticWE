@@ -577,7 +577,6 @@ WindowBehaviorPage::Callbacks KineticSettingsWindow::windowBehaviorPageCallbacks
 AppearancePage::Filter KineticSettingsWindow::appearanceFilter() const {
   return AppearancePage::Filter{
       .searchQuery = m_searchQuery,
-      .showAdvanced = m_showAdvanced,
       .showOverriddenOnly = m_showOverriddenOnly,
   };
 }
@@ -834,7 +833,7 @@ void KineticSettingsWindow::confirmResetPage() {
 void KineticSettingsWindow::applyActivePage() {
   bool applied = false;
   switch (m_activePage) {
-  case ActivePage::AppearanceGlobalTheme:
+  case ActivePage::AppearanceTitleBars:
     applied = m_appearancePage != nullptr && m_appearancePage->applyAll();
     break;
   case ActivePage::AppearanceIcons:
@@ -900,7 +899,7 @@ void KineticSettingsWindow::applyActivePage() {
 
 void KineticSettingsWindow::resetActivePage() {
   switch (m_activePage) {
-  case ActivePage::AppearanceGlobalTheme:
+  case ActivePage::AppearanceTitleBars:
     if (m_appearancePage != nullptr) {
       m_appearancePage->resetAll();
     }
@@ -987,7 +986,7 @@ void KineticSettingsWindow::resetActivePage() {
 
 bool KineticSettingsWindow::activeHasPending() const {
   switch (m_activePage) {
-  case ActivePage::AppearanceGlobalTheme:
+  case ActivePage::AppearanceTitleBars:
     return m_appearancePage != nullptr && m_appearancePage->hasPending();
   case ActivePage::AppearanceIcons:
     return m_iconsPage != nullptr && m_iconsPage->hasPending();
@@ -1027,7 +1026,7 @@ bool KineticSettingsWindow::activeHasPending() const {
 
 bool KineticSettingsWindow::activeHasResettableSettings() const {
   switch (m_activePage) {
-  case ActivePage::AppearanceGlobalTheme:
+  case ActivePage::AppearanceTitleBars:
     return m_appearancePage != nullptr && !m_appearancePage->resettableKeyPaths().empty();
   case ActivePage::AppearanceIcons:
     return m_iconsPage != nullptr && !m_iconsPage->resettableKeyPaths().empty();
@@ -1315,7 +1314,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     requestSceneRebuild();
   });
   if (m_appearanceExpanded) {
-    addSubNav(ActivePage::AppearanceGlobalTheme, "palette", "Global Theme");
+    addSubNav(ActivePage::AppearanceTitleBars, "palette", "Title Bars");
     addSubNav(ActivePage::AppearanceIcons, "apps", "Icons");
     addSubNav(ActivePage::AppearanceCursors, "mouse-2", "Cursors");
     addSubNav(ActivePage::Animations, "movie", "Animations");
@@ -1363,8 +1362,8 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
 
 std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
   switch (page) {
-  case ActivePage::AppearanceGlobalTheme:
-    return "appearance global theme look and feel colors palette window decorations decoration";
+  case ActivePage::AppearanceTitleBars:
+    return "appearance title bars titlebar dynamic neutral look and feel window decorations decoration";
   case ActivePage::AppearanceIcons:
     return "appearance icons icon theme";
   case ActivePage::AppearanceCursors:
@@ -1419,7 +1418,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildPageNode(ActivePage page, Rend
 
 std::unique_ptr<Node> KineticSettingsWindow::buildPageNodeWithQuery(ActivePage page, Renderer& renderer) {
   switch (page) {
-  case ActivePage::AppearanceGlobalTheme:
+  case ActivePage::AppearanceTitleBars:
     if (m_appearancePage != nullptr) {
       return m_appearancePage->build(
           uiScale(), renderer, appearanceFilter(), m_armedResetKeyPath, appearancePageCallbacks()
@@ -1549,7 +1548,7 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
   // Mirrors the sidebar order so results read top-to-bottom by category. Pages
   // return nullptr when nothing in them matches the query.
   static constexpr ActivePage kSearchPageOrder[] = {
-      ActivePage::AppearanceGlobalTheme, ActivePage::AppearanceIcons,   ActivePage::AppearanceCursors,
+      ActivePage::AppearanceTitleBars, ActivePage::AppearanceIcons,   ActivePage::AppearanceCursors,
       ActivePage::Animations,            ActivePage::DesktopEffects,    ActivePage::Keyboard,
       ActivePage::Mouse,                 ActivePage::Touchpad,          ActivePage::Keybinds,
       ActivePage::Displays,              ActivePage::WindowBehavior,    ActivePage::Workspaces,
@@ -1557,7 +1556,7 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
       ActivePage::Accessibility,         ActivePage::Autostart,
   };
 
-  // Global Theme (window decoration previews), Icons and Cursors rescan the
+  // Title Bars (window decoration previews), Icons and Cursors rescan the
   // theme directories and decode a preview image per matching entry on every
   // rebuild. A one-character query matches whole swathes of theme names, so
   // skip those pages until the query narrows.
@@ -1566,7 +1565,7 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
   bool any = false;
   for (const ActivePage page : kSearchPageOrder) {
     if (skipThemePages
-        && (page == ActivePage::AppearanceGlobalTheme || page == ActivePage::AppearanceIcons
+        && (page == ActivePage::AppearanceTitleBars || page == ActivePage::AppearanceIcons
             || page == ActivePage::AppearanceCursors)) {
       continue;
     }

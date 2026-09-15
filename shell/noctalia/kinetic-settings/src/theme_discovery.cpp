@@ -7,6 +7,7 @@
 #include "util/string_utils.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -14,6 +15,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -145,6 +147,51 @@ namespace {
       }
     }
     return {};
+  }
+
+  // A `<key>=<value>` reader for one section of an Aurorae theme config
+  // (<theme>/<name>rc). Keys are matched verbatim inside the requested section;
+  // surrounding whitespace is stripped and '#' comments are skipped. Empty when
+  // the file, section or key is absent.
+  std::string auroraeConfigValue(const fs::path& configPath, std::string_view section, std::string_view key) {
+    std::ifstream in(configPath);
+    if (!in.is_open()) {
+      return {};
+    }
+    bool inSection = false;
+    std::string line;
+    while (std::getline(in, line)) {
+      const std::string trimmed = StringUtils::trim(line);
+      if (trimmed.empty() || trimmed.front() == '#') {
+        continue;
+      }
+      if (trimmed.front() == '[') {
+        inSection = std::string_view(trimmed) == section;
+        continue;
+      }
+      if (!inSection) {
+        continue;
+      }
+      const std::size_t eq = trimmed.find('=');
+      if (eq == std::string::npos) {
+        continue;
+      }
+      if (std::string_view(trimmed).substr(0, eq) == key) {
+        return StringUtils::unquote(StringUtils::trim(std::string_view(trimmed).substr(eq + 1)));
+      }
+    }
+    return {};
+  }
+
+  // The same file, as a non-negative int (0 when absent or unparsable).
+  int auroraeConfigInt(const fs::path& configPath, std::string_view section, std::string_view key) {
+    const std::string raw = auroraeConfigValue(configPath, section, key);
+    if (raw.empty()) {
+      return 0;
+    }
+    int value = 0;
+    const auto [end, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), value);
+    return ec == std::errc() && end == raw.data() + raw.size() ? value : 0;
   }
 
   // A subdirectory name like "scalable", "48x48", "64x64@2x" denotes an icon
@@ -384,13 +431,65 @@ std::vector<DecorationThemeInfo> decorationThemes() {
       if (display.empty()) {
         display = name;
       }
-      out.push_back(DecorationThemeInfo{.name = name, .displayName = std::move(display), .path = dir.string()});
+      DecorationThemeInfo info{.name = name, .displayName = std::move(display), .path = dir.string()};
+      // Aurorae's configrc is <themeDir>/<pluginId>rc (e.g. Layanrc); its
+      // titlebar layout drives Kinetic Settings' drawn window preview.
+      const fs::path configRc = dir / (name + "rc");
+      if (const std::string alignment = auroraeConfigValue(configRc, "[General]", "TitleAlignment");
+          !alignment.empty()) {
+        info.titleAlignment = StringUtils::toLower(alignment);
+      }
+      info.leftButtons = auroraeConfigValue(configRc, "[General]", "LeftButtons");
+      info.rightButtons = auroraeConfigValue(configRc, "[General]", "RightButtons");
+      if (const int titleContent = auroraeConfigInt(configRc, "[Layout]", "TitleHeight"); titleContent > 0) {
+        info.titlebarHeight = titleContent + auroraeConfigInt(configRc, "[Layout]", "TitleEdgeTop")
+            + auroraeConfigInt(configRc, "[Layout]", "TitleEdgeBottom");
+      }
+      out.push_back(std::move(info));
     }
   }
   std::ranges::sort(out, [](const auto& a, const auto& b) {
     return StringUtils::naturalCaseInsensitiveLess(a.displayName, b.displayName);
   });
   return out;
+}
+
+std::string decorationButtonFile(const std::string& themePath, char letter) {
+  if (themePath.empty()) {
+    return {};
+  }
+  std::string_view base;
+  switch (letter) {
+  case 'X':
+    base = "close";
+    break;
+  case 'I':
+    base = "minimize";
+    break;
+  case 'A':
+    base = "maximize";
+    break;
+  case 'H':
+    base = "help";
+    break;
+  case 'S':
+    base = "alldesktops";
+    break;
+  case 'F':
+    base = "keepabove";
+    break;
+  case 'B':
+    base = "keepbelow";
+    break;
+  default:
+    return {};
+  }
+  std::error_code ec;
+  const fs::path candidate = fs::path(themePath) / (std::string(base) + ".svg");
+  if (fs::is_regular_file(candidate, ec)) {
+    return candidate.string();
+  }
+  return {};
 }
 
 std::string decorationRootPath() {

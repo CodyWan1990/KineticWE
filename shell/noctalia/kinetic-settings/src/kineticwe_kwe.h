@@ -21,7 +21,7 @@ public:
   [[nodiscard]] static std::filesystem::path rulesDefaultPath();
 
   // Overrides the file this reader/writer targets. Default is kineticwe.kwe;
-  // the Appearance page uses this for its own portable appearance.kwe. Must be
+  // the Icons/Cursors pages use this for their portable appearance.kwe. Must be
   // called before load()/save().
   void setPath(std::filesystem::path path) { m_path = std::move(path); }
 

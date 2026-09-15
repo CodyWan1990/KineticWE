@@ -443,7 +443,7 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 # =============================================================================
 
 %files
-%license LICENSES/* ../kdecoration/LICENSES/* ../aurorae/LICENSES/*
+%license LICENSES/* ../kdecoration/LICENSES/* ../aurorae/LICENSES/* data/aurorae-themes/LICENSE
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
 %{_bindir}/kwindowprop
@@ -466,6 +466,8 @@ rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
 %{_datadir}/qlogging-categories6/
 %{_datadir}/kwin-wayland/
 %{_datadir}/kwin/aurorae/
+%{_datadir}/aurorae/themes/Layan/
+%{_datadir}/aurorae/themes/Layan-solid/
 %{_datadir}/krunner/
 %{_datadir}/locale/
 %{_userunitdir}/plasma-kwin_wayland.service

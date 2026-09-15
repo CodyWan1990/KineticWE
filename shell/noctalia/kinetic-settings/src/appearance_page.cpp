@@ -3,30 +3,20 @@
 #include "kinetic-settings/src/theme_discovery.h"
 
 #include "core/log.h"
-#include "core/process/process.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
-#include "net/url_open.h"
 #include "render/core/renderer.h"
-#include "theme/color.h"
-#include "theme/fixed_palette.h"
-#include "theme/kde_color_scheme.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
-#include "ui/controls/glyph.h"
 #include "ui/controls/image.h"
 #include "ui/controls/label.h"
-#include "ui/controls/select.h"
-#include "ui/controls/separator.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
 #include <filesystem>
-#include <format>
-#include <fstream>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -36,24 +26,12 @@ namespace {
 
   constexpr Logger kLog("kinetic-settings");
 
-  constexpr int kSettingDescriptionMaxLines = 5;
-  constexpr float kDefaultControlWidth = 190.0F;
   // Window decoration tiles (a wider tile than the Icons page so the
   // decoration preview reads like a window).
   constexpr float kDecorationTileWidth = 200.0F;
   constexpr float kDecorationTileHeight = 150.0F;
   constexpr float kDecorationPreviewWidth = 168.0F;
   constexpr float kDecorationPreviewHeight = 96.0F;
-  // The KDE Store category for window decorations.
-  constexpr std::string_view kDecorationStoreUrl = "https://store.kde.org/browse?cat=717&ord=latest";
-
-  // The Appearance page persists to its own portable appearance.kwe (not the
-  // compositor's kineticwe.kwe), so a theme choice travels with the rest of
-  // ~/.config/kineticwe when copied to a new machine.
-  std::filesystem::path appearanceKwePath() {
-    const auto dir = KineticweKwe::defaultPath().parent_path();
-    return dir / "appearance.kwe";
-  }
 
   [[nodiscard]] std::unique_ptr<Label>
   makeLabel(std::string_view text, float fontSize, const ColorSpec& color, FontWeight fontWeight = FontWeight::Normal) {
@@ -87,13 +65,10 @@ namespace {
     );
   }
 
-  [[nodiscard]] std::string joinKeyPath(std::string_view group, std::string_view key) {
-    return std::string(group) + '.' + std::string(key);
-  }
-
   // A representative preview image for a decoration theme: a bundled preview
-  // image when present, otherwise the theme's decoration SVG (which reads as a
-  // simple window titlebar for many themes), otherwise empty (generic glyph).
+  // image when present, otherwise empty so the caller draws a window mock.
+  // decoration.svg is deliberately NOT used — for Aurorae themes it is the
+  // nine-slice artwork atlas, not a preview (rendered flat it reads as blobs).
   [[nodiscard]] std::string decorationPreviewFile(const std::string& themePath) {
     if (themePath.empty()) {
       return {};
@@ -106,611 +81,75 @@ namespace {
         return candidate.string();
       }
     }
-    const std::filesystem::path decoration = dir / "decoration.svg";
-    if (std::filesystem::is_regular_file(decoration, ec)) {
-      return decoration.string();
-    }
     return {};
   }
 
-  // The user's real config home ($XDG_CONFIG_HOME, else ~/.config). This is
-  // where qt5ct/qt6ct (and kdeglobals) live — NOT the compositor-redirected
-  // KWE_CONFIG_HOME. The shell process (which embeds kinetic-settings) keeps the
-  // real XDG_CONFIG_HOME, so this resolves to the shared config location.
-  [[nodiscard]] std::filesystem::path realConfigHome() {
-    if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg != nullptr && *xdg != '\0') {
-      return std::filesystem::path(xdg);
-    }
-    if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
-      return std::filesystem::path(home) / ".config";
-    }
-    return std::filesystem::path(".");
-  }
-
-  // Builds a qt5ct/qt6ct [ColorScheme] file (the native QPalette format the
-  // tools read from their colors/ directory), generated from a Noctalia
-  // TokenMap. Mirrors assets/templates/qt/qtct.conf.
-  [[nodiscard]] std::string buildQtctColorScheme(const noctalia::theme::TokenMap& tokens) {
-    const auto hexOf = [&tokens](std::string_view key, std::string_view fallback) {
-      auto it = tokens.find(std::string(key));
-      return it != tokens.end() ? noctalia::theme::Color::fromArgb(it->second).toHex()
-                                : noctalia::theme::Color::fromHex(fallback).toHex();
+  // KineticWE's display names for the Aurorae themes vendored under
+  // data/aurorae-themes/ (see that dir's README): the transparent dark variant
+  // reads as "Neutral", the flat one as "Solid". Every other discovered theme
+  // keeps its own metadata Name=.
+  [[nodiscard]] std::string titlebarDisplayName(std::string_view name, std::string_view fallback) {
+    static constexpr std::pair<std::string_view, std::string_view> kRenamed[] = {
+        {"Layan", "Neutral"},
+        {"Layan-solid", "Solid"},
     };
-    const auto line = [&](std::string_view onBg, std::string_view onSurface) {
-      return hexOf("on_background", onBg) + ", " + hexOf("surface", "#000000") + ", #ffffff, #cacaca, #9f9f9f, #b8b8b8, "
-             + hexOf("on_background", onBg) + ", #ffffff, " + hexOf("on_surface", onSurface) + ", "
-             + hexOf("background", onBg) + ", " + hexOf("background", onBg) + ", " + hexOf("shadow", "#000000") + ", "
-             + hexOf("primary_container", "#000000") + ", " + hexOf("on_primary_container", "#ffffff") + ", "
-             + hexOf("secondary", "#ffffff") + ", " + hexOf("primary", "#ffffff") + ", "
-             + hexOf("surface_variant", "#000000") + ", " + hexOf("surface", "#000000") + ", "
-             + hexOf("surface_variant", "#000000") + ", " + hexOf("on_surface", onSurface) + ", "
-             + hexOf("on_surface", onSurface) + ", " + hexOf("primary", "#ffffff");
-    };
-    const std::string active = line("#ffffff", "#ffffff");
-    std::string out;
-    out.reserve(1200);
-    out += "[ColorScheme]\n";
-    out += "# windowText,button,light,midlight,dark,mid,text,brightText,buttonText,base,window,shadow,"
-           "highlight,highlightedText,link,linkVisited,alternateBase,reserved,toolTipBase,toolTipText,"
-           "placeholderText,accent\n";
-    out += "active_colors=" + active + "\n";
-    out += "disabled_colors=" + active + "\n";
-    out += "inactive_colors=" + active + "\n";
-    return out;
-  }
-
-  // Minimal qt5ct/qt6ct config pointing at the Noctalia color scheme. Only the
-  // [Appearance] section is emitted; qt5ct/qt6ct fill the rest with defaults on
-  // first run and preserve any user edits to the other sections (this function
-  // is only called when the config file does not already exist).
-  [[nodiscard]] std::string buildQtctConfig(const std::filesystem::path& colorSchemePath) {
-    std::string out;
-    out.reserve(256);
-    out += "[Appearance]\n";
-    out += "color_scheme_path=" + colorSchemePath.string() + "\n";
-    out += "custom_palette=true\n";
-    out += "icon_theme=Papirus\n";
-    out += "standard_dialogs=gtk3\n";
-    out += "style=Breeze\n";
-    return out;
-  }
-
-  // Writes `content` to `path`, creating parent directories. Returns false on
-  // failure (sets *error when provided).
-  [[nodiscard]] bool writeFileIfAbsent(
-      const std::filesystem::path& path, const std::string& content, std::string* error
-  ) {
-    std::error_code ec;
-    if (std::filesystem::exists(path, ec)) {
-      return true;
-    }
-    std::filesystem::create_directories(path.parent_path(), ec);
-    if (ec) {
-      if (error != nullptr) {
-        *error = "failed to create directory for " + path.string();
+    for (const auto& [themeName, label] : kRenamed) {
+      if (name == themeName) {
+        return std::string(label);
       }
-      return false;
     }
-    std::ofstream out(path);
-    if (!out) {
-      if (error != nullptr) {
-        *error = "failed to write " + path.string();
-      }
-      return false;
-    }
-    out << content;
-    return static_cast<bool>(out);
-  }
-
-  // Breeze-inspired seed palettes. The exact derived colors are produced by
-  // Noctalia's palette generator (expandFixedPaletteMode), which guarantees the
-  // full token set with WCAG contrast enforcement.
-  [[nodiscard]] ::Palette breezeDarkSeeds() {
-    return ::Palette{
-        .primary = hex("#3daee9"),
-        .onPrimary = hex("#232629"),
-        .secondary = hex("#27ae60"),
-        .onSecondary = hex("#232629"),
-        .tertiary = hex("#2980b9"),
-        .onTertiary = hex("#232629"),
-        .error = hex("#da4453"),
-        .onError = hex("#ffffff"),
-        .surface = hex("#232629"),
-        .onSurface = hex("#fcfcfc"),
-        .surfaceVariant = hex("#31363b"),
-        .onSurfaceVariant = hex("#bdc3c7"),
-        .outline = hex("#4d4d4d"),
-        .shadow = hex("#000000"),
-        .hover = hex("#3daee9"),
-        .onHover = hex("#232629"),
-    };
-  }
-
-  [[nodiscard]] ::Palette breezeLightSeeds() {
-    return ::Palette{
-        .primary = hex("#3daee9"),
-        .onPrimary = hex("#ffffff"),
-        .secondary = hex("#27ae60"),
-        .onSecondary = hex("#ffffff"),
-        .tertiary = hex("#2980b9"),
-        .onTertiary = hex("#ffffff"),
-        .error = hex("#da4453"),
-        .onError = hex("#ffffff"),
-        .surface = hex("#fcfcfc"),
-        .onSurface = hex("#232629"),
-        .surfaceVariant = hex("#eff0f1"),
-        .onSurfaceVariant = hex("#4d4d4d"),
-        .outline = hex("#b6b6b6"),
-        .shadow = hex("#000000"),
-        .hover = hex("#3daee9"),
-        .onHover = hex("#ffffff"),
-    };
+    return std::string(fallback);
   }
 
 } // namespace
 
-// ---------------------------------------------------------------------------
-// Schema: field descriptor table + option catalogs.
-// ---------------------------------------------------------------------------
-
-const std::vector<std::string>& AppearancePage::themeValues() {
-  static const std::vector<std::string> values{"BreezeDark", "BreezeLight"};
-  return values;
-}
-
-const std::vector<std::string>& AppearancePage::themeLabels() {
-  static const std::vector<std::string> labels{"Breeze Dark", "Breeze Light"};
-  return labels;
-}
-
-const std::vector<AppearancePage::Field>& AppearancePage::fields() {
-  static const std::vector<Field> table{
-      Field{
-          .group = "Appearance",
-          .key = "GlobalTheme",
-          .control = ControlKind::Select,
-          .title = "Global theme",
-          .subtitle = "Color scheme applied to Qt and KDE applications. The "
-                      "scheme is generated from a Breeze seed palette and merged "
-                      "into kdeglobals; apps pick it up on their next launch.",
-          .pageGroup = "Global Theme",
-          .optionValues = &themeValues(),
-          .optionLabels = &themeLabels(),
-          .fallback = Value{std::string("BreezeDark")},
-      },
-  };
-  return table;
-}
-
-AppearancePage::Value AppearancePage::defaultValue(const Field& field) {
-  return field.fallback;
-}
-
-std::string AppearancePage::keyPath(const Field& field) {
-  return joinKeyPath(field.group, field.key);
-}
-
-const AppearancePage::Field* AppearancePage::findField(std::string_view path) {
-  for (const auto& field : fields()) {
-    if (path == keyPath(field)) {
-      return &field;
-    }
-  }
-  return nullptr;
-}
-
 AppearancePage::AppearancePage(SessionBus& bus) : m_dbus(bus) {}
-
-bool AppearancePage::equalsDefault(const Field& field, const Value& value) {
-  return valuesEqual(field, value, defaultValue(field));
-}
-
-bool AppearancePage::valuesEqual(const Field& field, const Value& a, const Value& b) {
-  (void)field;
-  return a.index() == b.index() && a == b;
-}
 
 void AppearancePage::ensureLoaded() {
   if (!m_loaded) {
-    m_config.setPath(appearanceKwePath());
-    m_config.load();
-    // The window decorations live in the compositor's kineticwe.kwe (the file
-    // the compositor reads), not in the portable appearance.kwe.
     m_decorationsConfig.load();
     m_loaded = true;
-    kLog.info("appearance ensureLoaded: path={}", m_config.path().string());
+    kLog.info("appearance ensureLoaded: path={}", m_decorationsConfig.path().string());
   }
-}
-
-AppearancePage::Value AppearancePage::fileBackedValue(const Field& field) const {
-  const Value fallback = defaultValue(field);
-  return std::visit(
-      [this, &field](const auto& fallbackValue) -> Value {
-        using T = std::decay_t<decltype(fallbackValue)>;
-        if constexpr (std::is_same_v<T, std::string>) {
-          return m_config.readString(field.group, field.key).value_or(fallbackValue);
-        } else if constexpr (std::is_same_v<T, bool>) {
-          return m_config.readBool(field.group, field.key, fallbackValue);
-        } else if constexpr (std::is_same_v<T, int>) {
-          return m_config.readInt(field.group, field.key, fallbackValue);
-        } else if constexpr (std::is_same_v<T, double>) {
-          return m_config.readDouble(field.group, field.key, fallbackValue);
-        } else {
-          return m_config.readStringList(field.group, field.key);
-        }
-      },
-      fallback
-  );
-}
-
-AppearancePage::Value AppearancePage::effectiveValue(const Field& field) const {
-  const auto staged = m_pending.find(keyPath(field));
-  if (staged != m_pending.end()) {
-    return staged->second;
-  }
-  return fileBackedValue(field);
-}
-
-bool AppearancePage::overridden(const Field& field) const {
-  return !equalsDefault(field, effectiveValue(field));
-}
-
-bool AppearancePage::matchesFilter(const Field& field, const Filter& filter) const {
-  if (!filter.showAdvanced && field.advanced) {
-    return false;
-  }
-  if (filter.showOverriddenOnly && equalsDefault(field, effectiveValue(field))) {
-    return false;
-  }
-  if (!filter.searchQuery.empty()) {
-    const auto matches = [&filter](std::string_view text) {
-      return StringUtils::containsInsensitive(text, filter.searchQuery);
-    };
-    if (!matches(field.title) && !matches(field.subtitle) && !matches(field.pageGroup)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 // ---------------------------------------------------------------------------
-// Persistence: staged edits + Apply.
+// Persistence: staged edit + Apply.
 // ---------------------------------------------------------------------------
-
-void AppearancePage::writeValue(const Field& field, const Value& value) {
-  // The Appearance choice is always written explicitly (even when it equals the
-  // default). Unlike the Tiling/Workspaces override semantics, the theme is a
-  // user-facing selection we want to persist in appearance.kwe so it is
-  // portable and never collapses to an empty file.
-  std::visit(
-      [this, &field](const auto& v) {
-        using T = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<T, bool>) {
-          m_config.setBool(field.group, field.key, v);
-        } else if constexpr (std::is_same_v<T, int>) {
-          m_config.setInt(field.group, field.key, v);
-        } else if constexpr (std::is_same_v<T, double>) {
-          m_config.setDouble(field.group, field.key, v);
-        } else if constexpr (std::is_same_v<T, std::string>) {
-          m_config.setString(field.group, field.key, v);
-        } else {
-          m_config.setStringList(field.group, field.key, v);
-        }
-      },
-      value
-  );
-}
-
-void AppearancePage::stage(const Field& field, const Value& value) {
-  ensureLoaded();
-  const std::string path = keyPath(field);
-  const auto fileValue = fileBackedValue(field);
-  kLog.info(
-      "appearance stage: field={} value={} equalToFile={}",
-      path,
-      std::get<std::string>(value),
-      valuesEqual(field, value, fileValue) ? "yes" : "no"
-  );
-  if (valuesEqual(field, value, fileValue)) {
-    m_pending.erase(path);
-  } else {
-    m_pending[path] = value;
-  }
-}
-
-void AppearancePage::stageAndRebuild(const Field& field, const Value& value, const Callbacks& callbacks) {
-  stage(field, value);
-  if (callbacks.requestRebuild) {
-    callbacks.requestRebuild();
-  }
-}
 
 bool AppearancePage::applyAll() {
-  ensureLoaded();
-  const bool hasAppearance = !m_pending.empty();
-  const bool hasDecoration = m_pendingDecoration.has_value();
-  if (!hasAppearance && !hasDecoration) {
+  if (!m_pendingDecoration.has_value()) {
     return true;
   }
-
-  if (hasAppearance) {
-    kLog.info("appearance applyAll: pending={}", m_pending.size());
-    kLog.info("appearance applyAll: config path={}", m_config.path().string());
-    for (const auto& [path, value] : m_pending) {
-      if (const Field* field = findField(path)) {
-        writeValue(*field, value);
-        kLog.info("appearance applyAll: wrote field group={} key={}", field->group, field->key);
-      }
-    }
-    if (const auto v = m_config.readString("Appearance", "GlobalTheme"); v.has_value()) {
-      kLog.info("appearance applyAll: in-memory GlobalTheme after write={}", *v);
-    } else {
-      kLog.info("appearance applyAll: in-memory GlobalTheme after write=ABSENT");
-    }
-    if (!m_config.save()) {
-      m_errorNotice = "Failed to write appearance.kwe. Your changes were kept; try Apply again.";
-      kLog.warn("kinetic-settings: failed to write {}", m_config.path().string());
-      return false;
-    }
-    {
-      std::error_code ec;
-      const auto size = std::filesystem::file_size(m_config.path(), ec);
-      kLog.info(
-          "appearance applyAll: saved, file_size={} (error={})", ec ? -1 : static_cast<long long>(size),
-          ec ? ec.message() : std::string("none")
-      );
-    }
-
-    // Regenerate kdeglobals from the effective Global Theme selection every time
-    // Apply runs. Using the effective value (not just the persisted key) means
-    // the noctalia-generated scheme is applied even when the theme equals the
-    // default (Breeze Dark), e.g. on a fresh install.
-    if (const Field* themeField = findField("Appearance.GlobalTheme"); themeField != nullptr) {
-      const auto themeValue = effectiveValue(*themeField);
-      std::string error;
-      if (!applyTheme(std::get<std::string>(themeValue), &error)) {
-        m_errorNotice = "Failed to apply the theme: " + error;
-        kLog.warn("kinetic-settings: failed to apply theme: {}", error);
-        return false;
-      }
-    }
-  }
-
-  // Window decorations apply from the same Apply button (kineticwe.kwe).
-  if (hasDecoration && !applyDecoration(*m_pendingDecoration)) {
+  ensureLoaded();
+  // applyDecoration() writes kineticwe.kwe [org.kde.kdecoration2] and asks the
+  // compositor to reconfigure; it sets m_errorNotice on failure.
+  if (!applyDecoration(*m_pendingDecoration)) {
     return false;
   }
-
-  m_pending.clear();
   m_pendingDecoration.reset();
   m_errorNotice.clear();
   return true;
 }
 
-bool AppearancePage::applyTheme(std::string_view theme, std::string* error) {
-  using namespace noctalia::theme;
-  const bool dark = theme == "BreezeDark";
-  const ::Palette seeds = dark ? breezeDarkSeeds() : breezeLightSeeds();
-  const TokenMap tokens = expandFixedPaletteMode(seeds, dark);
-  const std::filesystem::path configHome = realConfigHome();
-  const std::string schemeName = dark ? "BreezeDark" : "BreezeLight";
-
-  // 1. Regenerate the Noctalia color scheme for qt5ct and qt6ct. These files
-  // are always rewritten (pure outputs of the selected theme), so qt5ct/qt6ct
-  // pick up the new colors on the next app launch.
-  const std::string colorScheme = buildQtctColorScheme(tokens);
-  for (const std::string_view tool : {"qt5ct", "qt6ct"}) {
-    const std::filesystem::path colorsPath = configHome / std::string(tool) / "colors" / "noctalia.conf";
-    std::error_code ec;
-    std::filesystem::create_directories(colorsPath.parent_path(), ec);
-    if (ec) {
-      if (error != nullptr) {
-        *error = "failed to create directory for " + colorsPath.string();
-      }
-      return false;
-    }
-    std::ofstream out(colorsPath);
-    if (!out) {
-      if (error != nullptr) {
-        *error = "failed to write " + colorsPath.string();
-      }
-      return false;
-    }
-    out << colorScheme;
-    if (!out) {
-      if (error != nullptr) {
-        *error = "failed to write " + colorsPath.string();
-      }
-      return false;
-    }
-  }
-
-  // 2. Ensure qt5ct/qt6ct configs point at the Noctalia color scheme. Only
-  // written when absent so a user's existing config (fonts, interface tweaks)
-  // is never clobbered.
-  for (const std::string_view tool : {"qt5ct", "qt6ct"}) {
-    const std::filesystem::path cfgPath = configHome / std::string(tool) / (std::string(tool) + ".conf");
-    const std::filesystem::path colorsPath = configHome / std::string(tool) / "colors" / "noctalia.conf";
-    if (!writeFileIfAbsent(cfgPath, buildQtctConfig(colorsPath), error)) {
-      return false;
-    }
-  }
-
-  // 3. Also merge into kdeglobals so KDE Framework apps (Dolphin, Kate,
-  // Konsole, ...) pick up the theme. Kept for widest compatibility; easy to
-  // drop later if it causes issues.
-  const auto csv = [&tokens](std::string_view key, std::string_view fallback) {
-    auto it = tokens.find(std::string(key));
-    const noctalia::theme::Color color =
-        it != tokens.end() ? noctalia::theme::Color::fromArgb(it->second)
-                           : noctalia::theme::Color::fromHex(fallback);
-    return std::to_string(color.r) + ',' + std::to_string(color.g) + ',' + std::to_string(color.b);
-  };
-
-  std::string colors;
-  colors.reserve(4096);
-  colors += "[KDE]\ncontrast=4\n\n";
-  colors += "[General]\nColorScheme=" + schemeName + "\nName=" + schemeName + "\n\n";
-  colors += "[ColorEffects:Disabled]\n";
-  colors += "Color=" + csv("surface_container_lowest", "#000000") + "\n";
-  colors += "ColorAmount=0\nColorEffect=0\nContrastAmount=0.65\nContrastEffect=1\n"
-            "IntensityAmount=0.1\nIntensityEffect=2\n\n";
-  colors += "[ColorEffects:Inactive]\n";
-  colors += "ChangeSelectionColor=true\nColor=" + csv("surface_variant", "#000000") + "\n";
-  colors += "ColorAmount=0.025\nColorEffect=2\nContrastAmount=0.1\nContrastEffect=2\n"
-            "Enable=false\nIntensityAmount=0\nIntensityEffect=0\n\n";
-
-  const auto section = [&](std::string_view name, std::string_view bg, std::string_view bgAlt,
-                           std::string_view focus, std::string_view hover, std::string_view fgActive,
-                           std::string_view fgInactive, std::string_view fgLink, std::string_view fgNegative,
-                           std::string_view fgNeutral, std::string_view fgNormal, std::string_view fgPositive,
-                           std::string_view fgVisited) {
-    std::string out = std::string("[Colors:") + std::string(name) + "]\n";
-    out += "BackgroundAlternate=" + csv(bgAlt, "#000000") + "\n";
-    out += "BackgroundNormal=" + csv(bg, "#000000") + "\n";
-    out += "DecorationFocus=" + csv(focus, "#ffffff") + "\n";
-    out += "DecorationHover=" + csv(hover, "#ffffff") + "\n";
-    out += "ForegroundActive=" + csv(fgActive, "#ffffff") + "\n";
-    out += "ForegroundInactive=" + csv(fgInactive, "#ffffff") + "\n";
-    out += "ForegroundLink=" + csv(fgLink, "#ffffff") + "\n";
-    out += "ForegroundNegative=" + csv(fgNegative, "#ffffff") + "\n";
-    out += "ForegroundNeutral=" + csv(fgNeutral, "#ffffff") + "\n";
-    out += "ForegroundNormal=" + csv(fgNormal, "#ffffff") + "\n";
-    out += "ForegroundPositive=" + csv(fgPositive, "#ffffff") + "\n";
-    out += "ForegroundVisited=" + csv(fgVisited, "#ffffff") + "\n\n";
-    return out;
-  };
-
-  const std::string onSurface = "on_surface";
-  const std::string onSurfaceVariant = "on_surface_variant";
-  const std::string primary = "primary";
-  const std::string secondary = "secondary";
-  const std::string tertiary = "tertiary";
-  const std::string errorToken = "error";
-  const std::string onBackground = "on_background";
-  const std::string onPrimaryContainer = "on_primary_container";
-  const std::string onSecondaryContainer = "on_secondary_container";
-  const std::string primaryContainer = "primary_container";
-  const std::string surface = "surface";
-  const std::string surfaceVariant = "surface_variant";
-  const std::string surfaceContainer = "surface_container";
-  const std::string surfaceContainerLow = "surface_container_low";
-  const std::string surfaceContainerHigh = "surface_container_high";
-  const std::string errorContainer = "error_container";
-  const std::string tertiaryContainer = "tertiary_container";
-
-  colors += section(
-      "Button", surfaceContainerHigh, surfaceContainerLow, primary, primary, primary, onSurfaceVariant, secondary,
-      errorToken, tertiary, onSurface, tertiary, onSecondaryContainer
-  );
-  colors += section(
-      "Complementary", surface, surfaceContainerLow, primary, primary, primary, onSurfaceVariant, secondary, errorToken,
-      tertiary, onPrimaryContainer, tertiary, onSecondaryContainer
-  );
-  colors += section(
-      "Header", surfaceContainer, surface, primary, primary, primary, onSurfaceVariant, secondary, errorToken, tertiary,
-      onSurface, tertiary, onSecondaryContainer
-  );
-  colors += section(
-      "Selection", primary, surfaceContainerLow, primary, primary, onSurface, onSurfaceVariant, secondary,
-      errorContainer, tertiaryContainer, onSurface, tertiaryContainer, onSecondaryContainer
-  );
-  colors += section(
-      "Tooltip", surfaceContainer, surface, primary, primary, primary, onSurfaceVariant, secondary, errorToken, tertiary,
-      onBackground, tertiary, onSecondaryContainer
-  );
-  colors += section(
-      "View", surface, surfaceContainer, onPrimaryContainer, onSurface, primary, onSurfaceVariant, secondary, errorToken,
-      tertiary, onBackground, tertiary, onSecondaryContainer
-  );
-  colors += section(
-      "Window", surfaceContainer, primaryContainer, primary, primary, primary, onSurfaceVariant, secondary, errorToken,
-      tertiary, onBackground, tertiary, onSecondaryContainer
-  );
-
-  colors += "[WM]\n";
-  colors += "activeBackground=" + csv(surfaceContainer, "#000000") + "\n";
-  colors += "activeBlend=" + csv(onPrimaryContainer, "#ffffff") + "\n";
-  colors += "activeForeground=" + csv(onPrimaryContainer, "#ffffff") + "\n";
-  colors += "inactiveBackground=" + csv(surface, "#000000") + "\n";
-  colors += "inactiveBlend=" + csv(onSurfaceVariant, "#ffffff") + "\n";
-  colors += "inactiveForeground=" + csv(onSurfaceVariant, "#ffffff") + "\n";
-
-  const std::filesystem::path schemePath = std::filesystem::temp_directory_path() / "kineticwe-breeze-scheme.colors";
-  {
-    std::ofstream out(schemePath);
-    if (!out) {
-      if (error != nullptr) {
-        *error = "failed to write temporary color scheme";
-      }
-      return false;
-    }
-    out << colors;
-    if (!out) {
-      if (error != nullptr) {
-        *error = "failed to write temporary color scheme";
-      }
-      return false;
-    }
-  }
-
-  const std::filesystem::path kdeGlobals = configHome / "kdeglobals";
-  std::string mergeError;
-  if (!mergeKdeColorScheme(schemePath, kdeGlobals, &mergeError)) {
-    if (error != nullptr) {
-      *error = std::move(mergeError);
-    }
-    return false;
-  }
-
-  // 4. Notify Qt/KDE apps (including qt5ct) to reload their palette live.
-  if (const std::string notifyError = noctalia::theme::notifyKdeColorSchemeChanged(); !notifyError.empty()) {
-    kLog.warn("kinetic-settings: failed to notify Qt apps of theme change: {}", notifyError);
-  }
-
-  // 5. Notify GTK apps to switch light/dark live (gsettings/dconf — the same
-  // mechanism the shell's theme service uses), so GTK apps don't need a
-  // restart either.
-  const std::string gtkPref = dark ? "prefer-dark" : "prefer-light";
-  if (process::commandExists("gsettings")) {
-    (void)process::runAsync("gsettings set org.gnome.desktop.interface color-scheme \"" + gtkPref + "\"");
-  } else if (process::commandExists("dconf")) {
-    (void)process::runAsync("dconf write /org/gnome/desktop/interface/color-scheme \"'" + gtkPref + "'\"");
-  }
-
-  return true;
-}
-
 std::vector<std::string> AppearancePage::resettableKeyPaths() const {
-  std::vector<std::string> paths;
-  paths.reserve(fields().size() + 1);
-  for (const auto& field : fields()) {
-    paths.push_back(keyPath(field));
-  }
-  paths.push_back(decorationKeyPath());
-  return paths;
+  return {decorationKeyPath()};
 }
 
 void AppearancePage::resetKeyPath(std::string_view path) {
-  if (const Field* field = findField(path)) {
-    stage(*field, defaultValue(*field));
-    return;
-  }
   if (path == decorationKeyPath()) {
     stageDecoration(defaultDecoration());
   }
 }
 
 void AppearancePage::resetAll() {
-  for (const auto& field : fields()) {
-    stage(field, defaultValue(field));
-  }
   stageDecoration(defaultDecoration());
 }
 
 // ---------------------------------------------------------------------------
-// Window Decorations (inline section). Stored in the compositor's
-// kineticwe.kwe [org.kde.kdecoration2]; Breeze is the compiled-in default.
+// Title bars: the window decoration selection (inline section on this page).
+// Stored in the compositor's kineticwe.kwe [org.kde.kdecoration2]; Breeze is the
+// compiled-in default.
 // ---------------------------------------------------------------------------
 
 AppearancePage::DecorationSelection AppearancePage::defaultDecoration() {
@@ -798,52 +237,112 @@ namespace {
     });
   }
 
-  // A drawn window mock used when a decoration ships no preview image. The
-  // compiled-in Breeze decoration has no artwork on disk (only the
-  // org.kde.breeze plugin), so there is nothing to render; drawing a titlebar
+  // How a drawn window mock renders its titlebar. Mirrors the theme's own
+  // Aurorae rc ([General] TitleAlignment / LeftButtons / RightButtons and
+  // [Layout] TitleHeight + title edges). The compiled-in Breeze decoration has
+  // no rc, so its tile keeps the historical mock layout (title on the left,
+  // placeholder buttons on the right).
+  struct TitlebarStyle {
+    std::string leftButtons;  // KDE button letters, e.g. "XIA"
+    std::string rightButtons; // ... e.g. "IAX"
+    bool centeredTitle = false;
+    float titlebarHeight = 24.0F;
+    std::string buttonArtPath; // theme dir for real button SVGs; empty = placeholders
+  };
+
+  // One titlebar button: the theme's own artwork when it ships any (Layan ships
+  // close/minimize/maximize SVGs), otherwise a neutral palette-tinted dot. "_"
+  // is Aurorae's explicit spacer and draws nothing.
+  void addTitlebarButton(Flex& row, Renderer& renderer, char letter, const TitlebarStyle& style, float scale) {
+    // Placeholder dots keep the historical Breeze mock size; real theme artwork
+    // (Layan's buttons are 22px canvases holding 16px glyphs) needs a bit more
+    // room to stay legible.
+    constexpr float kPlaceholderSize = 9.0F;
+    constexpr float kArtworkSize = 12.0F;
+    if (letter == '_') {
+      const float spacer = kPlaceholderSize * scale;
+      row.addChild(ui::row({.width = spacer, .height = spacer}));
+      return;
+    }
+    if (const std::string art = theme_discovery::decorationButtonFile(style.buttonArtPath, letter); !art.empty()) {
+      const float size = kArtworkSize * scale;
+      auto img = ui::image({
+          .fit = ImageFit::Contain,
+          .width = size,
+          .height = size,
+      });
+      img->setSourceFile(renderer, art, static_cast<int>(size * 2), true);
+      row.addChild(std::move(img));
+      return;
+    }
+    const bool close = letter == 'X';
+    const float size = kPlaceholderSize * scale;
+    row.addChild(ui::row({
+        .fill = colorSpecFromRole(close ? ColorRole::Error : ColorRole::OnSurfaceVariant, close ? 0.85F : 0.55F),
+        .radius = size / 2.0F,
+        .width = size,
+        .height = size,
+    }));
+  }
+
+  [[nodiscard]] std::unique_ptr<Flex> titlebarButtonRow(
+      Renderer& renderer, std::string_view letters, const TitlebarStyle& style, float scale, FlexJustify justify,
+      float grow
+  ) {
+    auto row =
+        ui::row({.align = FlexAlign::Center, .justify = justify, .gap = Style::spaceXs * scale, .flexGrow = grow});
+    for (const char letter : letters) {
+      addTitlebarButton(*row, renderer, letter, style, scale);
+    }
+    return row;
+  }
+
+  // A drawn window mock used when a decoration ships no preview image: the
+  // compiled-in Breeze decoration has no artwork on disk, and an Aurorae theme's
+  // decoration.svg is the nine-slice atlas (not a preview). Drawing a titlebar
   // and content area keeps the tile reading as a window thumbnail instead of a
   // generic glyph. Palette roles make it track the active scheme, the way KDE
   // renders its live decoration previews with the current colors.
-  [[nodiscard]] std::unique_ptr<Flex> buildDecorationMockPreview(float scale) {
-    constexpr float kTitlebarHeight = 24.0F;
-    constexpr float kButtonSize = 9.0F;
+  [[nodiscard]] std::unique_ptr<Flex>
+  buildDecorationMockPreview(float scale, Renderer& renderer, const TitlebarStyle& style) {
     constexpr float kContentBarHeight = 6.0F;
+    constexpr float kTitlebarMinHeight = 18.0F;
+    constexpr float kTitlebarMaxHeight = 34.0F;
+    const float titlebarHeight = std::clamp(style.titlebarHeight, kTitlebarMinHeight, kTitlebarMaxHeight) * scale;
 
-    auto buttons = ui::row({.align = FlexAlign::Center, .gap = Style::spaceXs * scale});
-    const ColorSpec buttonFills[] = {
-        colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.55F),
-        colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.55F),
-        colorSpecFromRole(ColorRole::Error, 0.85F),
-    };
-    for (const ColorSpec& fill : buttonFills) {
-      buttons->addChild(ui::row({
-          .fill = fill,
-          .radius = (kButtonSize * scale) / 2.0F,
-          .width = kButtonSize * scale,
-          .height = kButtonSize * scale,
-      }));
+    auto titlebar = ui::row({
+        .align = FlexAlign::Center,
+        .justify = FlexJustify::SpaceBetween,
+        .paddingH = Style::spaceSm * scale,
+        .fill = colorSpecFromRole(ColorRole::SurfaceVariant),
+        // Matches the outer radius so the titlebar corners align with the
+        // window frame (Flex clipping is rectangular, not rounded).
+        .radius = Style::scaledRadiusMd(scale),
+        .width = kDecorationPreviewWidth * scale,
+        .height = titlebarHeight,
+    });
+
+    auto title = ui::row({
+        .fill = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.5F),
+        .radius = (5.0F * scale) / 2.0F,
+        .width = 46.0F * scale,
+        .height = 5.0F * scale,
+    });
+
+    if (style.centeredTitle) {
+      // Equal-growing side columns keep the title centered whatever the button
+      // counts are, like the real centered Aurorae titlebar.
+      titlebar->addChild(titlebarButtonRow(renderer, style.leftButtons, style, scale, FlexJustify::Start, 1.0F));
+      titlebar->addChild(std::move(title));
+      titlebar->addChild(titlebarButtonRow(renderer, style.rightButtons, style, scale, FlexJustify::End, 1.0F));
+    } else {
+      if (!style.leftButtons.empty()) {
+        titlebar->addChild(titlebarButtonRow(renderer, style.leftButtons, style, scale, FlexJustify::Start, 0.0F));
+      }
+      titlebar->addChild(std::move(title));
+      titlebar->addChild(ui::row({.flexGrow = 1.0F}));
+      titlebar->addChild(titlebarButtonRow(renderer, style.rightButtons, style, scale, FlexJustify::End, 0.0F));
     }
-
-    auto titlebar = ui::row(
-        {
-            .align = FlexAlign::Center,
-            .justify = FlexJustify::SpaceBetween,
-            .paddingH = Style::spaceSm * scale,
-            .fill = colorSpecFromRole(ColorRole::SurfaceVariant),
-            // Matches the outer radius so the titlebar corners align with the
-            // window frame (Flex clipping is rectangular, not rounded).
-            .radius = Style::scaledRadiusMd(scale),
-            .width = kDecorationPreviewWidth * scale,
-            .height = kTitlebarHeight * scale,
-        },
-        ui::row({
-            .fill = colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.5F),
-            .radius = (5.0F * scale) / 2.0F,
-            .width = 46.0F * scale,
-            .height = 5.0F * scale,
-        }),
-        std::move(buttons)
-    );
 
     auto content = ui::column(
         {
@@ -886,11 +385,12 @@ namespace {
     );
   }
 
-  // One window-decoration tile: preview (bundled image or decoration.svg) + a
-  // name label, with the shared selected/hover styling of the Icons page.
+  // One window-decoration tile: preview (bundled preview image or a drawn
+  // window mock) + a name label, with the shared selected/hover styling of the
+  // Icons page.
   [[nodiscard]] std::unique_ptr<Node> buildDecorationTile(
-      float scale, Renderer& renderer, const std::string& displayName, const std::string& themePath, bool selected,
-      std::function<void()> onClick
+      float scale, Renderer& renderer, const std::string& displayName, const std::string& themePath,
+      const TitlebarStyle& titlebarStyle, bool selected, std::function<void()> onClick
   ) {
     const float tileW = kDecorationTileWidth * scale;
     const float tileH = kDecorationTileHeight * scale;
@@ -922,7 +422,7 @@ namespace {
       img->setSourceFile(renderer, previewPath, static_cast<int>(previewW * 2), true);
       card->addChild(std::move(img));
     } else {
-      card->addChild(buildDecorationMockPreview(scale));
+      card->addChild(buildDecorationMockPreview(scale, renderer, titlebarStyle));
     }
 
     card->addChild(ui::label({
@@ -957,79 +457,6 @@ namespace {
 
 } // namespace
 
-std::unique_ptr<Node>
-AppearancePage::buildControl(const Field& field, float scale, const Callbacks& callbacks) {
-  const auto& values = *field.optionValues;
-  const auto& labels = *field.optionLabels;
-  const auto selected = std::ranges::find(values, std::get<std::string>(effectiveValue(field)));
-  const bool known = selected != values.end();
-  const std::optional<std::size_t> selectedIndex =
-      known ? std::optional<std::size_t>{static_cast<std::size_t>(selected - values.begin())} : std::nullopt;
-  return ui::select({
-      .options = labels,
-      .selectedIndex = selectedIndex,
-      .clearSelection = !known,
-      .placeholder = known ? std::optional<std::string>{std::nullopt}
-                           : std::optional<std::string>{"Unknown value: "
-                                                        + std::get<std::string>(effectiveValue(field))},
-      .fontSize = Style::fontSizeBody * scale,
-      .controlHeight = Style::controlHeight * scale,
-      .glyphSize = Style::fontSizeBody * scale,
-      .width = kDefaultControlWidth * scale,
-      .height = Style::controlHeight * scale,
-      .onSelectionChanged = [this, field, callbacks, values](std::size_t index, std::string_view /*label*/) {
-        if (index < values.size()) {
-          kLog.info("appearance dropdown: selected index={} value={}", index, values[index]);
-          stageAndRebuild(field, Value{values[index]}, callbacks);
-        } else {
-          kLog.warn("appearance dropdown: out-of-range index={}", index);
-        }
-      },
-  });
-}
-
-void AppearancePage::addSettingRow(
-    Flex& parent, const Field& field, float scale, std::string_view armedResetKey, const Callbacks& callbacks
-) {
-  const std::string path = keyPath(field);
-  const bool isOverridden = overridden(field);
-
-  auto titleRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
-  titleRow->addChild(makeLabel(
-      field.title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
-  ));
-  titleRow->addChild(ui::spacer());
-
-  auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
-  copy->addChild(std::move(titleRow));
-  if (!field.subtitle.empty()) {
-    copy->addChild(ui::label({
-        .text = std::string(field.subtitle),
-        .fontSize = Style::fontSizeCaption * scale,
-        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        .maxLines = kSettingDescriptionMaxLines,
-    }));
-  }
-
-  auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-  if (isOverridden) {
-    actions->addChild(makeOverrideBadge(scale));
-    actions->addChild(makeResetButton(path, armedResetKey == path, scale, callbacks));
-  }
-  actions->addChild(buildControl(field, scale, callbacks));
-
-  auto row = ui::row(
-      {.align = FlexAlign::Center,
-       .justify = FlexJustify::SpaceBetween,
-       .gap = Style::spaceXs * scale,
-       .paddingV = 2.0F * scale,
-       .fillWidth = true}
-  );
-  row->addChild(std::move(copy));
-  row->addChild(std::move(actions));
-  parent.addChild(std::move(row));
-}
-
 std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     float scale, Renderer& renderer, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
 ) {
@@ -1037,25 +464,49 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     std::string displayName;
     std::string path;
     DecorationSelection selection;
+    TitlebarStyle titlebarStyle;
   };
 
   // Breeze is the compiled-in default; every discovered Aurorae theme is
   // applied through the org.kde.kwin.aurorae.v2 plugin with the
-  // __aurorae__svg__<Name> theme id.
+  // __aurorae__svg__<Name> theme id. Only the labels are KineticWE's names for
+  // the vendored styles (Breeze -> "Dynamic", Layan -> "Neutral", Layan-solid
+  // -> "Solid"); the stored (library, theme) pair, and every other discovered
+  // theme's own Name=, are unchanged.
   std::vector<Tile> tiles;
-  tiles.push_back(Tile{.displayName = "Breeze", .path = {}, .selection = defaultDecoration()});
+  // The compiled-in Breeze decoration ships no artwork, so its tile keeps the
+  // historical mock layout: title on the left, minimize/maximize/close
+  // placeholder dots on the right.
+  tiles.push_back(Tile{
+      .displayName = "Dynamic",
+      .path = {},
+      .selection = defaultDecoration(),
+      .titlebarStyle = TitlebarStyle{.rightButtons = "IAX"},
+  });
   for (const auto& theme : theme_discovery::decorationThemes()) {
+    const std::string displayName = titlebarDisplayName(theme.name, theme.displayName);
+    // An Aurorae theme previews as a drawn window whose titlebar mirrors the
+    // theme's own rc (title alignment, button sides, titlebar height) and, when
+    // the theme ships button artwork, its real button SVGs.
     tiles.push_back(Tile{
-        .displayName = theme.displayName,
+        .displayName = displayName,
         .path = theme.path,
         .selection =
             DecorationSelection{.library = "org.kde.kwin.aurorae.v2", .theme = "__aurorae__svg__" + theme.name},
+        .titlebarStyle =
+            TitlebarStyle{
+                .leftButtons = theme.leftButtons,
+                .rightButtons = theme.rightButtons,
+                .centeredTitle = theme.titleAlignment == "center",
+                .titlebarHeight = static_cast<float>(theme.titlebarHeight),
+                .buttonArtPath = theme.path,
+            },
     });
   }
 
   const bool searchActive = !filter.searchQuery.empty();
   const bool sectionTitleMatches =
-      searchActive && StringUtils::containsInsensitive("Window Decorations", filter.searchQuery);
+      searchActive && StringUtils::containsInsensitive("Title bars", filter.searchQuery);
   const DecorationSelection current = effectiveDecoration();
 
   std::vector<const Tile*> visible;
@@ -1076,21 +527,8 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
 
   auto section = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale, .fillWidth = true});
 
-  // Action row: store link + folder button, then the override/reset controls.
+  // Action row: folder button, then the override/reset controls.
   auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
-  header->addChild(ui::button({
-      .text = "Get New…",
-      .glyph = "external-link",
-      .fontSize = Style::fontSizeCaption * scale,
-      .glyphSize = Style::fontSizeBody * scale,
-      .variant = ButtonVariant::Ghost,
-      .tooltip = "Browse window decorations on store.kde.org",
-      .minHeight = Style::controlHeightSm * scale,
-      .paddingV = Style::spaceXs * scale,
-      .paddingH = Style::spaceSm * scale,
-      .radius = Style::scaledRadiusMd(scale),
-      .onClick = []() { (void)net::openInBrowser(std::string(kDecorationStoreUrl)); },
-  }));
   header->addChild(ui::button({
       .glyph = "folder-open",
       .glyphSize = Style::fontSizeBody * scale,
@@ -1117,7 +555,7 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
   for (const Tile* tile : visible) {
     const bool selected = tile->selection == current;
     grid->addChild(buildDecorationTile(
-        scale, renderer, tile->displayName, tile->path, selected,
+        scale, renderer, tile->displayName, tile->path, tile->titlebarStyle, selected,
         [this, selection = tile->selection, callbacks]() { stageDecorationAndRebuild(selection, callbacks); }
     ));
   }
@@ -1138,16 +576,6 @@ std::unique_ptr<Node> AppearancePage::build(
       .fillWidth = true,
   });
 
-  root->addChild(ui::row(
-      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-      ui::glyph({
-          .glyph = "palette",
-          .glyphSize = Style::fontSizeHeader * scale,
-          .color = colorSpecFromRole(ColorRole::Primary),
-      }),
-      makeLabel("Global Theme", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
-  ));
-
   if (!m_errorNotice.empty()) {
     root->addChild(ui::row(
         {.align = FlexAlign::Center,
@@ -1161,45 +589,14 @@ std::unique_ptr<Node> AppearancePage::build(
   }
 
   bool anyRows = false;
-  bool firstGroup = true;
-  std::string_view lastGroup;
-  const auto addGroupHeader = [&](std::string_view title) {
-    if (title.empty()) {
-      return;
-    }
-    if (!firstGroup) {
-      root->addChild(ui::column(
-          {.align = FlexAlign::Stretch,
-           .gap = Style::spaceSm * scale,
-           .configure = [scale](Flex& flex) { flex.setPadding(Style::spaceSm * scale, 0.0F, 0.0F, 0.0F); }},
-          ui::separator(),
-          makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold)
-      ));
-    } else {
-      root->addChild(
-          makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold)
-      );
-    }
-    firstGroup = false;
-  };
 
-  for (const auto& field : fields()) {
-    if (!matchesFilter(field, filter)) {
-      continue;
-    }
-    if (field.pageGroup != lastGroup) {
-      lastGroup = field.pageGroup;
-      addGroupHeader(lastGroup);
-    }
-    addSettingRow(*root, field, scale, armedResetKey, callbacks);
-    anyRows = true;
-  }
-
-  // Window Decorations live inline on this page, under the Global Theme
-  // selector, using the same tile grid as the Icons page.
+  // The titlebar picker is this page's only section, using the same tile grid
+  // as the Icons page.
   if (auto decorations = buildDecorationsSection(scale, renderer, filter, armedResetKey, callbacks);
       decorations != nullptr) {
-    addGroupHeader("Window Decorations");
+    root->addChild(
+        makeLabel("Title bars", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold)
+    );
     root->addChild(std::move(decorations));
     anyRows = true;
   }

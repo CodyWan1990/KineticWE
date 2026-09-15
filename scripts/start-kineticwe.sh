@@ -165,19 +165,12 @@ if [[ ! -e "$KWE_CONFIG_HOME/kineticwe.kwe" ]]; then
     done
 fi
 
-# Seed the portable Appearance settings (Global Theme) so a fresh install
-# defaults to Breeze Dark. This file is read/written by Kinetic Settings ->
-# Appearance and travels with the rest of ~/.config/kineticwe when copied to a
-# new machine.
-if [[ ! -e "$KWE_CONFIG_HOME/appearance.kwe" ]]; then
-    printf '[Appearance]\nGlobalTheme=BreezeDark\n' > "$KWE_CONFIG_HOME/appearance.kwe"
-fi
-
 # Seed minimal qt5ct/qt6ct configs pointing at the Noctalia color scheme, so Qt
 # apps (which load these via QT_QPA_PLATFORMTHEME=qt5ct) are themed out of the
 # box. Only created when absent so a user's existing config (fonts, interface
 # tweaks) is never clobbered. The color scheme files themselves are regenerated
-# by Kinetic Settings -> Appearance on Apply.
+# by the shell's theme templates whenever the palette changes (the Qt
+# color-scheme template).
 for _qttool in qt5ct qt6ct; do
     _qtconf="${HOME}/.config/${_qttool}/${_qttool}.conf"
     if [[ ! -e "$_qtconf" ]]; then
@@ -631,9 +624,9 @@ fi
 #     The compositor config keys ([Mouse] cursorTheme/cursorSize) are the ones
 #     KWin and the launch-time cursor actually read; kdeglobals carries the
 #     shared Qt/KDE settings (icon theme, cursor, default terminal);
-#     appearance.kwe is the portable mirror the Kinetic Settings Appearance
-#     page drives; and the custom-command definition + chord are what the shell
-#     registers/replays at start so Meta+T fires Alacritty.
+#     appearance.kwe is the portable mirror the Kinetic Settings Icons and
+#     Cursors pages drive; and the custom-command definition + chord are what
+#     the shell registers/replays at start so Meta+T fires Alacritty.
 # ---------------------------------------------------------------------------
 # Only seed the default Meta+T -> Alacritty shortcut on the first run (when the
 # user has no custom keybinds yet). Once custom-keybinds.kwe exists the user has
