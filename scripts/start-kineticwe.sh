@@ -77,20 +77,47 @@ mkdir -p "$KWE_CONFIG_HOME"
 # 1. Locate KineticWE binaries / libraries / plugins / data
 # ---------------------------------------------------------------------------
 export PATH="$INSTALL_PREFIX/bin:$PATH"
-export LD_LIBRARY_PATH="$INSTALL_PREFIX/lib64:$INSTALL_PREFIX/lib/x86_64-linux-gnu"
-export QT_PLUGIN_PATH="$INSTALL_PREFIX/lib64/qt6/plugins:$INSTALL_PREFIX/lib64/plugins"
+
+# --- Prefix library/plugin/QML dirs. The libdir name depends on the distro
+# --- and prefix: Fedora RPM installs to /usr with lib64, while an Arch
+# --- $HOME/.local dev prefix gets plain lib. Reference only the dirs that
+# --- actually exist, lib64 first, so both layouts work and a fresh build is
+# --- still preferred over any stale copy.
+_KWE_LIBDIRS=()
+for _d in "$INSTALL_PREFIX/lib64" "$INSTALL_PREFIX/lib" "$INSTALL_PREFIX/lib/x86_64-linux-gnu"; do
+    [[ -d "$_d" ]] && _KWE_LIBDIRS+=("$_d")
+done
+export LD_LIBRARY_PATH="$(IFS=:; echo "${_KWE_LIBDIRS[*]}")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+# Qt plugin roots. KWin discovers its plugins (including the screencast plugin
+# that exports zkde_screencast_unstable_v1 -- required for portal screen
+# sharing) through KPluginMetaData::findPlugins("kwin/plugins"), which searches
+# QT_PLUGIN_PATH. Both the Qt6 plugin dir and the KDE plugin dir must be
+# present or the screencast global is never advertised and screen sharing
+# fails with "zkde_screencast_unstable_v1 does not seem to be available".
+_qt_plugin_paths=()
+for _d in "${_KWE_LIBDIRS[@]}"; do
+    _qt_plugin_paths+=("$_d/qt6/plugins" "$_d/plugins")
+done
+export QT_PLUGIN_PATH="$(IFS=:; echo "${_qt_plugin_paths[*]}")"
+
 # QML import roots. ECM installs KWin's private QML modules
 # (org.kde.kwin.private.effects -- WindowHeap/WindowHeapDelegate, imported by
 # Overview/Grid View -- and org.kde.kwin.private.kdecoration) under
-# KDE_INSTALL_QMLDIR = lib64/qml, while the rest of the KDE/Qt QML stack lives
-# under lib64/qt6/qml. Both roots must be on the import path or the private
-# effects module fails to resolve and Overview/Grid View come up blank on a
-# fresh install. The KDE root comes first so a fresh build wins over any stale
-# copy left under qt6/qml by an older install. QML_IMPORT_PATH is the Qt 6
+# KDE_INSTALL_QMLDIR = <libdir>/qml, while the rest of the KDE/Qt QML stack
+# lives under <libdir>/qt6/qml. Both roots must be on the import path or the
+# private effects module fails to resolve and Overview/Grid View come up blank
+# on a fresh install. The KDE root comes first so a fresh build wins over any
+# stale copy left under qt6/qml by an older install. QML_IMPORT_PATH is the Qt 6
 # name; QML2_IMPORT_PATH is the legacy name the session already exported (Qt 6
 # still honors it) -- keep both in sync.
-export QML_IMPORT_PATH="$INSTALL_PREFIX/lib64/qml:$INSTALL_PREFIX/lib64/qt6/qml"
+_qml_import_paths=()
+for _d in "${_KWE_LIBDIRS[@]}"; do
+    _qml_import_paths+=("$_d/qml" "$_d/qt6/qml")
+done
+export QML_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")"
 export QML2_IMPORT_PATH="$QML_IMPORT_PATH"
+unset _qt_plugin_paths _qml_import_paths _KWE_LIBDIRS _d
 export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 # Traditional-WM Qt theming (Hyprland/Niri style): tell Qt apps to load the
 # qt5ct platform theme plugin, which reads ~/.config/qt5ct/qt5ct.conf and

@@ -118,8 +118,7 @@ GREETER_DEPS=(
 # Default session packages: icon themes, cursor, Qt tools, Xwayland, terminal
 SESSION_PKGS=(
     breeze-icons
-    plasma-breeze-common
-    plasma-breeze
+    breeze
     aurorae
     qt5ct
     qt6ct
@@ -127,12 +126,16 @@ SESSION_PKGS=(
     alacritty
 )
 
-# QML runtime modules the portal backend loads
+# QML runtime modules the portal backend loads. `kpipewire` provides the
+# org.kde.pipewire QML module imported by the screen-cast chooser dialog
+# (PipeWireDelegate.qml); without it the source picker fails to load and
+# Discord/OBS screen sharing breaks. `pipewire` is the daemon/client runtime.
 PORTAL_QML_PKGS=(
     kirigami
     kitemmodels
     ki18n
     pipewire
+    kpipewire
     kiconthemes
     kcmutils
     kdeclarative
@@ -167,6 +170,22 @@ EFFECT_QML_MODULES=(
     org/kde/kitemmodels
 )
 
+# QML modules the xdg-desktop-portal-kwe backend imports at runtime (screen
+# chooser, file dialog, ...). These are the *module URIs*, which do not always
+# match the Arch package name: the `kiconthemes` package ships org.kde.iconthemes
+# and `kdeclarative` ships org.kde.kquickcontrols. Also invisible to ldd; a
+# missing one only shows up when the dialog is opened, so verify by path too.
+# org.kde.xdgdesktopportal is built and installed from this repo with the portal.
+PORTAL_QML_MODULES=(
+    org/kde/pipewire
+    org/kde/kirigami
+    org/kde/kitemmodels
+    org/kde/ki18n
+    org/kde/iconthemes
+    org/kde/kcmutils
+    org/kde/kquickcontrols
+)
+
 # PipeWire media stack (screen capture + audio). The compositor's screencast
 # plugin and the portal backend need a live PipeWire daemon and a session
 # manager (wireplumber) to create and route the capture node. pipewire itself
@@ -174,6 +193,7 @@ EFFECT_QML_MODULES=(
 # pipewire-pulse (audio) were only build-time deps, so add them at runtime so a
 # fresh "from nothing" install screenshares out of the box.
 MEDIA_RUNTIME_PKGS=(
+    pipewire
     wireplumber
     pipewire-pulse
 )
@@ -577,16 +597,27 @@ qml_module_package() {
         org/kde/ksvg)                echo ksvg ;;
         org/kde/kcmutils)            echo kcmutils ;;
         org/kde/kitemmodels)         echo kitemmodels ;;
+        org/kde/pipewire)            echo kpipewire ;;
+        org/kde/ki18n)               echo ki18n ;;
+        org/kde/iconthemes)          echo kiconthemes ;;
+        org/kde/kquickcontrols)      echo kdeclarative ;;
         *)                           echo "$1" ;;
     esac
 }
 
 # QML import roots searched on the host (dev prefix first, then the system Qt).
+# ECM installs KWin's private modules under <libdir>/qml while the Qt/KDE stack
+# lives under <libdir>/qt6/qml; the libdir is lib64 on some prefixes and lib on
+# others, so cover both for each layout.
 qml_import_roots() {
     local -a roots=(
+        "${TEST_PREFIX}/lib64/qml"
         "${TEST_PREFIX}/lib64/qt6/qml"
+        "${TEST_PREFIX}/lib/qml"
         "${TEST_PREFIX}/lib/qt6/qml"
+        /usr/lib64/qml
         /usr/lib64/qt6/qml
+        /usr/lib/qml
         /usr/lib/qt6/qml
     )
     local root
@@ -595,21 +626,22 @@ qml_import_roots() {
     done
 }
 
-# Hard gate: every QML module the compositor's built-in effects import must be
-# present. A missing module never fails ldd; it only shows up at runtime as a
-# blank Overview/Grid View, so check it explicitly and fail loudly.
+# Hard gate: every QML module the compositor's built-in effects and the portal
+# backend import must be present. A missing module never fails ldd; it only
+# shows up at runtime as a blank Overview/Grid View (effects) or a screen
+# chooser that fails to open (portal), so check explicitly and fail loudly.
 verify_qml_modules() {
     local -a roots=()
     mapfile -t roots < <(qml_import_roots)
     if [[ ${#roots[@]} -eq 0 ]]; then
-        warn "No Qt QML import roots found; cannot verify effect QML modules."
+        warn "No Qt QML import roots found; cannot verify effect/portal QML modules."
         return 0
     fi
 
     local -a missing_modules=()
     local -a missing_pkgs=()
     local module root found pkg
-    for module in "${EFFECT_QML_MODULES[@]}"; do
+    for module in "${EFFECT_QML_MODULES[@]}" "${PORTAL_QML_MODULES[@]}"; do
         found=false
         for root in "${roots[@]}"; do
             if [[ -e "$root/$module/qmldir" || -e "$root/$module" ]]; then
@@ -628,7 +660,7 @@ verify_qml_modules() {
         return 0
     fi
 
-    error "Missing QML modules required by Overview/Grid View (and other effects):"
+    error "Missing QML modules required by the compositor effects and/or portal:"
     local i
     for i in "${!missing_modules[@]}"; do
         error "    ${missing_modules[$i]} (${missing_pkgs[$i]})"
