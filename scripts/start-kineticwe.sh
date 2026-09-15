@@ -206,7 +206,7 @@ for _qttool in qt5ct qt6ct; do
 [Appearance]
 color_scheme_path=${HOME}/.config/${_qttool}/colors/noctalia.conf
 custom_palette=true
-icon_theme=Papirus
+icon_theme=breeze
 standard_dialogs=xdgdesktopportal
 style=Breeze
 EOF
@@ -805,6 +805,137 @@ fi
 if [[ -e "$KWE_REAL_CONFIG_HOME/kdeglobals" && ! -e "$KWE_CONFIG_HOME/kdeglobals" && ! -L "$KWE_CONFIG_HOME/kdeglobals" ]]; then
     ln -s "$KWE_REAL_CONFIG_HOME/kdeglobals" "$KWE_CONFIG_HOME/kdeglobals"
 fi
+
+
+# ---------------------------------------------------------------------------
+# 4h. Keep the qt5ct/qt6ct tool configs in step with the session's icon theme.
+#     Those configs are seeded once (first run only), so a user who picks
+#     another icon theme in Kinetic Settings -> Icons would still get the seeded
+#     one in non-KDE Qt apps: they read the platform-theme config, not
+#     kdeglobals. Patch the two keys that must follow the session:
+#       * [Appearance] icon_theme       <- appearance.kwe [Appearance] IconTheme
+#                                          (fallback: kdeglobals [Icons] Theme=)
+#       * [Appearance] standard_dialogs <- xdgdesktopportal, but only where the
+#                                          legacy gtk3/gtk2 value is still set
+#                                          (the session ships its own portal)
+#     Only existing configs are touched, only those keys change, and the write
+#     is atomic and skipped when nothing differs.
+# ---------------------------------------------------------------------------
+python3 - "$KWE_CONFIG_HOME/appearance.kwe" "$KWE_REAL_CONFIG_HOME/kdeglobals" \
+    "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt6ct/qt6ct.conf" <<'PY' || \
+    echo "kineticwe: qt5ct/qt6ct appearance sync failed (continuing)" >&2
+import os
+import stat
+import sys
+import tempfile
+
+APPEARANCE = "Appearance"
+LEGACY_DIALOGS = ("gtk3", "gtk2")
+
+
+def read_key(path, section, key):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return ""
+    current = None
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1]
+            continue
+        if current != section or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        if name.strip() == key:
+            return value.strip()
+    return ""
+
+
+def patch(path, updates, replace_only=None):
+    """Set `updates` in the file's [Appearance] section.
+
+    Keys listed in `replace_only` are only rewritten while they still hold one
+    of the listed (legacy) values, so a deliberate user choice survives.
+    """
+    if not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+
+    out = []
+    changed = False
+    seen = set()
+    in_section = False
+
+    def flush_missing():
+        nonlocal changed
+        # Keep the section's trailing blank lines where they are
+        trailing = []
+        while out and out[-1].strip() == "":
+            trailing.append(out.pop())
+        for name, value in updates.items():
+            if name not in seen:
+                out.append(f"{name}={value}")
+                seen.add(name)
+                changed = True
+        out.extend(reversed(trailing))
+
+    for raw in lines:
+        stripped = raw.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if in_section:
+                flush_missing()
+            in_section = stripped[1:-1] == APPEARANCE
+            out.append(raw)
+            continue
+        if in_section and "=" in stripped and not stripped.startswith(("#", ";")):
+            name, value = stripped.split("=", 1)
+            name, value = name.strip(), value.strip()
+            if name in updates:
+                seen.add(name)
+                allowed = (replace_only or {}).get(name)
+                if (allowed is None or value in allowed) and value != updates[name]:
+                    out.append(f"{name}={updates[name]}")
+                    changed = True
+                    continue
+        out.append(raw)
+    if in_section:
+        flush_missing()
+    if not changed:
+        return
+
+    parent = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=parent, prefix="." + os.path.basename(path) + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(out) + "\n")
+        os.chmod(tmp, stat.S_IMODE(os.stat(path).st_mode))
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def main():
+    appearance, kdeglobals = sys.argv[1], sys.argv[2]
+    icon_theme = read_key(appearance, APPEARANCE, "IconTheme") or read_key(kdeglobals, "Icons", "Theme")
+    updates = {"standard_dialogs": "xdgdesktopportal"}
+    if icon_theme:
+        updates["icon_theme"] = icon_theme
+    for path in sys.argv[3:]:
+        patch(path, updates, replace_only={"standard_dialogs": LEGACY_DIALOGS})
+
+
+if __name__ == "__main__":
+    main()
+PY
 
 
 # ---------------------------------------------------------------------------

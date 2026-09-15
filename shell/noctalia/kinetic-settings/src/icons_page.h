@@ -53,7 +53,8 @@ public:
 
   [[nodiscard]] bool hasPending() const noexcept { return !m_pending.empty(); }
   // Writes every staged edit to appearance.kwe and, when a theme was selected,
-  // applies it to kdeglobals + gsettings + KGlobalSettings notification.
+  // applies it to kdeglobals + the qt5ct/qt6ct icon_theme + gsettings +
+  // KGlobalSettings notification.
   bool applyAll();
 
   void reloadFromDisk() noexcept {

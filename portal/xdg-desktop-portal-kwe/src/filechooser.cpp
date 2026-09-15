@@ -421,7 +421,11 @@ void FileChooserPortal::OpenFile(const QDBusObjectPath &handle,
         auto dirDialog = new QFileDialog;
         dirDialog->setWindowTitle(title);
         dirDialog->setFileMode(QFileDialog::Directory);
-        dirDialog->setOptions(QFileDialog::ShowDirsOnly);
+        // Never use a native dialog here: on sessions that route QFileDialog through
+        // xdg-desktop-portal (e.g. qt6ct's standard_dialogs=xdgdesktopportal), the native
+        // dialog would call org.freedesktop.portal.FileChooser back into this very process,
+        // recursing forever and leaking a window plus a wl_shm buffer per iteration.
+        dirDialog->setOptions(QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
         if (!isKIOFuseAvailable()) {
             dirDialog->setSupportedSchemes(QStringList{QStringLiteral("file")});
         }
