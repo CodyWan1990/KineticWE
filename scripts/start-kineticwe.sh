@@ -207,7 +207,7 @@ for _qttool in qt5ct qt6ct; do
 color_scheme_path=${HOME}/.config/${_qttool}/colors/noctalia.conf
 custom_palette=true
 icon_theme=Papirus
-standard_dialogs=gtk3
+standard_dialogs=xdgdesktopportal
 style=Breeze
 EOF
     fi

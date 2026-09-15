@@ -1542,7 +1542,9 @@ struct ThemeConfig {
   };
 
   PaletteSource source = PaletteSource::Builtin;
-  std::string builtinPalette = "Noctalia";
+  // KineticWE defaults to the Origami palette (RakuOS's "Origami Paper" window
+  // scheme) instead of upstream's Noctalia palette; see builtin_palettes.cpp.
+  std::string builtinPalette = "Origami";
   std::string communityPalette = "Oxocarbon";
   std::string customPalette;
   std::string wallpaperScheme = "m3-content";

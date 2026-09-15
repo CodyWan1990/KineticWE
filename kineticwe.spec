@@ -188,6 +188,11 @@ Requires:       plasma-milou
 # our own kdecoration; do not require the distro package.
 # Requires:     aurorae
 Requires:       plasma-breeze
+# plasma-breeze does not pull in plasma-breeze-common, which provides
+# /usr/share/color-schemes/BreezeDark.colors — the scheme start-kineticwe.sh
+# seeds into kdeglobals as the pre-theme-service default. Without it the seed
+# silently no-ops and apps fall back to KColorScheme's built-in light default.
+Requires:       plasma-breeze-common
 Requires:       breeze-icons
 Requires:       qaccessibilityclient-qt6
 Requires:       xorg-x11-server-Xwayland
