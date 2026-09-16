@@ -1066,7 +1066,14 @@ systemctl --user start pipewire.socket pipewire.service wireplumber.service \
 #     XDG_CURRENT_DESKTOP=KineticWE against kineticwe-portals.conf
 #     ([preferred] default=kwe), which resolves to the xdg-desktop-portal-kwe
 #     backend (org.freedesktop.impl.portal.desktop.kwe) — never the KDE one.
-systemctl --user start xdg-desktop-portal.service 2>/dev/null || true
+#
+#     --no-block: never hold up the shell on the portal. The frontend is
+#     Type=dbus with TimeoutStartSec=15s, so a backend that hangs while the
+#     frontend activates it would otherwise block this script for the full
+#     15s before noctalia-kwe is ever launched. Nothing in the session needs
+#     the portal before the shell is up, and D-Bus activation starts it on
+#     demand anyway, so start the job and move on.
+systemctl --user start --no-block xdg-desktop-portal.service 2>/dev/null || true
 
 # Power management is initialized inside noctalia-kwe. No PowerDevil or
 # upowerd process is started by the session launcher.

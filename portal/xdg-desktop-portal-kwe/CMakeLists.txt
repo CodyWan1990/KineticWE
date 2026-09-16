@@ -55,6 +55,7 @@ endif()
 find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
     CoreAddons
     Config
+    ColorScheme
     I18n
     GlobalAccel
     KIO

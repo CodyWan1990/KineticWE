@@ -17,6 +17,7 @@
 #include <QDBusMetaType>
 #include <QPalette>
 
+#include <KColorScheme>
 #include <KConfigGroup>
 #include <KConfigWatcher>
 
@@ -255,10 +256,26 @@ public:
     }
 
 private:
+    // The portal backend intentionally starts without the session's Qt platform
+    // theme (see xdg-desktop-portal-kwe.cpp), so its QPalette is the untinted
+    // default and must not be used to derive the system appearance. Read the
+    // user's KDE color scheme from kdeglobals instead -- the same source the
+    // compositor, Noctalia and the (unloaded) Qt platform theme all agree on.
+    static QColor readKdeGlobalsColor(const QString &group, const QString &key, const QColor &fallback)
+    {
+        const KConfigGroup config(KSharedConfig::openConfig(u"kdeglobals"_s), group);
+        const QColor color = config.readEntry(key, fallback);
+        return color.isValid() ? color : fallback;
+    }
+
     QDBusVariant readFdoColorScheme()
     {
-        const QPalette palette = QApplication::palette();
-        const int windowBackgroundGray = qGray(palette.window().color().rgb());
+        // The freedesktop spec only distinguishes dark from light, but the
+        // value has to reflect the scheme the user actually chose, which lives
+        // in [Colors:Window] BackgroundNormal. Fall back to the palette only
+        // for the edge case where no scheme has been configured yet.
+        const QColor windowBackground = readKdeGlobalsColor(u"Colors:Window"_s, u"BackgroundNormal"_s, QApplication::palette().window().color());
+        const int windowBackgroundGray = qGray(windowBackground.rgb());
 
         uint result = 0; // no preference
 
@@ -278,7 +295,7 @@ private:
      */
     QDBusVariant readAccentColor() const
     {
-        const QColor color = qGuiApp->palette().highlight().color();
+        const QColor color = readKdeGlobalsColor(u"Colors:Selection"_s, u"BackgroundNormal"_s, qGuiApp->palette().highlight().color());
         return QDBusVariant(AccentColorArray{color.redF(), color.greenF(), color.blueF()});
     }
 
@@ -301,6 +318,23 @@ private Q_SLOTS:
     {
         if (configGroup.name() == u"KDE" && names.contains("AnimationDurationFactor")) {
             Q_EMIT settingChanged(group(), reducedMotion, readReducedMotion());
+        }
+        // [Colors:Window] BackgroundNormal drives the light/dark preference and
+        // [Colors:Selection] BackgroundNormal the accent colour. Both are read
+        // from kdeglobals, so the palette-based onPaletteChanged signal never
+        // fires for them in this unthemed process -- announce from here instead.
+        if (configGroup.name().startsWith(u"Colors:"_s)) {
+            // KSharedConfig caches parsed values, so reparse before reading the
+            // scheme that was just written (same pattern as KDEGlobalsSettings).
+            const KSharedConfigPtr kdeglobals = KSharedConfig::openConfig(u"kdeglobals"_s);
+            kdeglobals->reparseConfiguration();
+            // Re-apply the scheme to the process palette: the portal runs
+            // without the session's Qt platform theme (see the main() comment),
+            // so nothing else keeps the QApplication palette -- and with it the
+            // Kirigami/QML dialogs -- in sync with kdeglobals.
+            qApp->setPalette(KColorScheme::createApplicationPalette(kdeglobals));
+            Q_EMIT settingChanged(group(), colorScheme, readFdoColorScheme());
+            Q_EMIT settingChanged(group(), accentColor, readAccentColor());
         }
     }
 

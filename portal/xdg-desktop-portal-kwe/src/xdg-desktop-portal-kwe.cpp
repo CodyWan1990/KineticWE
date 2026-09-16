@@ -10,10 +10,13 @@
 #include <QCommandLineParser>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
+#include <QQuickStyle>
 
 #include <KAboutData>
+#include <KColorScheme>
 #include <KCrash>
 #include <KLocalizedString>
+#include <KSharedConfig>
 
 #include "../version.h"
 #include "debug.h"
@@ -28,10 +31,32 @@ int main(int argc, char *argv[])
     // Do not try to reconnect to the compositor as KWayland can't handle that
     // Reconsider enabling when we do not use KWayland anymore
     qunsetenv("QT_WAYLAND_RECONNECT");
+    // Never load the session's Qt platform theme in the portal backend. With
+    // qt5ct/qt6ct's standard_dialogs=xdgdesktopportal the theme plugin calls
+    // org.freedesktop.portal.Settings.ReadAll and queries the FileChooser
+    // version while QApplication is being constructed -- i.e. straight back
+    // into the xdg-desktop-portal frontend that is still activating this very
+    // process. That deadlocks the frontend until systemd's 15s TimeoutStartSec
+    // fires, so the frontend is killed and restarted on every login, delaying
+    // the whole session. The portal is a system service; it must not depend on
+    // the desktop portal theme.
+    qunsetenv("QT_QPA_PLATFORMTHEME");
     QCoreApplication::setAttribute(Qt::AA_DisableSessionManager);
     QApplication a(argc, argv);
     a.setQuitOnLastWindowClosed(false);
     a.setQuitLockEnabled(false);
+
+    // Because the platform theme above is deliberately not loaded, reproduce
+    // the two things it would otherwise provide, or the portal's own
+    // Kirigami/QML dialogs (screen-share chooser, file chooser, ...) fall back
+    // to Qt's stock light palette and Kirigami's hard-coded Basic theme. Both
+    // are plain local setup -- no portal round-trips -- so the deadlock the
+    // unset above avoids cannot come back.
+    a.setPalette(KColorScheme::createApplicationPalette(KSharedConfig::openConfig(u"kdeglobals"_s)));
+    // Kirigami only loads its palette-driven theme (styles/org.kde.desktop)
+    // when the desktop QQuick Controls style is active, which nothing selects
+    // on a session that does not run the KDE platform theme.
+    QQuickStyle::setStyle(u"org.kde.desktop"_s);
 
     // Guard against an app closing the reading end when the clipboard portal writes current clipboard contents
     signal(SIGPIPE, SIG_IGN);
