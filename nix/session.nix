@@ -8,12 +8,35 @@
   xwayland,
   kdePackages,
   psmisc,
+  qt6,
 }:
 
 let
   # Literal dollar — needed so Nix doesn't interpret shell ${...}
   # as Nix interpolation inside the script heredoc.
   dl = "$";
+
+  # Qt plugin + QML import paths, built from the Qt6 + KDE packages that
+  # provide the modules the session's apps load (org.kde.plasma.core and
+  # org.kde.kquickcontrols are both shipped by libplasma). Qt ignores any
+  # component that has no such dir, so listing a package without
+  # lib/qt-6/qml is harmless.
+  qtDeps = [
+    qt6.qtbase
+    qt6.qtdeclarative
+    qt6.qtsvg
+    qt6.qtwayland
+    kdePackages.libplasma
+    kdePackages.plasma-workspace
+    kdePackages.kirigami
+    kdePackages.kconfig
+    kdePackages.kcoreaddons
+    kdePackages.kwindowsystem
+    kdePackages.ki18n
+    kdePackages.kiconthemes
+  ];
+  qtPluginPath = lib.concatStringsSep ":" (lib.map (p: "${p}/lib/qt-6/plugins") qtDeps);
+  qmlImportPath = lib.concatStringsSep ":" (lib.map (p: "${p}/lib/qt-6/qml") qtDeps);
 in
 stdenv.mkDerivation {
   pname = "kineticwe-session";
@@ -24,6 +47,13 @@ stdenv.mkDerivation {
   dontBuild = true;
 
   nativeBuildInputs = [ makeWrapper ];
+  # Declared so the QML/plugin paths embedded below reference packages that
+  # are guaranteed to be in the store when the session runs.
+  buildInputs = qtDeps;
+  # This derivation depends on qtbase (via buildInputs) but is not a Qt app —
+  # it's a bash session launcher that sets the Qt env manually via wrapProgram.
+  # Tell the qt build system to skip its app-wrapping requirement.
+  dontWrapQtApps = true;
 
   installPhase = ''
     runHook preInstall
@@ -184,13 +214,21 @@ SCRIPTEOF
        --replace-fail "@xdg_desktop_portal@" "${xdg-desktop-portal}/libexec/xdg-desktop-portal" \
        --replace-fail "@xdg_desktop_portal_kde@" "${kdePackages.xdg-desktop-portal-kde}/libexec/xdg-desktop-portal-kde"
 
-    # Wrap so helpers (xwayland, killall, kbuildsycoca6) are on PATH.
+    # Wrap so helpers (xwayland, killall, kbuildsycoca6) are on PATH, and set
+    # the Qt plugin + QML import environment (QT_PLUGIN_PATH,
+    # NIXPKGS_QT6_QML_IMPORT_PATH) so the KDE apps this session spawns
+    # (System Settings, plasmashell components, ...) resolve their QML
+    # modules (org.kde.plasma.core, org.kde.kquickcontrols, ...). Without
+    # this the launcher only sets XDG_*, and Qt falls back to a QML path
+    # that lacks the KDE modules -> "module ... is not installed".
     wrapProgram "$out/bin/start-kineticwe" \
       --prefix PATH : "${lib.makeBinPath [
         xwayland
         psmisc
         kdePackages.kservice
-      ]}"
+      ]}" \
+      --prefix QT_PLUGIN_PATH : "${qtPluginPath}" \
+      --prefix NIXPKGS_QT6_QML_IMPORT_PATH : "${qmlImportPath}"
 
     runHook postInstall
   '';

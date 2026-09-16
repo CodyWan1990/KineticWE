@@ -26,9 +26,7 @@ stdenv.mkDerivation rec {
     owner = "plasma";
     repo = "kdecoration";
     rev = "d13049250c0ea1afc279aa8dc99243565c0d83e8";
-    # Placeholder — on the first build Nix reports the expected hash; copy it
-    # here and rebuild (same workflow as kglobalacceld-git).
-    hash = lib.fakeHash;
+    hash = "sha256-4oqhnoVQjVWtqIurZQ3qCjRy3UCdNBjEJNDk8jaUz6Q=";
   };
 
   nativeBuildInputs = [
