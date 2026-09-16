@@ -104,6 +104,10 @@ PointingDevicesPage::PointingDevicesPage(SessionBus& bus, Kind kind) : m_kind(ki
   m_state.setPath(pointingDevicesStatePath());
   m_state.load();
   m_selectedDevice = m_state.readString("PointingDevices", m_kind == Kind::Mouse ? "Mouse" : "Touchpad").value_or("");
+  if (m_kind == Kind::Mouse) {
+    // The Mouse page also carries the compositor-wide [EdgeBarrier] setting.
+    m_compositorConfig.load();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +174,24 @@ const std::vector<PointingDevicesPage::Field>& PointingDevicesPage::fields() con
           .subtitle = "Reverse the mouse wheel's scroll direction",
           .pageGroup = "Scrolling",
           .isBool = true,
+      },
+      // Screen edges (compositor-wide [EdgeBarrier] group in kineticwe.kwe) ---
+      Field{
+          .writeProperty = "EdgeBarrier",
+          .readProperty = "EdgeBarrier",
+          .defaultProperty = "",
+          .supportProperty = "",
+          .title = "Edge barrier",
+          .subtitle = "Extra distance the pointer must travel to cross onto another "
+                      "screen. Set to None to move freely between screens.",
+          .pageGroup = "Screen Edges",
+          .isBool = false,
+          .minValue = 0.0,
+          .maxValue = 1000.0,
+          .step = 1.0,
+          .isGlobal = true,
+          .integerValue = true,
+          .zeroLabel = "None",
       },
   };
 
@@ -338,11 +360,10 @@ void PointingDevicesPage::resetAll() {
   const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
   });
-  if (it == m_devices.cend()) {
-    return;
-  }
   for (const auto& field : fields()) {
-    if (rowVisible(field, *it)) {
+    if (field.isGlobal) {
+      m_pending[std::string(field.writeProperty)] = deviceDefaultValue(field);
+    } else if (it != m_devices.cend() && rowVisible(field, *it)) {
       m_pending[std::string(field.writeProperty)] = deviceDefaultValue(field);
     }
   }
@@ -357,11 +378,10 @@ std::vector<std::string> PointingDevicesPage::resettableKeyPaths() {
   const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
   });
-  if (it == m_devices.cend()) {
-    return paths;
-  }
   for (const auto& field : fields()) {
-    if (rowVisible(field, *it)) {
+    if (field.isGlobal) {
+      paths.emplace_back(field.writeProperty);
+    } else if (it != m_devices.cend() && rowVisible(field, *it)) {
       paths.emplace_back(field.writeProperty);
     }
   }
@@ -373,6 +393,11 @@ std::vector<std::string> PointingDevicesPage::resettableKeyPaths() {
 // ---------------------------------------------------------------------------
 
 double PointingDevicesPage::currentDeviceValue(const Field& field) {
+  if (field.isGlobal) {
+    // Compositor-wide setting in kineticwe.kwe; clamped to the schema range.
+    const int value = m_compositorConfig.readInt("EdgeBarrier", field.readProperty, 0);
+    return std::clamp(static_cast<double>(value), field.minValue, field.maxValue);
+  }
   const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
   });
@@ -386,6 +411,10 @@ double PointingDevicesPage::currentDeviceValue(const Field& field) {
 }
 
 double PointingDevicesPage::deviceDefaultValue(const Field& field) {
+  if (field.isGlobal) {
+    // [EdgeBarrier] EdgeBarrier defaults to 0 (None) in src/kwin.kcfg.
+    return 0.0;
+  }
   const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
   });
@@ -410,18 +439,24 @@ bool PointingDevicesPage::applyAll() {
   const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
   });
-  if (it == m_devices.cend()) {
-    return true;
-  }
-  const auto& device = *it;
+  const bool haveDevice = it != m_devices.cend();
 
+  bool edgeBarrierPending = false;
   for (const auto& [key, value] : m_pending) {
+    if (key == "EdgeBarrier") {
+      // Compositor-wide setting, written to kineticwe.kwe below.
+      edgeBarrierPending = true;
+      continue;
+    }
+    if (!haveDevice) {
+      continue;
+    }
     if (key == "AccelerationProfile") {
       // Adaptive == value != 0; write the matching profile bool (the device's
       // setter switches the active profile and persists it).
       const bool adaptive = value != 0.0;
       m_dbus.setInputDeviceBool(
-          device.sysName, adaptive ? "pointerAccelerationProfileAdaptive" : "pointerAccelerationProfileFlat", true
+          it->sysName, adaptive ? "pointerAccelerationProfileAdaptive" : "pointerAccelerationProfileFlat", true
       );
       continue;
     }
@@ -432,13 +467,31 @@ bool PointingDevicesPage::applyAll() {
       continue;
     }
     if (fIt->isBool) {
-      m_dbus.setInputDeviceBool(device.sysName, key, value != 0.0);
+      m_dbus.setInputDeviceBool(it->sysName, key, value != 0.0);
     } else {
-      m_dbus.setInputDeviceDouble(device.sysName, key, value);
+      m_dbus.setInputDeviceDouble(it->sysName, key, value);
+    }
+  }
+
+  if (edgeBarrierPending) {
+    const int barrier = static_cast<int>(std::lround(m_pending.at("EdgeBarrier")));
+    if (barrier == 0) {
+      // 0 (None) is the default: drop the key so the compositor falls back to it.
+      m_compositorConfig.removeKey("EdgeBarrier", "EdgeBarrier");
+    } else {
+      m_compositorConfig.setInt("EdgeBarrier", "EdgeBarrier", barrier);
+    }
+    if (!m_compositorConfig.save()) {
+      kLog.warn("kinetic-settings: failed to write {}", KineticweKwe::defaultPath().string());
+      // Keep the staged edits so the user can retry Apply.
+      return false;
     }
   }
 
   m_pending.clear();
+  if (edgeBarrierPending) {
+    m_dbus.requestReconfigure();
+  }
   return true;
 }
 
@@ -511,7 +564,15 @@ void PointingDevicesPage::addDevicePicker(Flex& parent, float scale, const Callb
         if (index < m_devices.size() && m_devices[index].sysName != m_selectedDevice) {
           m_selectedDevice = m_devices[index].sysName;
           persistSelectedDevice();
+          // Device edits are dropped on switch; the compositor-wide Edge barrier
+          // is not tied to a device, so keep its staged edit.
+          const auto edgeBarrier = m_pending.find("EdgeBarrier");
+          const std::optional<double> stagedEdgeBarrier =
+              edgeBarrier != m_pending.end() ? std::optional<double>{edgeBarrier->second} : std::nullopt;
           m_pending.clear();
+          if (stagedEdgeBarrier.has_value()) {
+            m_pending["EdgeBarrier"] = *stagedEdgeBarrier;
+          }
           if (callbacks.requestRebuild) {
             callbacks.requestRebuild();
           }
@@ -634,16 +695,20 @@ void PointingDevicesPage::addFieldRow(
     }));
   } else {
     // Numeric slider.
-    const double value = [&]() {
-      const auto stagedValue = staged(field.writeProperty);
-      if (stagedValue.has_value()) {
-        return *stagedValue;
+    const auto stagedValue = staged(field.writeProperty);
+    const double value = stagedValue.has_value() ? *stagedValue : currentDeviceValue(field);
+    // Integer-valued rows (e.g. Edge barrier) hide the decimals and can name
+    // their zero position (e.g. "None").
+    const auto formatValue = [](const Field& f, double v) -> std::string {
+      if (!f.integerValue) {
+        return std::format("{:.2f}", v);
       }
-      const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
-        return d.sysName == m_selectedDevice;
-      });
-      return it != m_devices.cend() ? currentDouble(*it, field.readProperty) : 0.0;
-    }();
+      const int rounded = static_cast<int>(std::lround(v));
+      if (rounded == 0 && !f.zeroLabel.empty()) {
+        return std::string(f.zeroLabel);
+      }
+      return std::to_string(rounded);
+    };
     Slider* sliderPtr = nullptr;
     Label* valuePtr = nullptr;
     auto slider = ui::slider({
@@ -659,15 +724,15 @@ void PointingDevicesPage::addFieldRow(
     });
     auto valueLabel = ui::label({
         .out = &valuePtr,
-        .text = std::format("{:.2f}", value),
+        .text = formatValue(field, value),
         .fontSize = Style::fontSizeCaption * scale,
         .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
         .minWidth = 52.0F * scale,
         .textAlign = TextAlign::End,
     });
-    slider->setOnValueChanged([valuePtr](double next) {
+    slider->setOnValueChanged([valuePtr, field, formatValue](double next) {
       if (valuePtr != nullptr) {
-        valuePtr->setText(std::format("{:.2f}", next));
+        valuePtr->setText(formatValue(field, next));
       }
     });
     slider->setOnDragEnd([this, field, sliderPtr, callbacks]() {
@@ -742,24 +807,13 @@ std::unique_ptr<Node> PointingDevicesPage::build(
   ));
 
   const bool searchActive = !filter.searchQuery.empty();
-  if (m_devices.empty()) {
-    // Global search drops pages with no hits; a device-less page has none.
-    if (searchActive) {
-      return nullptr;
-    }
-    root->addChild(makeLabel(
-        isTouchpad ? "No touchpads detected." : "No mice detected.", Style::fontSizeBody * scale,
-        colorSpecFromRole(ColorRole::OnSurfaceVariant)
-    ));
-    return root;
-  }
 
   // Fall back to a sensible device when nothing is selected yet or the saved
   // device is gone (e.g. unplugged).
   const bool selectedPresent = std::any_of(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
   });
-  if (!selectedPresent) {
+  if (!m_devices.empty() && !selectedPresent) {
     const bool hadSavedSelection = !m_selectedDevice.empty();
     m_selectedDevice = pickDefaultDevice();
     // Pin the first-run default so a later device addition cannot silently
@@ -772,17 +826,14 @@ std::unique_ptr<Node> PointingDevicesPage::build(
 
   // The device picker is page chrome, not a setting; hide it while searching so
   // merged results only show the matching rows.
-  if (!searchActive) {
+  if (!searchActive && !m_devices.empty()) {
     addDevicePicker(*root, scale, callbacks);
   }
 
   const auto it = std::find_if(m_devices.cbegin(), m_devices.cend(), [this](const auto& d) {
     return d.sysName == m_selectedDevice;
   });
-  if (it == m_devices.cend()) {
-    return root;
-  }
-  const auto& device = *it;
+  const CompositorDbus::InputDeviceInfo* device = it != m_devices.cend() ? &*it : nullptr;
 
   const auto searchMatches = [&filter](std::string_view text) {
     return filter.searchQuery.empty() || StringUtils::containsInsensitive(text, filter.searchQuery);
@@ -792,7 +843,9 @@ std::unique_ptr<Node> PointingDevicesPage::build(
   bool firstSection = true;
   std::string_view lastSection;
   for (const auto& field : fields()) {
-    if (!rowVisible(field, device)) {
+    // Compositor-wide fields (e.g. Edge barrier) render even without a device;
+    // per-device fields need a selected device that supports them.
+    if (!field.isGlobal && (device == nullptr || !rowVisible(field, *device))) {
       continue;
     }
     if (filter.showOverriddenOnly && !isOverridden(field)) {
@@ -810,12 +863,14 @@ std::unique_ptr<Node> PointingDevicesPage::build(
   }
 
   if (!anyRows) {
+    // Global search drops pages with no hits.
     if (searchActive) {
       return nullptr;
     }
     root->addChild(makeLabel(
-        isTouchpad ? "No touchpad settings match the current filters."
-                   : "No mouse settings match the current filters.",
+        m_devices.empty() ? (isTouchpad ? "No touchpads detected." : "No mice detected.")
+                          : (isTouchpad ? "No touchpad settings match the current filters."
+                                        : "No mouse settings match the current filters."),
         Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurfaceVariant)
     ));
   }

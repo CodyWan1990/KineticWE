@@ -1375,7 +1375,7 @@ std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
   case ActivePage::Keyboard:
     return "input output keyboard input devices key repeat num lock";
   case ActivePage::Mouse:
-    return "input output mouse pointer devices";
+    return "input output mouse pointer devices screen edges edge barrier";
   case ActivePage::Touchpad:
     return "input output touchpad trackpad pointer devices";
   case ActivePage::Keybinds:

@@ -82,6 +82,12 @@ private:
     double minValue = 0.0;            // numeric slider range
     double maxValue = 1.0;
     double step = 0.05;
+    // Compositor-wide (non-device) setting stored in kineticwe.kwe instead of
+    // the per-device D-Bus interface. readProperty is the .kwe key in the
+    // [EdgeBarrier] group; applyAll() writes it and reconfigures once.
+    bool isGlobal = false;
+    bool integerValue = false;        // show the numeric value without decimals
+    std::string_view zeroLabel;       // shown instead of "0" (e.g. "None")
   };
 
   [[nodiscard]] const std::vector<Field>& fields() const;
@@ -119,6 +125,9 @@ private:
   // Persisted page state (selected device per kind), stored in
   // ~/.config/kineticwe/kinetic-settings.kwe.
   KineticweKwe m_state;
+  // Compositor config (~/.config/kineticwe/kineticwe.kwe). Only the Mouse page
+  // uses it, for the compositor-wide [EdgeBarrier] setting.
+  KineticweKwe m_compositorConfig;
   // sysName of the device being configured.
   std::string m_selectedDevice;
   // Cached device list of this kind (mice or touchpads).
