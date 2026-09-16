@@ -15,6 +15,7 @@
 #include <QDBusContext>
 #include <QDBusMessage>
 #include <QDBusMetaType>
+#include <QIcon>
 #include <QPalette>
 
 #include <KColorScheme>
@@ -335,6 +336,17 @@ private Q_SLOTS:
             qApp->setPalette(KColorScheme::createApplicationPalette(kdeglobals));
             Q_EMIT settingChanged(group(), colorScheme, readFdoColorScheme());
             Q_EMIT settingChanged(group(), accentColor, readAccentColor());
+        }
+        if (configGroup.name() == u"Icons"_s && names.contains("Theme")) {
+            // Same for the icon theme: nothing republishes [Icons] Theme to
+            // QIcon when the session's Qt platform theme is not loaded.
+            const KSharedConfigPtr kdeglobals = KSharedConfig::openConfig(u"kdeglobals"_s);
+            kdeglobals->reparseConfiguration();
+            const KConfigGroup iconGroup(kdeglobals, u"Icons"_s);
+            const QString iconTheme = iconGroup.readEntry("Theme", QString());
+            if (!iconTheme.isEmpty()) {
+                QIcon::setThemeName(iconTheme);
+            }
         }
     }
 

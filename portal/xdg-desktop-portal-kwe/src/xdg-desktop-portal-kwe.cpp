@@ -10,10 +10,12 @@
 #include <QCommandLineParser>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
+#include <QIcon>
 #include <QQuickStyle>
 
 #include <KAboutData>
 #include <KColorScheme>
+#include <KConfigGroup>
 #include <KCrash>
 #include <KLocalizedString>
 #include <KSharedConfig>
@@ -47,16 +49,27 @@ int main(int argc, char *argv[])
     a.setQuitLockEnabled(false);
 
     // Because the platform theme above is deliberately not loaded, reproduce
-    // the two things it would otherwise provide, or the portal's own
+    // the three things it would otherwise provide, or the portal's own
     // Kirigami/QML dialogs (screen-share chooser, file chooser, ...) fall back
-    // to Qt's stock light palette and Kirigami's hard-coded Basic theme. Both
-    // are plain local setup -- no portal round-trips -- so the deadlock the
-    // unset above avoids cannot come back.
+    // to Qt's stock light palette, Kirigami's hard-coded Basic theme and
+    // KIconLoader's light "breeze" fallback. All are plain local setup -- no
+    // portal round-trips -- so the deadlock the unset above avoids cannot come
+    // back.
     a.setPalette(KColorScheme::createApplicationPalette(KSharedConfig::openConfig(u"kdeglobals"_s)));
     // Kirigami only loads its palette-driven theme (styles/org.kde.desktop)
     // when the desktop QQuick Controls style is active, which nothing selects
     // on a session that does not run the KDE platform theme.
     QQuickStyle::setStyle(u"org.kde.desktop"_s);
+    // ...and the same platform theme normally publishes the icon theme. With
+    // QIcon::themeName() left empty, KIconLoader falls back to "breeze" (the
+    // light variant), so the KIO file chooser's toolbar icons come out dark on
+    // the now-dark background. Read the user's choice from kdeglobals, the
+    // source KDE apps and the colour scheme above already use.
+    const KConfigGroup iconGroup(KSharedConfig::openConfig(u"kdeglobals"_s), u"Icons"_s);
+    const QString iconTheme = iconGroup.readEntry("Theme", QString());
+    if (!iconTheme.isEmpty()) {
+        QIcon::setThemeName(iconTheme);
+    }
 
     // Guard against an app closing the reading end when the clipboard portal writes current clipboard contents
     signal(SIGPIPE, SIG_IGN);
