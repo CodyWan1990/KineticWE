@@ -958,6 +958,7 @@ PY
 #     compositor's stderr to a dedicated log file for easy grepping. Set
 #     KWE_DRM_DEBUG=0 to return to the quiet default.
 # ---------------------------------------------------------------------------
+mkdir -p "$HOME/.local/share"
 KWE_DRM_DEBUG="${KWE_DRM_DEBUG:-1}"
 _KWE_DRM_LOG=""
 if [[ "$KWE_DRM_DEBUG" != "0" ]]; then
@@ -1018,8 +1019,6 @@ done
 # ---------------------------------------------------------------------------
 # 6. Publish the full session environment to D-Bus / systemd
 # ---------------------------------------------------------------------------
-mkdir -p "$HOME/.local/share"
-
 # The compositor's display sockets and Qt theming environment must reach the
 # systemd user manager: D-Bus services that activate through SystemdService=
 # units (Spectacle, portals, other KDE apps) inherit the user manager's
