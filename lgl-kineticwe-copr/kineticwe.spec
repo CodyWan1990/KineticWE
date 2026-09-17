@@ -443,7 +443,7 @@ systemctl daemon-reload 2>/dev/null || true
 %{_datadir}/applications/dev.noctalia.Noctalia.desktop
 %{_datadir}/applications/dev.kineticwe.Settings.desktop
 %{_datadir}/icons/hicolor/scalable/apps/noctalia.svg
-%{_datadir}/icons/hicolor/256x256/apps/kineticwe-logo.png
+%{_datadir}/icons/hicolor/512x512/apps/kineticwe-logo.png
 
 %changelog
 * Sat Aug 15 2026 TheBlackDon <theblackdon@gitlab.com> - 6.7.80-17

@@ -940,9 +940,15 @@ PY
 
 # ---------------------------------------------------------------------------
 # 5. Start kinetic-we (the compositor) and wait for its Wayland socket.
-#    Only the compositor process gets XDG_CONFIG_HOME pointed at the kineticwe
-#    root (per-command env prefix); everything else in the session keeps the
-#    real config home so user apps read/write ~/.config as usual.
+#    Only the compositor process gets XDG_CONFIG_HOME and XDG_CACHE_HOME
+#    pointed at the kineticwe root (per-command env prefix); everything else
+#    in the session keeps the real config/cache home so user apps read/write
+#    ~/.config and ~/.cache as usual.  The cache redirect keeps the
+#    compositor's KSycoca service cache in a private file — without it, a
+#    process with a different XDG_CONFIG_HOME that shares the same cache file
+#    (the filename hash covers XDG_DATA_DIRS but not XDG_CONFIG_HOME)
+#    would continuously invalidate the other's db (different mimeapps.list
+#    tracking), causing an infinite ksycoca rebuild ping-pong at ~2 s/cycle.
 # ---------------------------------------------------------------------------
 # 5a. DRM debug (output-config / HDR troubleshooting).
 #     Opt-out via KWE_DRM_DEBUG=0 (default: on). When enabled we turn on the
@@ -967,10 +973,10 @@ _before_wayland="$(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep '^wayland-' || true)"
 _before_x11="$(ls -1 /tmp/.X11-unix 2>/dev/null | grep '^X[0-9]' || true)"
 
 if [[ -n "$_KWE_DRM_LOG" ]]; then
-    QT_LOGGING_RULES="kwin_wayland_drm=true" XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen 2>>"$_KWE_DRM_LOG" &
+    QT_LOGGING_RULES="kwin_wayland_drm=true" XDG_CONFIG_HOME="$KWE_CONFIG_HOME" XDG_CACHE_HOME="$HOME/.cache/kineticwe" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen 2>>"$_KWE_DRM_LOG" &
     KWIN_PID=$!
 else
-    XDG_CONFIG_HOME="$KWE_CONFIG_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen &
+    XDG_CONFIG_HOME="$KWE_CONFIG_HOME" XDG_CACHE_HOME="$HOME/.cache/kineticwe" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen &
     KWIN_PID=$!
 fi
 

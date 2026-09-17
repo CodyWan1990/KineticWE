@@ -554,6 +554,7 @@ reset_local() {
         "$TEST_PREFIX/share/icons/hicolor/scalable/apps/noctalia.svg"
         "$TEST_PREFIX/share/applications/dev.kineticwe.Settings.desktop"
         "$TEST_PREFIX/share/icons/hicolor/256x256/apps/kineticwe-logo.png"
+        "$TEST_PREFIX/share/icons/hicolor/512x512/apps/kineticwe-logo.png"
     )
 
     for pattern in "${known_paths[@]}"; do

@@ -1174,7 +1174,7 @@ install_data(
 
 install_data(
   'kinetic-settings/assets/kineticwe-logo.png',
-  install_dir: get_option('datadir') / 'icons' / 'hicolor' / '256x256' / 'apps',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / '512x512' / 'apps',
 )
 
 if build_tests

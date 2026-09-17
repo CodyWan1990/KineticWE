@@ -58,6 +58,15 @@ namespace {
     return size;
   }
 
+  // App icon size directories to probe when a theme ships no index.theme. Large
+  // sizes are included so high-resolution icons in metadata-less themes (such as
+  // a user's ~/.local/share/icons/hicolor) are still found.
+  constexpr const char* kFallbackAppIconDirs[] = {
+      "/scalable/apps/", "/1024x1024/apps/", "/512x512/apps/", "/384x384/apps/", "/256x256/apps/",
+      "/192x192/apps/",  "/128x128/apps/",   "/96x96/apps/",   "/64x64/apps/",   "/48x48/apps/",
+      "/32x32/apps/",    "/24x24/apps/",     "/16x16/apps/",
+  };
+
   // Shared across all IconResolver instances, including thread_local ones on
   // script worker threads; every access goes through `mutex`.
   struct IconThemeState {
@@ -384,8 +393,7 @@ namespace {
 
       if (dirs.empty()) {
         // No index.theme — fall back to common paths so the theme isn't silently skipped
-        for (const char* path :
-             {"/scalable/apps/", "/256x256/apps/", "/128x128/apps/", "/64x64/apps/", "/48x48/apps/", "/32x32/apps/"}) {
+        for (const char* path : kFallbackAppIconDirs) {
           const std::string_view name(path);
           pushUniqueDir(
               searchDirs,

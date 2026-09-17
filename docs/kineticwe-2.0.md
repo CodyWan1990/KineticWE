@@ -185,6 +185,7 @@ All desktop-environment settings live in one folder with sane defaults. No scatt
 ### 5.2 Layout
 
 Compositor-owned settings live in `~/.config/kineticwe`. The session script (`scripts/start-kineticwe.sh`, step 1b) redirects `XDG_CONFIG_HOME` **only for the compositor process** (per-command env prefix), so the compositor natively resolves `kineticwe.kwe` / `rules.kwe` / `kglobalaccelrc` / `kwinoutputconfig.json` inside that root — no compositor source changes for those, and every `KConfigWatcher` hot-reload path keeps working. The shell, kinetic-settings, D-Bus-activated services, and **all user applications keep the real `~/.config`** — user apps never have to duplicate or relocate their dotfiles. The script publishes the real config home to the compositor as `KWE_REAL_CONFIG_HOME` so shared state (`kdeglobals`) stays a single source of truth.
+The script also redirects `XDG_CACHE_HOME` to `~/.cache/kineticwe` for the compositor process so its KSycoca service cache lives in a private file — without this, a process with a different `XDG_CONFIG_HOME` that shares the same cache file (the filename hash covers `XDG_DATA_DIRS` but not `XDG_CONFIG_HOME`) would continuously invalidate the other's database (different `mimeapps.list` tracking), causing an infinite ksycoca rebuild ping-pong at ~2 s/cycle.
 
 | File | Replaces | Contents |
 |---|---|---|
