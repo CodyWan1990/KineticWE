@@ -53,6 +53,10 @@ DEV_BINARIES=(
     "${TEST_PREFIX}/bin/kinetic-we"
     "${TEST_PREFIX}/bin/noctalia-kwe"
     "${TEST_PREFIX}/libexec/xdg-desktop-portal-kwe"
+    # Noctalia greeter (--full mode only). The client needs EGL/GLES and the
+    # Cairo/Pango stack; the compositor links wlroots and libinput.
+    "${TEST_PREFIX}/bin/noctalia-greeter"
+    "${TEST_PREFIX}/bin/noctalia-greeter-compositor"
 )
 
 # Baseline runtime packages verified to be needed on a fresh Fedora host.

@@ -32,8 +32,10 @@ set -euo pipefail
 # testing is unchanged.
 #
 # Environment variables:
-#   TEST_PREFIX     - Where to install for TTY testing (default: $HOME/.local)
-#   DISTROBOX_NAME  - Name of the distrobox container (default: kineticwe-build)
+#   TEST_PREFIX             - Where to install for TTY testing (default: $HOME/.local)
+#   DISTROBOX_NAME          - Name of the distrobox container (default: kineticwe-build)
+#   NOCTALIA_GREETER_REPO   - Git URL for the noctalia-greeter fork (default: KineticWE fork)
+#   NOCTALIA_GREETER_REF    - Git branch/tag to build (default: main)
 #
 # On Debian/Ubuntu-based hosts use build-deb-dev.sh instead: it mirrors this
 # flow but builds inside a debian:sid distrobox via apt and can emit .deb
@@ -46,6 +48,27 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_DIR="${SCRIPT_DIR}/lgl-kineticwe-copr"
 RESULTS_DIR="${SPEC_DIR}/results"
 DISTROBOX_IMAGE="fedora:44"
+
+# Noctalia greeter source: the KineticWE fork (rebranded logo), built from
+# source in the distrobox for --full mode instead of pulling
+# noctalia-greeter-git from the LionHeartP COPR.
+NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO:-https://gitlab.com/theblackdon/noctalia-greeter-kwe}"
+NOCTALIA_GREETER_REF="${NOCTALIA_GREETER_REF:-main}"
+
+# Extra Fedora packages needed to build noctalia-greeter. Most are already in
+# the spec's BuildRequires; wlroots is handled separately in setup_distrobox
+# because Fedora may ship it under a versioned package name.
+GREETER_DEPS=(
+    meson gcc-c++
+    wayland-devel wayland-protocols-devel
+    libEGL-devel mesa-libGLES-devel
+    libinput-devel
+    freetype-devel fontconfig-devel
+    cairo-devel pango-devel harfbuzz-devel
+    libxkbcommon-devel glib2-devel
+    tomlplusplus-devel json-devel stb_image_resize2-devel
+    libwebp-devel librsvg2-devel libxml2-devel
+)
 
 # Login-screen session entry for the dev build. /usr/local/share is in the
 # default session search path of SDDM / plasma-login-manager, so the entry
@@ -147,10 +170,21 @@ setup_distrobox() {
 
     local buildreqs
     buildreqs=$(grep '^BuildRequires:' "$SPEC_FILE" | sed 's/BuildRequires:\s*//' | tr '\n' ' ')
+    local greeter_deps
+    greeter_deps="${GREETER_DEPS[*]}"
     info "Installing build dependencies (one-time, cached across builds)..."
     distrobox enter "$DISTROBOX_NAME" -- bash -c "
         # Ignore scriptlet failures; container cannot run systemd/udev scripts
         sudo dnf install -y --skip-unavailable $buildreqs || true
+
+        # Noctalia greeter build deps (--full mode builds the KineticWE fork
+        # from source). The spec's BuildRequires cover most of these.
+        sudo dnf install -y --skip-unavailable $greeter_deps || true
+
+        # noctalia-greeter needs wlroots 0.20 via pkg-config. Fedora 44 ships
+        # the current 0.20 as wlroots-devel (its .pc file is wlroots-0.20.pc);
+        # older versions live in versioned compat packages (e.g. wlroots0.19-devel).
+        sudo dnf install -y --skip-unavailable wlroots-devel || true
 
         # Fail fast if key build tools are missing instead of dying mid-build
         missing_tools=()
@@ -742,37 +776,124 @@ resolve_greeter_user() {
 }
 
 # ---------------------------------------------------------------------------
-# Install and activate the Noctalia greeter (greetd + noctalia-greeter-git)
+# Install greeter host runtime dependencies (--full mode)
+# ---------------------------------------------------------------------------
+install_greeter_runtime_deps() {
+    step "Installing noctalia-greeter host runtime dependencies..."
+
+    # The greeter is built in the distrobox, so the host package manager never
+    # resolves its libraries. ldd the installed binaries and map each missing
+    # SONAME to the package that provides it. Deriving the name this way avoids
+    # hardcoding it: wlroots ships as "wlroots" (SONAME libwlroots-0.20.so),
+    # and there is no "wlroots0.20" package.
+    local -a binaries=(
+        "${TEST_PREFIX}/bin/noctalia-greeter"
+        "${TEST_PREFIX}/bin/noctalia-greeter-compositor"
+    )
+
+    local -a missing_libs=()
+    local bin lib
+    for bin in "${binaries[@]}"; do
+        [[ -x "$bin" ]] || continue
+        while IFS= read -r lib; do
+            [[ -n "$lib" ]] && missing_libs+=("$lib")
+        done < <(LD_LIBRARY_PATH="${TEST_PREFIX}/lib64:${TEST_PREFIX}/lib" \
+                    ldd "$bin" 2>/dev/null | awk '/not found/ {print $1}')
+    done
+
+    if [[ ${#missing_libs[@]} -eq 0 ]]; then
+        info "All greeter runtime libraries resolve on the host."
+        return 0
+    fi
+
+    echo
+    info "Missing greeter runtime libraries:"
+    printf '    %s\n' "${missing_libs[@]}" | sort -u
+    echo
+
+    local -a pkgs=()
+    local pkg
+    while IFS= read -r lib; do
+        [[ -z "$lib" ]] && continue
+        # The pipe's exit status is head's, so set -e is not tripped when the
+        # lookup finds nothing.
+        pkg=$(dnf repoquery --available --whatprovides "$lib" --queryformat '%{name}' 2>/dev/null | sort -u | head -1)
+        if [[ -n "$pkg" ]]; then
+            info "    $lib -> $pkg"
+            pkgs+=("$pkg")
+        else
+            warn "    $lib -> (no package found)"
+        fi
+    done < <(printf '%s\n' "${missing_libs[@]}" | sort -u)
+
+    if [[ ${#pkgs[@]} -eq 0 ]]; then
+        error "Could not resolve the greeter's missing runtime libraries."
+        return 1
+    fi
+
+    mapfile -t pkgs < <(printf '%s\n' "${pkgs[@]}" | sort -u)
+    info "Installing: ${pkgs[*]}"
+    sudo dnf install -y "${pkgs[@]}"
+}
+
+# ---------------------------------------------------------------------------
+# Install and activate the Noctalia greeter (greetd + KineticWE fork)
 # ---------------------------------------------------------------------------
 setup_noctalia_greeter() {
-    step "Setting up Noctalia greeter (lionheartp/Hyprland COPR)..."
+    step "Setting up Noctalia greeter (KineticWE fork, built from source)..."
 
     # Refresh/cache sudo credentials up front so the many systemctl/dnf calls
     # below need only a single password entry. Failure here is non-fatal.
     sudo -v 2>/dev/null || warn "sudo not cached; you may be prompted more than once."
 
-    # The greeter runs under greetd and is packaged in the LionHeartP COPR.
-    local copr_repo="/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:lionheartp:Hyprland.repo"
-    if [[ ! -f "$copr_repo" ]]; then
-        info "Enabling lionheartp/Hyprland COPR..."
-        sudo dnf -y copr enable lionheartp/Hyprland
+    # greetd itself stays distro-packaged; only the greeter comes from the fork.
+    if ! command -v greetd &>/dev/null; then
+        info "Installing greetd..."
+        sudo dnf install -y greetd
     else
-        info "lionheartp/Hyprland COPR already enabled."
+        info "greetd already installed."
     fi
 
-    if ! command -v noctalia-greeter-session &>/dev/null || ! command -v greetd &>/dev/null; then
-        info "Installing noctalia-greeter-git and greetd..."
-        sudo dnf install -y noctalia-greeter-git greetd
+    local session_bin="${TEST_PREFIX}/bin/noctalia-greeter-session"
+
+    # Build the KineticWE fork in the distrobox and install it into TEST_PREFIX.
+    # The container's own /usr is not visible to the host, and TEST_PREFIX
+    # lives in $HOME (shared), which is how kinetic-we and the shell run too.
+    if [[ ! -x "$session_bin" ]]; then
+        step "Building noctalia-greeter from ${NOCTALIA_GREETER_REPO} (${NOCTALIA_GREETER_REF})..."
+        distrobox enter "$DISTROBOX_NAME" -- bash -c "
+            set -euo pipefail
+            export PATH='/usr/local/bin:/usr/bin:/bin'
+
+            GREETER_SRC=\$(mktemp -d /tmp/noctalia-greeter-build.XXXXXX)
+            trap 'rm -rf \"\$GREETER_SRC\"' EXIT
+
+            echo '[STEP] Cloning ${NOCTALIA_GREETER_REPO} (${NOCTALIA_GREETER_REF})...'
+            git clone --depth=1 --branch '${NOCTALIA_GREETER_REF}' '${NOCTALIA_GREETER_REPO}' \"\$GREETER_SRC/src\"
+
+            echo '[STEP] Configuring noctalia-greeter...'
+            meson setup \"\$GREETER_SRC/build\" \"\$GREETER_SRC/src\" \\
+                --prefix='${TEST_PREFIX}' \\
+                --buildtype=release
+
+            echo '[STEP] Building noctalia-greeter...'
+            meson compile -C \"\$GREETER_SRC/build\" --jobs \$(nproc)
+
+            echo '[STEP] Installing noctalia-greeter to ${TEST_PREFIX}...'
+            meson install -C \"\$GREETER_SRC/build\"
+        "
     else
-        info "noctalia-greeter and greetd already installed."
+        info "noctalia-greeter (KineticWE fork) already installed in ${TEST_PREFIX}."
     fi
 
-    local session_bin
-    session_bin=$(command -v noctalia-greeter-session)
-    if [[ -z "$session_bin" ]]; then
-        error "noctalia-greeter-session was not found after installation."
+    if [[ ! -x "$session_bin" ]]; then
+        error "noctalia-greeter-session was not produced at ${session_bin}."
         return 1
     fi
+
+    # The greeter binaries were built in the distrobox but run on the host, so
+    # their runtime libraries must exist here too.
+    install_greeter_runtime_deps
 
     # Resolve the user greetd actually runs the greeter as ('greetd' on this
     # host), then ensure that user exists and has DRM/input access. Idempotent
@@ -864,7 +985,7 @@ EOF
     fi
 
     # Run the packaged system setup: PAM patch, state dir, greeter.toml.
-    local setup_script="/usr/share/noctalia-greeter/setup_greeter_system.sh"
+    local setup_script="${TEST_PREFIX}/share/noctalia-greeter/setup_greeter_system.sh"
     if [[ -x "$setup_script" ]]; then
         info "Running Noctalia greeter system setup..."
         sudo "$setup_script"
@@ -1166,18 +1287,10 @@ main() {
             install_dev_session_entry
         fi
         if $do_full; then
-            # The greeter is a post-build convenience: a failure here must not
-            # undo/abort the already-installed dev build, so run it with
-            # errexit temporarily off and merely warn on a non-zero result.
-            local greeter_rc
-            set +e
+            # Hard-fail: a broken greeter (bad clone, missing deps, wrong
+            # wlroots) must abort --full instead of leaving the session
+            # without a login screen.
             setup_noctalia_greeter
-            greeter_rc=$?
-            set -e
-            if [[ $greeter_rc -ne 0 ]]; then
-                warn "Noctalia greeter setup did not complete cleanly; the dev build installed."
-                warn "Re-run './build-rpm-dev.sh --full' or configure the greeter separately."
-            fi
         fi
         print_usage
         exit 0

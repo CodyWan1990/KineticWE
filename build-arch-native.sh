@@ -5,7 +5,7 @@ set -euo pipefail
 # KineticWE - Arch Linux Native Dev Build Script
 # =============================================================================
 # Builds KineticWE directly on the host system using pacman (no distrobox).
-# Noctalia greeter is built from source (no AUR/yay dependency).
+# Noctalia greeter (KineticWE fork) is built from source (no AUR/yay dependency).
 #
 # Usage:
 #   ./build-arch-native.sh                         # Default: binary build
@@ -29,14 +29,16 @@ set -euo pipefail
 #
 # Environment variables:
 #   TEST_PREFIX     - Where to install for TTY testing (default: $HOME/.local)
-#   NOCTALIA_GREETER_REPO - Git URL for noctalia-greeter (default: https://github.com/noctalia-dev/noctalia-greeter)
+#   NOCTALIA_GREETER_REPO - Git URL for the noctalia-greeter fork (default: KineticWE fork)
+#   NOCTALIA_GREETER_REF  - Git branch/tag to build (default: main)
 # =============================================================================
 
 TEST_PREFIX="${TEST_PREFIX:-$HOME/.local}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_DIR="${SCRIPT_DIR}/lgl-kineticwe-copr"
 RESULTS_DIR="${SPEC_DIR}/results"
-NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO:-https://github.com/noctalia-dev/noctalia-greeter}"
+NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO:-https://gitlab.com/theblackdon/noctalia-greeter-kwe}"
+NOCTALIA_GREETER_REF="${NOCTALIA_GREETER_REF:-main}"
 
 SESSION_DIR="/usr/local/share/wayland-sessions"
 SESSION_DESKTOP="kineticwe-dev.desktop"
@@ -858,8 +860,8 @@ setup_noctalia_greeter() {
         info "Building noctalia-greeter from source..."
         local greeter_src
         greeter_src=$(mktemp -d /tmp/noctalia-greeter-build.XXXXXX)
-        info "Cloning ${NOCTALIA_GREETER_REPO}..."
-        git clone --depth=1 "$NOCTALIA_GREETER_REPO" "$greeter_src"
+        info "Cloning ${NOCTALIA_GREETER_REPO} (${NOCTALIA_GREETER_REF})..."
+        git clone --depth=1 --branch "$NOCTALIA_GREETER_REF" "$NOCTALIA_GREETER_REPO" "$greeter_src"
 
         info "Configuring noctalia-greeter..."
         meson setup "$greeter_src/build" "$greeter_src" \
@@ -1254,15 +1256,9 @@ main() {
             install_dev_session_entry
         fi
         if $do_full; then
-            local greeter_rc
-            set +e
+            # Hard-fail: a broken greeter (bad clone, missing deps) must abort
+            # --full instead of leaving the session without a login screen.
             setup_noctalia_greeter
-            greeter_rc=$?
-            set -e
-            if [[ $greeter_rc -ne 0 ]]; then
-                warn "Noctalia greeter setup did not complete cleanly; the dev build installed."
-                warn "Re-run './build-arch-native.sh --full' or configure the greeter separately."
-            fi
         fi
         print_usage
         exit 0
