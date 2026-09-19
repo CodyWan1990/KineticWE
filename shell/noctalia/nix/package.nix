@@ -72,9 +72,13 @@ lib.warnIf cudaSupport
       --prefix PATH : ${lib.makeBinPath [ git ]} \
       --prefix XDG_DATA_DIRS : "${glib.getSchemaDataDirPath gsettings-desktop-schemas}"
 
-    $out/bin/noctalia completions bash | install -D /dev/stdin $out/share/bash-completion/completions/noctalia
-    $out/bin/noctalia completions zsh  | install -D /dev/stdin $out/share/zsh/site-functions/_noctalia
-    $out/bin/noctalia completions fish | install -D /dev/stdin $out/share/fish/vendor_completions.d/noctalia.fish
+    $out/bin/noctalia-kwe completions bash | install -D /dev/stdin $out/share/bash-completion/completions/noctalia
+    $out/bin/noctalia-kwe completions zsh  | install -D /dev/stdin $out/share/zsh/site-functions/_noctalia
+    $out/bin/noctalia-kwe completions fish | install -D /dev/stdin $out/share/fish/vendor_completions.d/noctalia.fish
+
+    if [ ! -e "$out/bin/noctalia" ]; then
+      ln -s noctalia-kwe "$out/bin/noctalia"
+    fi
   '';
 
   nativeBuildInputs = [

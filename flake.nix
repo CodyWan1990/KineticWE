@@ -63,11 +63,25 @@
         # The KineticWE portal backend (rebranded xdg-desktop-portal-kde).
         xdg-desktop-portal-kwe = pkgs.callPackage ./nix/portal-kwe.nix { };
 
+        # Use the in-tree Noctalia fork that ships the Kinetic Settings module
+        # and `noctalia-kwe` IPC commands. The session launcher expects a
+        # `${noctalia}/bin/noctalia` path, so provide a compat symlink too.
+        noctaliaKweRaw = pkgs.callPackage ./shell/noctalia/nix/package.nix { };
+        noctaliaKwe = pkgs.symlinkJoin {
+          name = "noctalia-kwe-compat";
+          paths = [ noctaliaKweRaw ];
+          postBuild = ''
+            if [ ! -e "$out/bin/noctalia" ] && [ -e "$out/bin/noctalia-kwe" ]; then
+              ln -s noctalia-kwe "$out/bin/noctalia"
+            fi
+          '';
+        };
+
         # The session package wires kinetic-we + noctalia + xdg-desktop-portal
         # together and produces `bin/start-kineticwe`.
         session = pkgs.callPackage ./nix/session.nix {
           inherit kineticWe;
-          noctalia = noctalia.packages.${system}.default;
+          noctalia = noctaliaKwe;
           xwayland = pkgs.xwayland;
         };
       in
@@ -79,7 +93,7 @@
           session = session;
           kdecoration = kdecorationGit;
           kglobalacceld = kglobalacceldGit;
-          noctalia = noctalia.packages.${system}.default;
+          noctalia = noctaliaKwe;
           inherit xdg-desktop-portal-kwe;
         };
 
@@ -101,7 +115,7 @@
         devShells = {
           default = pkgs.callPackage ./nix/devshell.nix {
             inherit kineticWe;
-            noctalia = noctalia.packages.${system}.default;
+            noctalia = noctaliaKwe;
           };
         };
       }
