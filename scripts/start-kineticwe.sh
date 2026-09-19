@@ -120,9 +120,11 @@ export QML2_IMPORT_PATH="$QML_IMPORT_PATH"
 unset _qt_plugin_paths _qml_import_paths _KWE_LIBDIRS _d
 export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 # Traditional-WM Qt theming (Hyprland/Niri style): tell Qt apps to load the
-# qt5ct platform theme plugin, which reads ~/.config/qt5ct/qt5ct.conf and
-# applies the Noctalia color scheme. qt5ct serves both Qt5 and Qt6 apps.
-export QT_QPA_PLATFORMTHEME=qt5ct
+# qt6ct platform theme plugin, which reads ~/.config/qt6ct/qt6ct.conf and
+# applies the Noctalia color scheme. Both the Qt6 qt6ct plugin and the Qt5
+# qt5ct plugin register the qt6ct key, so Qt5 apps stay themed too (they load
+# the Qt5 plugin and read ~/.config/qt5ct/qt5ct.conf).
+export QT_QPA_PLATFORMTHEME=qt6ct
 
 # ---------------------------------------------------------------------------
 # 2. Session / desktop identity (2.0: hard cut to KineticWE)
@@ -193,7 +195,7 @@ if [[ ! -e "$KWE_CONFIG_HOME/kineticwe.kwe" ]]; then
 fi
 
 # Seed minimal qt5ct/qt6ct configs pointing at the Noctalia color scheme, so Qt
-# apps (which load these via QT_QPA_PLATFORMTHEME=qt5ct) are themed out of the
+# apps (which load these via QT_QPA_PLATFORMTHEME=qt6ct) are themed out of the
 # box. Only created when absent so a user's existing config (fonts, interface
 # tweaks) is never clobbered. The color scheme files themselves are regenerated
 # by the shell's theme templates whenever the palette changes (the Qt
@@ -1023,9 +1025,8 @@ done
 # systemd user manager: D-Bus services that activate through SystemdService=
 # units (Spectacle, portals, other KDE apps) inherit the user manager's
 # environment — not this script's — so without this they start with no
-# WAYLAND_DISPLAY/DISPLAY and without QT_QPA_PLATFORMTHEME (qt6ct serves the
-# qt5ct key, so that value is valid) and fall back to the unthemed default Qt
-# style. systemctl is always present; dbus-update-activation-environment lives
+# WAYLAND_DISPLAY/DISPLAY and without QT_QPA_PLATFORMTHEME and fall back to the
+# unthemed default Qt style. systemctl is always present; dbus-update-activation-environment lives
 # in dbus-tools, which is not a hard dependency.
 systemctl --user import-environment \
     WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
