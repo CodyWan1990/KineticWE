@@ -105,6 +105,10 @@ log() {
 log "=== KineticWE session starting ==="
 log "KINETIC_WE=${dl}KINETIC_WE"
 
+KWE_CONFIG_HOME="${dl}{XDG_CONFIG_HOME:-$HOME/.config}/kineticwe"
+mkdir -p "${dl}KWE_CONFIG_HOME" 2>/dev/null || true
+KWE_REAL_CONFIG_HOME="${dl}{XDG_CONFIG_HOME:-$HOME/.config}"
+
 # Build the KWin startup payload (runs as KWin's child process).
 STARTUP_PAYLOAD_DIR="${dl}{XDG_RUNTIME_DIR:-/tmp}/kineticwe-${dl}USER"
 mkdir -p "${dl}STARTUP_PAYLOAD_DIR" 2>/dev/null || true
@@ -119,6 +123,8 @@ export KDE_SESSION_VERSION=6
 export KDE_FULL_SESSION=true
 export XDG_MENU_PREFIX=plasma-
 export XDG_DATA_DIRS="@kwin_share@:${dl}{XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+export XDG_CONFIG_HOME="${dl}{KWE_REAL_CONFIG_HOME:-$HOME/.config}"
+unset KWE_CONFIG_HOME
 
 # KWin exports WAYLAND_DISPLAY and DISPLAY (XWayland) before launching this
 # payload; the fallback guards against the payload being started other ways.
@@ -128,7 +134,7 @@ export WAYLAND_DISPLAY="${dl}{WAYLAND_DISPLAY:-wayland-0}"
 # (e.g. Spectacle via its global shortcut). Without this, activated services
 # get no WAYLAND_DISPLAY/DISPLAY and crash: "startup job failed".
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
-    dbus-update-activation-environment --systemd --all 2>/dev/null || true
+    dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE KDE_SESSION_VERSION KDE_FULL_SESSION XDG_MENU_PREFIX XDG_DATA_DIRS 2>/dev/null || true
 fi
 
 # Pull the curated session target up: activates graphical-session.target via
@@ -202,7 +208,7 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
 fi
 
 log "Launching: ${dl}KINETIC_WE --xwayland --no-lockscreen --exit-with-session ${dl}STARTUP_PAYLOAD"
-exec "${dl}KINETIC_WE" --xwayland --no-lockscreen --exit-with-session "${dl}STARTUP_PAYLOAD"
+exec env XDG_CONFIG_HOME="${dl}KWE_CONFIG_HOME" KWE_CONFIG_HOME="${dl}KWE_CONFIG_HOME" KWE_REAL_CONFIG_HOME="${dl}KWE_REAL_CONFIG_HOME" "${dl}KINETIC_WE" --xwayland --no-lockscreen --exit-with-session "${dl}STARTUP_PAYLOAD"
 SCRIPTEOF
     chmod +x "$out/bin/start-kineticwe"
 
