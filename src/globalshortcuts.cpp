@@ -103,26 +103,34 @@ void GlobalShortcutsManager::init()
         m_kglobalAccel.reset();
         return;
     }
-    clearSpectacleDefaults();
+    clearAppShortcutDefaults();
 #endif
 }
 
-void GlobalShortcutsManager::clearSpectacleDefaults()
+void GlobalShortcutsManager::clearAppShortcutDefaults()
 {
 #if KWIN_BUILD_GLOBALSHORTCUTS
     if (!m_kglobalAccel) {
         return;
     }
-    // The action ids come from /usr/share/kglobalaccel/org.kde.spectacle.desktop
-    // ([Desktop Action ...] headers), NOT from the localized Name= strings.
-    // Marking each NoAutoloading with empty chords makes the daemon persist an
-    // empty bind (instead of autoloading the X-KDE-Shortcuts defaults) and is
-    // idempotent across restarts: re-applying an empty bind is a no-op. We do
-    // NOT call removeAllShortcuts() afterwards — unlike KWin's own actions
-    // (which re-register on every startup), Spectacle registers on demand, so
-    // removing the entry would let the daemon autoload the .desktop defaults
-    // the next time the component shows up.
-    const QStringList actions{
+    // Installed apps ship default global shortcuts in their
+    // /usr/share/kglobalaccel/*.desktop entries (X-KDE-Shortcuts), which the
+    // embedded kglobalaccel daemon autoloads unless the action is marked
+    // NoAutoloading. KineticWE ships those binds empty: a default the user never
+    // chose — launching Dolphin on Meta+E, KRunner on Alt+Space, ... — should
+    // not be handed to them behind their back. Users can still bind any of them
+    // later via Kinetic Settings.
+    //
+    // The action ids come from the [Desktop Action ...] headers of each desktop
+    // file, NOT from the localized Name= strings; "_launch" is the [Desktop
+    // Entry] launch bind. Marking each NoAutoloading with empty chords makes the
+    // daemon persist an empty bind (instead of autoloading the X-KDE-Shortcuts
+    // defaults) and is idempotent across restarts: re-applying an empty bind is
+    // a no-op. We do NOT call removeAllShortcuts() afterwards — unlike KWin's
+    // own actions (which re-register on every startup), these app components
+    // register on demand, so removing the entry would let the daemon autoload
+    // the .desktop defaults the next time the component shows up.
+    const QStringList spectacleActions{
         QStringLiteral("_launch"),
         QStringLiteral("FullScreenScreenShot"),
         QStringLiteral("CurrentMonitorScreenShot"),
@@ -134,12 +142,30 @@ void GlobalShortcutsManager::clearSpectacleDefaults()
         QStringLiteral("RecordScreen"),
         QStringLiteral("RecordWindow"),
     };
-    for (const QString &actionName : actions) {
-        QAction action;
-        action.setObjectName(actionName);
-        action.setProperty("componentName", QStringLiteral("org.kde.spectacle.desktop"));
-        action.setProperty("componentDisplayName", QStringLiteral("Spectacle"));
-        KGlobalAccel::self()->setShortcut(&action, {QKeySequence()}, KGlobalAccel::NoAutoloading);
+    struct AppComponent
+    {
+        QString uniqueName;
+        QString displayName;
+        QStringList actions;
+    };
+    const QList<AppComponent> appComponents{
+        {QStringLiteral("org.kde.dolphin.desktop"), QStringLiteral("Dolphin"), {QStringLiteral("_launch")}},
+        {QStringLiteral("org.kde.konsole.desktop"), QStringLiteral("Konsole"), {QStringLiteral("_launch")}},
+        {QStringLiteral("com.mitchellh.ghostty.desktop"), QStringLiteral("Ghostty"), {QStringLiteral("_launch")}},
+        {QStringLiteral("org.kde.krunner.desktop"), QStringLiteral("KRunner"), {QStringLiteral("_launch"), QStringLiteral("RunClipboard")}},
+        {QStringLiteral("org.kde.kscreen.desktop"), QStringLiteral("Display Configuration"), {QStringLiteral("ShowOSD")}},
+        {QStringLiteral("org.kde.plasma-systemmonitor.desktop"), QStringLiteral("System Monitor"), {QStringLiteral("_launch")}},
+        {QStringLiteral("org.kde.kcalc.desktop"), QStringLiteral("KCalc"), {QStringLiteral("_launch")}},
+        {QStringLiteral("org.kde.spectacle.desktop"), QStringLiteral("Spectacle"), spectacleActions},
+    };
+    for (const AppComponent &component : appComponents) {
+        for (const QString &actionName : component.actions) {
+            QAction action;
+            action.setObjectName(actionName);
+            action.setProperty("componentName", component.uniqueName);
+            action.setProperty("componentDisplayName", component.displayName);
+            KGlobalAccel::self()->setShortcut(&action, {QKeySequence()}, KGlobalAccel::NoAutoloading);
+        }
     }
 #endif
 }

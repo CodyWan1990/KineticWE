@@ -234,6 +234,12 @@ namespace {
 KeybindsPage::KeybindsPage(SessionBus& bus, CustomKeybinds& customKeybinds)
     : m_bus(bus), m_customKeybinds(customKeybinds), m_dbus(bus) {}
 
+InputArea* KeybindsPage::takePendingFocusArea() {
+  InputArea* area = m_pendingFocusArea;
+  m_pendingFocusArea = nullptr;
+  return area;
+}
+
 std::string KeybindsPage::keyPath(std::string_view component, std::string_view action) {
   // Separator between the component and action halves of the pending-key path.
   // It must never appear in a component or action name: both can contain dots
@@ -578,8 +584,8 @@ void KeybindsPage::buildChordRow(
     });
     prompt->addChild(makeLabel(
         i18n::tr(
-            "settings.keybinds.conflict-prompt", "{keybind}", KeybindCodec::toChordString(pending.chord),
-            "{action}", ownerActionName, "{component}", ownerComponentName
+            "settings.keybinds.conflict-prompt", "keybind", KeybindCodec::toChordString(pending.chord),
+            "action", ownerActionName, "component", ownerComponentName
         ),
         Style::fontSizeCaption * scale, colorSpecFromRole(ColorRole::Error)
     ));
@@ -756,6 +762,7 @@ std::unique_ptr<Node> KeybindsPage::buildAddMenu(float scale, const Callbacks& c
       [this, callbacks]() {
         m_addMenuOpen = false;
         m_addMode = AddMode::Apps;
+        m_focusAddField = true;
         if (callbacks.requestRebuild) {
           callbacks.requestRebuild();
         }
@@ -766,6 +773,7 @@ std::unique_ptr<Node> KeybindsPage::buildAddMenu(float scale, const Callbacks& c
       [this, callbacks]() {
         m_addMenuOpen = false;
         m_addMode = AddMode::Command;
+        m_focusAddField = true;
         if (callbacks.requestRebuild) {
           callbacks.requestRebuild();
         }
@@ -793,7 +801,7 @@ std::unique_ptr<Node> KeybindsPage::buildAppPicker(float scale, const Callbacks&
         .icon = "app-window",
     });
   }
-  column->addChild(ui::searchPicker({
+  auto picker = ui::searchPicker({
       .placeholder = i18n::tr("settings.keybinds.app-picker-placeholder"),
       .emptyText = i18n::tr("settings.keybinds.app-picker-empty"),
       .options = std::move(options),
@@ -811,6 +819,7 @@ std::unique_ptr<Node> KeybindsPage::buildAppPicker(float scale, const Callbacks&
             m_addMenuOpen = false;
             if (m_customKeybinds.addApp(entry->id, entry->name, entry->exec)) {
               m_loaded = false;
+              m_selectedComponent = std::string(CustomKeybinds::kAppsComponent);
             }
             if (callbacks.requestRebuild) {
               callbacks.requestRebuild();
@@ -830,7 +839,12 @@ std::unique_ptr<Node> KeybindsPage::buildAppPicker(float scale, const Callbacks&
             picker.setRadius(0.0F);
             picker.setPadding(0.0F);
           },
-  }));
+  });
+  if (m_focusAddField) {
+    m_pendingFocusArea = picker->filterInputArea();
+    m_focusAddField = false;
+  }
+  column->addChild(std::move(picker));
 
   column->addChild(ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceXs * scale},
@@ -864,6 +878,10 @@ std::unique_ptr<Node> KeybindsPage::buildCommandForm(float scale, const Callback
   auto input = std::make_unique<Input>();
   input->setPlaceholder(i18n::tr("settings.keybinds.command-placeholder"));
   input->setMinLayoutWidth(480.0F * scale);
+  if (m_focusAddField) {
+    m_pendingFocusArea = input->inputArea();
+    m_focusAddField = false;
+  }
   Input* inputPtr = input.get();
   input->setOnSubmit(
       [this, inputPtr, callbacks](const std::string& command) {
@@ -874,6 +892,7 @@ std::unique_ptr<Node> KeybindsPage::buildCommandForm(float scale, const Callback
         m_addMenuOpen = false;
         if (m_customKeybinds.addCommand(command)) {
           m_loaded = false;
+          m_selectedComponent = std::string(CustomKeybinds::kCommandsComponent);
         }
         if (callbacks.requestRebuild) {
           callbacks.requestRebuild();
@@ -902,6 +921,7 @@ std::unique_ptr<Node> KeybindsPage::buildCommandForm(float scale, const Callback
                 m_addMenuOpen = false;
                 if (m_customKeybinds.addCommand(command)) {
                   m_loaded = false;
+                  m_selectedComponent = std::string(CustomKeybinds::kCommandsComponent);
                 }
                 if (callbacks.requestRebuild) {
                   callbacks.requestRebuild();
@@ -966,6 +986,10 @@ std::unique_ptr<Node> KeybindsPage::buildComponentList(float scale, const Callba
 std::unique_ptr<Node>
 KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callbacks) {
   ensureLoaded();
+  // A stale focus request must not survive into a build that does not render the
+  // add form (e.g. the user navigated away before it was consumed); the add
+  // branches below re-arm it when they build.
+  m_pendingFocusArea = nullptr;
 
   auto root = ui::column({
       .align = FlexAlign::Stretch,

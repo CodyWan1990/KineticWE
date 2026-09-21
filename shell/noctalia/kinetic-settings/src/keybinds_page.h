@@ -13,6 +13,7 @@
 #include <vector>
 
 class Flex;
+class InputArea;
 class Node;
 class SessionBus;
 
@@ -80,6 +81,8 @@ public:
     m_pending.clear();
     m_pendingRebind.reset();
     m_errorNotice.clear();
+    m_pendingFocusArea = nullptr;
+    m_focusAddField = false;
     // Drop any leftover capture count (e.g. a recorder was destroyed while
     // recording, or the window closed mid-capture) so a stale isCapturing()
     // can't leave the keyboard-shortcuts inhibitor held open.
@@ -89,6 +92,12 @@ public:
   // True while any chord recorder on the page is capturing input; the window
   // must not treat Escape as "close" (and must not rebuild) during capture.
   [[nodiscard]] bool isCapturing() const noexcept { return m_recordingCount > 0; }
+
+  // Input area of the add-application / add-command field that should receive
+  // keyboard focus on this scene build, or nullptr. One-shot: the call clears
+  // it so the hosting window can focus the field without stealing focus on
+  // unrelated rebuilds.
+  [[nodiscard]] InputArea* takePendingFocusArea();
 
 private:
   struct StagedAction {
@@ -186,6 +195,10 @@ private:
   enum class AddMode { None, Apps, Command };
   bool m_addMenuOpen = false;
   AddMode m_addMode = AddMode::None;
+  // Set when the user opens one of the add forms; the next build of that form
+  // records its field's input area in m_pendingFocusArea for the window.
+  bool m_focusAddField = false;
+  InputArea* m_pendingFocusArea = nullptr;
 
   // Human-readable message shown above the component list when the last Apply
   // failed (e.g. the daemon rejected a staged chord). Cleared on the next

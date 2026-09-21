@@ -1690,6 +1690,15 @@ void KineticSettingsWindow::buildScene(float width, float height) {
     if (m_searchInput != nullptr && m_searchInput->inputArea() != nullptr) {
       m_inputDispatcher.setFocus(m_searchInput->inputArea());
     }
+  } else if (m_keybindsPage != nullptr) {
+    // Always consume the keybinds page's one-shot focus request so it cannot go
+    // stale, but only honor it on the page itself: the add forms can also render
+    // under global search, where the field must not steal the caret. Honoring it
+    // puts the caret in the field so the user can type without clicking first.
+    if (auto* focusArea = m_keybindsPage->takePendingFocusArea();
+        focusArea != nullptr && m_activePage == ActivePage::Keybinds && m_searchQuery.empty()) {
+      m_inputDispatcher.setFocus(focusArea);
+    }
   }
 }
 

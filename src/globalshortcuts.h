@@ -117,15 +117,15 @@ public:
 private:
     void objectDeleted(QObject *object);
     bool add(GlobalShortcut sc, DeviceType device = DeviceType::Touchpad);
-    // Spectacle ships its default global shortcuts in
-    // /usr/share/kglobalaccel/org.kde.spectacle.desktop (RecordRegion,
-    // RecordScreen, RecordWindow, ...). The embedded kglobalaccel daemon
-    // autoloads those into a session unless each action is marked
-    // NoAutoloading. KineticWE ships those binds empty by default, so we mark
-    // the whole component NoAutoloading here — before Spectacle has a chance
-    // to register — and the empty state persists in kglobalaccelrc. Users can
-    // still rebind any Spectacle action later via Kinetic Settings.
-    void clearSpectacleDefaults();
+    // Installed apps ship default global shortcuts in their
+    // /usr/share/kglobalaccel/*.desktop entries (X-KDE-Shortcuts). The embedded
+    // kglobalaccel daemon autoloads those into a session unless each action is
+    // marked NoAutoloading. KineticWE ships those binds empty by default so a
+    // default the user never chose (Dolphin on Meta+E, KRunner on Alt+Space,
+    // ...) never appears; the user can bind anything they like later via
+    // Kinetic Settings. This covers app launch/action binds only — KineticWE's
+    // own Meta+T terminal and Meta+Space launcher are registered elsewhere.
+    void clearAppShortcutDefaults();
 
     QList<GlobalShortcut> m_shortcuts;
 
