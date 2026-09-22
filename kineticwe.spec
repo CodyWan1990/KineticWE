@@ -286,6 +286,10 @@ cd ../aurorae
 tar xf %{SOURCE4} --strip-components=1
 cd -
 
+# The namespace rewrite below changes the helper name in CMakeLists.txt; keep
+# the configure_file source template name in sync with that rewritten reference.
+mv ../aurorae/plasma-apply-aurorae.cmake ../aurorae/kineticwe-apply-aurorae.cmake
+
 # KineticWE coexistence: namespace the vendored aurorae artifacts so they do not
 # collide with Fedora's stock aurorae package.
 find ../aurorae -type f \( -name 'CMakeLists.txt' -o -name '*.cpp' -o -name '*.h' -o -name '*.qml' -o -name '*.json' -o -name '*.desktop' -o -name '*.in' -o -name '*.xml' \) -print0 \
@@ -483,6 +487,7 @@ rm -f %{buildroot}%{_datadir}/applications/kcm_*.desktop 2>/dev/null || true
 %{_libdir}/qt6/plugins/kf6/packagestructure/kineticwe/
 %{_libdir}/qt6/plugins/org.kineticwe.decoration/
 %{_libdir}/qt6/qml/org/kineticwe/
+%{_libdir}/qt6/qml/org/kde/kineticwe/decorations/plastik/
 %{_libdir}/libexec/kineticwe*
 %dir %{_datadir}/knotifications6/
 %{_datadir}/qlogging-categories6/
@@ -493,6 +498,7 @@ rm -f %{buildroot}%{_datadir}/applications/kcm_*.desktop 2>/dev/null || true
 %{_datadir}/icons/Breeze-Round-Chameleon*
 %{_datadir}/krunner/
 %{_datadir}/locale/
+%exclude %{_datadir}/locale/*/LC_MESSAGES/xdg-desktop-portal-kwe.mo
 %{_userunitdir}/kineticwe.service
 %{_userunitdir}/kineticwe-session.target
 
@@ -509,7 +515,7 @@ rm -f %{buildroot}%{_datadir}/applications/kcm_*.desktop 2>/dev/null || true
 %{_datadir}/applications/org.freedesktop.impl.portal.desktop.kwe.desktop
 %{_userunitdir}/plasma-xdg-desktop-portal-kwe.service
 %{_qt6_qmldir}/org/kde/xdgdesktopportal/
-%{_datadir}/locale/
+%{_datadir}/locale/*/LC_MESSAGES/xdg-desktop-portal-kwe.mo
 
 %files -n kineticwe-noctalia
 %license shell/noctalia/LICENSE
