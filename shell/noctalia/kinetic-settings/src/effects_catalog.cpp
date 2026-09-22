@@ -222,37 +222,42 @@ static std::vector<Effect> discoverEffects() {
     });
   };
 
+  // Prefer KineticWE's namespace, but keep compatibility with a Noctalia-KWE
+  // process running against a standard KDE/KWin data directory.
+  const std::vector<std::string_view> effectRoots{"kineticwe-wayland", "kwin-wayland"};
   for (const auto& dir : dataDirs()) {
-    // Built-in (compiled) effects: kwin-wayland/builtin-effects/<name>.json
-    const fs::path builtinDir = fs::path(dir) / "kwin-wayland" / "builtin-effects";
-    std::error_code ec;
-    fs::directory_iterator it(builtinDir, ec);
-    const fs::directory_iterator end;
-    for (; !ec && it != end; it.increment(ec)) {
-      if (!it->is_regular_file() || it->path().extension() != ".json") {
-        continue;
+    for (const std::string_view effectRoot : effectRoots) {
+      // Built-in (compiled) effects: <root>/builtin-effects/<name>.json
+      const fs::path builtinDir = fs::path(dir) / effectRoot / "builtin-effects";
+      std::error_code ec;
+      fs::directory_iterator it(builtinDir, ec);
+      const fs::directory_iterator end;
+      for (; !ec && it != end; it.increment(ec)) {
+        if (!it->is_regular_file() || it->path().extension() != ".json") {
+          continue;
+        }
+        consumeJson(it->path(), it->path().stem().string(), /*requireEffectPackage=*/false);
       }
-      consumeJson(it->path(), it->path().stem().string(), /*requireEffectPackage=*/false);
-    }
 
-    // Scripted effects bundled with KineticWE: kwin-wayland/effects/<name>/metadata.json
-    // (this includes Geometry Change). The sibling kwin/effects root is
-    // deliberately NOT scanned: that is the KWin/Effect KPackage install path
-    // used by third-party "Get New Effects" (KNewStuff) downloads, which are
-    // out of scope for these pages.
-    const fs::path pkgRoot = fs::path(dir) / "kwin-wayland/effects";
-    std::error_code ec2;
-    fs::directory_iterator pkgIt(pkgRoot, ec2);
-    const fs::directory_iterator pkgEnd;
-    for (; !ec2 && pkgIt != pkgEnd; pkgIt.increment(ec2)) {
-      if (!pkgIt->is_directory()) {
-        continue;
+      // Scripted effects bundled with KineticWE: <root>/effects/<name>/metadata.json
+      // (this includes Geometry Change). The sibling kwin/effects root is
+      // deliberately NOT scanned: that is the KWin/Effect KPackage install path
+      // used by third-party "Get New Effects" (KNewStuff) downloads, which are
+      // out of scope for these pages.
+      const fs::path pkgRoot = fs::path(dir) / effectRoot / "effects";
+      std::error_code ec2;
+      fs::directory_iterator pkgIt(pkgRoot, ec2);
+      const fs::directory_iterator pkgEnd;
+      for (; !ec2 && pkgIt != pkgEnd; pkgIt.increment(ec2)) {
+        if (!pkgIt->is_directory()) {
+          continue;
+        }
+        const fs::path metaFile = pkgIt->path() / "metadata.json";
+        if (!fs::is_regular_file(metaFile)) {
+          continue;
+        }
+        consumeJson(metaFile, pkgIt->path().filename().string(), /*requireEffectPackage=*/true);
       }
-      const fs::path metaFile = pkgIt->path() / "metadata.json";
-      if (!fs::is_regular_file(metaFile)) {
-        continue;
-      }
-      consumeJson(metaFile, pkgIt->path().filename().string(), /*requireEffectPackage=*/true);
     }
   }
 
