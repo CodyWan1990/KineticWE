@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "dbus/session_bus.h"
 #include "i18n/i18n.h"
+#include "kinetic-settings/src/section_card.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
@@ -943,13 +944,37 @@ std::unique_ptr<Node> WindowBehaviorPage::build(
       makeLabel("Window Behavior", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
   ));
 
+  // Each page group renders as a collapsible card. During a global search the
+  // groups flatten to plain headers so every match stays visible (mirrors
+  // Noctalia's settings behaviour).
+  const bool collapsible = filter.searchQuery.empty();
+  if (collapsible && !m_expandedInitialized) {
+    m_expandedInitialized = true;
+    for (const auto& field : fields()) {
+      if (!field.pageGroup.empty()) {
+        m_expandedGroups.insert(std::string(field.pageGroup));
+        break;
+      }
+    }
+  }
+
   bool anyRows = false;
   bool firstGroup = true;
   std::string_view lastGroup;
-  const auto addGroupHeader = [&](std::string_view title) {
+  Flex* currentBody = root.get();
+  const auto beginGroup = [&](std::string_view title) {
     if (title.empty()) {
+      currentBody = root.get();
       return;
     }
+    if (collapsible) {
+      currentBody = kinetic_settings::addCollapsibleSection(
+          *root, title, title, m_expandedGroups, scale, callbacks.jumpRow
+      );
+      firstGroup = false;
+      return;
+    }
+    // Search mode: flat section header.
     if (!firstGroup) {
       root->addChild(ui::column(
           {.align = FlexAlign::Stretch,
@@ -963,6 +988,7 @@ std::unique_ptr<Node> WindowBehaviorPage::build(
           makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold)
       );
     }
+    currentBody = root.get();
     firstGroup = false;
   };
 
@@ -989,9 +1015,9 @@ std::unique_ptr<Node> WindowBehaviorPage::build(
           if (sectionVisible) {
             if (field.pageGroup != lastGroup) {
               lastGroup = field.pageGroup;
-              addGroupHeader(lastGroup);
+              beginGroup(lastGroup);
             }
-            root->addChild(buildButtonsSection(*left, *right, scale, armedResetKey, callbacks));
+            currentBody->addChild(buildButtonsSection(*left, *right, scale, armedResetKey, callbacks));
             anyRows = true;
           }
         }
@@ -1004,9 +1030,9 @@ std::unique_ptr<Node> WindowBehaviorPage::build(
     }
     if (field.pageGroup != lastGroup) {
       lastGroup = field.pageGroup;
-      addGroupHeader(lastGroup);
+      beginGroup(lastGroup);
     }
-    addSettingRow(*root, field, scale, armedResetKey, callbacks);
+    addSettingRow(*currentBody, field, scale, armedResetKey, callbacks);
     anyRows = true;
   }
 

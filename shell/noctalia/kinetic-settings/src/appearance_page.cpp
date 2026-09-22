@@ -436,7 +436,8 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
   const bool sectionTitleMatches =
       searchActive && StringUtils::containsInsensitive("Title bars", filter.searchQuery);
   const bool showToggleRow = !searchActive || sectionTitleMatches
-      || StringUtils::containsInsensitive("Toggle title bars", filter.searchQuery)
+      || StringUtils::containsInsensitive("Show title bars", filter.searchQuery)
+      || StringUtils::containsInsensitive("Hide title bars", filter.searchQuery)
       || StringUtils::containsInsensitive("Remove the title bar and frame on every window", filter.searchQuery);
   const DecorationSelection current = effectiveDecoration();
 
@@ -458,10 +459,12 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
 
   auto section = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale, .fillWidth = true});
 
-  // Global default: hide every title bar and frame unless a per-window rule
-  // overrides it.
+  // Global default: show every title bar and frame unless a per-window rule
+  // overrides it. The stored [Windows] DefaultDecorationPolicy is unchanged
+  // (0 = no decoration / hidden, 1 = client preference / shown); only the
+  // toggle's sense flips so off means no title bar and on means title bars.
   if (showToggleRow) {
-    const bool hideTitleBars = effectiveHideTitleBars();
+    const bool showTitleBars = !effectiveHideTitleBars();
     auto card = ui::column({
         .align = FlexAlign::Stretch,
         .gap = Style::spaceSm * scale,
@@ -479,11 +482,11 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     });
     auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
     copy->addChild(makeLabel(
-        "Toggle title bars", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+        "Show title bars", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
     ));
     copy->addChild(ui::label({
         .text =
-            "Remove the title bar and frame on every window, unless a per-window "
+            "Show the title bar and frame on every window, unless a per-window "
             "rule overrides it for a specific application.",
         .fontSize = Style::fontSizeCaption * scale,
         .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
@@ -491,11 +494,11 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     }));
     row->addChild(std::move(copy));
     row->addChild(ui::toggle({
-        .checked = hideTitleBars,
+        .checked = showTitleBars,
         .scale = scale,
         .onChange =
-            [this, callbacks](bool hide) {
-              stageHideTitleBars(hide);
+            [this, callbacks](bool show) {
+              stageHideTitleBars(!show);
               if (callbacks.requestRebuild) {
                 callbacks.requestRebuild();
               }

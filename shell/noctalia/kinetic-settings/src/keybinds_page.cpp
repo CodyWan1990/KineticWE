@@ -6,6 +6,7 @@
 #include "i18n/i18n.h"
 #include "keybind_codec.h"
 #include "keybinds_kwe.h"
+#include "kinetic-settings/src/section_card.h"
 #include "system/desktop_entry.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -29,7 +30,6 @@ namespace {
 
   constexpr Logger kLog("kinetic-settings");
 
-  constexpr float kComponentListWidth = 200.0F;
   constexpr float kChordRecorderWidth = 260.0F;
   // Per-window shortcuts (Window Close, Move, ...) are per-instance, not
   // rebindable globals; hide them like the KDE Shortcuts KCM.
@@ -117,6 +117,13 @@ namespace {
   [[nodiscard]] std::string componentDisplayName(const KeybindDbus::Component& component) {
     if (component.uniqueName == "kineticwe") {
       return "KineticWE";
+    }
+    // Spectacle registers under its desktop-file storage id and the daemon
+    // reports no component friendly name, so surface the product name instead
+    // of the package id. The underscore form is the id with dots replaced.
+    if (component.uniqueName == "org.kde.spectacle.desktop"
+        || component.uniqueName == "org_kde_spectacle_desktop") {
+      return "Spectacle";
     }
     if (!component.friendlyName.empty()) {
       return component.friendlyName;
@@ -820,7 +827,7 @@ std::unique_ptr<Node> KeybindsPage::buildAppPicker(float scale, const Callbacks&
             m_addMenuOpen = false;
             if (m_customKeybinds.addApp(entry->id, entry->name, entry->exec)) {
               m_loaded = false;
-              m_selectedComponent = std::string(CustomKeybinds::kAppsComponent);
+              m_expandedGroups.insert(std::string(CustomKeybinds::kAppsComponent));
             }
             if (callbacks.requestRebuild) {
               callbacks.requestRebuild();
@@ -893,7 +900,7 @@ std::unique_ptr<Node> KeybindsPage::buildCommandForm(float scale, const Callback
         m_addMenuOpen = false;
         if (m_customKeybinds.addCommand(command)) {
           m_loaded = false;
-          m_selectedComponent = std::string(CustomKeybinds::kCommandsComponent);
+          m_expandedGroups.insert(std::string(CustomKeybinds::kCommandsComponent));
         }
         if (callbacks.requestRebuild) {
           callbacks.requestRebuild();
@@ -922,7 +929,7 @@ std::unique_ptr<Node> KeybindsPage::buildCommandForm(float scale, const Callback
                 m_addMenuOpen = false;
                 if (m_customKeybinds.addCommand(command)) {
                   m_loaded = false;
-                  m_selectedComponent = std::string(CustomKeybinds::kCommandsComponent);
+                  m_expandedGroups.insert(std::string(CustomKeybinds::kCommandsComponent));
                 }
                 if (callbacks.requestRebuild) {
                   callbacks.requestRebuild();
@@ -947,41 +954,6 @@ std::unique_ptr<Node> KeybindsPage::buildCommandForm(float scale, const Callback
       })
   ));
   return column;
-}
-
-std::unique_ptr<Node> KeybindsPage::buildComponentList(float scale, const Callbacks& callbacks) {
-  auto list = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceXs * scale,
-      .width = kComponentListWidth * scale,
-  });
-  for (const auto& component : m_components) {
-    const bool selected = component.uniqueName == m_selectedComponent;
-    list->addChild(ui::button({
-        .text = componentDisplayName(component),
-        .fontSize = Style::fontSizeCaption * scale,
-        .contentAlign = ButtonContentAlign::Start,
-        .variant = selected ? ButtonVariant::TabActive : ButtonVariant::Tab,
-        .minHeight = Style::controlHeight * scale,
-        .paddingV = Style::spaceXs * scale,
-        .paddingH = Style::spaceMd * scale,
-        .radius = Style::scaledRadiusMd(scale),
-        .onClick =
-            [this, uniqueName = component.uniqueName, callbacks]() {
-              m_selectedComponent = uniqueName;
-              if (callbacks.requestRebuild) {
-                callbacks.requestRebuild();
-              }
-            },
-        .configure = [selected](Button& button) {
-          if (selected && button.label() != nullptr) {
-            button.label()->setFontWeight(FontWeight::Bold);
-          }
-          button.setTabStop(false);
-        },
-    }));
-  }
-  return list;
 }
 
 std::unique_ptr<Node>
@@ -1096,8 +1068,8 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
         root->addChild(ui::separator());
       }
       root->addChild(makeLabel(
-          component.friendlyName.empty() ? component.uniqueName : component.friendlyName,
-          Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
+          componentDisplayName(component), Style::fontSizeBody * scale,
+          colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
       ));
       for (const KeybindDbus::Action* action : matching) {
         buildActionRow(*root, component, *action, scale, callbacks);
@@ -1111,55 +1083,43 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
     return root;
   }
 
-  if (m_selectedComponent.empty()
-      || std::ranges::none_of(m_components, [this](const KeybindDbus::Component& c) {
-           return c.uniqueName == m_selectedComponent;
-         })) {
-    m_selectedComponent = m_components.front().uniqueName;
+  // One collapsible card per component: the components are the sections, so
+  // collapsing folds a whole group of binds. (The search path above stays flat
+  // and grouped by component.)
+  if (!m_expandedInitialized) {
+    m_expandedInitialized = true;
+    if (!m_components.empty()) {
+      m_expandedGroups.insert(m_components.front().uniqueName);
+    }
   }
 
-  // Component list on the left, actions on the right (KDE Shortcuts KCM layout).
-  auto body = ui::row({
-      .align = FlexAlign::Start,
-      .gap = Style::spaceMd * scale,
-      .fillWidth = true,
-  });
-  body->addChild(buildComponentList(scale, callbacks));
-  body->addChild(ui::separator({
-      .thickness = 1.0F,
-      .spacing = Style::spaceXs * scale,
-      .orientation = SeparatorOrientation::VerticalRule,
-  }));
-
-  auto actionsColumn = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
-  });
   bool anyRows = false;
-  const auto componentIt = std::ranges::find_if(
-      m_components, [this](const KeybindDbus::Component& c) { return c.uniqueName == m_selectedComponent; }
-  );
-  if (componentIt != m_components.end()) {
-    for (const auto& action : componentIt->actions) {
+  for (const auto& component : m_components) {
+    std::vector<const KeybindDbus::Action*> visible;
+    for (const auto& action : component.actions) {
       if (action.actionUnique.starts_with(kSessionActionPrefix)) {
         continue;
       }
-      if (!matchesFilter(*componentIt, action, filter)) {
-        continue;
+      if (matchesFilter(component, action, filter)) {
+        visible.push_back(&action);
       }
-      buildActionRow(*actionsColumn, *componentIt, action, scale, callbacks);
-      anyRows = true;
     }
+    if (visible.empty()) {
+      continue;
+    }
+    Flex* body = kinetic_settings::addCollapsibleSection(
+        *root, componentDisplayName(component), component.uniqueName, m_expandedGroups, scale, callbacks.jumpRow
+    );
+    for (const KeybindDbus::Action* action : visible) {
+      buildActionRow(*body, component, *action, scale, callbacks);
+    }
+    anyRows = true;
   }
   if (!anyRows) {
-    actionsColumn->addChild(makeLabel(
+    root->addChild(makeLabel(
         "No keybinds match the current filters.", Style::fontSizeBody * scale,
         colorSpecFromRole(ColorRole::OnSurfaceVariant)
     ));
   }
-
-  body->addChild(std::move(actionsColumn));
-  root->addChild(std::move(body));
   return root;
 }

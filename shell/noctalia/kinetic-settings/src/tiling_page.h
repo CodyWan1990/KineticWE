@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -57,6 +58,9 @@ public:
     std::function<void()> requestRebuild;
     std::function<void(std::string keyPath)> armReset;
     std::function<void(std::string keyPath)> confirmReset;
+    // Window-level fixed section jump row; when non-null each collapsible
+    // section adds a pill to it. Owned by the window.
+    Flex* jumpRow = nullptr;
   };
 
   explicit TilingPage(class SessionBus& bus);
@@ -207,8 +211,11 @@ private:
   [[nodiscard]] bool desktopOverrideRowMatches(
       const Filter& filter, std::string_view desktopName, std::string_view outputName, bool overridden
   ) const;
-  [[nodiscard]] bool buildDesktopOverridesBlock(
-      Flex& parent, float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
+  // Builds the per-desktop override rows (caption + workspace/monitor rows) as a
+  // standalone node so the caller can place it inside a collapsible section card;
+  // returns nullptr when there is nothing to show.
+  [[nodiscard]] std::unique_ptr<Node> buildDesktopOverridesContent(
+      float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
   );
 
   SessionBus& m_bus;
@@ -222,4 +229,9 @@ private:
   std::map<std::string, std::string> m_pendingDesktopOverrides;
   // Connected monitor connector names, refreshed by the window before build().
   std::vector<std::string> m_outputNames;
+  // Page-group keys whose collapsible card is expanded. Owned here so the state
+  // survives the window's per-change scene rebuilds; the first group is
+  // expanded on the first non-search build.
+  std::unordered_set<std::string> m_expandedGroups;
+  bool m_expandedInitialized = false;
 };

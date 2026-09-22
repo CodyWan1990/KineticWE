@@ -129,6 +129,11 @@ private:
 
   [[nodiscard]] std::unique_ptr<Flex> buildFilterRow(float scale);
   [[nodiscard]] std::unique_ptr<Node> buildSidebar(float scale);
+  // The fixed section-jump (pill) row under the filter row: cleared before each
+  // content rebuild, populated by the active page's collapsible sections, and
+  // hidden when it ends up with fewer than two pills or during a search.
+  void clearGroupJumpRow();
+  void updateGroupJumpRowVisibility();
   // Filters/callbacks handed to whichever page is currently active. All pages
   // expose the same Filter/Callbacks shape, so these centralize the wiring.
   [[nodiscard]] TilingPage::Filter pageFilter() const;
@@ -210,6 +215,8 @@ private:
   Box* m_background = nullptr;
   Flex* m_pageContainer = nullptr;
   Flex* m_mainContainer = nullptr;
+  // Fixed jump row (section pills) between the filter row and the page scroll.
+  Flex* m_groupJumpRow = nullptr;
 
   // Active secondary page and which sidebar categories are expanded.
   ActivePage m_activePage = ActivePage::AppearanceTitleBars;

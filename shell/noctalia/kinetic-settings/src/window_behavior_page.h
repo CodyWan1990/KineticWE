@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -58,6 +59,9 @@ public:
     std::function<void()> requestRebuild;
     std::function<void(std::string keyPath)> armReset;
     std::function<void(std::string keyPath)> confirmReset;
+    // Window-level fixed section jump row; when non-null each collapsible
+    // section adds a pill to it. Owned by the window.
+    Flex* jumpRow = nullptr;
   };
 
   explicit WindowBehaviorPage(class SessionBus& bus);
@@ -188,4 +192,9 @@ private:
   bool m_loaded = false;
   // Edits staged by the controls, keyed by "group.key"; flushed by applyAll().
   std::map<std::string, Value> m_pending;
+  // Page-group keys whose collapsible card is expanded. Owned here so the state
+  // survives the window's per-change scene rebuilds; the first group is
+  // expanded on the first non-search build.
+  std::unordered_set<std::string> m_expandedGroups;
+  bool m_expandedInitialized = false;
 };

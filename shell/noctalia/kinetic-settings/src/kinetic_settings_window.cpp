@@ -392,6 +392,7 @@ TilingPage::Callbacks KineticSettingsWindow::tilingPageCallbacks() {
             }
             requestSceneRebuild();
           },
+      .jumpRow = m_groupJumpRow,
   };
 }
 
@@ -437,6 +438,7 @@ KeybindsPage::Callbacks KineticSettingsWindow::keybindsPageCallbacks() {
       .requestRebuild =
           [this]() { clearArmedResets(); requestSceneRebuild(); },
       .recordingChanged = [this](bool) { updateKeyboardShortcutInhibit(); },
+      .jumpRow = m_groupJumpRow,
   };
 }
 
@@ -571,6 +573,7 @@ WindowBehaviorPage::Callbacks KineticSettingsWindow::windowBehaviorPageCallbacks
             }
             requestSceneRebuild();
           },
+      .jumpRow = m_groupJumpRow,
   };
 }
 
@@ -1533,15 +1536,38 @@ void KineticSettingsWindow::rebuildContent(Renderer& renderer) {
   if (m_pageContainer == nullptr) {
     return;
   }
+  clearGroupJumpRow();
   removeAllChildren(*m_pageContainer);
   if (!m_searchQuery.empty()) {
     // Global search: merge the matching settings of every page into one list.
     rebuildSearchResults(renderer);
+    updateGroupJumpRowVisibility();
     return;
   }
   if (auto node = buildPageNode(m_activePage, renderer); node != nullptr) {
     m_pageContainer->addChild(std::move(node));
   }
+  updateGroupJumpRowVisibility();
+}
+
+void KineticSettingsWindow::clearGroupJumpRow() {
+  if (m_groupJumpRow == nullptr) {
+    return;
+  }
+  while (!m_groupJumpRow->children().empty()) {
+    m_groupJumpRow->removeChild(m_groupJumpRow->children().back().get());
+  }
+}
+
+void KineticSettingsWindow::updateGroupJumpRowVisibility() {
+  if (m_groupJumpRow == nullptr) {
+    return;
+  }
+  // Hidden during a search (pages are flattened then) and when a page has fewer
+  // than two sections, where a lone pill would be pointless.
+  const bool show = m_searchQuery.empty() && m_groupJumpRow->children().size() >= 2;
+  m_groupJumpRow->setVisible(show);
+  m_groupJumpRow->setParticipatesInLayout(show);
 }
 
 void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
@@ -1602,6 +1628,7 @@ void KineticSettingsWindow::buildScene(float width, float height) {
   m_inputDispatcher.setSceneRoot(nullptr);
   m_pageContainer = nullptr;
   m_mainContainer = nullptr;
+  m_groupJumpRow = nullptr;
 
   m_sceneRoot = ui::node({.width = width, .height = height});
   m_sceneRoot->setAnimationManager(&m_animations);
@@ -1668,10 +1695,29 @@ void KineticSettingsWindow::buildScene(float width, float height) {
   content->setDirection(FlexDirection::Vertical);
   content->setAlign(FlexAlign::Stretch);
   content->setGap(Style::spaceMd * scale);
+
+  // Fixed section-jump (pill) row: above the scrolling page content and to the
+  // right of the sidebar, so the pills line up with the section cards. It is
+  // populated by the active page during rebuildContent().
+  auto contentColumn = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .flexGrow = 1.0F,
+  });
+  contentColumn->addChild(ui::row({
+      .out = &m_groupJumpRow,
+      .align = FlexAlign::Center,
+      .wrap = true,
+      .gap = Style::spaceXs * scale,
+      .fillWidth = true,
+      .configure = [scale](Flex& flex) { flex.setPadding(0.0F, Style::spaceLg * scale); },
+  }));
+
   auto& renderer = m_surface->renderTarget().renderer();
   rebuildContent(renderer);
 
-  body->addChild(std::move(scroll));
+  contentColumn->addChild(std::move(scroll));
+  body->addChild(std::move(contentColumn));
   main->addChild(std::move(body));
 
   // Lay the new tree out before attaching it: the render path only draws

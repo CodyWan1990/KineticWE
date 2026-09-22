@@ -3679,6 +3679,16 @@ namespace settings {
       }
     }
 
+    // KineticWE runs on compositors (e.g. KWin) that do not expose
+    // wlr-screencopy-unstable-v1, where Noctalia's capture is unavailable.
+    // Drop the Screenshot entries entirely so the section disappears from the
+    // Settings sidebar and search rather than advertising a dead feature.
+    if (!env.screencopySupported) {
+      std::erase_if(entries, [](const SettingEntry& entry) {
+        return entry.section == SettingsSection::Screenshot;
+      });
+    }
+
     return entries;
   }
 

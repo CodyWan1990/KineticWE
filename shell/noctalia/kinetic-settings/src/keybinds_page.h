@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 class Flex;
@@ -26,10 +27,11 @@ class SessionBus;
 // by Plasma services or individual applications are not surfaced: KineticWE
 // does not manage or theme their config. The page mirrors the
 // Noctalia settings content layout like the Workspaces/Tiling pages: a glyph +
-// title header, a component list on the left (like the KDE Shortcuts KCM) and
-// the selected component's actions on the right, each with a chord recorder
-// list (trash to the right of each bound chord; custom actions are deleted as
-// a whole) and the Override badge on the action's title line.
+// title header, then one collapsible card per component (mirroring Noctalia's
+// settings group cards), each with a chord recorder list (trash to the right of
+// each bound chord; custom actions are deleted as a whole) and the Override
+// badge on the action's title line. During a global search the cards flatten
+// into one grouped list so every match stays visible.
 //
 // Edits are STAGED and only reach the daemon when the window's Apply button
 // flushes everything: one setShortcutKeys call per staged action, then the
@@ -53,6 +55,9 @@ public:
     // a bind is being recorded, so a taken chord can be captured for the
     // conflict-overwrite flow instead of being consumed by the compositor.
     std::function<void(bool)> recordingChanged;
+    // Window-level fixed section jump row; when non-null each component card
+    // adds a pill to it. Owned by the window.
+    Flex* jumpRow = nullptr;
   };
 
   explicit KeybindsPage(SessionBus& bus, CustomKeybinds& customKeybinds);
@@ -137,7 +142,6 @@ private:
   void stage(const std::string& component, const std::string& action, std::vector<KeyChord> chords);
   void stageAndRebuild(const std::string& component, const std::string& action, std::vector<KeyChord> chords, const Callbacks& callbacks);
 
-  [[nodiscard]] std::unique_ptr<Node> buildComponentList(float scale, const Callbacks& callbacks);
   void buildActionRow(
       Flex& parent, const KeybindDbus::Component& component, const KeybindDbus::Action& action, float scale,
       const Callbacks& callbacks
@@ -184,8 +188,11 @@ private:
   KeybindDbus m_dbus;
   bool m_loaded = false;
   std::vector<KeybindDbus::Component> m_components;
-  // Selected component ("uniqueName"); the first component when never chosen.
-  std::string m_selectedComponent;
+  // Component uniqueNames whose collapsible card is expanded. Owned here so the
+  // state survives the window's per-change scene rebuilds; the first component
+  // is expanded on the first build.
+  std::unordered_set<std::string> m_expandedGroups;
+  bool m_expandedInitialized = false;
   // Chords staged for "component.action" paths; flushed by applyAll().
   std::map<std::string, std::vector<KeyChord>> m_pending;
   std::optional<PendingRebind> m_pendingRebind;

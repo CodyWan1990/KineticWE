@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "dbus/session_bus.h"
 #include "i18n/i18n.h"
+#include "kinetic-settings/src/section_card.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
@@ -1221,12 +1222,12 @@ bool TilingPage::desktopOverrideRowMatches(
   return true;
 }
 
-bool TilingPage::buildDesktopOverridesBlock(
-    Flex& parent, float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
+std::unique_ptr<Node> TilingPage::buildDesktopOverridesContent(
+    float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
 ) {
   const auto desktops = m_dbus.virtualDesktops();
   if (desktops.empty()) {
-    return false; // compositor unreachable — nothing to override
+    return nullptr; // compositor unreachable — nothing to override
   }
   std::vector<std::string> outputs = m_outputNames;
   if (outputs.empty()) {
@@ -1237,7 +1238,7 @@ bool TilingPage::buildDesktopOverridesBlock(
     }
   }
   if (outputs.empty()) {
-    return false;
+    return nullptr;
   }
 
   // Compute the visible rows first so the group header only appears when at
@@ -1265,21 +1266,13 @@ bool TilingPage::buildDesktopOverridesBlock(
     }
   }
   if (rows.empty()) {
-    return false;
+    return nullptr;
   }
 
-  // Group header (same style as the other section headers) + info caption.
-  parent.addChild(ui::column(
-      {.align = FlexAlign::Stretch,
-       .gap = Style::spaceSm * scale,
-       .configure = [scale](Flex& flex) { flex.setPadding(Style::spaceSm * scale, 0.0F, 0.0F, 0.0F); }},
-      ui::separator(),
-      makeLabel(
-          "Per-desktop layout overrides", Style::fontSizeBody * scale,
-          colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
-      )
-  ));
-  parent.addChild(ui::label({
+  // Content column (the section title is provided by the caller's collapsible
+  // card) + info caption.
+  auto content = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale, .fillWidth = true});
+  content->addChild(ui::label({
       .text =
           "Each row is a workspace and a connected monitor. Pick a layout to "
           "override the global default for that pair; leave it as \"Use "
@@ -1301,7 +1294,7 @@ bool TilingPage::buildDesktopOverridesBlock(
   for (const auto& row : rows) {
     if (row.desktopName != lastDesktop) {
       lastDesktop = row.desktopName;
-      parent.addChild(ui::row(
+      content->addChild(ui::row(
           {.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .paddingV = Style::spaceXs * scale},
           makeLabel(
               row.desktopName, Style::fontSizeBody * scale,
@@ -1355,9 +1348,9 @@ bool TilingPage::buildDesktopOverridesBlock(
         },
     }));
     rowNode->addChild(std::move(actions));
-    parent.addChild(std::move(rowNode));
+    content->addChild(std::move(rowNode));
   }
-  return true;
+  return content;
 }
 // Runtime-only group (org.kde.KWin.Tiling over D-Bus): live state and actions;
 // nothing here persists, so these rows never carry Override/Reset controls.
@@ -1504,13 +1497,37 @@ TilingPage::build(float scale, const Filter& filter, std::string_view armedReset
       makeLabel("Tiling", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
   ));
 
+  // Each page group renders as a collapsible card. During a global search the
+  // groups flatten to plain headers so every match stays visible (mirrors
+  // Noctalia's settings behaviour).
+  const bool collapsible = filter.searchQuery.empty();
+  if (collapsible && !m_expandedInitialized) {
+    m_expandedInitialized = true;
+    for (const auto& field : fields()) {
+      if (!field.pageGroup.empty()) {
+        m_expandedGroups.insert(std::string(field.pageGroup));
+        break;
+      }
+    }
+  }
+
   bool anyRows = false;
   bool firstGroup = true;
   std::string_view lastGroup;
-  const auto addGroupHeader = [&](std::string_view title) {
+  Flex* currentBody = root.get();
+  const auto beginGroup = [&](std::string_view title) {
     if (title.empty()) {
+      currentBody = root.get();
       return;
     }
+    if (collapsible) {
+      currentBody = kinetic_settings::addCollapsibleSection(
+          *root, title, title, m_expandedGroups, scale, callbacks.jumpRow
+      );
+      firstGroup = false;
+      return;
+    }
+    // Search mode: flat section header.
     if (!firstGroup) {
       // Non-first groups get a separator above the (bold, secondary) label.
       root->addChild(ui::column(
@@ -1525,6 +1542,7 @@ TilingPage::build(float scale, const Filter& filter, std::string_view armedReset
           makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold)
       );
     }
+    currentBody = root.get();
     firstGroup = false;
   };
 
@@ -1534,27 +1552,28 @@ TilingPage::build(float scale, const Filter& filter, std::string_view armedReset
     }
     if (field.pageGroup != lastGroup) {
       lastGroup = field.pageGroup;
-      addGroupHeader(lastGroup);
+      beginGroup(lastGroup);
       if (lastGroup == "Gaps") {
-        addMonitorGapOverrideNotice(*root, scale, callbacks);
+        addMonitorGapOverrideNotice(*currentBody, scale, callbacks);
       }
       if (lastGroup == "Gap Toggle") {
-        addGapToggleActionRow(*root, scale, callbacks);
+        addGapToggleActionRow(*currentBody, scale, callbacks);
       }
     }
     if (field.control == ControlKind::LayoutToggles) {
-      root->addChild(buildLayoutTogglesBlock(field, scale, armedResetKey, callbacks));
+      currentBody->addChild(buildLayoutTogglesBlock(field, scale, armedResetKey, callbacks));
     } else {
-      addSettingRow(*root, field, scale, armedResetKey, callbacks);
+      addSettingRow(*currentBody, field, scale, armedResetKey, callbacks);
     }
     anyRows = true;
   }
 
   // Per-desktop layout overrides: one row per (workspace, connected monitor)
-  // pair, after the persisted fields and before the Runtime group. Rendered by
-  // the block itself (header, caption, workspace captions, rows); skipped
-  // entirely when nothing matches the filter.
-  if (buildDesktopOverridesBlock(*root, scale, filter, armedResetKey, callbacks)) {
+  // pair, in its own collapsible section, after the persisted fields and before
+  // the Runtime group. Skipped entirely when nothing matches the filter.
+  if (auto desktopOverrides = buildDesktopOverridesContent(scale, filter, armedResetKey, callbacks)) {
+    beginGroup("Per-desktop layout overrides");
+    currentBody->addChild(std::move(desktopOverrides));
     anyRows = true;
   }
 
@@ -1570,8 +1589,8 @@ TilingPage::build(float scale, const Filter& filter, std::string_view armedReset
              || StringUtils::containsInsensitive("Layout actions", filter.searchQuery);
     };
     if (runtimeMatches()) {
-      addGroupHeader("Runtime");
-      buildRuntimeGroup(*root, scale, callbacks);
+      beginGroup("Runtime");
+      buildRuntimeGroup(*currentBody, scale, callbacks);
       anyRows = true;
     }
   }
