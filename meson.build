@@ -1,5 +1,5 @@
 project('noctalia', ['c', 'cpp'],
-  version: '5.0.1',
+  version: '5.1.0',
   default_options: [
     'cpp_std=c++23',
     'cpp_extensions=false',
@@ -341,6 +341,10 @@ foreach _p : [
     wayland_protos_dir / 'staging/ext-idle-notify/ext-idle-notify-v1.xml'],
   ['ext-background-effect-v1',
     wayland_protos_dir / 'staging/ext-background-effect/ext-background-effect-v1.xml'],
+  ['ext-image-capture-source-v1',
+    wayland_protos_dir / 'staging/ext-image-capture-source/ext-image-capture-source-v1.xml'],
+  ['ext-image-copy-capture-v1',
+    wayland_protos_dir / 'staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml'],
   ['fractional-scale-v1',
     wayland_protos_dir / 'staging/fractional-scale/fractional-scale-v1.xml'],
   ['viewporter',
@@ -412,6 +416,8 @@ _wlr_ls_c = custom_target('wlr-layer-shell-unstable-v1-client-source',
 )
 _protocol_sources += _wlr_ls_c
 _protocol_headers += _wlr_ls_h
+
+alias_target('wayland-protocol-headers', _protocol_headers)
 
 # ── Main sources ──────────────────────────────────────────────────────────────
 _noctalia_sources = files(
@@ -509,6 +515,8 @@ _noctalia_sources = files(
   'src/launcher/dmenu_stdin_provider.cpp',
   'src/launcher/emoji_provider.cpp',
   'src/launcher/math_provider.cpp',
+  'src/launcher/panel_catalog.cpp',
+  'src/launcher/panel_provider.cpp',
   'src/launcher/plugin_launcher_provider.cpp',
   'src/launcher/session_provider.cpp',
   'src/launcher/wallpaper_provider.cpp',
@@ -543,6 +551,7 @@ _noctalia_sources = files(
   'src/render/core/thumbnail_service.cpp',
   'src/render/core/image_decoder.cpp',
   'src/render/core/image_encoder.cpp',
+  'src/render/core/image_orientation.cpp',
   'src/render/programs/glyph_program.cpp',
   'src/render/programs/image_program.cpp',
   'src/render/programs/linear_gradient_program.cpp',
@@ -832,7 +841,10 @@ _noctalia_sources = files(
   'src/system/gamma_service.cpp',
   'src/system/location_service.cpp',
   'src/capture/screencopy_capture.cpp',
+  'src/capture/pointer_cursor_capture.cpp',
   'src/capture/screencopy_util.cpp',
+  'src/capture/screenshot_capture.cpp',
+  'src/capture/screenshot_image.cpp',
   'src/capture/screenshot_service.cpp',
   'src/capture/screenshot_region_overlay.cpp',
   'src/capture/annotation_document.cpp',
@@ -1182,6 +1194,7 @@ if build_tests
     'ico_decoder',
     'icon_resolver',
     'image_file_loader_data_uri',
+    'image_orientation',
     'image_source_log',
     'inotify',
     'input_area',
@@ -1234,14 +1247,17 @@ if build_tests
     'ui_tree_reconciler',
     'upower_charge_limit',
     'upower_device_catalog',
+    'uri',
     'vdir_reader',
     'virtual_grid_view_gesture',
+    'wallpaper_scan_symlink',
     'wallpaper_shuffle_state',
     'wayland_output_scale',
     'wayland_toplevels_identity',
     'webp_decoder',
     'widget_action',
     'widget_definition',
+    'widget_settings_schema',
     'workspace_alert_service',
   ]
 
@@ -1298,6 +1314,11 @@ if build_tests
   test('template_undo_signal',
     bash_program,
     args: ['tests/template_undo_signal_test.sh', meson.current_source_dir() / 'assets/templates'],
+    workdir: meson.current_source_dir(),
+  )
+  test('umbriel_apply_include_comment',
+    bash_program,
+    args: ['tests/umbriel_apply_include_comment_test.sh', meson.current_source_dir() / 'assets/templates/umbriel/apply.sh'],
     workdir: meson.current_source_dir(),
   )
 endif # build_tests

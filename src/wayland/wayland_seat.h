@@ -87,6 +87,7 @@ public:
 
   [[nodiscard]] std::uint32_t lastSerial() const noexcept { return m_lastSerial; }
   [[nodiscard]] wl_seat* seat() const noexcept { return m_seat; }
+  [[nodiscard]] wl_pointer* pointer() const noexcept { return m_pointer; }
 
   // Key repeat — driven by KeyRepeatPollSource
   [[nodiscard]] int repeatPollTimeoutMs() const;
@@ -201,6 +202,7 @@ private:
   xkb_context* m_xkbContext = nullptr;
   xkb_keymap* m_xkbKeymap = nullptr;
   xkb_state* m_xkbState = nullptr;
+  std::string m_xkbKeymapData;
   xkb_compose_table* m_composeTable = nullptr;
   xkb_compose_state* m_composeState = nullptr;
   KeyboardEventCallback m_keyboardEventCallback;

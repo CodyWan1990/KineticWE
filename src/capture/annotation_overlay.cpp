@@ -38,6 +38,7 @@
 #include <format>
 #include <limits>
 #include <linux/input-event-codes.h>
+#include <nlohmann/json.hpp>
 #include <utility>
 
 namespace capture {
@@ -323,11 +324,12 @@ namespace capture {
     int deviceWidth = 0;
     int deviceHeight = 0;
     float scale = 1.0F;
-    bool backdropShowsCursor = false;
+    const ScreencopyImage* backdropImage = nullptr;
     bool pointerInside = false;
     // Toolbar glyph state, so a mark only moves (and forces a relayout) when it really changed.
     std::optional<std::size_t> markedSwatch;
     bool fillGlyphOn = false;
+    const char* cursorTooltip = nullptr;
   };
 
   AnnotationOverlay::AnnotationOverlay() = default;
@@ -343,9 +345,15 @@ namespace capture {
 
   void AnnotationOverlay::setFreezeCallback(FreezeCallback callback) { m_onFreeze = std::move(callback); }
 
+  void AnnotationOverlay::setCaptureRegionCallback(CaptureRegionCallback callback) {
+    m_onCaptureRegion = std::move(callback);
+  }
+
   void AnnotationOverlay::setClosedCallback(ClosedCallback callback) { m_onClosed = std::move(callback); }
 
   void AnnotationOverlay::setFailureCallback(FailureCallback callback) { m_onFailure = std::move(callback); }
+
+  void AnnotationOverlay::setFeedbackCallback(FeedbackCallback callback) { m_onFeedback = std::move(callback); }
 
   void AnnotationOverlay::setStateSetter(StateSetter setter) { m_stateSetter = std::move(setter); }
 
@@ -358,7 +366,7 @@ namespace capture {
       m_tools.width[i] = std::clamp(m_tools.width[i], floorWidth, limit);
     }
     m_advancedSize = state.advancedSize;
-    m_toolbarPosition = state.toolbarPosition;
+    m_toolbarPositions.clear();
     for (auto& inst : m_instances) {
       if (inst != nullptr) {
         positionToolbar(*inst);
@@ -366,7 +374,7 @@ namespace capture {
     }
   }
 
-  void AnnotationOverlay::setFrozenScreenshots(std::vector<FrozenPair> frozen) {
+  void AnnotationOverlay::setFrozenScreenshots(std::vector<FrozenScreenshot> frozen) {
     m_frozen = std::move(frozen);
     m_mode = m_frozen.empty() ? AnnotationMode::Live : AnnotationMode::Frozen;
     if (m_mode == AnnotationMode::Live
@@ -377,20 +385,41 @@ namespace capture {
 
   void AnnotationOverlay::setCursorVisible(bool visible) { m_cursorVisible = visible; }
 
+  bool AnnotationOverlay::cursorVisible() const noexcept {
+    if (m_mode == AnnotationMode::Image) {
+      return m_image.canToggleCursor() ? m_cursorVisible : m_image.cursorVisible;
+    }
+    if (m_mode == AnnotationMode::Frozen && !m_instances.empty()) {
+      const Instance* target = m_instances.front().get();
+      for (const auto& inst : m_instances) {
+        if (inst != nullptr && inst->pointerInside) {
+          target = inst.get();
+          break;
+        }
+      }
+      if (target != nullptr) {
+        if (const ScreenshotImage* image = screenshot(*target); image != nullptr) {
+          return image->canToggleCursor() ? m_cursorVisible : image->cursorVisible;
+        }
+      }
+    }
+    return m_cursorVisible;
+  }
+
   void AnnotationOverlay::begin() {
     if (m_wayland == nullptr || m_renderContext == nullptr) {
       return;
     }
     destroySurfaces();
-    m_image = ScreencopyImage{};
+    m_image = ScreenshotImage{};
     m_imageOutput = nullptr;
     m_active = true;
     ensureSurfaces();
     requestFullRefresh();
   }
 
-  void AnnotationOverlay::beginImage(ScreencopyImage image, wl_output* target) {
-    if (m_wayland == nullptr || m_renderContext == nullptr || image.width <= 0 || image.height <= 0) {
+  void AnnotationOverlay::beginImage(ScreenshotImage image, wl_output* target) {
+    if (m_wayland == nullptr || m_renderContext == nullptr || image.image.width <= 0 || image.image.height <= 0) {
       return;
     }
     destroySurfaces();
@@ -398,6 +427,9 @@ namespace capture {
     m_frozen.clear();
     m_mode = AnnotationMode::Image;
     m_image = std::move(image);
+    if (!m_image.canToggleCursor()) {
+      m_cursorVisible = m_image.cursorVisible;
+    }
     m_imageOutput =
         target != nullptr ? target : (m_wayland->outputs().empty() ? nullptr : m_wayland->outputs().front().output);
     if (m_imageOutput == nullptr) {
@@ -433,7 +465,7 @@ namespace capture {
     destroySurfaces();
     m_documents.clear();
     m_frozen.clear();
-    m_image = ScreencopyImage{};
+    m_image = ScreenshotImage{};
     m_imageOutput = nullptr;
     m_mode = AnnotationMode::Live;
     if (wasActive) {
@@ -448,6 +480,10 @@ namespace capture {
     if (!m_active) {
       return;
     }
+    syncToolbarPositionsForConnectedOutputs();
+    std::erase_if(m_toolbarPositions, [this](const auto& entry) {
+      return findOutput(*m_wayland, entry.first) == nullptr;
+    });
     if (m_mode == AnnotationMode::Image) {
       if (findOutput(*m_wayland, m_imageOutput) == nullptr) {
         DeferredCall::callLater([this]() { cancel(); });
@@ -577,27 +613,56 @@ namespace capture {
     m_textInstance = nullptr;
     m_textIndex.reset();
     m_moveIndex.reset();
-    m_toolbarDragging = false;
+    m_toolbarDragInstance = nullptr;
     m_cropDragging = false;
     clearBlurCache();
   }
 
-  const ScreencopyImage* AnnotationOverlay::background(const Instance& instance) const {
+  const ScreenshotImage* AnnotationOverlay::screenshot(const Instance& instance) const {
     switch (m_mode) {
     case AnnotationMode::Live:
       return nullptr;
     case AnnotationMode::Image:
-      return m_image.width > 0 ? &m_image : nullptr;
+      return m_image.image.width > 0 ? &m_image : nullptr;
     case AnnotationMode::Frozen:
       break;
     }
-    for (const auto& pair : m_frozen) {
-      if (pair.output == instance.output) {
-        const ScreencopyImage& chosen = m_cursorVisible ? pair.cursor : pair.plain;
-        return chosen.rgba.empty() ? nullptr : &chosen;
+    for (const auto& frozen : m_frozen) {
+      if (frozen.output == instance.output) {
+        return &frozen.image;
       }
     }
     return nullptr;
+  }
+
+  const ScreencopyImage* AnnotationOverlay::background(const Instance& instance) const {
+    const ScreenshotImage* image = screenshot(instance);
+    if (image == nullptr) {
+      return nullptr;
+    }
+    const ScreencopyImage& chosen = image->imageForCursor(m_cursorVisible);
+    return chosen.rgba.empty() ? nullptr : &chosen;
+  }
+
+  const char* AnnotationOverlay::cursorTooltipKey(const Instance& instance) const {
+    if (m_mode == AnnotationMode::Live) {
+      return "bar.annotate.cursor-live";
+    }
+    const ScreenshotImage* image = screenshot(instance);
+    if (image == nullptr) {
+      return "bar.annotate.cursor-not-captured";
+    }
+    if (image->canToggleCursor()) {
+      return "bar.annotate.cursor";
+    }
+    switch (image->cursorStatus) {
+    case CursorToggleStatus::CaptureFailed:
+      return "bar.annotate.cursor-capture-failed";
+    case CursorToggleStatus::Available:
+    case CursorToggleStatus::NotCaptured:
+      return "bar.annotate.cursor-not-captured";
+    }
+    return "bar.annotate.cursor-not-captured";
   }
 
   AnnotationDocument& AnnotationOverlay::documentFor(const Instance& instance) {
@@ -684,8 +749,8 @@ namespace capture {
     const double areaTop = Style::spaceMd + toolbarHeight + Style::spaceLg;
     const double availableWidth = std::max(1.0, surfaceW - (2.0 * Style::spaceLg));
     const double availableHeight = std::max(1.0, surfaceH - areaTop - Style::spaceLg);
-    const auto imageWidth = static_cast<double>(m_image.width);
-    const auto imageHeight = static_cast<double>(m_image.height);
+    const auto imageWidth = static_cast<double>(m_image.image.width);
+    const auto imageHeight = static_cast<double>(m_image.image.height);
     const double fitScale =
         std::max({0.1, static_cast<double>(inst.scale), imageWidth / availableWidth, imageHeight / availableHeight});
     const double displayWidth = imageWidth / fitScale;
@@ -698,8 +763,8 @@ namespace capture {
         .height = displayHeight,
     };
     inst.canvasScale = fitScale;
-    inst.deviceWidth = m_image.width;
-    inst.deviceHeight = m_image.height;
+    inst.deviceWidth = m_image.image.width;
+    inst.deviceHeight = m_image.image.height;
   }
 
   void AnnotationOverlay::buildScene(Instance& inst) {
@@ -729,6 +794,7 @@ namespace capture {
     inst.toolButtons.fill(nullptr);
     inst.swatchButtons.fill(nullptr);
     inst.fillButton = inst.freezeButton = inst.cursorButton = nullptr;
+    inst.cursorTooltip = nullptr;
     inst.undoButton = inst.redoButton = inst.copyButton = inst.saveButton = inst.doneButton = nullptr;
     inst.exportSeparator = nullptr;
     inst.activePainted = AnnotationRect{};
@@ -769,7 +835,7 @@ namespace capture {
     if (bg != nullptr) {
       inst.backgroundSurface = frozenToCairo(*bg);
     }
-    inst.backdropShowsCursor = m_cursorVisible;
+    inst.backdropImage = bg;
 
     const auto canvasX = static_cast<float>(inst.canvasRect.x);
     const auto canvasY = static_cast<float>(inst.canvasRect.y);
@@ -820,6 +886,21 @@ namespace capture {
     inst.committedLayer = makeLayer(inst.committedTexture);
     inst.activeLayer = makeLayer(inst.activeTexture);
 
+    if (m_mode == AnnotationMode::Image) {
+      // Box borders paint inward without changing the canvas or exported pixels.
+      canvas->addChild(
+          ui::box({
+              .fill = fixedColorSpec(rgba(0.0F, 0.0F, 0.0F, 0.0F)),
+              .border = colorSpecFromRole(ColorRole::Outline),
+              .borderWidth = Style::borderWidth,
+              .radius = 0.0F,
+              .width = canvasW,
+              .height = canvasH,
+              .configure = [canvasX, canvasY](Box& box) { box.setPosition(canvasX, canvasY); },
+          })
+      );
+    }
+
     const auto makeDimStrip = [&]() {
       auto strip = ui::box({
           // Fixed black scrim so the cropped-away area darkens under every theme.
@@ -869,9 +950,19 @@ namespace capture {
     });
     // Toolbar tooltips are xdg_popups parented to this layer surface, and they must die
     // before it does; destroySurfaces() force-destroys them.
-    inst.inputDispatcher.setHoverChangeCallback([instPtr](InputArea* /*old*/, InputArea* next) {
+    inst.inputDispatcher.setHoverChangeCallback([this, instPtr](InputArea* /*old*/, InputArea* next) {
       if (instPtr->surface != nullptr) {
-        TooltipManager::instance().onHoverChange(next, instPtr->surface->layerSurface(), instPtr->output);
+        if (next != nullptr && instPtr->toolbar != nullptr) {
+          // Open toward the roomier half of the output so the popup stays clear of the movable toolbar.
+          const float toolbarCenterY = instPtr->toolbar->y() + (instPtr->toolbar->height() * 0.5F);
+          const float surfaceCenterY = static_cast<float>(instPtr->surface->height()) * 0.5F;
+          next->setTooltipPlacement(
+              toolbarCenterY <= surfaceCenterY ? TooltipPlacement::Below : TooltipPlacement::Above
+          );
+        }
+        TooltipManager::instance().onHoverChange(
+            m_toolbarDragInstance != nullptr ? nullptr : next, instPtr->surface->layerSurface(), instPtr->output
+        );
       }
     });
     inst.inputDispatcher.setFocus(inst.canvas);
@@ -925,8 +1016,8 @@ namespace capture {
     AnnotationDocument& doc = documentFor(inst);
 
     // Toggling the cursor swaps the whole backdrop, and Blur samples it, so both re-upload.
-    if (m_mode == AnnotationMode::Frozen && inst.backdropShowsCursor != m_cursorVisible) {
-      const ScreencopyImage* bg = background(inst);
+    const ScreencopyImage* bg = background(inst);
+    if (bg != inst.backdropImage) {
       if (bg != nullptr && inst.backdrop != nullptr) {
         inst.backdrop->clear(renderer);
         if (!inst.backdrop->setSourceRaw(
@@ -944,8 +1035,9 @@ namespace capture {
         inst.backgroundSurface = frozenToCairo(*bg);
         clearBlurCache();
         inst.committedNeedsFullRedraw = true;
+        inst.pendingActiveFullRedraw = true;
       }
-      inst.backdropShowsCursor = m_cursorVisible;
+      inst.backdropImage = bg;
     }
 
     const bool gestureHere = m_gestureActive && m_gestureInstance == &inst;
@@ -1005,10 +1097,17 @@ namespace capture {
     inst.dragHandle->setOnPress([this, instPtr](float /*localX*/, float /*localY*/, bool pressed) {
       if (pressed) {
         beginToolbarDrag(*instPtr);
-      } else {
-        m_toolbarDragging = false;
+      } else if (m_toolbarDragInstance == instPtr) {
+        m_toolbarDragInstance = nullptr;
       }
     });
+    if (InputArea* dragArea = inst.dragHandle->inputArea(); dragArea != nullptr) {
+      dragArea->setOnCancel([this, instPtr]() {
+        if (m_toolbarDragInstance == instPtr) {
+          m_toolbarDragInstance = nullptr;
+        }
+      });
+    }
     addSeparator();
 
     inst.undoButton = addGhostButton("arrow-back-up", "bar.annotate.undo", [this]() { undo(); });
@@ -1029,7 +1128,17 @@ namespace capture {
 
     addSeparator();
     inst.freezeButton = addGhostButton("snowflake", "bar.annotate.freeze", [this]() { requestFreeze(); });
-    inst.cursorButton = addGhostButton("pointer", "bar.annotate.cursor", [this]() { toggleCursor(); });
+    inst.cursorButton = addGhostButton("pointer", "bar.annotate.cursor", [this, instPtr]() { toggleCursor(instPtr); });
+    if (const ScreenshotImage* image = screenshot(inst);
+        image != nullptr && !image->canToggleCursor() && image->cursorVisible) {
+      // Keep the captured-on state visible even when this capture cannot be toggled.
+      auto palette = Button::defaultPalette(ButtonVariant::Ghost);
+      if (palette.selected.has_value()) {
+        palette.disabled.bg = palette.selected->bg;
+        palette.disabled.border = palette.selected->border;
+      }
+      inst.cursorButton->setCustomPalette(palette);
+    }
     inst.fillButton = addGhostButton("paint-off", "bar.annotate.fill-off", [this]() { toggleFill(); });
     addSeparator();
 
@@ -1094,6 +1203,7 @@ namespace capture {
             .onClick = [this]() { requestExport(AnnotationExport::Done); },
         })
     ));
+    addGhostButton("screenshot", "bar.annotate.capture-new-region", [this]() { requestCaptureRegion(); });
     addGhostButton("x", "bar.annotate.close", [this]() { closeOverlay(); });
 
     inst.toolbar = toolbar.get();
@@ -1131,9 +1241,25 @@ namespace capture {
     }
 
     show(inst.freezeButton, m_mode == AnnotationMode::Live);
-    show(inst.cursorButton, m_mode == AnnotationMode::Frozen);
     if (inst.cursorButton != nullptr) {
-      inst.cursorButton->setSelected(m_cursorVisible);
+      const ScreenshotImage* image = screenshot(inst);
+      const bool available = image != nullptr && image->canToggleCursor();
+      inst.cursorButton->setSelected(image != nullptr && (available ? m_cursorVisible : image->cursorVisible));
+      inst.cursorButton->setEnabled(available);
+      const char* tooltip = cursorTooltipKey(inst);
+      if (inst.cursorTooltip != tooltip) {
+        inst.cursorButton->setTooltip(i18n::tr(tooltip));
+        inst.cursorTooltip = tooltip;
+      }
+      // Keep disabled controls hoverable. Button guards activation; consume the press
+      // rather than letting it fall through to the annotation canvas underneath.
+      if (InputArea* area = inst.cursorButton->inputArea(); area != nullptr) {
+        area->setEnabled(true);
+        area->setFocusable(available);
+        area->setCursorShape(
+            available ? WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER : WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT
+        );
+      }
     }
     show(inst.fillButton, shapeTool);
     if (inst.fillButton != nullptr) {
@@ -1249,8 +1375,8 @@ namespace capture {
     requestRedrawAll();
   }
 
-  // Default placement is centered under the top edge; a dragged toolbar keeps its own spot,
-  // clamped so it stays reachable when the output resizes or a smaller monitor takes over.
+  // Default placement is centered under the top edge. Each output keeps its own dragged spot,
+  // clamped so it stays reachable when that output resizes.
   void AnnotationOverlay::positionToolbar(Instance& inst) {
     if (inst.toolbar == nullptr || inst.surface == nullptr) {
       return;
@@ -1262,13 +1388,43 @@ namespace capture {
     const float maxX = std::max(kToolbarEdgeMargin, surfaceW - width - kToolbarEdgeMargin);
     const float maxY = std::max(kToolbarEdgeMargin, surfaceH - height - kToolbarEdgeMargin);
 
+    const WaylandOutput* output = m_wayland != nullptr ? findOutput(*m_wayland, inst.output) : nullptr;
+    auto positionIt = m_toolbarPositions.find(inst.output);
+    if (positionIt == m_toolbarPositions.end() && output != nullptr && !output->connectorName.empty()) {
+      const auto savedIt = m_tools.toolbarPositions.find(output->connectorName);
+      if (savedIt != m_tools.toolbarPositions.end()) {
+        positionIt = m_toolbarPositions.emplace(inst.output, savedIt->second).first;
+      }
+    }
+
     float x = std::max(Style::spaceMd, (surfaceW - width) * 0.5F);
     float y = Style::spaceMd;
-    if (m_toolbarPosition.has_value()) {
-      x = static_cast<float>(m_toolbarPosition->x);
-      y = static_cast<float>(m_toolbarPosition->y);
+    if (positionIt != m_toolbarPositions.end()) {
+      x = static_cast<float>(positionIt->second.x);
+      y = static_cast<float>(positionIt->second.y);
     }
-    inst.toolbar->setPosition(std::clamp(x, kToolbarEdgeMargin, maxX), std::clamp(y, kToolbarEdgeMargin, maxY));
+    x = std::clamp(x, kToolbarEdgeMargin, maxX);
+    y = std::clamp(y, kToolbarEdgeMargin, maxY);
+    inst.toolbar->setPosition(x, y);
+
+    if (positionIt != m_toolbarPositions.end()) {
+      positionIt->second = AnnotationPoint{.x = static_cast<double>(x), .y = static_cast<double>(y)};
+      if (output != nullptr && !output->connectorName.empty()) {
+        m_tools.toolbarPositions.insert_or_assign(output->connectorName, positionIt->second);
+      }
+    }
+  }
+
+  void AnnotationOverlay::syncToolbarPositionsForConnectedOutputs() {
+    if (m_wayland == nullptr) {
+      return;
+    }
+    for (const auto& [outputHandle, position] : m_toolbarPositions) {
+      const WaylandOutput* output = findOutput(*m_wayland, outputHandle);
+      if (output != nullptr && !output->connectorName.empty()) {
+        m_tools.toolbarPositions.insert_or_assign(output->connectorName, position);
+      }
+    }
   }
 
   // The grab is anchored in surface coordinates rather than as a delta inside the handle,
@@ -1277,22 +1433,28 @@ namespace capture {
     if (inst.toolbar == nullptr) {
       return;
     }
-    m_toolbarDragging = true;
+    m_toolbarDragInstance = &inst;
+    TooltipManager::instance().forceDestroy();
     m_toolbarGrabX = static_cast<float>(m_pointerX) - inst.toolbar->x();
     m_toolbarGrabY = static_cast<float>(m_pointerY) - inst.toolbar->y();
   }
 
   void AnnotationOverlay::dragToolbarTo(double surfaceX, double surfaceY) {
-    m_toolbarPosition = AnnotationPoint{
-        .x = surfaceX - static_cast<double>(m_toolbarGrabX),
-        .y = surfaceY - static_cast<double>(m_toolbarGrabY),
-    };
-    for (auto& instance : m_instances) {
-      if (instance != nullptr) {
-        positionToolbar(*instance);
-      }
+    if (m_toolbarDragInstance == nullptr) {
+      return;
     }
-    requestRedrawAll();
+    Instance& inst = *m_toolbarDragInstance;
+    m_toolbarPositions.insert_or_assign(
+        inst.output,
+        AnnotationPoint{
+            .x = surfaceX - static_cast<double>(m_toolbarGrabX),
+            .y = surfaceY - static_cast<double>(m_toolbarGrabY),
+        }
+    );
+    positionToolbar(inst);
+    if (inst.surface != nullptr) {
+      inst.surface->requestRedraw();
+    }
   }
 
   void AnnotationOverlay::markCommittedDirty(Instance& inst, const AnnotationRect& logicalBounds) {
@@ -1575,7 +1737,7 @@ namespace capture {
         target->pointerInside = true;
       }
       if (onTarget || target->pointerInside) {
-        if (m_toolbarDragging) {
+        if (m_toolbarDragInstance != nullptr) {
           dragToolbarTo(event.sx, event.sy);
           return true;
         }
@@ -2204,11 +2366,34 @@ namespace capture {
     DeferredCall::callLater([onFreeze]() { onFreeze(); });
   }
 
-  void AnnotationOverlay::toggleCursor() {
-    commitPendingText();
-    if (!m_active || m_mode != AnnotationMode::Frozen) {
+  void AnnotationOverlay::requestCaptureRegion() {
+    if (!m_active || !m_onCaptureRegion) {
       return;
     }
+    CaptureRegionCallback onCaptureRegion = m_onCaptureRegion;
+    DeferredCall::callLater([onCaptureRegion]() { onCaptureRegion(); });
+  }
+
+  void AnnotationOverlay::toggleCursor(Instance* instance) {
+    if (!m_active) {
+      return;
+    }
+    if (instance == nullptr) {
+      instance = exportTarget();
+    }
+    if (instance == nullptr) {
+      return;
+    }
+    const ScreenshotImage* image = screenshot(*instance);
+    if (image == nullptr || !image->canToggleCursor()) {
+      if (m_onFeedback) {
+        const std::string message = i18n::tr(cursorTooltipKey(*instance));
+        FeedbackCallback onFeedback = m_onFeedback;
+        DeferredCall::callLater([onFeedback, message]() { onFeedback(message); });
+      }
+      return;
+    }
+    commitPendingText();
     m_cursorVisible = !m_cursorVisible;
     requestRedrawAll();
   }
@@ -2261,10 +2446,12 @@ namespace capture {
     m_stateSetter("tool", annotationToolName(m_tools.tool));
     m_stateSetter("fill", m_tools.fill ? "1" : "0");
     m_stateSetter("advanced_size", m_advancedSize ? "1" : "0");
-    if (m_toolbarPosition.has_value()) {
-      m_stateSetter("toolbar_x", std::format("{}", m_toolbarPosition->x));
-      m_stateSetter("toolbar_y", std::format("{}", m_toolbarPosition->y));
+    syncToolbarPositionsForConnectedOutputs();
+    nlohmann::json toolbarPositions = nlohmann::json::object();
+    for (const auto& [outputName, position] : m_tools.toolbarPositions) {
+      toolbarPositions[outputName] = {{"x", position.x}, {"y", position.y}};
     }
+    m_stateSetter("toolbar_positions", toolbarPositions.dump());
     for (std::size_t i = 0; i < kAnnotationToolCount; ++i) {
       const std::string name(annotationToolName(static_cast<AnnotationTool>(i)));
       m_stateSetter(std::format("width_{}", name), std::format("{}", m_tools.width[i]));
