@@ -67,6 +67,36 @@ namespace {
     return kVisible;
   }
 
+  // Upstream compositor actions KineticWE deliberately does not surface on the
+  // page: they are not part of the KineticWE workflow. Window Restore, the
+  // Present Windows launcher, the titlebar/frame toggle (duplicated by
+  // "Toggle Title Bars"), the custom quick-tile slots, and the xkill-style
+  // Kill Window. Unlike hidden components these are kept in m_components so
+  // conflict detection still knows about chords they own (e.g. Kill Window's
+  // Meta+Ctrl+Esc); they are only skipped when rendering and when resetting.
+  const std::vector<std::string>& hiddenActions() {
+    static const std::vector<std::string> kHidden{
+        "Window Restore",
+        "ExposeAll",
+        "Window No Border",
+        "Window Custom Quick Tile Left",
+        "Window Custom Quick Tile Right",
+        "Window Custom Quick Tile Top",
+        "Window Custom Quick Tile Bottom",
+        "Kill Window",
+    };
+    return kHidden;
+  }
+
+  [[nodiscard]] bool isHiddenAction(std::string_view component, std::string_view action) {
+    if (component != "kineticwe") {
+      return false;
+    }
+    return std::ranges::any_of(hiddenActions(), [action](const std::string& hidden) {
+      return std::string_view(hidden) == action;
+    });
+  }
+
   [[nodiscard]] bool isHiddenComponent(std::string_view uniqueName) {
     const auto underscoreForm = [&uniqueName]() {
       std::string form(uniqueName);
@@ -359,7 +389,8 @@ std::vector<std::string> KeybindsPage::resettableKeyPaths() const {
   std::vector<std::string> paths;
   for (const auto& component : m_components) {
     for (const auto& action : component.actions) {
-      if (!action.actionUnique.starts_with(kSessionActionPrefix)) {
+      if (!action.actionUnique.starts_with(kSessionActionPrefix)
+          && !isHiddenAction(component.uniqueName, action.actionUnique)) {
         paths.push_back(keyPath(component.uniqueName, action.actionUnique));
       }
     }
@@ -371,7 +402,8 @@ void KeybindsPage::resetAll() {
   m_pendingRebind.reset();
   for (const auto& component : m_components) {
     for (const auto& action : component.actions) {
-      if (action.actionUnique.starts_with(kSessionActionPrefix)) {
+      if (action.actionUnique.starts_with(kSessionActionPrefix)
+          || isHiddenAction(component.uniqueName, action.actionUnique)) {
         continue;
       }
       if (effectiveChords(component.uniqueName, action.actionUnique) != action.defaults) {
@@ -1054,7 +1086,8 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
     for (const auto& component : m_components) {
       std::vector<const KeybindDbus::Action*> matching;
       for (const auto& action : component.actions) {
-        if (action.actionUnique.starts_with(kSessionActionPrefix)) {
+        if (action.actionUnique.starts_with(kSessionActionPrefix)
+            || isHiddenAction(component.uniqueName, action.actionUnique)) {
           continue;
         }
         if (matchesFilter(component, action, filter)) {
@@ -1097,7 +1130,8 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
   for (const auto& component : m_components) {
     std::vector<const KeybindDbus::Action*> visible;
     for (const auto& action : component.actions) {
-      if (action.actionUnique.starts_with(kSessionActionPrefix)) {
+      if (action.actionUnique.starts_with(kSessionActionPrefix)
+          || isHiddenAction(component.uniqueName, action.actionUnique)) {
         continue;
       }
       if (matchesFilter(component, action, filter)) {

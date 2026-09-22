@@ -64,6 +64,25 @@ QColor KineticButton::hoverColor() const
     return c;
 }
 
+QColor KineticButton::dotColor(bool hovered) const
+{
+    const KDecoration3::DecoratedWindow *w = decoration()->window();
+    const bool active = w ? w->isActive() : true;
+    if (hovered && type() == KDecoration3::DecorationButtonType::Close) {
+        // The close dot turns red on hover, matching the theme preview. Fall
+        // back to a generic red when the scheme provides no warning colour.
+        QColor close = w ? w->color(KDecoration3::ColorGroup::Warning, KDecoration3::ColorRole::Foreground) : QColor();
+        if (!close.isValid()) {
+            close = QColor(0xDA, 0x44, 0x53);
+        }
+        close.setAlphaF(0.9);
+        return close;
+    }
+    QColor c = kinetic()->colorFor(KDecoration3::ColorRole::Foreground, active);
+    c.setAlphaF(hovered ? 0.8 : 0.55);
+    return c;
+}
+
 void KineticButton::paint(QPainter *painter, const QRectF &repaintArea)
 {
     Q_UNUSED(repaintArea)
@@ -79,6 +98,17 @@ void KineticButton::paint(QPainter *painter, const QRectF &repaintArea)
     const qreal side = qMin(r.width(), r.height());
     const QRectF square(r.center().x() - side / 2.0, r.center().y() - side / 2.0, side, side);
 
+    if (kinetic()->buttonStyle() == KineticButtonStyle::Dots) {
+        paintDots(painter, square, side);
+    } else {
+        paintStandard(painter, square, side);
+    }
+
+    painter->restore();
+}
+
+void KineticButton::paintStandard(QPainter *painter, const QRectF &square, qreal side)
+{
     if (isHovered() || isPressed()) {
         painter->setPen(Qt::NoPen);
         painter->setBrush(hoverColor());
@@ -95,7 +125,49 @@ void KineticButton::paint(QPainter *painter, const QRectF &repaintArea)
     // Glyph box centered in the button.
     const qreal g = side * 0.30;
     const QRectF box(square.center().x() - g, square.center().y() - g, g * 2.0, g * 2.0);
+    drawGlyph(painter, box, pen.color());
+}
 
+void KineticButton::paintDots(QPainter *painter, const QRectF &square, qreal side)
+{
+    // The window-menu button keeps its app icon and a spacer draws nothing.
+    if (type() == KDecoration3::DecorationButtonType::Menu
+        || type() == KDecoration3::DecorationButtonType::ApplicationMenu
+        || type() == KDecoration3::DecorationButtonType::Spacer) {
+        paintStandard(painter, square, side);
+        return;
+    }
+
+    const bool hovered = isHovered() || isPressed();
+    const QPointF center = square.center();
+
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(dotColor(hovered));
+    const qreal radius = side * 0.30;
+    painter->drawEllipse(center, radius, radius);
+
+    if (!hovered) {
+        return;
+    }
+
+    // Reveal the glyph, drawn in the title-bar colour so it reads as a cut-out
+    // of the dot.
+    const KDecoration3::DecoratedWindow *w = decoration()->window();
+    const bool active = w ? w->isActive() : true;
+    QPen pen(kinetic()->colorFor(KDecoration3::ColorRole::TitleBar, active));
+    pen.setWidthF(qMax<qreal>(1.2, side * 0.075));
+    pen.setCapStyle(Qt::RoundCap);
+    pen.setJoinStyle(Qt::RoundJoin);
+    painter->setPen(pen);
+    painter->setBrush(Qt::NoBrush);
+
+    const qreal g = side * 0.17;
+    const QRectF box(center.x() - g, center.y() - g, g * 2.0, g * 2.0);
+    drawGlyph(painter, box, pen.color());
+}
+
+void KineticButton::drawGlyph(QPainter *painter, const QRectF &box, const QColor &color)
+{
     switch (type()) {
     case KDecoration3::DecorationButtonType::Minimize: {
         const qreal y = box.center().y() + box.height() * 0.28;
@@ -104,27 +176,28 @@ void KineticButton::paint(QPainter *painter, const QRectF &repaintArea)
     }
     case KDecoration3::DecorationButtonType::Maximize: {
         const bool restore = isChecked();
-        const qreal d = box.width() * 0.74;
+        // Half the square edge, sized to sit alongside the minimize line and
+        // close cross, which span ~0.6 of the button.
+        const qreal h = box.width() * 0.44;
+        const QPointF c = box.center();
         if (restore) {
-            const QRectF back(box.left() + box.width() * 0.22, box.top(), d, d);
-            painter->drawRect(back.adjusted(0, 0, -back.width() * 0.28, -back.height() * 0.28));
-            const QRectF front(box.left(), box.top() + box.height() * 0.24, d, d);
-            painter->drawRect(front.adjusted(0, 0, -front.width() * 0.28, -front.height() * 0.28));
+            const qreal off = h * 0.65;
+            painter->drawRect(QRectF(c.x() - h - off, c.y() - h - off, h * 2.0, h * 2.0));
+            painter->drawRect(QRectF(c.x() - h + off, c.y() - h + off, h * 2.0, h * 2.0));
         } else {
-            const QRectF front(box.left() + box.width() * 0.1, box.top() + box.height() * 0.1, d, d);
-            painter->drawRect(front.adjusted(0, 0, -front.width() * 0.28, -front.height() * 0.28));
+            painter->drawRect(QRectF(c.x() - h, c.y() - h, h * 2.0, h * 2.0));
         }
         break;
     }
     case KDecoration3::DecorationButtonType::Close: {
-        const qreal d = box.width() * 0.5;
+        const qreal d = box.width() * 0.42;
         const QPointF c = box.center();
         painter->drawLine(c + QPointF(-d, -d), c + QPointF(d, d));
         painter->drawLine(c + QPointF(d, -d), c + QPointF(-d, d));
         break;
     }
     case KDecoration3::DecorationButtonType::OnAllDesktops: {
-        painter->setBrush(glyphColor());
+        painter->setBrush(color);
         painter->drawEllipse(box.center(), box.width() * 0.22, box.width() * 0.22);
         break;
     }
@@ -160,8 +233,8 @@ void KineticButton::paint(QPainter *painter, const QRectF &repaintArea)
         const KDecoration3::DecoratedWindow *w = decoration()->window();
         const QIcon icon = w ? w->icon() : QIcon();
         if (!icon.isNull()) {
-            const qreal iconSize = side * 0.72;
-            const QRectF iconRect(square.center().x() - iconSize / 2.0, square.center().y() - iconSize / 2.0, iconSize, iconSize);
+            const qreal iconSize = box.width() * 1.2;
+            const QRectF iconRect(box.center().x() - iconSize / 2.0, box.center().y() - iconSize / 2.0, iconSize, iconSize);
             if (w && !w->isActive()) {
                 painter->setOpacity(0.7);
             }
@@ -169,10 +242,10 @@ void KineticButton::paint(QPainter *painter, const QRectF &repaintArea)
             painter->setOpacity(1.0);
             break;
         }
-        painter->setBrush(glyphColor());
+        painter->setBrush(color);
         painter->setPen(Qt::NoPen);
         for (int i = -1; i <= 1; ++i) {
-            painter->drawEllipse(box.center() + QPointF(0, i * box.height() * 0.34), side * 0.055, side * 0.055);
+            painter->drawEllipse(box.center() + QPointF(0, i * box.height() * 0.34), box.width() * 0.09, box.width() * 0.09);
         }
         break;
     }
@@ -181,13 +254,11 @@ void KineticButton::paint(QPainter *painter, const QRectF &repaintArea)
     default: {
         // Custom/unhandled types: draw a neutral dot so the button is still
         // discoverable and clickable.
-        painter->setBrush(glyphColor());
+        painter->setBrush(color);
         painter->drawEllipse(box.center(), box.width() * 0.18, box.width() * 0.18);
         break;
     }
     }
-
-    painter->restore();
 }
 
 }

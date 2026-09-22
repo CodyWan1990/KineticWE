@@ -51,6 +51,11 @@ public:
      */
     bool forcedColors() const;
 
+    /**
+     * How this variant draws its buttons (standard glyphs or dots).
+     */
+    KineticButtonStyle buttonStyle() const;
+
 private:
     void updateBorders();
     void updateTitleBar();
@@ -63,6 +68,7 @@ private:
     std::unique_ptr<KDecoration3::DecorationButtonGroup> m_rightButtons;
     QFileSystemWatcher *m_watcher = nullptr;
     KineticTheme m_theme = KineticTheme::Dark;
+    KineticButtonStyle m_buttonStyle = KineticButtonStyle::Standard;
     KineticColors m_colors;
 };
 

@@ -28,9 +28,12 @@ KineticDecoration::KineticDecoration(QObject *parent, const QVariantList &args)
     : KDecoration3::Decoration(parent, args)
 {
     // The decoration bridge passes the configured theme in the argument map
-    // ("dark" / "light"); anything else falls back to following the scheme.
+    // ("dark" / "light" / "dots-dark" / "dots-light"); anything else falls
+    // back to following the scheme with standard buttons.
     if (!args.isEmpty()) {
-        m_theme = kineticThemeFromString(args.first().toMap().value(QStringLiteral("theme")).toString());
+        const QString theme = args.first().toMap().value(QStringLiteral("theme")).toString();
+        m_theme = kineticThemeFromString(theme);
+        m_buttonStyle = kineticButtonStyleFromString(theme);
     }
     m_colors = loadKineticColors(m_theme);
 }
@@ -45,6 +48,11 @@ QColor KineticDecoration::colorFor(KDecoration3::ColorRole role, bool active) co
 bool KineticDecoration::forcedColors() const
 {
     return m_colors.isValid();
+}
+
+KineticButtonStyle KineticDecoration::buttonStyle() const
+{
+    return m_buttonStyle;
 }
 
 void KineticDecoration::reloadColors()
@@ -238,6 +246,13 @@ void KineticDecoration::paint(QPainter *painter, const QRectF &repaintArea)
     // Caption.
     const std::shared_ptr<KDecoration3::DecorationSettings> s = settings();
     QFont font = s ? s->font() : painter->font();
+    // The default title font is a touch large for the short title bar, so
+    // scale it down ~10% (with a floor) to give the caption some breathing room.
+    if (font.pointSizeF() > 0) {
+        font.setPointSizeF(qMax<qreal>(8.0, font.pointSizeF() * 0.9));
+    } else if (font.pixelSize() > 0) {
+        font.setPixelSize(qMax(10, qRound(font.pixelSize() * 0.9)));
+    }
     painter->setFont(font);
     painter->setPen(captionColor);
     const qreal padding = s ? qMax<qreal>(4.0, s->smallSpacing() * 1.5) : 6.0;

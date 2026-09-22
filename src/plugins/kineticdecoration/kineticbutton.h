@@ -20,7 +20,8 @@ class KineticDecoration;
  *
  * It draws a simple, flat glyph (minimize/maximize/close/...) using the
  * decoration's resolved palette, so the button follows the selected Kinetic
- * variant or the shared color scheme.
+ * variant or the shared color scheme. The "dots" variants instead paint a
+ * solid circle that reveals the glyph on hover.
  */
 class KineticButton : public KDecoration3::DecorationButton
 {
@@ -36,6 +37,11 @@ private:
     KineticDecoration *kinetic() const;
     QColor glyphColor() const;
     QColor hoverColor() const;
+    QColor dotColor(bool hovered) const;
+
+    void paintStandard(QPainter *painter, const QRectF &square, qreal side);
+    void paintDots(QPainter *painter, const QRectF &square, qreal side);
+    void drawGlyph(QPainter *painter, const QRectF &box, const QColor &color);
 };
 
 }

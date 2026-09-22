@@ -28,18 +28,33 @@ enum class KineticTheme {
     Light,
 };
 
+/**
+ * How the decoration buttons are drawn. Standard paints the flat outline
+ * glyphs; Dots paints Layan-style solid circles that reveal the glyph on hover.
+ * The choice is encoded in the theme string ("dots-dark" / "dots-light").
+ */
+enum class KineticButtonStyle {
+    Standard,
+    Dots,
+};
+
 inline KineticTheme kineticThemeFromString(const QString &theme)
 {
     const QString t = theme.toLower();
-    if (t == QLatin1String("light")) {
+    if (t.contains(QLatin1String("light"))) {
         return KineticTheme::Light;
     }
-    if (t == QLatin1String("auto")) {
+    if (t.contains(QLatin1String("auto"))) {
         return KineticTheme::Auto;
     }
     // "dark", the metadata default and any older/unknown value map to the dark
     // variant so the compiled-in default is actually dark.
     return KineticTheme::Dark;
+}
+
+inline KineticButtonStyle kineticButtonStyleFromString(const QString &theme)
+{
+    return theme.toLower().contains(QLatin1String("dots")) ? KineticButtonStyle::Dots : KineticButtonStyle::Standard;
 }
 
 /**

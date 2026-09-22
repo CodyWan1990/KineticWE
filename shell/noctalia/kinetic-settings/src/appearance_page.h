@@ -15,8 +15,8 @@ class Renderer;
 class SessionBus;
 
 // The Appearance -> Title Bars settings page: the titlebar (window decoration)
-// picker, rendered as a tile grid holding the two Kinetic decoration variants
-// (dark/light). The selection is written to the compositor's
+// picker, rendered as a tile grid holding the four Kinetic decoration variants
+// (standard/dots x dark/light). The selection is written to the compositor's
 // ~/.config/kineticwe/kineticwe.kwe ([org.kde.kdecoration2] library/theme) by
 // applyAll(), which the window's Apply button calls; the compositor is then
 // asked to reconfigure.
@@ -79,7 +79,7 @@ private:
   // [org.kde.kdecoration2]. The Kinetic decoration is the compiled-in default.
   struct DecorationSelection {
     std::string library; // "kineticwe"
-    std::string theme;   // "dark" or "light"
+    std::string theme;   // "dark" / "light", or "dots-dark" / "dots-light"
 
     [[nodiscard]] bool operator==(const DecorationSelection& other) const noexcept {
       return library == other.library && theme == other.theme;

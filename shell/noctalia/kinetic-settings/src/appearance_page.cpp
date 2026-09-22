@@ -227,40 +227,59 @@ namespace {
   }
 
   // How the drawn window mock renders its titlebar: which side(s) carry
-  // buttons, whether the title is centered, and the titlebar height.
+  // buttons, whether the title is centered, the titlebar height and whether
+  // the buttons are Layan-style dots or flat glyphs.
   struct TitlebarStyle {
     std::string leftButtons;  // KDE button letters, e.g. "XIA"
     std::string rightButtons; // ... e.g. "IAX"
     bool centeredTitle = false;
     float titlebarHeight = 24.0F;
+    bool dots = false;
   };
 
-  // One titlebar button: a neutral palette-tinted dot. "_" is a spacer and
-  // draws nothing.
-  void addTitlebarButton(Flex& row, char letter, float scale) {
+  // One titlebar button. The dots themes draw a neutral palette-tinted circle,
+  // the standard themes the matching flat glyph. "_" is a spacer and draws
+  // nothing.
+  void addTitlebarButton(Flex& row, char letter, float scale, bool dots) {
     constexpr float kPlaceholderSize = 9.0F;
+    constexpr float kGlyphSize = 8.0F;
+    const float size = kPlaceholderSize * scale;
     if (letter == '_') {
-      const float spacer = kPlaceholderSize * scale;
-      row.addChild(ui::row({.width = spacer, .height = spacer}));
+      row.addChild(ui::row({.width = size, .height = size}));
       return;
     }
     const bool close = letter == 'X';
-    const float size = kPlaceholderSize * scale;
-    row.addChild(ui::row({
-        .fill = colorSpecFromRole(close ? ColorRole::Error : ColorRole::OnSurfaceVariant, close ? 0.85F : 0.55F),
-        .radius = size / 2.0F,
+    if (dots) {
+      row.addChild(ui::row({
+          .fill = colorSpecFromRole(close ? ColorRole::Error : ColorRole::OnSurfaceVariant, close ? 0.85F : 0.55F),
+          .radius = size / 2.0F,
+          .width = size,
+          .height = size,
+      }));
+      return;
+    }
+    std::string glyphName = "minus";
+    if (close) {
+      glyphName = "close";
+    } else if (letter == 'A') {
+      glyphName = "square";
+    }
+    row.addChild(ui::glyph({
+        .glyph = std::move(glyphName),
+        .glyphSize = kGlyphSize * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
         .width = size,
         .height = size,
     }));
   }
 
   [[nodiscard]] std::unique_ptr<Flex> titlebarButtonRow(
-      std::string_view letters, float scale, FlexJustify justify, float grow
+      std::string_view letters, float scale, FlexJustify justify, float grow, bool dots
   ) {
     auto row =
         ui::row({.align = FlexAlign::Center, .justify = justify, .gap = Style::spaceXs * scale, .flexGrow = grow});
     for (const char letter : letters) {
-      addTitlebarButton(*row, letter, scale);
+      addTitlebarButton(*row, letter, scale, dots);
     }
     return row;
   }
@@ -297,16 +316,16 @@ namespace {
     if (style.centeredTitle) {
       // Equal-growing side columns keep the title centered whatever the button
       // counts are.
-      titlebar->addChild(titlebarButtonRow(style.leftButtons, scale, FlexJustify::Start, 1.0F));
+      titlebar->addChild(titlebarButtonRow(style.leftButtons, scale, FlexJustify::Start, 1.0F, style.dots));
       titlebar->addChild(std::move(title));
-      titlebar->addChild(titlebarButtonRow(style.rightButtons, scale, FlexJustify::End, 1.0F));
+      titlebar->addChild(titlebarButtonRow(style.rightButtons, scale, FlexJustify::End, 1.0F, style.dots));
     } else {
       if (!style.leftButtons.empty()) {
-        titlebar->addChild(titlebarButtonRow(style.leftButtons, scale, FlexJustify::Start, 0.0F));
+        titlebar->addChild(titlebarButtonRow(style.leftButtons, scale, FlexJustify::Start, 0.0F, style.dots));
       }
       titlebar->addChild(std::move(title));
       titlebar->addChild(ui::row({.flexGrow = 1.0F}));
-      titlebar->addChild(titlebarButtonRow(style.rightButtons, scale, FlexJustify::End, 0.0F));
+      titlebar->addChild(titlebarButtonRow(style.rightButtons, scale, FlexJustify::End, 0.0F, style.dots));
     }
 
     auto content = ui::column(
@@ -417,19 +436,30 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     TitlebarStyle titlebarStyle;
   };
 
-  // The two selectable variants; Dark is the compiled-in default.
+  // The selectable variants; Standard Dark is the compiled-in default.
   std::vector<Tile> tiles;
   // The Kinetic decoration is drawn by the compositor itself, so its tiles use
-  // a mock layout: title on the left, minimize/maximize/close dots on the right.
+  // a mock layout: title on the left, minimize/maximize/close on the right.
+  // Standard draws flat glyphs, Dots the Layan-style solid circles.
   tiles.push_back(Tile{
-      .displayName = "Kinetic Dark",
+      .displayName = "Kinetic Standard Dark",
       .selection = DecorationSelection{.library = "kineticwe", .theme = "dark"},
       .titlebarStyle = TitlebarStyle{.rightButtons = "IAX"},
   });
   tiles.push_back(Tile{
-      .displayName = "Kinetic Light",
+      .displayName = "Kinetic Standard Light",
       .selection = DecorationSelection{.library = "kineticwe", .theme = "light"},
       .titlebarStyle = TitlebarStyle{.rightButtons = "IAX"},
+  });
+  tiles.push_back(Tile{
+      .displayName = "Kinetic Dots Dark",
+      .selection = DecorationSelection{.library = "kineticwe", .theme = "dots-dark"},
+      .titlebarStyle = TitlebarStyle{.rightButtons = "IAX", .dots = true},
+  });
+  tiles.push_back(Tile{
+      .displayName = "Kinetic Dots Light",
+      .selection = DecorationSelection{.library = "kineticwe", .theme = "dots-light"},
+      .titlebarStyle = TitlebarStyle{.rightButtons = "IAX", .dots = true},
   });
 
   const bool searchActive = !filter.searchQuery.empty();

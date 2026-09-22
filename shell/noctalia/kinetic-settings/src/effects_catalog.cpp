@@ -39,7 +39,12 @@ namespace {
         // discovered in kwin-wayland/effects on installs that carried it over;
         // hide it so the same feature is not presented twice with two
         // independent toggles (and so it is not animated twice).
-        "kwin4_effect_geometry_change"};
+        "kwin4_effect_geometry_change",
+        // Not part of the KineticWE session: the Thumbnail Aside demo effect,
+        // the Touch Points debug visualiser, and the moving/resizing
+        // Translucency effect. They stay available to the compositor, just not
+        // configurable here.
+        "thumbnailaside", "touchpoints", "translucency"};
     return kExcluded;
   }
 
