@@ -110,7 +110,7 @@ WorkspaceScene::WorkspaceScene()
     updateCursor();
 
     QAction *toggleAction = new QAction(this);
-    toggleAction->setProperty("componentName", QStringLiteral("kwin"));
+    toggleAction->setProperty("componentName", QStringLiteral("kineticwe"));
     toggleAction->setObjectName("Toggle Show Compositing");
     toggleAction->setText(i18n("Toggle “Show Compositing” effect"));
     KGlobalAccel::self()->setDefaultShortcut(toggleAction, QList<QKeySequence>());

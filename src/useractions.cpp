@@ -808,7 +808,7 @@ QAction *Workspace::initShortcut(const QString &actionName, const QString &descr
 {
     QAction *a = new QAction(this);
     a->setAutoRepeat(autoRepeat);
-    a->setProperty("componentName", QStringLiteral("kwin"));
+    a->setProperty("componentName", QStringLiteral("kineticwe"));
     a->setObjectName(actionName);
     a->setText(description);
     KGlobalAccel::setGlobalShortcut(a, QList<QKeySequence>{shortcut});
@@ -1226,7 +1226,7 @@ void Workspace::windowShortcutUpdated(Window *window)
                 delete action;
             });
 
-            action->setProperty("componentName", QStringLiteral("kwin"));
+            action->setProperty("componentName", QStringLiteral("kineticwe"));
             action->setObjectName(key);
             action->setText(i18n("Activate Window (%1)", window->caption()));
             connect(action, &QAction::triggered, window, std::bind(&Workspace::activateWindow, this, window, true));

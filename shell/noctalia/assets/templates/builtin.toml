@@ -44,6 +44,10 @@ category = "system"
 name = "Kitty"
 category = "terminal"
 
+[catalog.kineticwe]
+name = "KineticWE"
+category = "compositor"
+
 [catalog.labwc]
 name = "Labwc"
 category = "compositor"
@@ -152,6 +156,12 @@ input_path = "./kitty/kitty.conf"
 output_path = "$XDG_CONFIG_HOME/kitty/themes/noctalia.conf"
 post_hook = "bash '{{ config_dir }}/kitty/apply.sh'"
 undo_hook = "bash '{{ config_dir }}/kitty/undo.sh'"
+
+[templates.kineticwe]
+input_path = "./kineticwe/kineticwe.colors"
+output_path = "$XDG_CONFIG_HOME/kineticwe/decoration.colors"
+post_hook = "bash '{{ config_dir }}/kineticwe/apply.sh'"
+undo_hook = "bash '{{ config_dir }}/kineticwe/undo.sh'"
 
 [templates.labwc]
 input_path = "./labwc/labwc.conf"

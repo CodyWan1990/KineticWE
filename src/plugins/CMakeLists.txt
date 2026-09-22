@@ -1,7 +1,7 @@
 function(kwin_add_effect_config name)
     list(REMOVE_ITEM ARGV ${name})
-    kcoreaddons_add_plugin(${name} INSTALL_NAMESPACE "kwin/effects/configs" SOURCES ${ARGV})
-    target_compile_definitions(${name} PRIVATE -DTRANSLATION_DOMAIN=\"kwin\")
+    kcoreaddons_add_plugin(${name} INSTALL_NAMESPACE "kineticwe/effects/configs" SOURCES ${ARGV})
+    target_compile_definitions(${name} PRIVATE -DTRANSLATION_DOMAIN=\"kineticwe\")
 endfunction()
 
 # Add a CMake-time check for python3 to avoid failures during build.
@@ -24,28 +24,29 @@ function (kwin_strip_builtin_effect_metadata target metadata)
 endfunction()
 
 macro(kwin_add_builtin_effect name)
-    kcoreaddons_add_plugin(${name} STATIC SOURCES ${ARGN} INSTALL_NAMESPACE "kwin/effects/plugins")
-    target_compile_definitions(${name} PRIVATE -DTRANSLATION_DOMAIN=\"kwin\")
+    kcoreaddons_add_plugin(${name} STATIC SOURCES ${ARGN} INSTALL_NAMESPACE "kineticwe/effects/plugins")
+    target_compile_definitions(${name} PRIVATE -DTRANSLATION_DOMAIN=\"kineticwe\")
     kwin_strip_builtin_effect_metadata(${name} metadata.json)
-    install(FILES metadata.json DESTINATION ${KDE_INSTALL_DATADIR}/kwin-wayland/builtin-effects/ RENAME ${name}.json)
+    install(FILES metadata.json DESTINATION ${KDE_INSTALL_DATADIR}/kineticwe-wayland/builtin-effects/ RENAME ${name}.json)
 endmacro()
 
 function(kwin_add_scripted_effect name source)
-    kpackage_install_package(${source} ${name} effects kwin-wayland)
+    kpackage_install_package(${source} ${name} effects kineticwe-wayland)
 
     # necessary so tests are found without installing
-    file(COPY ${source}/contents ${source}/metadata.json DESTINATION ${CMAKE_BINARY_DIR}/bin/kwin-wayland/effects/${name})
+    file(COPY ${source}/contents ${source}/metadata.json DESTINATION ${CMAKE_BINARY_DIR}/bin/kineticwe-wayland/effects/${name})
 endfunction()
 
 function(kwin_add_script name source)
-    kpackage_install_package(${source} ${name} scripts kwin-wayland)
+    kpackage_install_package(${source} ${name} scripts kineticwe-wayland)
 
     # Copy the script to the build directory so one can run tests without prior
     # make install. FIXME: use add_custom_command.
-    file(COPY ${source}/contents ${source}/metadata.json DESTINATION ${CMAKE_BINARY_DIR}/bin/kwin-wayland/scripts/${name})
+    file(COPY ${source}/contents ${source}/metadata.json DESTINATION ${CMAKE_BINARY_DIR}/bin/kineticwe-wayland/scripts/${name})
 endfunction()
 
 add_subdirectory(private)
+add_subdirectory(kineticdecoration)
 
 add_subdirectory(blendchanges)
 add_subdirectory(blur)

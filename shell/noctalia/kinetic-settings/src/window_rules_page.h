@@ -19,10 +19,9 @@ class WaylandConnection;
 // The Window Rules settings page: compositor-wide "Window defaults" plus the
 // per-window rule book.
 //
-// * Window defaults: a "Toggle title bars" toggle that drives
-//   [Windows] DefaultDecorationPolicy in kineticwe.kwe (None vs
-//   ClientPreference). The compositor re-seeds every window's decoration base
-//   on reconfigure (rules still win via checkDecorationPolicy).
+// * Window defaults: the global active/inactive opacity sliders
+//   ([Windows] DefaultActiveOpacity / DefaultInactiveOpacity in kineticwe.kwe).
+//   ("Toggle title bars" now lives on the Appearance -> Title Bars page.)
 //
 // * Window rules: a list (+ Add / Duplicate / Delete / Move / Edit) of rules
 //   stored in ~/.config/kineticwe/rules.kwe (one [<uuid>] group per rule,
@@ -62,7 +61,7 @@ public:
 
   // True while unapplied (staged) edits exist — drives the window's Apply button.
   [[nodiscard]] bool hasPending() const noexcept {
-    return m_pending.has_value() || m_pendingActiveOpacity.has_value() || m_pendingInactiveOpacity.has_value() || m_rulesDirty;
+    return m_pendingActiveOpacity.has_value() || m_pendingInactiveOpacity.has_value() || m_rulesDirty;
   }
 
   // Writes the staged window defaults to kineticwe.kwe atomically. Returns
@@ -72,7 +71,6 @@ public:
   // Drops staged edits and forces the next build() to re-read the file.
   void reloadFromDisk() noexcept {
     m_loaded = false;
-    m_pending.reset();
     m_pendingActiveOpacity.reset();
     m_pendingInactiveOpacity.reset();
     m_errorNotice.clear();
@@ -86,27 +84,14 @@ public:
   [[nodiscard]] std::string_view lastError() const noexcept { return m_errorNotice; }
 
 private:
-  // The toggle drives [Windows] DefaultDecorationPolicy: hidden -> None (0),
-  // shown -> ClientPreference (1, the KWin default).
+  // The opacity defaults are stored in kineticwe.kwe [Windows].
   static constexpr std::string_view kGroup = "Windows";
-  static constexpr std::string_view kKey = "DefaultDecorationPolicy";
   static constexpr std::string_view kActiveOpacityKey = "DefaultActiveOpacity";
   static constexpr std::string_view kInactiveOpacityKey = "DefaultInactiveOpacity";
-  static constexpr std::string_view kKeyPath = "Windows/DefaultDecorationPolicy";
   static constexpr std::string_view kActiveOpacityPath = "Windows/DefaultActiveOpacity";
   static constexpr std::string_view kInactiveOpacityPath = "Windows/DefaultInactiveOpacity";
 
   void ensureLoaded();
-  // Whether the file currently hides title bars (value == None/0). Absent key
-  // reads as ClientPreference (1) -> not hidden.
-  [[nodiscard]] bool hideTitleBarsOnDisk() const;
-  // What the UI shows: the staged value when present, else the file's.
-  [[nodiscard]] bool effectiveHideTitleBars() const;
-  // True when the effective value differs from the app default (not hidden).
-  [[nodiscard]] bool overridden() const;
-  // Stage a new toggle state; un-stages when it matches what's on disk.
-  void stageHideTitleBars(bool hide, const Callbacks& callbacks);
-
   // ---- Global active/inactive opacity defaults (kineticwe.kwe [Windows]) ---
   [[nodiscard]] int activeOpacityOnDisk() const;
   [[nodiscard]] int inactiveOpacityOnDisk() const;
@@ -180,8 +165,6 @@ private:
   KineticweKwe m_config;      // kineticwe.kwe (window defaults)
   KineticweKwe m_rulesConfig; // rules.kwe (window rules)
   bool m_loaded = false;
-  // Staged "hide title bars" value; nullopt = nothing staged.
-  std::optional<bool> m_pending;
   // Staged global opacity values (0-100); nullopt = nothing staged.
   std::optional<int> m_pendingActiveOpacity;
   std::optional<int> m_pendingInactiveOpacity;

@@ -181,7 +181,7 @@ void KWinTabBoxConfig::initLayoutLists()
     }
 
     const QStringList packageRoots{
-        QStringLiteral("kwin-wayland/tabbox"),
+        QStringLiteral("kineticwe-wayland/tabbox"),
         QStringLiteral("kwin/tabbox"),
     };
     for (const QString &packageRoot : packageRoots) {

@@ -36,6 +36,7 @@ override_dh_auto_build:
 	mkdir -p $(STAGE)/kga-build
 	curl -fsSL https://invent.kde.org/plasma/kglobalacceld/-/archive/$(KGA_REF)/kglobalacceld-$(KGA_REF).tar.gz \
 		| tar xz -C $(STAGE)/kga-build --strip-components=1
+	echo 'set_target_properties(KGlobalAccelD PROPERTIES OUTPUT_NAME kineticwe-globalacceld)' >> $(STAGE)/kga-build/CMakeLists.txt
 	cmake -S $(STAGE)/kga-build -B $(STAGE)/kga-build/build \
 		-DCMAKE_INSTALL_PREFIX=$(KGA_PREFIX) \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -47,6 +48,8 @@ override_dh_auto_build:
 	mkdir -p $(STAGE)/kdeco-build
 	curl -fsSL https://invent.kde.org/plasma/kdecoration/-/archive/$(KDECO_REF)/kdecoration-$(KDECO_REF).tar.gz \
 		| tar xz -C $(STAGE)/kdeco-build --strip-components=1
+	echo 'set_target_properties(kdecorations3 PROPERTIES OUTPUT_NAME kineticwe-decoration)' >> $(STAGE)/kdeco-build/CMakeLists.txt
+	echo 'set_target_properties(kdecorations3private PROPERTIES OUTPUT_NAME kineticwe-decoration-private)' >> $(STAGE)/kdeco-build/CMakeLists.txt
 	cmake -S $(STAGE)/kdeco-build -B $(STAGE)/kdeco-build/build \
 		-DCMAKE_INSTALL_PREFIX=$(KGA_PREFIX) \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -60,7 +63,9 @@ override_dh_auto_build:
 		-DCMAKE_PREFIX_PATH=$(KGA_PREFIX) \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		-DBUILD_TESTING=OFF \
-		-DKWIN_BUILD_GLOBALSHORTCUTS=ON
+		-DKWIN_BUILD_GLOBALSHORTCUTS=ON \
+		-DKWIN_BUILD_KCMS=OFF \
+		-DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=ON
 	cmake --build $(STAGE)/kwe-build --parallel
 
 	# --- Phase 4: Build the KineticWE portal backend ---

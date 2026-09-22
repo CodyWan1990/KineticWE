@@ -1,5 +1,5 @@
-set(KWIN_KILLER_BIN ${CMAKE_INSTALL_FULL_LIBEXECDIR}/kwin_killer_helper)
-set(KWIN_DIALOG_BIN ${CMAKE_INSTALL_FULL_LIBEXECDIR}/kwin_dialog_helper)
+set(KWIN_KILLER_BIN ${CMAKE_INSTALL_FULL_LIBEXECDIR}/kineticwe_killer_helper)
+set(KWIN_DIALOG_BIN ${CMAKE_INSTALL_FULL_LIBEXECDIR}/kineticwe_dialog_helper)
 
 configure_file(config-kwin.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config-kwin.h)
 
@@ -22,10 +22,11 @@ target_include_directories(kwin INTERFACE "$<INSTALL_INTERFACE:${KDE_INSTALL_INC
 set_target_properties(kwin PROPERTIES
    VERSION ${PROJECT_VERSION}
    SOVERSION 6
+   OUTPUT_NAME kineticwe
 )
 
 target_compile_definitions(kwin PRIVATE
-    -DTRANSLATION_DOMAIN=\"kwin\"
+    -DTRANSLATION_DOMAIN=\"kineticwe\"
 )
 target_compile_definitions(kwin PUBLIC
     -DVULKAN_HPP_NO_EXCEPTIONS=1
@@ -445,9 +446,9 @@ if (KWIN_BUILD_X11)
     target_link_libraries(kinetic-we KWinXwaylandServerModule)
 endif()
 target_compile_definitions(kinetic-we PRIVATE
-    -DTRANSLATION_DOMAIN=\"kwin\"
+    -DTRANSLATION_DOMAIN=\"kineticwe\"
 )
-kcoreaddons_target_static_plugins(kinetic-we NAMESPACE "kwin/effects/plugins")
+kcoreaddons_target_static_plugins(kinetic-we NAMESPACE "kineticwe/effects/plugins")
 
 install(TARGETS kinetic-we ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
@@ -464,7 +465,8 @@ add_custom_target(
             ${CMAKE_CURRENT_BINARY_DIR}/org.kde.KWin.TabletModeManager.xml
 )
 
-install(FILES kwin.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
+# The KConfigXT schema (kwin.kcfg) is a build-time codegen input only; with the
+# KCMs off there is no runtime consumer, so it is not installed.
 if (KWIN_BUILD_NOTIFICATIONS)
     install(FILES kwin.notifyrc DESTINATION ${KDE_INSTALL_KNOTIFYRCDIR})
 endif()

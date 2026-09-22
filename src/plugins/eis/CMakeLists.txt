@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2024 David Redondo <kde@david-redono.de>
 # SPDX-License-Identifier: BSD-3-Clause
 
-kcoreaddons_add_plugin(eis INSTALL_NAMESPACE "kwin/plugins")
+kcoreaddons_add_plugin(eis INSTALL_NAMESPACE "kineticwe/plugins")
 
 ecm_qt_declare_logging_category(eis
     HEADER libeis_logging.h
@@ -33,17 +33,17 @@ target_link_libraries(eis PRIVATE kwin KF6::I18n KF6::GlobalAccel KF6::ConfigGui
 if(KWIN_BUILD_X11)
     target_sources(eis PRIVATE xwaylandeiscontext.cpp)
 
-    add_executable(kwin_eis_prompter eisprompter.cpp)
-    kconfig_target_kcfg_file(kwin_eis_prompter
+    add_executable(kineticwe_eis_prompter eisprompter.cpp)
+    kconfig_target_kcfg_file(kineticwe_eis_prompter
         FILE ${PROJECT_SOURCE_DIR}/src/kcms/xwayland/kwinxwaylandsettings.kcfg
         CLASS_NAME XwaylandSettings
         MUTATORS
         NOTIFIERS
     )
-    target_link_libraries(kwin_eis_prompter PRIVATE  KF6::I18n  KF6::ConfigGui KF6::WidgetsAddons KF6::Service)
-    install(TARGETS kwin_eis_prompter DESTINATION ${KDE_INSTALL_LIBEXECDIR})
+    target_link_libraries(kineticwe_eis_prompter PRIVATE  KF6::I18n  KF6::ConfigGui KF6::WidgetsAddons KF6::Service)
+    install(TARGETS kineticwe_eis_prompter DESTINATION ${KDE_INSTALL_LIBEXECDIR})
 
-    set(PROMPTER_BIN ${KDE_INSTALL_FULL_LIBEXECDIR}/kwin_eis_prompter)
+    set(PROMPTER_BIN ${KDE_INSTALL_FULL_LIBEXECDIR}/kineticwe_eis_prompter)
 endif()
 
 if (Libeis_VERSION VERSION_GREATER_EQUAL "1.5")

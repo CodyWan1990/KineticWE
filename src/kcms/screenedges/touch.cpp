@@ -137,8 +137,8 @@ void KWinScreenEdgesConfig::monitorInit()
     m_form->monitorAddItem(i18n("Toggle alternative window switching"));
 
     KConfigGroup config(m_config, QStringLiteral("Plugins"));
-    const auto effects = KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kwin-wayland/builtin-effects/"))
-        + KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kwin-wayland/effects/"))
+    const auto effects = KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kineticwe-wayland/builtin-effects/"))
+        + KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kineticwe-wayland/effects/"))
         + KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kwin/effects/"));
 
     for (const KPluginMetaData &effect : effects) {
@@ -154,7 +154,7 @@ void KWinScreenEdgesConfig::monitorInit()
         m_effectSettings[effect.pluginId()] = new KWinTouchScreenEdgeEffectSettings(effect.pluginId(), this);
     }
 
-    const auto scripts = KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kwin-wayland/scripts/"))
+    const auto scripts = KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kineticwe-wayland/scripts/"))
         + KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kwin/scripts/"));
 
     for (const KPluginMetaData &script : scripts) {

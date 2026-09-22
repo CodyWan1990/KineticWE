@@ -1,7 +1,7 @@
 [ActivityManager][Global Shortcuts]
 switch-to-activity-936bf8d0-9f0a-4666-87a9-fc5b741d3d4c=
 
-[KDE Keyboard Layout Switcher][Global Shortcuts]
+[KineticWE Keyboard Layout Switcher][Global Shortcuts]
 Switch to Last-Used Keyboard Layout=Meta+Alt+L
 Switch to Next Keyboard Layout=Meta+Alt+K
 
@@ -101,7 +101,7 @@ Reboot=
 Reboot Without Confirmation=
 Shut Down=
 
-[kwin][Global Shortcuts]
+[kineticwe][Global Shortcuts]
 Activate Window Demanding Attention=
 Cycle Overview=
 Cycle Overview Opposite=

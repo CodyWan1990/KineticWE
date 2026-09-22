@@ -83,34 +83,6 @@ void WindowRulesPage::ensureLoaded() {
   m_loaded = true;
 }
 
-// ---- Window defaults -------------------------------------------------------
-
-bool WindowRulesPage::hideTitleBarsOnDisk() const {
-  // DefaultDecorationPolicy: 0 = None (hidden), 1 = ClientPreference (shown).
-  // Absent key reads as ClientPreference.
-  return m_config.readInt(kGroup, kKey, 1) == 0;
-}
-
-bool WindowRulesPage::effectiveHideTitleBars() const {
-  return m_pending.value_or(hideTitleBarsOnDisk());
-}
-
-bool WindowRulesPage::overridden() const {
-  return effectiveHideTitleBars();
-}
-
-void WindowRulesPage::stageHideTitleBars(bool hide, const Callbacks& callbacks) {
-  ensureLoaded();
-  if (hide == hideTitleBarsOnDisk()) {
-    m_pending.reset();
-  } else {
-    m_pending = hide;
-  }
-  if (callbacks.requestRebuild) {
-    callbacks.requestRebuild();
-  }
-}
-
 // ---- Global opacity defaults -----------------------------------------------
 
 int WindowRulesPage::activeOpacityOnDisk() const {
@@ -1057,20 +1029,14 @@ std::unique_ptr<Node> WindowRulesPage::buildRulesSection(float scale, const Call
 
 std::vector<std::string> WindowRulesPage::resettableKeyPaths() {
   ensureLoaded();
-  if (overridden() || m_pending.has_value() || m_pendingActiveOpacity.has_value() || m_pendingInactiveOpacity.has_value() || m_rulesDirty) {
-    return {std::string(kKeyPath), std::string(kActiveOpacityPath), std::string(kInactiveOpacityPath)};
+  if (m_pendingActiveOpacity.has_value() || m_pendingInactiveOpacity.has_value() || m_rulesDirty) {
+    return {std::string(kActiveOpacityPath), std::string(kInactiveOpacityPath)};
   }
   return {};
 }
 
 void WindowRulesPage::resetAll() {
   ensureLoaded();
-  // Defaults back to "title bars shown" (only stage when it differs).
-  if (hideTitleBarsOnDisk()) {
-    m_pending = false;
-  } else {
-    m_pending.reset();
-  }
   // Opacity defaults back to 100% (only stage when they differ).
   if (activeOpacityOnDisk() != 100) {
     m_pendingActiveOpacity = 100;
@@ -1090,13 +1056,10 @@ void WindowRulesPage::resetAll() {
 }
 
 bool WindowRulesPage::applyAll() {
-  // Window defaults (kineticwe.kwe): title bars + global opacity.
-  const bool defaultsDirty = m_pending.has_value() || m_pendingActiveOpacity.has_value() || m_pendingInactiveOpacity.has_value();
+  // Window defaults (kineticwe.kwe): global opacity.
+  const bool defaultsDirty = m_pendingActiveOpacity.has_value() || m_pendingInactiveOpacity.has_value();
   if (defaultsDirty) {
     m_config.load();
-    if (m_pending.has_value()) {
-      m_config.setInt(kGroup, kKey, *m_pending ? 0 : 1);
-    }
     if (m_pendingActiveOpacity.has_value()) {
       m_config.setInt(kGroup, kActiveOpacityKey, *m_pendingActiveOpacity);
     }
@@ -1108,7 +1071,6 @@ bool WindowRulesPage::applyAll() {
       m_errorNotice = "Could not write kineticwe.kwe. Your change was kept; try Apply again.";
       return false;
     }
-    m_pending.reset();
     m_pendingActiveOpacity.reset();
     m_pendingInactiveOpacity.reset();
   }
@@ -1143,13 +1105,11 @@ WindowRulesPage::build(float scale, const Filter& filter, const Callbacks& callb
   const auto searchMatches = [&filter](std::string_view text) {
     return StringUtils::containsInsensitive(text, filter.searchQuery);
   };
-  const bool showToggleRow = !searchActive || searchMatches("Toggle title bars")
-      || searchMatches("Remove the title bar and frame on every window");
   const bool showActiveOpacity =
       !searchActive || searchMatches("Active opacity") || searchMatches("Opacity of the currently focused window");
   const bool showInactiveOpacity =
       !searchActive || searchMatches("Inactive opacity") || searchMatches("Opacity of background windows");
-  const bool showDefaultsCard = showToggleRow || showActiveOpacity || showInactiveOpacity;
+  const bool showDefaultsCard = showActiveOpacity || showInactiveOpacity;
 
   ensureRulesLoaded();
   bool showRulesSection = !searchActive || searchMatches("Window rules") || searchMatches("rules");
@@ -1213,43 +1173,6 @@ WindowRulesPage::build(float scale, const Filter& filter, const Callbacks& callb
     card->addChild(makeLabel(
         "Window defaults", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold
     ));
-
-    if (showToggleRow) {
-      const bool hideTitleBars = effectiveHideTitleBars();
-      auto row = ui::row({
-          .align = FlexAlign::Center,
-          .justify = FlexJustify::SpaceBetween,
-          .gap = Style::spaceSm * scale,
-          .paddingV = 2.0F * scale,
-          .fillWidth = true,
-      });
-      auto copy = ui::column({
-          .align = FlexAlign::Start,
-          .gap = Style::spaceXs * scale,
-          .flexGrow = 1.0F,
-      });
-      copy->addChild(makeLabel(
-          "Toggle title bars", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
-      ));
-      copy->addChild(ui::label({
-          .text =
-              "Remove the title bar and frame on every window, unless a per-window "
-              "rule overrides it for a specific application.",
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-      }));
-      row->addChild(std::move(copy));
-      row->addChild(ui::toggle({
-          .checked = hideTitleBars,
-          .scale = scale,
-          .onChange =
-              [this, callbacks](bool hide) {
-                stageHideTitleBars(hide, callbacks);
-              },
-      }));
-      card->addChild(std::move(row));
-    }
 
     if (showActiveOpacity) {
       card->addChild(buildDefaultsRow(

@@ -1,0 +1,8 @@
+[Unit]
+Description=KineticWE Wayland Compositor
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/kinetic-we_wayland_wrapper --xwayland
+BusName=org.kineticwe.KWinWrapper
+Slice=session.slice

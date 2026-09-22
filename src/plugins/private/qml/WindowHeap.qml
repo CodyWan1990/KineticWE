@@ -8,8 +8,8 @@
 import QtQuick
 import QtQuick.Window
 import org.kde.kirigami as Kirigami
-import org.kde.kwin as KWinComponents
-import org.kde.kwin.private.effects
+import org.kineticwe.kwin as KWinComponents
+import org.kineticwe.kwin.private.effects
 
 FocusScope {
     id: heap

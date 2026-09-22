@@ -46,7 +46,7 @@ fi
 
 # ---------------------------------------------------------------------------
 # 1b. Config root: the compositor's settings live in ~/.config/kineticwe
-#     (kineticwe.kwe, rules.kwe, kglobalaccelrc, kwinoutputconfig.json, ...).
+#     (kineticwe.kwe, rules.kwe, kglobalaccelrc, kineticweoutputconfig.json, ...).
 #     We do NOT redirect the session's XDG_CONFIG_HOME globally: doing so
 #     leaked into every user application (yazi, zed, fish, kitty, ...), forcing
 #     them to read/write configs inside the kineticwe root instead of the real
@@ -54,7 +54,7 @@ fi
 #     redirect via a per-command env prefix; the shell, kinetic-settings,
 #     D-Bus-activated services and user apps all keep the real config home.
 #     The compositor natively resolves KWIN_CONFIG ("kineticwe.kwe"), rules.kwe,
-#     kglobalaccelrc and kwinoutputconfig.json inside the root, and every
+#     kglobalaccelrc and kineticweoutputconfig.json inside the root, and every
 #     KConfigWatcher hot-reload path keeps working. KWE_REAL_CONFIG_HOME lets
 #     the compositor reach the user's real config home for shared files
 #     (kdeglobals) without hardcoding ~/.config.
@@ -208,7 +208,7 @@ for _qttool in qt5ct qt6ct; do
 [Appearance]
 color_scheme_path=${KWE_REAL_CONFIG_HOME}/${_qttool}/colors/noctalia.conf
 custom_palette=true
-icon_theme=breeze
+icon_theme=Breeze-Round-Chameleon Dark Icons
 standard_dialogs=xdgdesktopportal
 style=Breeze
 EOF
@@ -240,11 +240,21 @@ if [[ -e "$HOME/.config/rules.kwe" && ! -e "$KWE_CONFIG_HOME/rules.kwe" ]]; then
     cp "$HOME/.config/rules.kwe" "$KWE_CONFIG_HOME/rules.kwe"
 fi
 rm -f "$HOME/.config/rules.kwe"
-for _shared in kglobalaccelrc kwinoutputconfig.json; do
+for _shared in kglobalaccelrc kineticweoutputconfig.json; do
     if [[ -e "$HOME/.config/$_shared" && ! -e "$KWE_CONFIG_HOME/$_shared" ]]; then
         cp "$HOME/.config/$_shared" "$KWE_CONFIG_HOME/$_shared"
     fi
 done
+# 2.0 renamed the output config (kwinoutputconfig.json ->
+# kineticweoutputconfig.json). Carry over the in-root 2.0 file, or the legacy
+# flat ~/.config file, so the user's monitor layout survives the upgrade.
+if [[ ! -e "$KWE_CONFIG_HOME/kineticweoutputconfig.json" ]]; then
+    if [[ -e "$KWE_CONFIG_HOME/kwinoutputconfig.json" ]]; then
+        mv "$KWE_CONFIG_HOME/kwinoutputconfig.json" "$KWE_CONFIG_HOME/kineticweoutputconfig.json"
+    elif [[ -e "$HOME/.config/kwinoutputconfig.json" ]]; then
+        cp "$HOME/.config/kwinoutputconfig.json" "$KWE_CONFIG_HOME/kineticweoutputconfig.json"
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # 4d. Prune stale user-app state from the config root. Earlier 2.0 builds
@@ -264,7 +274,7 @@ done
 #     custom-action registration step in CustomKeybinds::initialize() finds
 #     no definitions to register. Keep both files in lockstep.
 # ---------------------------------------------------------------------------
-_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe custom-keybinds.kwe appearance.kwe kinetic-settings.kwe kglobalaccelrc kglobalshortcutsrc kwinoutputconfig.json kactivitymanagerdrc session)
+_KWE_KEEP=(kineticwe.kwe rules.kwe keybinds.kwe custom-keybinds.kwe appearance.kwe kinetic-settings.kwe kglobalaccelrc kglobalshortcutsrc kineticweoutputconfig.json kactivitymanagerdrc session)
 for _entry in "$KWE_CONFIG_HOME"/* "$KWE_CONFIG_HOME"/.[!.]*; do
     [[ -e "$_entry" ]] || continue
     _name="${_entry##*/}"
@@ -444,6 +454,101 @@ if __name__ == "__main__":
     main()
 PY
 fi
+
+
+# ---------------------------------------------------------------------------
+# 4d.6. One-shot migration: rename the KGlobalAccel components to KineticWE
+#     identity (Phase 4). The compositor's own shortcut component moved from
+#     "kwin" to "kineticwe", and the keyboard-layout component from
+#     "KDE Keyboard Layout Switcher" to "KineticWE Keyboard Layout Switcher".
+#     The shortcuts live in kglobalshortcutsrc / kglobalaccelrc, keyed by that
+#     component name, so an existing user's binds would be lost unless the
+#     groups are carried over. Kinetic Settings mirrors the compositor's binds
+#     into keybinds.kwe, so that file is migrated too. Idempotent: after the
+#     rename the old groups no longer exist.
+# ---------------------------------------------------------------------------
+python3 - "$KWE_CONFIG_HOME/kglobalshortcutsrc" "$KWE_CONFIG_HOME/kglobalaccelrc" \
+    "$KWE_CONFIG_HOME/keybinds.kwe" <<'PY' || \
+    echo "kineticwe: shortcut component migration failed (continuing)" >&2
+import os, re, sys, tempfile
+
+# Component unique-name renames. Group headers may be "[name]" or
+# "[name][Global Shortcuts]".
+RENAMES = {
+    "kwin": "kineticwe",
+    "KDE Keyboard Layout Switcher": "KineticWE Keyboard Layout Switcher",
+}
+HEADER = re.compile(r"^\[([^\]]+)\](.*)$")
+
+
+def split_groups(text):
+    out = []
+    for line in text.splitlines(keepends=True):
+        if HEADER.match(line.rstrip("\n")):
+            out.append([line.rstrip("\n"), []])
+        elif out:
+            out[-1][1].append(line)
+        else:
+            out.append([None, [line]])
+    return out
+
+
+def key_of(line):
+    return line.split("=", 1)[0].strip() if "=" in line else None
+
+
+def rewrite(path):
+    if not os.path.isfile(path):
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        original = f.read()
+    groups = split_groups(original)
+    by_header = {}
+    for group in groups:
+        if group[0] is not None:
+            by_header.setdefault(group[0], group)
+    changed = False
+    out = []
+    for group in groups:
+        if group[0] is None:
+            out.append("".join(group[1]))
+            continue
+        match = HEADER.match(group[0])
+        new_name = RENAMES.get(match.group(1))
+        if new_name is None:
+            out.append(group[0] + "\n" + "".join(group[1]))
+            continue
+        new_header = "[" + new_name + "]" + match.group(2)
+        target = by_header.get(new_header)
+        if target is not None and target is not group:
+            # Merge into the group that is already present, keeping its values.
+            existing = {key_of(line) for line in target[1]}
+            for line in group[1]:
+                if key_of(line) not in existing:
+                    target[1].append(line)
+            changed = True
+            continue  # drop the old group
+        group[0] = new_header
+        out.append(new_header + "\n" + "".join(group[1]))
+        changed = True
+    if not changed:
+        return
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("".join(out))
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+for _path in sys.argv[1:]:
+    rewrite(_path)
+PY
 
 
 # ---------------------------------------------------------------------------
@@ -737,7 +842,7 @@ def main():
     cfg = lambda name: os.path.join(config_home, name)
 
     # Portable Appearance settings (drive the Kinetic Settings pages).
-    _ensure(cfg("appearance.kwe"), "[Appearance]", "IconTheme", "breeze")
+    _ensure(cfg("appearance.kwe"), "[Appearance]", "IconTheme", "Breeze-Round-Chameleon Dark Icons")
     _ensure(cfg("appearance.kwe"), "[Appearance]", "CursorTheme", "breeze_cursors")
     _ensure(cfg("appearance.kwe"), "[Appearance]", "CursorSize", "24")
 
@@ -755,7 +860,7 @@ def main():
     # Shared Qt/KDE settings so apps see icons and the cursor and can open a
     # terminal.
     kde = os.path.join(real_config_home, "kdeglobals")
-    _ensure(kde, "[Icons]", "Theme", "breeze")
+    _ensure(kde, "[Icons]", "Theme", "Breeze-Round-Chameleon Dark Icons")
     _ensure(kde, "[KDE]", "cursorTheme", "breeze_cursors")
     _ensure(kde, "[KDE]", "cursorSize", "24")
     _ensure(kde, "[General]", "TerminalApplication", "alacritty")

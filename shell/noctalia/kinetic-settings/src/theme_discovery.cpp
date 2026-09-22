@@ -7,7 +7,6 @@
 #include "util/string_utils.h"
 
 #include <algorithm>
-#include <charconv>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -79,16 +78,6 @@ namespace {
     return roots;
   }
 
-  // The Aurorae window decoration theme roots, in priority order (user dirs
-  // first). Downloads from the KDE Store install under aurorae/themes.
-  std::vector<std::string> decorationBaseDirs() {
-    std::vector<std::string> roots;
-    for (const auto& data : xdgDataDirs()) {
-      pushUniqueDir(roots, data + "/aurorae/themes");
-    }
-    return roots;
-  }
-
   // Reads Name= from the [Icon Theme] group of an index.theme file.
   std::string indexThemeName(const fs::path& indexTheme) {
     std::ifstream in(indexTheme);
@@ -117,81 +106,6 @@ namespace {
       }
     }
     return {};
-  }
-
-  // Reads Name= from the [Desktop Entry] group of a theme's metadata.desktop.
-  // Localized Name[xx]= keys are ignored.
-  std::string desktopEntryName(const fs::path& metadataDesktop) {
-    std::ifstream in(metadataDesktop);
-    if (!in.is_open()) {
-      return {};
-    }
-    bool inEntry = false;
-    std::string line;
-    while (std::getline(in, line)) {
-      while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) {
-        line.pop_back();
-      }
-      if (line.empty() || line.front() == '#') {
-        continue;
-      }
-      if (line.front() == '[') {
-        inEntry = (line == "[Desktop Entry]");
-        continue;
-      }
-      if (!inEntry) {
-        continue;
-      }
-      if (line.starts_with("Name=")) {
-        return StringUtils::unquote(StringUtils::trim(std::string_view(line).substr(5)));
-      }
-    }
-    return {};
-  }
-
-  // A `<key>=<value>` reader for one section of an Aurorae theme config
-  // (<theme>/<name>rc). Keys are matched verbatim inside the requested section;
-  // surrounding whitespace is stripped and '#' comments are skipped. Empty when
-  // the file, section or key is absent.
-  std::string auroraeConfigValue(const fs::path& configPath, std::string_view section, std::string_view key) {
-    std::ifstream in(configPath);
-    if (!in.is_open()) {
-      return {};
-    }
-    bool inSection = false;
-    std::string line;
-    while (std::getline(in, line)) {
-      const std::string trimmed = StringUtils::trim(line);
-      if (trimmed.empty() || trimmed.front() == '#') {
-        continue;
-      }
-      if (trimmed.front() == '[') {
-        inSection = std::string_view(trimmed) == section;
-        continue;
-      }
-      if (!inSection) {
-        continue;
-      }
-      const std::size_t eq = trimmed.find('=');
-      if (eq == std::string::npos) {
-        continue;
-      }
-      if (std::string_view(trimmed).substr(0, eq) == key) {
-        return StringUtils::unquote(StringUtils::trim(std::string_view(trimmed).substr(eq + 1)));
-      }
-    }
-    return {};
-  }
-
-  // The same file, as a non-negative int (0 when absent or unparsable).
-  int auroraeConfigInt(const fs::path& configPath, std::string_view section, std::string_view key) {
-    const std::string raw = auroraeConfigValue(configPath, section, key);
-    if (raw.empty()) {
-      return 0;
-    }
-    int value = 0;
-    const auto [end, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), value);
-    return ec == std::errc() && end == raw.data() + raw.size() ? value : 0;
   }
 
   // A subdirectory name like "scalable", "48x48", "64x64@2x" denotes an icon
@@ -407,121 +321,6 @@ std::vector<ThemeInfo> iconThemes() {
 
 std::vector<ThemeInfo> cursorThemes() {
   return discover(true);
-}
-
-std::vector<DecorationThemeInfo> decorationThemes() {
-  std::vector<DecorationThemeInfo> out;
-  std::vector<std::string> seen; // first root wins (user dirs are enumerated first)
-  for (const auto& base : decorationBaseDirs()) {
-    std::error_code ec;
-    if (!fs::is_directory(base, ec)) {
-      continue;
-    }
-    for (const auto& entry : fs::directory_iterator(base, ec)) {
-      if (!entry.is_directory(ec)) {
-        continue;
-      }
-      const fs::path dir = entry.path();
-      const std::string name = dir.filename().string();
-      if (name.empty() || name.front() == '.' || std::ranges::contains(seen, name)) {
-        continue;
-      }
-      seen.push_back(name);
-      std::string display = desktopEntryName(dir / "metadata.desktop");
-      if (display.empty()) {
-        display = name;
-      }
-      DecorationThemeInfo info{.name = name, .displayName = std::move(display), .path = dir.string()};
-      // Aurorae's configrc is <themeDir>/<pluginId>rc (e.g. Layanrc); its
-      // titlebar layout drives Kinetic Settings' drawn window preview.
-      const fs::path configRc = dir / (name + "rc");
-      if (const std::string alignment = auroraeConfigValue(configRc, "[General]", "TitleAlignment");
-          !alignment.empty()) {
-        info.titleAlignment = StringUtils::toLower(alignment);
-      }
-      info.leftButtons = auroraeConfigValue(configRc, "[General]", "LeftButtons");
-      info.rightButtons = auroraeConfigValue(configRc, "[General]", "RightButtons");
-      if (const int titleContent = auroraeConfigInt(configRc, "[Layout]", "TitleHeight"); titleContent > 0) {
-        info.titlebarHeight = titleContent + auroraeConfigInt(configRc, "[Layout]", "TitleEdgeTop")
-            + auroraeConfigInt(configRc, "[Layout]", "TitleEdgeBottom");
-      }
-      out.push_back(std::move(info));
-    }
-  }
-  std::ranges::sort(out, [](const auto& a, const auto& b) {
-    return StringUtils::naturalCaseInsensitiveLess(a.displayName, b.displayName);
-  });
-  return out;
-}
-
-std::string decorationButtonFile(const std::string& themePath, char letter) {
-  if (themePath.empty()) {
-    return {};
-  }
-  std::string_view base;
-  switch (letter) {
-  case 'X':
-    base = "close";
-    break;
-  case 'I':
-    base = "minimize";
-    break;
-  case 'A':
-    base = "maximize";
-    break;
-  case 'H':
-    base = "help";
-    break;
-  case 'S':
-    base = "alldesktops";
-    break;
-  case 'F':
-    base = "keepabove";
-    break;
-  case 'B':
-    base = "keepbelow";
-    break;
-  default:
-    return {};
-  }
-  std::error_code ec;
-  const fs::path candidate = fs::path(themePath) / (std::string(base) + ".svg");
-  if (fs::is_regular_file(candidate, ec)) {
-    return candidate.string();
-  }
-  return {};
-}
-
-std::string decorationRootPath() {
-  // User-owned dir first (that's where downloaded themes are installed).
-  const std::vector<std::string> roots = decorationBaseDirs();
-  std::error_code ec;
-  for (const std::string& root : roots) {
-    if (fs::is_directory(root, ec)) {
-      return root;
-    }
-  }
-  if (!roots.empty()) {
-    return roots.front();
-  }
-  return {};
-}
-
-bool openDecorationRoot() {
-  const std::vector<std::string> roots = decorationBaseDirs();
-  if (roots.empty()) {
-    return false;
-  }
-  // Prefer the user's own themes dir (downloads land there); create it so the
-  // folder opens even before anything has been installed.
-  const std::string userDir = roots.front();
-  std::error_code ec;
-  fs::create_directories(userDir, ec);
-  const std::string dir = fs::is_directory(userDir, ec) ? userDir : decorationRootPath();
-  if (dir.empty()) {
-    return false;
-  }
-  return openDirectoryInFileManager(dir);
 }
 
 std::string iconRootPath() {

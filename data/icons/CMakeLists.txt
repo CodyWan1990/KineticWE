@@ -1,9 +1,9 @@
 ecm_install_icons(
     ICONS
-        16-apps-kwin.png
-        32-apps-kwin.png
-        48-apps-kwin.png
-        sc-apps-kwin.svgz
+        16-apps-kineticwe.png
+        32-apps-kineticwe.png
+        48-apps-kineticwe.png
+        sc-apps-kineticwe.svgz
     DESTINATION
         ${KDE_INSTALL_ICONDIR}
     THEME

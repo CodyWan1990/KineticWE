@@ -187,12 +187,9 @@ Requires:       plasma-milou
 # aurorae: built from pinned KDE master commit (Source4) for ABI compat with
 # our own kdecoration; do not require the distro package.
 # Requires:     aurorae
-Requires:       plasma-breeze
-# plasma-breeze does not pull in plasma-breeze-common, which provides
-# /usr/share/color-schemes/BreezeDark.colors — the scheme start-kineticwe.sh
-# seeds into kdeglobals as the pre-theme-service default. Without it the seed
-# silently no-ops and apps fall back to KColorScheme's built-in light default.
-Requires:       plasma-breeze-common
+# The window decoration is the first-party org.kineticwe.decoration plugin
+# (built in-tree from src/plugins/kineticdecoration); neither Breeze nor the
+# distro kdecoration/aurorae packages are required.
 Requires:       breeze-icons
 Requires:       qaccessibilityclient-qt6
 Requires:       xorg-x11-server-Xwayland
@@ -201,11 +198,8 @@ Requires:       xdg-desktop-portal
 Requires:       xdg-desktop-portal-kwe
 Requires:       kineticwe-noctalia
 
-# Bundled kdecoration runtime (pinned KDE master) replaces the system package
-Provides:       kdecoration = %{version}-%{release}
-Provides:       kdecoration%{?_isa} = %{version}-%{release}
-Obsoletes:      kdecoration < %{version}-%{release}
-Obsoletes:      kdecoration-devel < %{version}-%{release}
+# KineticWE installs beside KWin instead of replacing it: no kdecoration
+# Provides/Obsoletes, so the stock KDE package stays installed.
 
 # Soft deps — nice to have for full experience
 # (2.0: the Noctalia fork shell ships in-tree as the kineticwe-noctalia subpackage;
@@ -292,11 +286,35 @@ cd ../aurorae
 tar xf %{SOURCE4} --strip-components=1
 cd -
 
+# KineticWE coexistence: namespace the vendored aurorae artifacts so they do not
+# collide with Fedora's stock aurorae package.
+find ../aurorae -type f \( -name 'CMakeLists.txt' -o -name '*.cpp' -o -name '*.h' -o -name '*.qml' -o -name '*.json' -o -name '*.desktop' -o -name '*.in' -o -name '*.xml' \) -print0 \
+    | xargs -0 sed -i \
+        -e 's/org\.kde\.kdecoration3/org.kineticwe.decoration/g' \
+        -e 's/org\.kde\.kwin\.decoration/org.kineticwe.decoration/g' \
+        -e 's#\bkwin/aurorae#kineticwe/aurorae#g' \
+        -e 's#\bkwin/decorations#kineticwe/decorations#g' \
+        -e 's/plasma-apply-aurorae/kineticwe-apply-aurorae/g'
+
 # Extract kconfig source alongside (for the fixed kconfig_compiler)
 mkdir -p ../kconfig
 cd ../kconfig
 tar xf %{SOURCE2} --strip-components=1
 cd -
+
+# KineticWE coexistence: give the vendored runtime libraries private sonames so
+# a stock kdecoration/kglobalacceld can stay installed. The CMake target names
+# (and thus our link lines) are unchanged.
+cat >> ../kdecoration/CMakeLists.txt <<'KWE_KDECO'
+
+set_target_properties(kdecorations3 PROPERTIES OUTPUT_NAME kineticwe-decoration)
+set_target_properties(kdecorations3private PROPERTIES OUTPUT_NAME kineticwe-decoration-private)
+KWE_KDECO
+
+cat >> ../kglobalacceld/CMakeLists.txt <<'KWE_KGA'
+
+set_target_properties(KGlobalAccelD PROPERTIES OUTPUT_NAME kineticwe-globalacceld)
+KWE_KGA
 
 # =============================================================================
 # Build
@@ -367,7 +385,9 @@ DESTDIR=${KGA_TMP_PREFIX} cmake --install ../aurorae/build --prefix %{_prefix}
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_TESTING=OFF \
     -DKWIN_KCONFIG_COMPILER=%{_builddir}/kconfig/build/bin/kconfig_compiler_kf6 \
-    -DKWIN_BUILD_GLOBALSHORTCUTS=ON
+    -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
+    -DKWIN_BUILD_KCMS=OFF \
+    -DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=ON
 %cmake_build
 
 # --- Phase 4: Build the KineticWE portal backend (rebranded xdg-desktop-portal-kde) ---
@@ -425,9 +445,9 @@ rm -rf %{buildroot}%{_libdir}/cmake/KDecoration3/ 2>/dev/null || true
 rm -rf %{buildroot}%{_libdir}/cmake/Aurorae/ 2>/dev/null || true
 
 # Remove .so symlinks (devel files) — prevents conflict with system kwin-devel
-rm -f %{buildroot}%{_libdir}/libKGlobalAccelD.so 2>/dev/null || true
-rm -f %{buildroot}%{_libdir}/libkdecorations3.so 2>/dev/null || true
-rm -f %{buildroot}%{_libdir}/libkdecorations3private.so 2>/dev/null || true
+rm -f %{buildroot}%{_libdir}/libkineticwe-globalacceld.so 2>/dev/null || true
+rm -f %{buildroot}%{_libdir}/libkineticwe-decoration.so 2>/dev/null || true
+rm -f %{buildroot}%{_libdir}/libkineticwe-decoration-private.so 2>/dev/null || true
 
 # Remove header files installed by kglobalacceld, kdecoration and kinetic-we (devel content)
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD/ 2>/dev/null || true
@@ -439,49 +459,46 @@ rm -rf %{buildroot}%{_includedir}/kwin/ 2>/dev/null || true
 # The directory will be owned via %dir in %files
 rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc 2>/dev/null || true
 
-# Remove .so symlink (devel file) from libkwin — only versioned .so.* belongs in main pkg
-rm -f %{buildroot}%{_libdir}/libkwin.so 2>/dev/null || true
-rm -f %{buildroot}%{_libdir}/libkcmkwincommon.so 2>/dev/null || true
+# Remove .so symlink (devel file) from the compositor library
+rm -f %{buildroot}%{_libdir}/libkineticwe.so 2>/dev/null || true
+
+# Kinetic Settings owns settings; drop KDE System Settings modules
+rm -rf %{buildroot}%{_libdir}/qt6/plugins/org.kde.kdecoration3.kcm 2>/dev/null || true
+rm -f %{buildroot}%{_datadir}/applications/kcm_*.desktop 2>/dev/null || true
 
 # =============================================================================
 # Files
 # =============================================================================
 
 %files
-%license LICENSES/* ../kdecoration/LICENSES/* ../aurorae/LICENSES/* data/aurorae-themes/LICENSE
+%license LICENSES/* ../kdecoration/LICENSES/* ../aurorae/LICENSES/* data/aurorae-themes/LICENSE data/icon-themes/LICENSE
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
-%{_bindir}/kwindowprop
+%{_bindir}/kineticwe_windowprop
 %{_bindir}/kinetic-we_wayland_wrapper
-%{_libdir}/libkwin.so.*
-%{_libdir}/libkcmkwincommon.so.*
-%{_libdir}/libkdecorations3.so.*
-%{_libdir}/libkdecorations3private.so.*
-%{_libdir}/qt6/plugins/kwin/
-%{_libdir}/qt6/plugins/plasma/kcms/
-%{_libdir}/qt6/plugins/kf6/packagestructure/
-%{_libdir}/qt6/plugins/org.kde.kdecoration3/
-%{_libdir}/qt6/qml/org/kde/kwin/
-%{_libdir}/libexec/kwin*
-%{_libexecdir}/plasma-apply-aurorae
-%{_libdir}/kconf_update_bin/kwin*
-%{_datadir}/kconf_update/
+%{_libdir}/libkineticwe.so.*
+%{_libdir}/libkineticwe-decoration.so.*
+%{_libdir}/libkineticwe-decoration-private.so.*
+%{_libdir}/qt6/plugins/kineticwe/
+%{_libdir}/qt6/plugins/kf6/packagestructure/kineticwe/
+%{_libdir}/qt6/plugins/org.kineticwe.decoration/
+%{_libdir}/qt6/qml/org/kineticwe/
+%{_libdir}/libexec/kineticwe*
 %dir %{_datadir}/knotifications6/
-%{_datadir}/knsrcfiles/
 %{_datadir}/qlogging-categories6/
-%{_datadir}/kwin-wayland/
-%{_datadir}/kwin/aurorae/
+%{_datadir}/kineticwe-wayland/
+%{_datadir}/kineticwe/aurorae/
 %{_datadir}/aurorae/themes/Layan/
 %{_datadir}/aurorae/themes/Layan-solid/
+%{_datadir}/icons/Breeze-Round-Chameleon*
 %{_datadir}/krunner/
 %{_datadir}/locale/
-%{_userunitdir}/plasma-kwin_wayland.service
+%{_userunitdir}/kineticwe.service
 %{_userunitdir}/kineticwe-session.target
-%{_datadir}/dbus-1/interfaces/
 
 %files -n kineticwe-kglobalacceld
 %license ../kglobalacceld/LICENSES/*
-%{_libdir}/libKGlobalAccelD.so.*
+%{_libdir}/libkineticwe-globalacceld.so.*
 
 %files -n xdg-desktop-portal-kwe
 %license portal/xdg-desktop-portal-kwe/LICENSES/*

@@ -338,6 +338,7 @@ binary_build() {
             curl -fsSL https://invent.kde.org/plasma/kglobalacceld/-/archive/${SPEC_KGA_REF}/kglobalacceld-${SPEC_KGA_REF}.tar.gz \
                 | tar xz -C \"\$KGA_BUILD\" --strip-components=1
             cd \"\$KGA_BUILD\"
+            echo 'set_target_properties(KGlobalAccelD PROPERTIES OUTPUT_NAME kineticwe-globalacceld)' >> CMakeLists.txt
             cmake -B build -S . \\
                 -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
                 -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
@@ -359,6 +360,8 @@ binary_build() {
             KDECO_BUILD=\$(mktemp -d /tmp/kdeco-build.XXXXXX)
             curl -fsSL https://invent.kde.org/plasma/kdecoration/-/archive/${SPEC_KDECO_REF}/kdecoration-${SPEC_KDECO_REF}.tar.gz \
                 | tar xz -C \"\$KDECO_BUILD\" --strip-components=1
+            echo 'set_target_properties(kdecorations3 PROPERTIES OUTPUT_NAME kineticwe-decoration)' >> "\$KDECO_BUILD/CMakeLists.txt"
+            echo 'set_target_properties(kdecorations3private PROPERTIES OUTPUT_NAME kineticwe-decoration-private)' >> "\$KDECO_BUILD/CMakeLists.txt"
             cmake -B \"\$KDECO_BUILD/build\" -S \"\$KDECO_BUILD\" \\
                 -DCMAKE_INSTALL_PREFIX='${TEST_PREFIX}' \\
                 -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
@@ -412,7 +415,9 @@ binary_build() {
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
             -DBUILD_TESTING=OFF \\
             -DKWIN_KCONFIG_COMPILER=\$KCFG_COMPILER_OVERRIDE \\
-            -DKWIN_BUILD_GLOBALSHORTCUTS=ON
+            -DKWIN_BUILD_GLOBALSHORTCUTS=ON \\
+            -DKWIN_BUILD_KCMS=OFF \\
+            -DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=ON
 
         echo '[STEP] Building KineticWE...'
         cmake --build '$build_dir' --parallel \$(nproc)
@@ -1034,24 +1039,21 @@ reset_local() {
     # within TEST_PREFIX that kineticwe owns.
     local -a known_paths=(
         "$TEST_PREFIX/bin/kinetic-we"
-        "$TEST_PREFIX/bin/kwin_wayland"
-        "$TEST_PREFIX/bin/kwin_wayland_wrapper"
         "$TEST_PREFIX/bin/kinetic-we_wayland"
         "$TEST_PREFIX/bin/kinetic-we_wayland_wrapper"
-        "$TEST_PREFIX/bin/kwindowprop"
+        "$TEST_PREFIX/bin/kineticwe_windowprop"
         "$TEST_PREFIX/bin/start-kineticwe"
-        "$TEST_PREFIX/lib64/libKGlobalAccelD.so"*
-        "$TEST_PREFIX/lib64/libkwin.so"*
-        "$TEST_PREFIX/lib64/libkcmkwincommon.so"*
-        "$TEST_PREFIX/lib64/libexec/kwin"*
-        "$TEST_PREFIX/lib64/kconf_update_bin/kwin"*
-        "$TEST_PREFIX/lib64/qt6/plugins/kwin"
-        "$TEST_PREFIX/lib64/qt6/plugins/plasma/kcms"
-        "$TEST_PREFIX/lib64/qt6/plugins/kf6/packagestructure"
+        "$TEST_PREFIX/lib64/libkineticwe-globalacceld.so"*
+        "$TEST_PREFIX/lib64/libkineticwe-decoration.so"*
+        "$TEST_PREFIX/lib64/libkineticwe-decoration-private.so"*
+        "$TEST_PREFIX/lib64/libkineticwe.so"*
+        "$TEST_PREFIX/lib64/libexec/kineticwe"*
+        "$TEST_PREFIX/lib64/qt6/plugins/kineticwe"
+        "$TEST_PREFIX/lib64/qt6/plugins/kf6/packagestructure/kineticwe"
+        "$TEST_PREFIX/lib64/qt6/plugins/org.kde.kdecoration3"
+        "$TEST_PREFIX/lib64/qt6/qml/org/kineticwe/kwin"
         "$TEST_PREFIX/lib64/qt6/qml/org/kde/kwin"
-        "$TEST_PREFIX/share/kwin-wayland"
-        "$TEST_PREFIX/share/config.kcfg"
-        "$TEST_PREFIX/share/kconf_update"
+        "$TEST_PREFIX/share/kineticwe-wayland"
         "$TEST_PREFIX/share/knsrcfiles"
         "$TEST_PREFIX/share/qlogging-categories6"
         "$TEST_PREFIX/share/krunner"
@@ -1061,6 +1063,7 @@ reset_local() {
         "$TEST_PREFIX/share/xdg-desktop-portal"
         "$TEST_PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.kwe.service"
         "$TEST_PREFIX/share/applications/org.freedesktop.impl.portal.desktop.kwe.desktop"
+        "$TEST_PREFIX/lib64/systemd/user/kineticwe.service"
         "$TEST_PREFIX/lib64/systemd/user/plasma-xdg-desktop-portal-kwe.service"
         "$TEST_PREFIX/lib64/qt6/qml/org/kde/xdgdesktopportal"
         "$TEST_PREFIX/lib/qt6/qml/org/kde/xdgdesktopportal"

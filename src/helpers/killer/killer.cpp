@@ -121,10 +121,10 @@ bool hasPidAborted(pid_t pid)
 
 int main(int argc, char *argv[])
 {
-    KLocalizedString::setApplicationDomain(QByteArrayLiteral("kwin"));
+    KLocalizedString::setApplicationDomain(QByteArrayLiteral("kineticwe"));
     QApplication app(argc, argv);
     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("tools-report-bug")));
-    QCoreApplication::setApplicationName(QStringLiteral("kwin_killer_helper"));
+    QCoreApplication::setApplicationName(QStringLiteral("kineticwe_killer_helper"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("kde.org"));
     QApplication::setApplicationDisplayName(i18n("Window Manager"));
     QCoreApplication::setApplicationVersion(KWIN_VERSION_STRING);

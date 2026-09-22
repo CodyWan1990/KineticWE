@@ -35,9 +35,9 @@ MouseClickEffectConfig::MouseClickEffectConfig(QObject *parent, const KPluginMet
 
     connect(m_ui.editor, &KShortcutsEditor::keyChange, this, &KCModule::markAsChanged);
 
-    // Shortcut config. The shortcut belongs to the component "kwin"!
-    m_actionCollection = new KActionCollection(this, QStringLiteral("kwin"));
-    m_actionCollection->setComponentDisplayName(i18n("KWin"));
+    // Shortcut config. The shortcut belongs to the component "kineticwe"!
+    m_actionCollection = new KActionCollection(this, QStringLiteral("kineticwe"));
+    m_actionCollection->setComponentDisplayName(i18n("KineticWE"));
 
     QAction *a = m_actionCollection->addAction(QStringLiteral("ToggleMouseClick"));
     a->setText(i18n("Toggle Mouse Click Animation"));

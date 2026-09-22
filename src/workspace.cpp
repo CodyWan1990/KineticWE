@@ -217,6 +217,16 @@ void Workspace::init()
     connect(options, &Options::rollOverDesktopsChanged, vds, &VirtualDesktopManager::setNavigationWrappingAround);
     vds->setPerOutputVirtualDesktops(options->isPerOutputVirtualDesktops());
     connect(options, &Options::perOutputVirtualDesktopsChanged, vds, &VirtualDesktopManager::setPerOutputVirtualDesktops);
+
+    // Re-apply the compositor-wide title bar default to every window when it
+    // changes (the built-in "Toggle Title Bars" action and the Kinetic Settings
+    // switch). Workspace::slotReconfigure() also re-evaluates rules, but this
+    // makes the change immediate and independent of that debounced path.
+    connect(options, &Options::defaultDecorationPolicyChanged, this, [this] {
+        for (Window *window : std::as_const(m_windows)) {
+            window->setDecorationPolicy(options->defaultDecorationPolicy());
+        }
+    });
     vds->setConfig(config);
 
     // Now we know how many desktops we'll have, thus we initialize the positioning object
@@ -1101,6 +1111,8 @@ void Workspace::slotToggleTitleBars()
     KConfigGroup windows(kwinApp()->config(), QStringLiteral("Windows"));
     windows.writeEntry(QStringLiteral("DefaultDecorationPolicy"), int(next));
     kwinApp()->config()->sync();
+
+    qCDebug(KWIN_CORE) << "slotToggleTitleBars: DefaultDecorationPolicy" << int(next);
 
     // Debounced full reconfigure re-reads kineticwe.kwe, updates options and
     // re-seeds every window's decoration base (the same path the settings

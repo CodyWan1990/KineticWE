@@ -43,7 +43,7 @@ namespace {
   // "ksmserver") and per-application components (Konsole, Dolphin, Ghostty,
   // KCalc, ...). None of those are backed by KineticWE config — they read
   // kwinrc / Plasma configs, not kineticwe.kwe — so editing them here presents
-  // binds that KineticWE neither owns nor themes. The compositor ("kwin"), the
+  // binds that KineticWE neither owns nor themes. The compositor ("kineticwe"), the
   // shell ("noctalia"), the shell-backed "audio" / "media-ui" / "brightness"
   // action groups (registered by the compositor, see src/noctaliasettings.cpp), Spectacle and
   // the user's own Applications / Custom Commands actions are shown.
@@ -55,7 +55,7 @@ namespace {
   // is the desktop-file storage id, not the friendly "Spectacle" name.
   const std::vector<std::string>& visibleComponents() {
     static const std::vector<std::string> kVisible{
-        "kwin",
+        "kineticwe",
         "noctalia",
         "audio",
         "media-ui",
@@ -111,11 +111,12 @@ namespace {
     );
   }
 
-  // kwin is branded "KWin"; everything else uses the daemon's friendly name
-  // (which for the compositor's own components defaults to the unique name).
+  // The compositor is branded "KineticWE"; everything else uses the daemon's
+  // friendly name (which for the compositor's own components defaults to the
+  // unique name).
   [[nodiscard]] std::string componentDisplayName(const KeybindDbus::Component& component) {
-    if (component.uniqueName == "kwin") {
-      return "KWin";
+    if (component.uniqueName == "kineticwe") {
+      return "KineticWE";
     }
     if (!component.friendlyName.empty()) {
       return component.friendlyName;
@@ -139,7 +140,7 @@ namespace {
     return action.actionUnique;
   }
 
-  // kwin first, then noctalia, then the rest in case-insensitive alphabetical
+  // kineticwe first, then noctalia, then the rest in case-insensitive alphabetical
   // order of the user-visible display name (the daemon's registration
   // order is not a stable UI order, and the user reads the list by display
   // name — sorting by uniqueName would disagree with that for any component
@@ -148,7 +149,7 @@ namespace {
   // alphabetically and the keybinds.kwe mirror file stays stable.
   void orderComponents(std::vector<KeybindDbus::Component>& components) {
     const auto rank = [](const std::string& name) {
-      if (name == "kwin") {
+      if (name == "kineticwe") {
         return 0;
       }
       if (name == "noctalia") {

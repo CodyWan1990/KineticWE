@@ -35,9 +35,9 @@ namespace KWin
 namespace Decoration
 {
 
-static const QString s_pluginName = QStringLiteral("org.kde.kdecoration3");
+static const QString s_pluginName = QStringLiteral("org.kineticwe.decoration");
 static const QString s_configKeyName = QStringLiteral("org.kde.kdecoration2");
-static const QString s_defaultPlugin = QStringLiteral("org.kde.breeze");
+static const QString s_defaultPlugin = QStringLiteral("kineticwe");
 static const QString s_fallbackPlugin = QStringLiteral("org.kde.kwin.aurorae.v2");
 
 static void migrateAuroraeTheme()

@@ -5,7 +5,7 @@
 */
 
 import QtQuick
-import org.kde.kwin as KWinComponents
+import org.kineticwe.kwin as KWinComponents
 
 Item {
     id: desktopView

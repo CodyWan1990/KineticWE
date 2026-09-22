@@ -1116,7 +1116,7 @@ static QJsonObject saveMode(const OutputModeline &modeline)
 
 void OutputConfigurationStore::load()
 {
-    const QString jsonPath = QStandardPaths::locate(QStandardPaths::ConfigLocation, QStringLiteral("kwinoutputconfig.json"));
+    const QString jsonPath = QStandardPaths::locate(QStandardPaths::ConfigLocation, QStringLiteral("kineticweoutputconfig.json"));
     if (jsonPath.isEmpty()) {
         return;
     }
@@ -1734,7 +1734,7 @@ void OutputConfigurationStore::save()
         qCWarning(KWIN_OUTPUT_CONFIG, "Couldn't create config folder for %s", qPrintable(folderPath));
         return;
     }
-    const QString path = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/kwinoutputconfig.json";
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/kineticweoutputconfig.json";
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
         qCWarning(KWIN_OUTPUT_CONFIG, "Couldn't open output config file %s", qPrintable(path));

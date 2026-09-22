@@ -135,7 +135,7 @@ EisInputCaptureManager::EisInputCaptureManager()
     });
 
     m_disableCaptureAction = new QAction(this);
-    m_disableCaptureAction->setProperty("componentName", QStringLiteral("kwin"));
+    m_disableCaptureAction->setProperty("componentName", QStringLiteral("kineticwe"));
     m_disableCaptureAction->setObjectName(QStringLiteral("disableInputCapture"));
     m_disableCaptureAction->setText(i18nc("@action shortcut", "Disable Active Input Capture"));
     KGlobalAccel::setGlobalShortcut(m_disableCaptureAction, QKeySequence(defaultDisableKeys));

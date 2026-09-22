@@ -1573,7 +1573,7 @@ void OutputChangesTest::testGenerateConfigs()
     Test::setOutputConfig({outputInfo});
 
     // delete the previous config to avoid loading the config from workspace
-    QFile(QStandardPaths::locate(QStandardPaths::ConfigLocation, QStringLiteral("kwinoutputconfig.json"))).remove();
+    QFile(QStandardPaths::locate(QStandardPaths::ConfigLocation, QStringLiteral("kineticweoutputconfig.json"))).remove();
 
     const auto outputs = kwinApp()->outputBackend()->outputs();
     OutputConfigurationStore configs;
@@ -1699,7 +1699,7 @@ void OutputChangesTest::testAutorotate_data()
 void OutputChangesTest::testAutorotate()
 {
     // delete the previous config to avoid clashes between test runs
-    QFile(QStandardPaths::locate(QStandardPaths::ConfigLocation, QStringLiteral("kwinoutputconfig.json"))).remove();
+    QFile(QStandardPaths::locate(QStandardPaths::ConfigLocation, QStringLiteral("kineticweoutputconfig.json"))).remove();
 
     QFETCH(OutputTransform::Kind, panelOrientation);
     Test::setOutputConfig({Test::OutputInfo{

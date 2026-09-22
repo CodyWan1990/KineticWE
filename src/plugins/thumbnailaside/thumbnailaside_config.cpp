@@ -40,10 +40,10 @@ ThumbnailAsideEffectConfig::ThumbnailAsideEffectConfig(QObject *parent, const KP
     ThumbnailAsideConfig::instance(KWIN_CONFIG);
     addConfig(ThumbnailAsideConfig::self(), widget());
 
-    // Shortcut config. The shortcut belongs to the component "kwin"!
-    m_actionCollection = new KActionCollection(this, QStringLiteral("kwin"));
+    // Shortcut config. The shortcut belongs to the component "kineticwe"!
+    m_actionCollection = new KActionCollection(this, QStringLiteral("kineticwe"));
 
-    m_actionCollection->setComponentDisplayName(i18n("KWin"));
+    m_actionCollection->setComponentDisplayName(i18n("KineticWE"));
     m_actionCollection->setConfigGroup(QStringLiteral("ThumbnailAside"));
     m_actionCollection->setConfigGlobal(true);
 

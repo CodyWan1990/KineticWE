@@ -1,4 +1,4 @@
-kcoreaddons_add_plugin(nightlight INSTALL_NAMESPACE "kwin/plugins")
+kcoreaddons_add_plugin(nightlight INSTALL_NAMESPACE "kineticwe/plugins")
 target_sources(nightlight PRIVATE
     nightlightdbusinterface.cpp
     nightlightmanager.cpp
@@ -32,5 +32,6 @@ target_link_libraries(nightlight
     KF6::I18n
 )
 
-install(FILES nightlightsettings.kcfg DESTINATION ${KDE_INSTALL_KCFGDIR})
+# The night-light KConfigXT schema is build-time codegen only; with the KCMs off
+# there is no runtime consumer, so it is not installed.
 install(FILES org.kde.KWin.NightLight.xml DESTINATION ${KDE_INSTALL_DBUSINTERFACEDIR})

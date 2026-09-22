@@ -38,7 +38,7 @@ InternalWindow::InternalWindow(QWindow *handle)
     setOutput(workspace()->activeOutput());
     setMoveResizeOutput(workspace()->activeOutput());
     setCaption(m_handle->title());
-    setIcon(QIcon::fromTheme(QStringLiteral("kwin")));
+    setIcon(QIcon::fromTheme(QStringLiteral("kineticwe")));
     setOnAllDesktops(true);
     setOpacity(m_handle->opacity());
     setSkipCloseAnimation(m_handle->property(s_skipClosePropertyName).toBool());

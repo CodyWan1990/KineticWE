@@ -167,7 +167,7 @@ bool ScriptedEffectLoader::loadJavascriptEffect(const KPluginMetaData &effect)
 bool ScriptedEffectLoader::loadDeclarativeEffect(const KPluginMetaData &metadata)
 {
     const QString name = metadata.pluginId();
-    QString scriptFile = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kwin-wayland/effects/") + name + QLatin1StringView("/contents/ui/main.qml"));
+    QString scriptFile = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kineticwe-wayland/effects/") + name + QLatin1StringView("/contents/ui/main.qml"));
     if (scriptFile.isNull()) {
         scriptFile = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kwin/effects/") + name + QLatin1StringView("/contents/ui/main.qml"));
         if (scriptFile.isNull()) {
@@ -227,13 +227,13 @@ void ScriptedEffectLoader::queryAndLoadAll()
 
 QList<KPluginMetaData> ScriptedEffectLoader::findAllEffects() const
 {
-    return KPackage::PackageLoader::self()->listPackages(s_serviceType, QStringLiteral("kwin-wayland/effects"))
+    return KPackage::PackageLoader::self()->listPackages(s_serviceType, QStringLiteral("kineticwe-wayland/effects"))
         + KPackage::PackageLoader::self()->listPackages(s_serviceType, QStringLiteral("kwin/effects"));
 }
 
 KPluginMetaData ScriptedEffectLoader::findEffect(const QString &name) const
 {
-    auto plugins = KPackage::PackageLoader::self()->findPackages(s_serviceType, QStringLiteral("kwin-wayland/effects"), [name](const KPluginMetaData &metadata) {
+    auto plugins = KPackage::PackageLoader::self()->findPackages(s_serviceType, QStringLiteral("kineticwe-wayland/effects"), [name](const KPluginMetaData &metadata) {
         return metadata.pluginId().compare(name, Qt::CaseInsensitive) == 0;
     });
     if (!plugins.isEmpty()) {
@@ -257,7 +257,7 @@ void ScriptedEffectLoader::clear()
 
 PluginEffectLoader::PluginEffectLoader(QObject *parent)
     : AbstractEffectLoader(parent)
-    , m_pluginSubDirectory(QStringLiteral("kwin/effects/plugins"))
+    , m_pluginSubDirectory(QStringLiteral("kineticwe/effects/plugins"))
 {
 }
 

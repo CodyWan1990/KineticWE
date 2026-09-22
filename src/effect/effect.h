@@ -67,7 +67,7 @@ class OutputFrame;
  *  The first parameter is the name of the library, this is the same as the id of the plugin.
  *  If our effect's source is in cooleffect.cpp, we'd use following:
  * \code
- *     kcoreaddons_add_plugin(cooleffect SOURCES cooleffect.cpp INSTALL_NAMESPACE "kwin/effects/plugins")
+ *     kcoreaddons_add_plugin(cooleffect SOURCES cooleffect.cpp INSTALL_NAMESPACE "kineticwe/effects/plugins")
  * \endcode
  *
  * \section2 Effect's .json file for embedded metadata

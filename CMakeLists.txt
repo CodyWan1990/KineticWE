@@ -545,7 +545,6 @@ if (KF6DocTools_FOUND)
 endif()
 
 add_subdirectory(data)
-add_subdirectory(kconf_update)
 add_subdirectory(src)
 
 if (BUILD_TESTING)
@@ -589,7 +588,7 @@ install(
 
 install(EXPORT KWinTargets DESTINATION "${CMAKECONFIG_INSTALL_DIR}" FILE KWinTargets.cmake NAMESPACE KWin:: )
 
-ecm_install_configured_files(INPUT plasma-kwin_wayland.service.in @ONLY
+ecm_install_configured_files(INPUT kineticwe.service.in @ONLY
             DESTINATION ${KDE_INSTALL_SYSTEMDUSERUNITDIR})
 
 

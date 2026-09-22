@@ -24,16 +24,16 @@
 
 static QString shortcut(const QString &name)
 {
-    const auto shortcuts = KGlobalAccel::self()->globalShortcut(QStringLiteral("kwin"), name);
+    const auto shortcuts = KGlobalAccel::self()->globalShortcut(QStringLiteral("kineticwe"), name);
     return !shortcuts.isEmpty() ? shortcuts.first().toString(QKeySequence::NativeText) : QString();
 }
 
 int main(int argc, char *argv[])
 {
-    KLocalizedString::setApplicationDomain(QByteArrayLiteral("kwin"));
+    KLocalizedString::setApplicationDomain(QByteArrayLiteral("kineticwe"));
     QApplication app(argc, argv);
-    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("kwin")));
-    QCoreApplication::setApplicationName(QStringLiteral("kwin_dialog_helper"));
+    QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("kineticwe")));
+    QCoreApplication::setApplicationName(QStringLiteral("kineticwe_dialog_helper"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("kde.org"));
     QApplication::setApplicationDisplayName(i18n("Window Manager"));
     QCoreApplication::setApplicationVersion(KWIN_VERSION_STRING);

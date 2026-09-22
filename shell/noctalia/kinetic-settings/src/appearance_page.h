@@ -15,11 +15,11 @@ class Renderer;
 class SessionBus;
 
 // The Appearance -> Title Bars settings page: the titlebar (window decoration)
-// picker, rendered as a tile grid holding the compiled-in Breeze decoration
-// plus every installed Aurorae theme. The selection is written to the
-// compositor's ~/.config/kineticwe/kineticwe.kwe ([org.kde.kdecoration2]
-// library/theme) by applyAll(), which the window's Apply button calls; the
-// compositor is then asked to reconfigure.
+// picker, rendered as a tile grid holding the two Kinetic decoration variants
+// (dark/light). The selection is written to the compositor's
+// ~/.config/kineticwe/kineticwe.kwe ([org.kde.kdecoration2] library/theme) by
+// applyAll(), which the window's Apply button calls; the compositor is then
+// asked to reconfigure.
 //
 // Theme COLORS are not handled here: the shell's theme service owns the
 // generated palette (qt5ct/qt6ct color schemes, ~/.config/kdeglobals, the GTK
@@ -56,16 +56,17 @@ public:
   void resetAll();
 
   [[nodiscard]] bool hasPending() const noexcept {
-    return m_pendingDecoration.has_value();
+    return m_pendingDecoration.has_value() || m_pendingHideTitleBars.has_value();
   }
-  // Writes the staged titlebar selection to kineticwe.kwe and asks the
-  // compositor to reconfigure. Returns false on failure (the staged edit is kept
-  // for retry).
+  // Writes the staged titlebar selection and "Toggle title bars" state to
+  // kineticwe.kwe and asks the compositor to reconfigure. Returns false on
+  // failure (the staged edit is kept for retry).
   bool applyAll();
 
   void reloadFromDisk() noexcept {
     m_loaded = false;
     m_pendingDecoration.reset();
+    m_pendingHideTitleBars.reset();
     m_errorNotice.clear();
   }
 
@@ -75,10 +76,10 @@ public:
 
 private:
   // The titlebar selection: a (library, theme) pair written to kineticwe.kwe
-  // [org.kde.kdecoration2]. Breeze is the compiled-in default.
+  // [org.kde.kdecoration2]. The Kinetic decoration is the compiled-in default.
   struct DecorationSelection {
-    std::string library; // "org.kde.breeze" or "org.kde.kwin.aurorae.v2"
-    std::string theme;   // "Breeze" or "__aurorae__svg__<Name>"
+    std::string library; // "kineticwe"
+    std::string theme;   // "dark" or "light"
 
     [[nodiscard]] bool operator==(const DecorationSelection& other) const noexcept {
       return library == other.library && theme == other.theme;
@@ -90,6 +91,7 @@ private:
   // --- Title bars (the page's only section) --------------------------------
   [[nodiscard]] static DecorationSelection defaultDecoration();
   [[nodiscard]] static std::string decorationKeyPath() { return "org.kde.kdecoration2.theme"; }
+  [[nodiscard]] static std::string titleBarsKeyPath() { return "Windows/DefaultDecorationPolicy"; }
   [[nodiscard]] DecorationSelection fileBackedDecoration() const;
   [[nodiscard]] DecorationSelection effectiveDecoration() const;
   [[nodiscard]] bool overriddenDecoration() const;
@@ -98,20 +100,29 @@ private:
   void stageDecorationAndRebuild(
       const DecorationSelection& selection, const Callbacks& callbacks
   );
-  // Writes the selection to kineticwe.kwe [org.kde.kdecoration2] and asks the
-  // compositor to reconfigure. Reloads the file first so concurrently applied
-  // edits on other pages are preserved.
-  [[nodiscard]] bool applyDecoration(const DecorationSelection& selection);
-  // Builds the section (header row with the folder + reset buttons, then the
-  // tile grid). Returns nullptr when the active filter leaves nothing to show.
+  // The global "Toggle title bars" switch: [Windows] DefaultDecorationPolicy
+  // (None/0 hides every frame, ClientPreference/1 shows the client's), unless a
+  // per-window rule overrides it.
+  [[nodiscard]] bool titleBarsHiddenOnDisk() const;
+  [[nodiscard]] bool effectiveHideTitleBars() const;
+  // Stages the toggle; clears it when it matches disk.
+  void stageHideTitleBars(bool hide);
+  // Writes the staged titlebar selection and toggle to kineticwe.kwe
+  // ([org.kde.kdecoration2] + [Windows]) and asks the compositor to reconfigure.
+  // Reloads the file first so concurrently applied edits on other pages are
+  // preserved.
+  [[nodiscard]] bool applyTitleBars();
+  // Builds the section (the toggle row, then the header/reset row and tile
+  // grid). Returns nullptr when the active filter leaves nothing to show.
   [[nodiscard]] std::unique_ptr<Node> buildDecorationsSection(
-      float scale, Renderer& renderer, const Filter& filter, std::string_view armedResetKey,
-      const Callbacks& callbacks
+      float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
   );
 
   bool m_loaded = false;
-  // Staged titlebar selection (kineticwe.kwe).
+  // Staged titlebar selection (kineticwe.kwe [org.kde.kdecoration2]).
   std::optional<DecorationSelection> m_pendingDecoration;
+  // Staged "Toggle title bars" value (kineticwe.kwe [Windows]); nullopt = no edit.
+  std::optional<bool> m_pendingHideTitleBars;
   // kineticwe.kwe reader/writer for the decoration keys.
   KineticweKwe m_decorationsConfig;
   CompositorDbus m_dbus;

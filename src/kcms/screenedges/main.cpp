@@ -124,7 +124,7 @@ void KWinScreenEdgesConfig::defaults()
 static QList<KPluginMetaData> listBuiltinEffects()
 {
     const QString rootDirectory = QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                                         QStringLiteral("kwin-wayland/builtin-effects"),
+                                                         QStringLiteral("kineticwe-wayland/builtin-effects"),
                                                          QStandardPaths::LocateDirectory);
 
     QList<KPluginMetaData> ret;
@@ -143,7 +143,7 @@ static QList<KPluginMetaData> listBuiltinEffects()
 
 static QList<KPluginMetaData> listScriptedEffects()
 {
-    return KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Effect"), QStringLiteral("kwin-wayland/effects/"))
+    return KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Effect"), QStringLiteral("kineticwe-wayland/effects/"))
         + KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Effect"), QStringLiteral("kwin/effects/"));
 }
 
@@ -185,7 +185,7 @@ void KWinScreenEdgesConfig::monitorInit()
         m_effectSettings[effect.pluginId()] = new KWinScreenEdgeEffectSettings(effect.pluginId(), this);
     }
 
-    const auto scripts = KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kwin-wayland/scripts/"))
+    const auto scripts = KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kineticwe-wayland/scripts/"))
         + KPackage::PackageLoader::self()->listPackages(QStringLiteral("KWin/Script"), QStringLiteral("kwin/scripts/"));
 
     for (const KPluginMetaData &script : scripts) {

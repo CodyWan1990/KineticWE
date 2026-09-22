@@ -65,7 +65,7 @@ void GenericScriptedConfig::createUi()
     QVBoxLayout *layout = new QVBoxLayout(widget());
 
     QString packageRoot = QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                                 QLatin1StringView("kwin-wayland/") + typeName() + QLatin1Char('/') + m_packageName,
+                                                 QLatin1StringView("kineticwe-wayland/") + typeName() + QLatin1Char('/') + m_packageName,
                                                  QStandardPaths::LocateDirectory);
     if (packageRoot.isEmpty()) {
         packageRoot = QStandardPaths::locate(QStandardPaths::GenericDataLocation,

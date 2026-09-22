@@ -170,7 +170,7 @@ WaylandOutput::WaylandOutput(const QString &name, WaylandBackend *backend)
     updateWindowTitle();
     if (auto toplevelIconManager = backend->display()->toplevelIconManager()) {
         auto toplevelIcon = xdg_toplevel_icon_manager_v1_create_icon(toplevelIconManager);
-        xdg_toplevel_icon_v1_set_name(toplevelIcon, "kwin");
+        xdg_toplevel_icon_v1_set_name(toplevelIcon, "kineticwe");
         xdg_toplevel_icon_manager_v1_set_icon(toplevelIconManager, *m_xdgShellSurface, toplevelIcon);
         xdg_toplevel_icon_v1_destroy(toplevelIcon);
     }

@@ -5,7 +5,7 @@
 # the only way a target with RefuseManualStart=yes (graphical-session.target,
 # xdg-desktop-autostart.target) becomes active. This mirrors the mechanism
 # startplasma uses via plasma-workspace-wayland.target, which KineticWE cannot
-# use because that unit Requires/BindsTo the stock plasma-kwin_wayland.service.
+# use because that unit Requires/BindsTo the stock kineticwe.service.
 #
 # Reaching graphical-session.target activates every user unit wired to it,
 # including any user/Home Manager service with:

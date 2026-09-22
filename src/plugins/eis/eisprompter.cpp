@@ -26,9 +26,9 @@
 
 int main(int argc, char **argv)
 {
-    KLocalizedString::setApplicationDomain(QByteArrayLiteral("kwin"));
+    KLocalizedString::setApplicationDomain(QByteArrayLiteral("kineticwe"));
     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("kde")));
-    QCoreApplication::setApplicationName(QStringLiteral("kwin_eis_prompter"));
+    QCoreApplication::setApplicationName(QStringLiteral("kineticwe_eis_prompter"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("kde.org"));
     QApplication::setApplicationDisplayName(QString());
     QCoreApplication::setApplicationVersion(KWIN_VERSION_STRING);

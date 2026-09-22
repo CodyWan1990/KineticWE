@@ -214,7 +214,7 @@ bool EffectsModel::setData(const QModelIndex &index, const QVariant &value, int 
 void EffectsModel::loadBuiltInEffects(const KConfigGroup &kwinConfig)
 {
     const QString rootDirectory = QStandardPaths::locate(QStandardPaths::GenericDataLocation,
-                                                         QStringLiteral("kwin-wayland/builtin-effects"),
+                                                         QStringLiteral("kineticwe-wayland/builtin-effects"),
                                                          QStandardPaths::LocateDirectory);
 
     const QStringList nameFilters{QStringLiteral("*.json")};
@@ -272,7 +272,7 @@ void EffectsModel::loadBuiltInEffects(const KConfigGroup &kwinConfig)
 void EffectsModel::loadJavascriptEffects(const KConfigGroup &kwinConfig)
 {
     const QStringList prefixes{
-        QStringLiteral("kwin-wayland/effects"),
+        QStringLiteral("kineticwe-wayland/effects"),
         QStringLiteral("kwin/effects"),
     };
     for (const QString &prefix : prefixes) {

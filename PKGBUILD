@@ -148,14 +148,11 @@ optdepends=(
     'kde-gtk-config: GTK application styling'
     'upower: Battery and power-device integration for Noctalia'
 )
-# COPR-compatible package replacement metadata
-# Mimics the COPR spec's Provides + Obsoletes for kwin, kwin-common, kwin-libs,
-# kwin-wayland, kglobalacceld, kglobalacceld-devel, and kdecoration.
-# On Arch, kwin-common/kwin-libs/kwin-wayland are bundled in 'kwin', but we
-# provide them virtually so packages that reference them see them satisfied.
-replaces=('kwin' 'kglobalacceld' 'kdecoration')
-provides=('kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'aurorae' 'kwin' 'kwin-common' 'kwin-libs' 'kwin-wayland' 'xdg-desktop-portal-kwe')
-conflicts=('kwin' 'kglobalacceld' 'kglobalacceld-devel' 'kdecoration' 'aurorae' 'xdg-desktop-portal-kde')
+# KineticWE installs beside KWin instead of replacing it: no
+# kwin/kdecoration/kglobalacceld provides, replaces, or conflicts. The portal
+# backend keeps its virtual provide so packages can depend on
+# xdg-desktop-portal-kwe.
+provides=('xdg-desktop-portal-kwe')
 
 
 # Source: kinetic-we from GitLab + kglobalacceld/kdecoration from KDE invent
@@ -199,6 +196,29 @@ prepare() {
     # Both are already cloned at their pinned commits via git sources;
     # no extra prep needed
     cd "$srcdir"
+
+    # KineticWE coexistence: private sonames for the vendored runtime libraries
+    # so a stock kdecoration/kglobalacceld can stay installed. The CMake target
+    # names (and thus kinetic-we's link lines) are unchanged.
+    cat >> kglobalacceld/CMakeLists.txt <<'KWE_KGA'
+
+set_target_properties(KGlobalAccelD PROPERTIES OUTPUT_NAME kineticwe-globalacceld)
+KWE_KGA
+    cat >> kdecoration/CMakeLists.txt <<'KWE_KDECO'
+
+set_target_properties(kdecorations3 PROPERTIES OUTPUT_NAME kineticwe-decoration)
+set_target_properties(kdecorations3private PROPERTIES OUTPUT_NAME kineticwe-decoration-private)
+KWE_KDECO
+
+    # KineticWE coexistence: namespace the vendored aurorae artifacts so they do
+    # not collide with the distro aurorae package.
+    find aurorae -type f \( -name 'CMakeLists.txt' -o -name '*.cpp' -o -name '*.h' -o -name '*.qml' -o -name '*.json' -o -name '*.desktop' -o -name '*.in' -o -name '*.xml' \) -print0 \
+        | xargs -0 sed -i \
+            -e 's/org\.kde\.kdecoration3/org.kineticwe.decoration/g' \
+            -e 's/org\.kde\.kwin\.decoration/org.kineticwe.decoration/g' \
+            -e 's#\bkwin/aurorae#kineticwe/aurorae#g' \
+            -e 's#\bkwin/decorations#kineticwe/decorations#g' \
+            -e 's/plasma-apply-aurorae/kineticwe-apply-aurorae/g'
 }
 
 build() {
@@ -278,6 +298,8 @@ build() {
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_TESTING=OFF \
         -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
+        -DKWIN_BUILD_KCMS=OFF \
+        -DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=ON \
         -Wno-dev
 
     cmake --build . --parallel "$(nproc)"
@@ -323,22 +345,23 @@ package() {
 
     # Strip kglobalacceld development files (matching COPR — keep only runtime lib)
     rm -rf "$pkgdir/usr/include/KGlobalAccelD" 2>/dev/null || true
-    rm -f "$pkgdir/usr/lib/libKGlobalAccelD.so" 2>/dev/null || true
+    rm -f "$pkgdir/usr/lib/libkineticwe-globalacceld.so" 2>/dev/null || true
 
     # Strip kdecoration development files (matching COPR — keep only runtime libs)
     rm -rf "$pkgdir/usr/include/KDecoration3" 2>/dev/null || true
     rm -f "$pkgdir/usr/include/KF6/kdecoration3_version.h" 2>/dev/null || true
     rm -rf "$pkgdir/usr/lib/cmake/KDecoration3" 2>/dev/null || true
-    rm -f "$pkgdir/usr/lib/libkdecorations3.so" 2>/dev/null || true
-    rm -f "$pkgdir/usr/lib/libkdecorations3private.so" 2>/dev/null || true
+    rm -f "$pkgdir/usr/lib/libkineticwe-decoration.so" 2>/dev/null || true
+    rm -f "$pkgdir/usr/lib/libkineticwe-decoration-private.so" 2>/dev/null || true
+
+    # Strip the libkineticwe.so devel symlink and every KDE System Settings module
+    rm -f "$pkgdir/usr/lib/libkineticwe.so" 2>/dev/null || true
+    rm -rf "$pkgdir/usr/lib/qt6/plugins/org.kde.kdecoration3.kcm" 2>/dev/null || true
+    rm -f "$pkgdir/usr/share/applications/kcm_"*.desktop 2>/dev/null || true
 
     # Strip aurorae development files (keep only runtime plugin + themes)
     rm -rf "$pkgdir/usr/lib/cmake/Aurorae" 2>/dev/null || true
     rm -rf "$pkgdir/usr/include/Aurorae" 2>/dev/null || true
-
-    # Compatibility symlinks so Plasma can find the compositor (like COPR does)
-    ln -s kinetic-we "$pkgdir/usr/bin/kwin_wayland"
-    ln -s kinetic-we_wayland_wrapper "$pkgdir/usr/bin/kwin_wayland_wrapper"
 
     # Install license
     install -Dm644 "$srcdir/$_sourcebase/LICENSES/"* \

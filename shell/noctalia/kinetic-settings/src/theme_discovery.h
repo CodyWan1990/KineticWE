@@ -21,50 +21,12 @@ struct ThemeInfo {
   std::string path;        // absolute path to the theme directory
 };
 
-// An installed window decoration theme. Only Aurorae themes are discovered
-// (the kind downloadable from store.kde.org category 717); their directory name
-// is the theme id used with the Aurorae KDecoration plugin.
-struct DecorationThemeInfo {
-  std::string name;        // theme directory name (Aurorae theme id)
-  std::string displayName; // Name= from metadata.desktop, fallback to directory name
-  std::string path;        // absolute path to the theme directory
-  // Titlebar layout from the theme's own <name>rc (Aurorae's configrc), used by
-  // Kinetic Settings to draw a faithful window preview. The defaults mirror
-  // Aurorae's when the rc omits the keys: centered title, no side buttons, and
-  // a 24px titlebar.
-  std::string titleAlignment = "center"; // [General] TitleAlignment, lowercased
-  std::string leftButtons;               // [General] LeftButtons (KDE button letters)
-  std::string rightButtons;              // [General] RightButtons
-  int titlebarHeight = 24;               // [Layout] TitleHeight + TitleEdgeTop + TitleEdgeBottom
-};
-
 // All installed icon themes, sorted by display name (case-insensitive).
 // Each entry's path is the theme's root directory.
 [[nodiscard]] std::vector<ThemeInfo> iconThemes();
 
 // All installed cursor themes, sorted by display name (case-insensitive).
   [[nodiscard]] std::vector<ThemeInfo> cursorThemes();
-
-  // All installed Aurorae window decoration themes, sorted by display name
-  // (case-insensitive). Each path is the theme's directory under
-  // `<data dir>/aurorae/themes/`.
-  [[nodiscard]] std::vector<DecorationThemeInfo> decorationThemes();
-
-  // Path to a theme's button artwork for a KDE/Aurorae button letter
-  // (X close, I minimize, A maximize, H help, S alldesktops, F keepabove,
-  // B keepbelow). Empty when the letter has no artwork or the theme ships none
-  // (only uncompressed .svg is resolved; .svgz archives are skipped).
-  [[nodiscard]] std::string decorationButtonFile(const std::string& themePath, char letter);
-
-  // The window decoration themes root directory (where downloaded themes are
-  // installed), preferring the user's own dir (`~/.local/share/aurorae/themes`)
-  // and falling back to the first existing system root. Empty when nothing can
-  // be resolved.
-  [[nodiscard]] std::string decorationRootPath();
-
-  // Creates (if needed) the user's Aurorae themes directory and opens it in the
-  // default file manager. Returns true when a launch was attempted.
-  bool openDecorationRoot();
 
   // The XDG icon theme root directory (where icon and cursor themes live),
   // preferring the user's own theme dir (~/.local/share/icons, ~/.icons) and

@@ -42,7 +42,7 @@ void KeyboardLayout::init()
 {
     QAction *switchKeyboardAction = new QAction(this);
     switchKeyboardAction->setObjectName(QStringLiteral("Switch to Next Keyboard Layout"));
-    switchKeyboardAction->setProperty("componentName", QStringLiteral("KDE Keyboard Layout Switcher"));
+    switchKeyboardAction->setProperty("componentName", QStringLiteral("KineticWE Keyboard Layout Switcher"));
     switchKeyboardAction->setProperty("componentDisplayName", i18n("Keyboard Layout Switcher"));
     KGlobalAccel::self()->setGlobalShortcut(switchKeyboardAction, QKeySequence(Qt::META | Qt::ALT | Qt::Key_K));
 
@@ -50,7 +50,7 @@ void KeyboardLayout::init()
 
     QAction *switchLastUsedKeyboardAction = new QAction(this);
     switchLastUsedKeyboardAction->setObjectName(QStringLiteral("Switch to Last-Used Keyboard Layout"));
-    switchLastUsedKeyboardAction->setProperty("componentName", QStringLiteral("KDE Keyboard Layout Switcher"));
+    switchLastUsedKeyboardAction->setProperty("componentName", QStringLiteral("KineticWE Keyboard Layout Switcher"));
     switchLastUsedKeyboardAction->setProperty("componentDisplayName", i18n("Keyboard Layout Switcher"));
     KGlobalAccel::self()->setGlobalShortcut(switchLastUsedKeyboardAction, QKeySequence(Qt::META | Qt::ALT | Qt::Key_L));
 
@@ -132,7 +132,7 @@ void KeyboardLayout::loadShortcuts()
 {
     qDeleteAll(m_layoutShortcuts);
     m_layoutShortcuts.clear();
-    const QString componentName = QStringLiteral("KDE Keyboard Layout Switcher");
+    const QString componentName = QStringLiteral("KineticWE Keyboard Layout Switcher");
     const QString componentDisplayName = i18n("Keyboard Layout Switcher");
     const quint32 count = m_xkb->numberOfLayouts();
     for (uint i = 0; i < count; ++i) {

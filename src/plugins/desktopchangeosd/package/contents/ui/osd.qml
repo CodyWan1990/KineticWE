@@ -11,7 +11,7 @@ import QtQuick.Window
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import org.kde.ksvg as KSvg
-import org.kde.kwin
+import org.kineticwe.kwin
 
 PlasmaCore.Window {
     id: dialog

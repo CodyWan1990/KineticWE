@@ -1,0 +1,11 @@
+[Dark]
+Frame={{colors.background.dark.hex}}
+TitleBar={{colors.surface_container.dark.hex}}
+Foreground={{colors.on_surface.dark.hex}}
+Outline={{colors.outline_variant.dark.hex}}
+
+[Light]
+Frame={{colors.background.light.hex}}
+TitleBar={{colors.surface_container.light.hex}}
+Foreground={{colors.on_surface.light.hex}}
+Outline={{colors.outline_variant.light.hex}}

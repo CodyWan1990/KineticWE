@@ -5,8 +5,8 @@
 */
 
 import QtQuick
-import org.kde.kwin as KWinComponents
-import org.kde.kwin.private.effects
+import org.kineticwe.kwin as KWinComponents
+import org.kineticwe.kwin.private.effects
 import org.kde.kirigami as Kirigami
 
 Rectangle {

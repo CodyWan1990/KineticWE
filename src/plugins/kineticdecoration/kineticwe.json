@@ -1,0 +1,18 @@
+{
+    "KPlugin": {
+        "Description": "Kinetic window decoration for KineticWE",
+        "Id": "kineticwe",
+        "License": "GPL-2.0-or-later",
+        "Name": "Kinetic",
+        "Version": "1.0"
+    },
+    "org.kineticwe.decoration": {
+        "defaultTheme": "dark",
+        "recommendedBorderSize": "Normal",
+        "styles": [
+            "titled",
+            "shadow"
+        ],
+        "themes": true
+    }
+}

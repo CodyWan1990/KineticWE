@@ -46,6 +46,8 @@ set -euo pipefail
 
 TEST_PREFIX="${TEST_PREFIX:-$HOME/.local}"
 DEV_LD_LIBRARY_PATH="${TEST_PREFIX}/lib64:${TEST_PREFIX}/lib/x86_64-linux-gnu"
+# Repository root, so the vendored icon theme archive can be located.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # The dev binaries to inspect. The portal backend is a separate subpackage and
 # may not be present on a partial build; we skip binaries that are not there.
@@ -82,17 +84,16 @@ BASELINE_RPM_PKGS=(
 # Default session packages so a fresh install from TTY actually has: the
 # Breeze icon theme (breeze-icon-theme), the Breeze color schemes that the
 # session seeds (BreezeDark/BreezeLight — plasma-breeze-common), the Breeze
-# window decoration plugin (plasma-breeze) and its aurorae fallback so server-
-# side title bars actually render, the Breeze cursor theme, the Qt5/Qt6
-# configuration tools that theme Qt apps via QT_QPA_PLATFORMTHEME=qt5ct,
-# Xwayland (so X11 clients and Electron apps can open windows), and a terminal
-# the user can launch. Installed idempotently by
+# cursor theme, the Qt5/Qt6 configuration tools that theme Qt apps via
+# QT_QPA_PLATFORMTHEME=qt5ct, Xwayland (so X11 clients and Electron apps can
+# open windows), and a terminal the user can launch. The window decoration is
+# the first-party org.kineticwe.decoration plugin built with KineticWE, and the
+# aurorae theme engine is vendored, so neither plasma-breeze nor the distro
+# aurorae package is needed. Installed idempotently by
 # install_default_session_packages.
 DEFAULT_RPM_PKGS=(
     breeze-icon-theme
     plasma-breeze-common
-    plasma-breeze
-    aurorae
     breeze-cursor-theme
     qt5ct
     qt6ct
@@ -362,10 +363,44 @@ install_default_session_packages() {
     info "Default session packages installed."
 }
 
+# The default icon theme (Breeze-Round-Chameleon Dark Icons) is vendored in the
+# repo, not a Fedora/COPR package, so it cannot be pulled in with dnf. Install
+# it from the vendored archive into the user's icon dir when it is not already
+# resolvable. The dev `cmake --install` already puts it in
+# ${TEST_PREFIX}/share/icons (=$HOME/.local/share/icons for the default
+# prefix), so this is a no-op after a build. Idempotent.
+install_default_icon_theme() {
+    local theme_name="Breeze-Round-Chameleon Dark Icons"
+    local archive="${SCRIPT_DIR}/data/icon-themes/Breeze-Round-Chameleon-Dark-Icons.tar.xz"
+    local -a roots=(
+        "${TEST_PREFIX}/share/icons"
+        "${HOME}/.local/share/icons"
+        "${HOME}/.icons"
+        /usr/share/icons
+    )
+    local root
+    for root in "${roots[@]}"; do
+        if [[ -f "${root}/${theme_name}/index.theme" ]]; then
+            info "Default icon theme '${theme_name}' already installed (${root})."
+            return 0
+        fi
+    done
+    if [[ ! -f "$archive" ]]; then
+        warn "Vendored icon theme archive not found: ${archive}"
+        warn "        (run from a checkout of the repo, or run a build first)"
+        return 1
+    fi
+    local dest="${TEST_PREFIX}/share/icons"
+    info "Installing default icon theme '${theme_name}' -> ${dest}"
+    mkdir -p "$dest"
+    tar xJf "$archive" -C "$dest"
+}
+
 main() {
     detect_pkgmgr
 
     install_default_session_packages
+    install_default_icon_theme || true
 
     # Hard gate: the effect QML modules must resolve even though ldd cannot
     # see them. install_default_session_packages() installs KWIN_QML_PKGS on

@@ -167,14 +167,14 @@ QObject *TabBoxHandlerPrivate::createSwitcherItem()
         QStandardPaths::GenericDataLocation,
         QStringLiteral("plasma/look-and-feel/%1/contents/windowswitcher/WindowSwitcher.qml").arg(config.layoutName()));
     if (file.isNull()) {
-        QString path = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kwin-wayland/tabbox/") + config.layoutName(), QStandardPaths::LocateDirectory);
+        QString path = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kineticwe-wayland/tabbox/") + config.layoutName(), QStandardPaths::LocateDirectory);
         if (path.isEmpty()) {
             path = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kwin/tabbox/") + config.layoutName(), QStandardPaths::LocateDirectory);
         }
         if (path.isEmpty()) {
             // load default
             qCWarning(KWIN_TABBOX) << "Could not load window switcher package" << config.layoutName() << ". Falling back to default";
-            path = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kwin-wayland/tabbox/") + TabBoxConfig::defaultLayoutName(), QStandardPaths::LocateDirectory);
+            path = QStandardPaths::locate(QStandardPaths::GenericDataLocation, QLatin1StringView("kineticwe-wayland/tabbox/") + TabBoxConfig::defaultLayoutName(), QStandardPaths::LocateDirectory);
         }
 
         KPackage::Package pkg = KPackage::PackageLoader::self()->loadPackage(QStringLiteral("KWin/WindowSwitcher"));
@@ -206,7 +206,7 @@ void TabBoxHandlerPrivate::show()
 {
 #ifndef KWIN_UNIT_TEST
     if (!m_qmlContext) {
-        qmlRegisterType<SwitcherItem>("org.kde.kwin", 3, 0, "TabBoxSwitcher");
+        qmlRegisterType<SwitcherItem>("org.kineticwe.kwin", 3, 0, "TabBoxSwitcher");
         m_qmlContext = std::make_unique<QQmlContext>(Scripting::self()->qmlEngine());
     }
     if (!m_qmlComponent) {
