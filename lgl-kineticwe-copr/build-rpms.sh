@@ -227,17 +227,26 @@ build_rpms() {
     step "Building binary RPMs from SRPM..."
 
     local srpm
-    srpm=$(ls -1 "${RPM_DIR}"/kineticwe-"${SPEC_VERSION}"-"${SPEC_RELEASE}"*.src.rpm 2>/dev/null | head -1)
-    [[ -f "$srpm" ]] || error "SRPM not found: ${RPM_DIR}/kineticwe-${SPEC_VERSION}-${SPEC_RELEASE}*.src.rpm"
+    srpm=$(find "$RPM_DIR" -maxdepth 1 -type f \
+        -name "kineticwe-${SPEC_VERSION}-*.src.rpm" -printf '%T@ %p\n' 2>/dev/null \
+        | sort -nr | awk 'NR == 1 {sub(/^[^ ]+ /, ""); print}')
+    [[ -n "$srpm" && -f "$srpm" ]] || error "SRPM not found in ${RPM_DIR}"
 
     distrobox enter "$DISTROBOX_NAME" -- bash -lc "
+        set -euo pipefail
+        find '${RPM_DIR}' -type f -name 'kineticwe-*.rpm' ! -name '*.src.rpm' -delete
         rpmbuild --rebuild \
             --define '_rpmdir ${RPM_DIR}' \
+            --define 'dist .fc44' \
             '${srpm}'
     "
 
+    local rpm_count
+    rpm_count=$(find "$RPM_DIR" -type f -name 'kineticwe-*.rpm' ! -name '*.src.rpm' | wc -l)
+    [[ "$rpm_count" -gt 0 ]] || error "No binary RPMs were produced in ${RPM_DIR}"
+
     info "Binary RPMs built."
-    find "$RPM_DIR" -type f \( -name '*.rpm' ! -name '*.src.rpm' \) -exec ls -lh {} \;
+    find "$RPM_DIR" -type f -name 'kineticwe-*.rpm' ! -name '*.src.rpm' -exec ls -lh {} \;
 }
 
 # ---------------------------------------------------------------------------

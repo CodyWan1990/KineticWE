@@ -27,7 +27,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -249,6 +249,11 @@ rm -rf ../aurorae
 mkdir -p ../aurorae
 tar xf %{SOURCE7} -C ../aurorae --strip-components=1
 
+# The namespace rewrite below changes the helper name in CMakeLists.txt; keep
+# the configure_file source template name in sync with that rewritten reference.
+mv %{_builddir}/aurorae/plasma-apply-aurorae.cmake \
+   %{_builddir}/aurorae/kineticwe-apply-aurorae.cmake
+
 # KineticWE coexistence: namespace every decorative artifact the vendored
 # aurorae installs so it does not collide with Fedora's stock aurorae package
 # (decoration plugin namespace, QML module URI, data dirs, helper binary).
@@ -469,7 +474,7 @@ rm -rf %{buildroot}%{_datadir}/dbus-1/interfaces
 
 # Kinetic Settings owns all settings; drop every KDE System Settings module,
 # including the one vendored aurorae ships.
-rm -rf %{buildroot}%{_qt6_plugindir}/org.kineticwe.decoration.kcm
+rm -rf %{buildroot}%{_qt6_plugindir}/org.kde.kdecoration3.kcm
 rm -f %{buildroot}%{_datadir}/applications/kcm_*.desktop
 
 # We do not ship KDE "get new decorations" (KNewStuff) data.
@@ -511,6 +516,7 @@ echo
 %{_qt6_plugindir}/kf6/packagestructure/kineticwe/
 %{_qt6_plugindir}/org.kineticwe.decoration/
 %{_qt6_qmldir}/org/kineticwe/
+%{_qt6_qmldir}/org/kde/kineticwe/decorations/plastik/
 %{_libdir}/libexec/kineticwe*
 %{_datadir}/applications/org.kineticwe.*.desktop
 %{_datadir}/icons/hicolor/*/apps/kineticwe.*
@@ -539,7 +545,7 @@ echo
 %{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.kwe.service
 %{_datadir}/applications/org.freedesktop.impl.portal.desktop.kwe.desktop
 %{_userunitdir}/plasma-xdg-desktop-portal-kwe.service
-%{_datadir}/locale/
+%{_datadir}/locale/*/LC_MESSAGES/xdg-desktop-portal-kwe.mo
 %{_datadir}/qlogging-categories6/xdp-kwe.categories
 
 %files -n kineticwe-noctalia
