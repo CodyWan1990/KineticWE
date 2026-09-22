@@ -85,7 +85,7 @@ void OutputLocatorEffect::show()
         const QString number = (index >= 0) ? QString::number(index + 1) : QString();
 
         auto scene = new OffscreenQuickScene();
-        scene->loadFromModule(QStringLiteral("org.kde.kwin.outputlocator"), QStringLiteral("OutputLabel"), {{QStringLiteral("outputName"), outputName(screen)}, {QStringLiteral("number"), number},{QStringLiteral("resolution"), screen->pixelSize()}, {QStringLiteral("scale"), screen->scale()}});
+        scene->loadFromModule(QStringLiteral("org.kineticwe.kwin.outputlocator"), QStringLiteral("OutputLabel"), {{QStringLiteral("outputName"), outputName(screen)}, {QStringLiteral("number"), number},{QStringLiteral("resolution"), screen->pixelSize()}, {QStringLiteral("scale"), screen->scale()}});
         RectF geometry(0, 0, scene->rootItem()->implicitWidth(), scene->rootItem()->implicitHeight());
         geometry.moveCenter(screen->geometry().center());
         scene->setGeometry(geometry.toRect());

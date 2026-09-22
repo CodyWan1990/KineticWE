@@ -82,10 +82,10 @@ void ShowFpsEffect::prePaintScreen(ScreenPrePaintData &data)
 
     if (!screenData->m_scene) {
         screenData->m_scene = std::make_unique<OffscreenQuickScene>();
-        screenData->m_scene->loadFromModule(QStringLiteral("org.kde.kwin.showfps"), QStringLiteral("Main"), {{QStringLiteral("effect"), QVariant::fromValue(screenData.get())}});
+        screenData->m_scene->loadFromModule(QStringLiteral("org.kineticwe.kwin.showfps"), QStringLiteral("Main"), {{QStringLiteral("effect"), QVariant::fromValue(screenData.get())}});
         if (!screenData->m_scene->rootItem()) {
             // main-fallback.qml has less dependencies than main.qml, so it should work on any system where kwin compiles
-            screenData->m_scene->loadFromModule(QStringLiteral("org.kde.kwin.showfps"), QStringLiteral("Fallback"), {{QStringLiteral("effect"), QVariant::fromValue(screenData.get())}});
+            screenData->m_scene->loadFromModule(QStringLiteral("org.kineticwe.kwin.showfps"), QStringLiteral("Fallback"), {{QStringLiteral("effect"), QVariant::fromValue(screenData.get())}});
         }
     }
     auto now = std::chrono::steady_clock::now();

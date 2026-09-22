@@ -146,8 +146,14 @@ void Application::destroyPlatform()
 
 void Application::createAboutData()
 {
-    KAboutData aboutData(QStringLiteral("kwin"), // The program name used internally
-                         i18n("KWin"), // A displayable program name string
+    // The component name doubles as the application name, which KGlobalAccel
+    // uses as the default shortcut component for actions that do not set
+    // componentName themselves (the effects do not). It must therefore match
+    // the explicit "kineticwe" component the compositor's own actions use
+    // (Workspace::initShortcut()), or effect shortcuts land in a separate
+    // "kwin" component that Kinetic Settings does not show.
+    KAboutData aboutData(QStringLiteral("kineticwe"), // The program name used internally
+                         i18n("KineticWE"), // A displayable program name string
                          KWIN_VERSION_STRING, // The program version string
                          i18n("KDE window manager"), // Short description of what the app does
                          KAboutLicense::GPL, // The license this code is released under
