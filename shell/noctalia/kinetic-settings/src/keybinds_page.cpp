@@ -166,15 +166,38 @@ namespace {
     return name;
   }
 
+  // The compositor still registers its virtual-desktop shortcuts with upstream
+  // KWin's "Desktop" wording ("Switch to Next Desktop", "Window to Desktop 1",
+  // ...), but every other KineticWE settings page calls these workspaces.
+  // Rename the displayed label for the compositor's own component so the
+  // Kwebinds list reads consistently. This is display-only: action IDs,
+  // chords, and the friendly names sent back to the daemon are untouched.
+  [[nodiscard]] std::string workspaceWording(std::string_view text) {
+    std::string result(text);
+    static constexpr std::pair<std::string_view, std::string_view> kTerms[] = {
+        {"Desktops", "Workspaces"},
+        {"Desktop", "Workspace"},
+    };
+    for (const auto& [from, to] : kTerms) {
+      for (std::size_t pos = result.find(from); pos != std::string::npos; pos = result.find(from, pos + to.size())) {
+        result.replace(pos, from.size(), to);
+      }
+    }
+    return result;
+  }
+
   // The label the UI shows for an action row: friendlyName when the daemon
   // has one, otherwise the actionUnique id (matches buildActionRow at the
   // call site). Sorting by this key keeps the rendered list in the same
-  // order as the visible labels.
-  [[nodiscard]] std::string_view actionDisplayName(const KeybindDbus::Action& action) {
-    if (!action.friendlyName.empty()) {
-      return action.friendlyName;
+  // order as the visible labels. The compositor's own component gets the
+  // workspace wording applied; "Peek at Desktop" ("Show Desktop") is left
+  // alone because it refers to the desktop surface, not a virtual desktop.
+  [[nodiscard]] std::string displayActionName(const KeybindDbus::Component& component, const KeybindDbus::Action& action) {
+    const std::string_view name = action.friendlyName.empty() ? std::string_view(action.actionUnique) : std::string_view(action.friendlyName);
+    if (component.uniqueName != "kineticwe" || action.actionUnique == "Show Desktop") {
+      return std::string(name);
     }
-    return action.actionUnique;
+    return workspaceWording(name);
   }
 
   // kineticwe first, then noctalia, then the rest in case-insensitive alphabetical
@@ -249,8 +272,8 @@ namespace {
     };
     for (auto& component : components) {
       std::stable_sort(component.actions.begin(), component.actions.end(),
-          [&](const KeybindDbus::Action& a, const KeybindDbus::Action& b) {
-            return naturalLess(actionDisplayName(a), actionDisplayName(b));
+          [&component, &naturalLess](const KeybindDbus::Action& a, const KeybindDbus::Action& b) {
+            return naturalLess(displayActionName(component, a), displayActionName(component, b));
           });
     }
     std::stable_sort(components.begin(), components.end(), [&](const auto& a, const auto& b) {
@@ -350,7 +373,7 @@ bool KeybindsPage::matchesFilter(
   const auto matches = [&filter](std::string_view text) {
     return StringUtils::containsInsensitive(text, filter.searchQuery);
   };
-  if (matches(action.friendlyName) || matches(action.actionUnique)) {
+  if (matches(action.friendlyName) || matches(action.actionUnique) || matches(displayActionName(component, action))) {
     return true;
   }
   for (const auto& chord : effectiveChords(component.uniqueName, action.actionUnique)) {
@@ -607,15 +630,14 @@ void KeybindsPage::buildChordRow(
     const auto& pending = *m_pendingRebind;
     std::string ownerActionName = pending.ownerAction;
     std::string ownerComponentName = pending.ownerComponent;
-    if (const auto* owner = findAction(pending.ownerComponent, pending.ownerAction);
-        owner != nullptr && !owner->friendlyName.empty()) {
-      ownerActionName = owner->friendlyName;
-    }
     const auto ownerComponent = std::ranges::find_if(
         m_components, [&pending](const KeybindDbus::Component& c) { return c.uniqueName == pending.ownerComponent; }
     );
     if (ownerComponent != m_components.end()) {
       ownerComponentName = componentDisplayName(*ownerComponent);
+      if (const auto* owner = findAction(pending.ownerComponent, pending.ownerAction); owner != nullptr) {
+        ownerActionName = displayActionName(*ownerComponent, *owner);
+      }
     }
     auto prompt = ui::row({
         .align = FlexAlign::Center,
@@ -743,7 +765,7 @@ void KeybindsPage::buildActionRow(
       .fillWidth = true,
   });
   titleRow->addChild(makeLabel(
-      action.friendlyName.empty() ? action.actionUnique : action.friendlyName, Style::fontSizeBody * scale,
+      displayActionName(component, action), Style::fontSizeBody * scale,
       colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
   ));
   titleRow->addChild(ui::spacer());
@@ -1016,7 +1038,7 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
       .glyphSize = Style::fontSizeHeader * scale,
       .color = colorSpecFromRole(ColorRole::Primary),
   }));
-  header->addChild(makeLabel("Keybinds", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold));
+  header->addChild(makeLabel("Kwebinds", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold));
   header->addChild(ui::spacer());
   header->addChild(ui::button({
       .glyph = "plus",

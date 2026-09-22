@@ -435,7 +435,7 @@ std::unique_ptr<Node> KeyboardPage::build(
           .glyphSize = Style::fontSizeHeader * scale,
           .color = colorSpecFromRole(ColorRole::Primary),
       }),
-      makeLabel("Keyboard", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
+      makeLabel("Kweboard", Style::fontSizeHeader * scale, colorSpecFromRole(ColorRole::Primary), FontWeight::Bold)
   ));
 
   bool anyRows = false;

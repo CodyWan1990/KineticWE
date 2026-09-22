@@ -1330,10 +1330,10 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     requestSceneRebuild();
   });
   if (m_inputOutputExpanded) {
-    addSubNav(ActivePage::Keyboard, "keyboard", "Keyboard");
+    addSubNav(ActivePage::Keyboard, "keyboard", "Kweboard");
     addSubNav(ActivePage::Mouse, "mouse", "Mouse");
     addSubNav(ActivePage::Touchpad, "mouse-2", "Touchpad");
-    addSubNav(ActivePage::Keybinds, "keyboard", "Keybinds");
+    addSubNav(ActivePage::Keybinds, "keyboard", "Kwebinds");
     addSubNav(ActivePage::Displays, "device-desktop", "Displays");
   }
 
