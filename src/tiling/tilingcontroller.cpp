@@ -2406,8 +2406,25 @@ void TilingController::moveWindowToOutput(TilingDirection direction)
         return;
     }
 
+    // Capture the source engine while the window is still attached. Because a
+    // tiled window reports requestedQuickTileMode() == Custom, sendToOutput()
+    // detaches it from its CustomTile via TileManager::forgetWindow() but
+    // leaves the now-empty leaf in the source engine. layoutEngineForWindow()
+    // can no longer find the window afterwards, so migrateWindow() would skip
+    // removing that leaf and the source reflow would keep reserving a slot for
+    // it — leaving a ghost/empty tile on the old output.
+    LayoutEngine *sourceEngine = layoutEngineForWindow(window);
+
     // Move window to target output, preserving desktop membership.
     window->sendToOutput(targetOutput);
+
+    // Prune the orphaned empty leaf so the source layout reflows and fills the
+    // gap. removeWindow() is a no-op when sendToOutput() already detached the
+    // window, but still handles the case where it did not.
+    if (sourceEngine) {
+        sourceEngine->removeWindow(window);
+        sourceEngine->pruneEmptyLeaves();
+    }
 
     // Use the shared migration helper so monitor moves and desktop moves
     // follow the exact same engine-swap path. The helper is idempotent for
