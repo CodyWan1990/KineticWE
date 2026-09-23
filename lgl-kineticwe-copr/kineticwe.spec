@@ -27,7 +27,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        8%{?dist}
+Release:        10%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -143,6 +143,7 @@ BuildRequires:  librsvg2-devel
 BuildRequires:  libqalculate-devel
 BuildRequires:  libxml2-devel
 BuildRequires:  jemalloc-devel
+BuildRequires:  json-devel
 
 # Noctalia fork shell (kineticwe-noctalia / noctalia-kwe; vendored at shell/noctalia)
 BuildRequires:  meson
@@ -183,6 +184,7 @@ Recommends:     alacritty
 Recommends:     qt5ct
 Recommends:     qt6ct
 Recommends:     spectacle
+Recommends:     kf6-qqc2-desktop-style
 Requires:       adw-gtk3-theme
 # KineticWE installs beside KWin instead of replacing it. There are deliberately
 # no Provides/Obsoletes for kwin*, kdecoration, or kglobalacceld: those would
