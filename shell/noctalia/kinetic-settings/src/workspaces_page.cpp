@@ -152,7 +152,7 @@ const std::vector<WorkspacesPage::Field>& WorkspacesPage::fields() {
     f.push_back(Field{
         .group = "Windows",
         .key = "InvertScrollDesktopSwitch",
-        .title = "Swap scroll modifiers for moving windows with workspace switch",
+        .title = "Swap Scroll Modifiers",
         .subtitle = "Inverts which scroll modifier moves the active window "
                     "instead of switching workspaces",
         .pageGroup = "Options",
