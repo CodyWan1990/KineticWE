@@ -1023,11 +1023,19 @@ EOF
     if [[ "$current_dm" == *greetd.service* ]]; then
         info "greetd is already the active display manager."
     else
-        if [[ -n "$current_dm" ]]; then
+        # Only a real DM unit can be disabled. A stale/dangling alias resolves
+        # to .../display-manager.service, which is not a unit at all; leaving it
+        # also blocks systemd from installing greetd's own DM alias. Drop it.
+        local dm_link="/etc/systemd/system/display-manager.service"
+        if [[ -n "$current_dm" && "$current_dm" != */display-manager.service ]]; then
             local current_unit
             current_unit=$(basename "$current_dm")
             info "Disabling current display manager: ${current_unit}"
-            sudo systemctl disable "$current_unit"
+            sudo systemctl disable "$current_unit" \
+                || warn "Could not disable '${current_unit}'; continuing."
+        elif [[ -L "$dm_link" && ! -e "$dm_link" ]]; then
+            info "Removing stale display-manager.service symlink..."
+            sudo rm -f "$dm_link"
         fi
         info "Enabling greetd as the display manager..."
         sudo systemctl enable greetd.service
