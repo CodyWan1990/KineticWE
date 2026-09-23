@@ -991,9 +991,20 @@ EOF
 
     # Run the packaged system setup: PAM patch, state dir, greeter.toml.
     local setup_script="${TEST_PREFIX}/share/noctalia-greeter/setup_greeter_system.sh"
+    local apply_appearance="${TEST_PREFIX}/bin/noctalia-greeter-apply-appearance"
     if [[ -x "$setup_script" ]]; then
         info "Running Noctalia greeter system setup..."
-        sudo "$setup_script"
+        # The fork's setup helper only searches /usr[/local]/bin and sibling
+        # build dirs, so a TEST_PREFIX install is invisible to it: it would
+        # default to the nonexistent 'greeter' user and abort with
+        # "noctalia-greeter-apply-appearance not found". Point it at the copy
+        # we just built and hand it the greetd session user we already
+        # resolved from /etc/greetd/config.toml.
+        sudo env \
+            "NOCTALIA_GREETER_SESSION_BIN=${session_bin}" \
+            "NOCTALIA_GREETER_APPLY_APPEARANCE=${apply_appearance}" \
+            "GREETER_USER=${greeter_user}" \
+            "$setup_script"
     else
         warn "Noctalia greeter setup script not found: $setup_script"
     fi
