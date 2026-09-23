@@ -56,12 +56,26 @@ public:
      */
     KineticButtonStyle buttonStyle() const;
 
+    /**
+     * The side length of a titlebar button, in device pixels. Uses the
+     * user-configured value from kineticwe.kwe when present, otherwise the
+     * grid-unit-derived default. Also used by the buttons themselves.
+     */
+    qreal buttonSize() const;
+
 private:
     void updateBorders();
     void updateTitleBar();
     void reloadColors();
 
-    qreal buttonSize() const;
+    // Reads the Kinetic titlebar metrics (height/font/button size) from the
+    // compositor config; 0 means "not configured, use the derived default".
+    void loadMetrics();
+    // (Re)creates the left/right button groups. Called from init() and again
+    // from updateBorders() when the configured button size changes, since
+    // buttons size themselves only when constructed.
+    void createButtonGroups();
+
     qreal frameThickness() const;
 
     std::unique_ptr<KDecoration3::DecorationButtonGroup> m_leftButtons;
@@ -70,6 +84,15 @@ private:
     KineticTheme m_theme = KineticTheme::Dark;
     KineticButtonStyle m_buttonStyle = KineticButtonStyle::Standard;
     KineticColors m_colors;
+
+    // User-configured metrics ([org.kde.kdecoration2] in kineticwe.kwe).
+    // 0 = unset; the derived default is used instead.
+    int m_titleBarHeight = 0;     // logical pixels
+    int m_titleFontPointSize = 0; // points
+    int m_buttonSize = 0;         // logical pixels
+    // Cached button size (device pixels) so a size change can rebuild the
+    // button groups; 0 before the first updateBorders().
+    qreal m_lastButtonSize = 0.0;
 };
 
 }

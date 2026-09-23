@@ -167,6 +167,17 @@ public:
      */
     void toggleOuterGaps();
 
+    /**
+     * Toggle float-only tiling for the active output's current desktop. The
+     * state is persisted as a [Tiling][DesktopOutput <n>:<out>] "FloatOnly"
+     * override and applied live: enabling it floats every tiled window on
+     * that desktop and tears down its layout engine; disabling it rebuilds
+     * the engine and re-tiles the windows the toggle had floated. Bound to
+     * the "Tiling Toggle Float Only Workspace" shortcut and exposed over
+     * D-Bus.
+     */
+    void toggleFloatOnly();
+
     TilingRules *rules() const { return m_rules.get(); }
 
     /** Whether native tiling is currently enabled (kwinrc [Tiling] Enabled). */
@@ -274,6 +285,33 @@ private:
     void setupLayoutEngine(TileManager *manager, VirtualDesktop *desktop, LayoutEngine::LayoutKind kind);
     LayoutEngine::LayoutKind resolveLayoutKind(LogicalOutput *output, VirtualDesktop *desktop = nullptr) const;
     LayoutEngine::LayoutKind globalDefaultLayoutKind() const;
+    /**
+     * Whether tiling is disabled (float-only) for @p output's @p desktop, per
+     * the [Tiling][DesktopOutput <n>:<out>] "FloatOnly" override.
+     */
+    [[nodiscard]] bool isFloatOnly(LogicalOutput *output, VirtualDesktop *desktop) const;
+    /**
+     * Float every window in @p desktop's engine on @p output and tear the
+     * engine down, remembering the windows so clearFloatOnly() can re-tile
+     * exactly them (not ones the user floated manually).
+     */
+    void applyFloatOnly(LogicalOutput *output, VirtualDesktop *desktop);
+    /**
+     * Rebuild @p desktop's engine on @p output and re-tile the windows
+     * previously floated by applyFloatOnly(). No-op when nothing was floated.
+     */
+    void clearFloatOnly(LogicalOutput *output, VirtualDesktop *desktop);
+    /**
+     * Float every window on every (output, desktop) and drop all engines.
+     * Used when tiling is disabled globally via [Tiling] Enabled.
+     */
+    void floatAllWindows();
+    /**
+     * Re-tile the windows remembered by applyFloatOnly() for every
+     * (output, desktop) whose float-only override is no longer set. Safe to
+     * call on every reconfigure: it is a no-op when nothing is remembered.
+     */
+    void restoreFloatedWindows();
     bool isLayoutEnabled(LayoutEngine::LayoutKind kind) const;
     void applyGapSettingsToOutput(LogicalOutput *output);
     void applyCenterTileRatioToOutput(LogicalOutput *output);
@@ -415,6 +453,12 @@ private:
     // leave the engine alone, preserving runtime setLayout()/cycleLayout()
     // switches).
     QHash<QString, LayoutEngine::LayoutKind> m_reconciledLayoutKinds;
+
+    // Windows floated by the float-only toggle / global disable, keyed by
+    // "<output>:<desktop number>". QPointer so a destroyed window is skipped
+    // rather than re-tiled. Lets the toggle round-trip re-tile exactly the
+    // windows it floated.
+    QHash<QString, QList<QPointer<Window>>> m_floatOnlyWindows;
 };
 
 } // namespace KWin

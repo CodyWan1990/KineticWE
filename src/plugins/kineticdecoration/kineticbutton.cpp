@@ -9,7 +9,6 @@
 
 #include <KDecoration3/DecoratedWindow>
 #include <KDecoration3/Decoration>
-#include <KDecoration3/DecorationSettings>
 
 #include <QIcon>
 #include <QPainter>
@@ -29,12 +28,10 @@ KineticButton::KineticButton(KDecoration3::DecorationButtonType type, KDecoratio
     : KDecoration3::DecorationButton(type, decoration, parent)
 {
     // The button group lays the buttons out using their current size(), so a
-    // preferred size has to be set here. It is derived from the grid unit so
-    // the button scales with the user's font/DPI settings.
-    const std::shared_ptr<KDecoration3::DecorationSettings> s = decoration->settings();
-    const qreal scale = decoration->window() ? decoration->window()->scale() : 1.0;
-    const qreal unit = s ? qMax<qreal>(14.0, s->gridUnit() * 1.2) : 18.0;
-    const qreal size = qBound<qreal>(14.0, unit * scale, 32.0);
+    // preferred size has to be set here. It comes from the decoration, which
+    // uses the user-configured size from kineticwe.kwe when present and the
+    // grid-unit-derived default otherwise.
+    const qreal size = kinetic()->buttonSize();
     setGeometry(QRectF(QPointF(0, 0), QSizeF(size, size)));
 }
 

@@ -673,13 +673,18 @@ bool TilingPage::applyAll() {
       writeValue(*field, value);
     }
   }
-  // Per-desktop layout overrides land in the same file + same reload; an empty
-  // value removes the override key (and the group once it is empty).
+  // Per-desktop layout overrides land in the same file + same reload. "Float
+  // only" sets the FloatOnly key (leaving any DefaultLayout choice intact so
+  // toggling back on restores it); an empty value removes both keys.
   for (const auto& [group, layout] : m_pendingDesktopOverrides) {
-    if (layout.empty()) {
+    if (layout == "FloatOnly") {
+      m_config.setBool(group, "FloatOnly", true);
+    } else if (layout.empty()) {
       m_config.removeKey(group, "DefaultLayout");
+      m_config.removeKey(group, "FloatOnly");
     } else {
       m_config.setString(group, "DefaultLayout", layout);
+      m_config.removeKey(group, "FloatOnly");
     }
   }
   if (!m_config.save()) {
@@ -1180,13 +1185,18 @@ std::string TilingPage::desktopOverrideValue(std::string_view group) const {
   if (staged != m_pendingDesktopOverrides.end()) {
     return staged->second;
   }
+  if (m_config.readBool(group, "FloatOnly", false)) {
+    return "FloatOnly";
+  }
   return m_config.readString(group, "DefaultLayout").value_or("");
 }
 
 void TilingPage::stageDesktopOverride(const std::string& group, std::string value) {
   ensureLoaded();
   // Editing back to the file value un-stages (the row stops being dirty).
-  const std::string fileValue = m_config.readString(group, "DefaultLayout").value_or("");
+  const std::string fileValue = m_config.readBool(group, "FloatOnly", false)
+      ? std::string("FloatOnly")
+      : m_config.readString(group, "DefaultLayout").value_or("");
   if (value == fileValue) {
     m_pendingDesktopOverrides.erase(group);
   } else {
@@ -1215,7 +1225,7 @@ bool TilingPage::desktopOverrideRowMatches(
       return StringUtils::containsInsensitive(text, filter.searchQuery);
     };
     if (!matches(desktopName) && !matches(outputName) && !matches("per-desktop")
-        && !matches("layout override") && !matches("override")) {
+        && !matches("layout override") && !matches("float only") && !matches("override")) {
       return false;
     }
   }
@@ -1275,16 +1285,17 @@ std::unique_ptr<Node> TilingPage::buildDesktopOverridesContent(
   content->addChild(ui::label({
       .text =
           "Each row is a workspace and a connected monitor. Pick a layout to "
-          "override the global default for that pair; leave it as \"Use "
-          "default\" to fall back to the per-monitor or global setting.",
+          "override the global default for that pair, or \"Float only\" to "
+          "disable tiling there; leave it as \"Use default\" to fall back to "
+          "the per-monitor or global setting.",
       .fontSize = Style::fontSizeCaption * scale,
       .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       .maxLines = kSettingDescriptionMaxLines,
   }));
 
-  // Options: "Use default" + every layout kind.
-  std::vector<std::string> labels{"Use default"};
-  std::vector<std::string> values{""};
+  // Options: "Use default" + "Float only" + every layout kind.
+  std::vector<std::string> labels{"Use default", "Float only"};
+  std::vector<std::string> values{"", "FloatOnly"};
   for (std::size_t i = 0; i < layoutKindValues().size(); ++i) {
     labels.push_back(layoutKindLabels()[i]);
     values.push_back(layoutKindValues()[i]);

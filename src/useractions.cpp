@@ -1136,6 +1136,11 @@ void Workspace::initShortcuts()
             m_tilingController->toggleOuterGaps();
         }
     }, true);
+    initShortcut("Tiling Toggle Float Only Workspace", i18n("Tiling Toggle Float Only Workspace"), QKeySequence(), [this]() {
+        if (m_tilingController) {
+            m_tilingController->toggleFloatOnly();
+        }
+    }, true);
     initShortcut("Tiling Switch To MasterStack", i18n("Tiling Switch To MasterStack"), QKeySequence(), [this]() {
         if (m_tilingController) {
             m_tilingController->setLayout(LayoutEngine::LayoutKind::MasterStack);

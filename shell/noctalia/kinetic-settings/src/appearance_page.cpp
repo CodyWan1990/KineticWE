@@ -8,12 +8,15 @@
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/label.h"
+#include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
+#include <functional>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -28,6 +31,13 @@ namespace {
   constexpr float kDecorationTileHeight = 150.0F;
   constexpr float kDecorationPreviewWidth = 168.0F;
   constexpr float kDecorationPreviewHeight = 96.0F;
+
+  // Values the titlebar-metric sliders show when the config key is absent. The
+  // compositor derives the actual default from the title font/grid unit, so
+  // these approximate it; dragging a slider writes an explicit value.
+  constexpr int kDefaultTitleBarHeight = 30; // logical px
+  constexpr int kDefaultTitleFontSize = 9;   // points
+  constexpr int kDefaultButtonSize = 22;     // logical px
 
   [[nodiscard]] std::unique_ptr<Label>
   makeLabel(std::string_view text, float fontSize, const ColorSpec& color, FontWeight fontWeight = FontWeight::Normal) {
@@ -78,7 +88,9 @@ void AppearancePage::ensureLoaded() {
 // ---------------------------------------------------------------------------
 
 bool AppearancePage::applyAll() {
-  if (!m_pendingDecoration.has_value() && !m_pendingHideTitleBars.has_value()) {
+  if (!m_pendingDecoration.has_value() && !m_pendingHideTitleBars.has_value()
+      && !m_pendingTitleBarHeight.has_value() && !m_pendingTitleFontSize.has_value()
+      && !m_pendingButtonSize.has_value()) {
     return true;
   }
   ensureLoaded();
@@ -89,12 +101,15 @@ bool AppearancePage::applyAll() {
   }
   m_pendingDecoration.reset();
   m_pendingHideTitleBars.reset();
+  m_pendingTitleBarHeight.reset();
+  m_pendingTitleFontSize.reset();
+  m_pendingButtonSize.reset();
   m_errorNotice.clear();
   return true;
 }
 
 std::vector<std::string> AppearancePage::resettableKeyPaths() const {
-  return {decorationKeyPath(), titleBarsKeyPath()};
+  return {decorationKeyPath(), titleBarsKeyPath(), titleBarHeightKeyPath(), titleFontSizeKeyPath(), buttonSizeKeyPath()};
 }
 
 void AppearancePage::resetKeyPath(std::string_view path) {
@@ -102,12 +117,21 @@ void AppearancePage::resetKeyPath(std::string_view path) {
     stageDecoration(defaultDecoration());
   } else if (path == titleBarsKeyPath()) {
     stageHideTitleBars(false);
+  } else if (path == titleBarHeightKeyPath()) {
+    stageTitleBarHeight(kDefaultTitleBarHeight);
+  } else if (path == titleFontSizeKeyPath()) {
+    stageTitleFontSize(kDefaultTitleFontSize);
+  } else if (path == buttonSizeKeyPath()) {
+    stageButtonSize(kDefaultButtonSize);
   }
 }
 
 void AppearancePage::resetAll() {
   stageDecoration(defaultDecoration());
   stageHideTitleBars(false);
+  stageTitleBarHeight(kDefaultTitleBarHeight);
+  stageTitleFontSize(kDefaultTitleFontSize);
+  stageButtonSize(kDefaultButtonSize);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +194,69 @@ void AppearancePage::stageHideTitleBars(bool hide) {
   }
 }
 
+int AppearancePage::titleBarHeightOnDisk() const {
+  return m_decorationsConfig.readInt("org.kde.kdecoration2", "KineticTitleBarHeight", kDefaultTitleBarHeight);
+}
+
+int AppearancePage::titleFontSizeOnDisk() const {
+  return m_decorationsConfig.readInt("org.kde.kdecoration2", "KineticTitleFontSize", kDefaultTitleFontSize);
+}
+
+int AppearancePage::buttonSizeOnDisk() const {
+  return m_decorationsConfig.readInt("org.kde.kdecoration2", "KineticButtonSize", kDefaultButtonSize);
+}
+
+int AppearancePage::effectiveTitleBarHeight() const {
+  return m_pendingTitleBarHeight.value_or(titleBarHeightOnDisk());
+}
+
+int AppearancePage::effectiveTitleFontSize() const {
+  return m_pendingTitleFontSize.value_or(titleFontSizeOnDisk());
+}
+
+int AppearancePage::effectiveButtonSize() const {
+  return m_pendingButtonSize.value_or(buttonSizeOnDisk());
+}
+
+bool AppearancePage::overriddenTitleBarHeight() const {
+  return effectiveTitleBarHeight() != kDefaultTitleBarHeight;
+}
+
+bool AppearancePage::overriddenTitleFontSize() const {
+  return effectiveTitleFontSize() != kDefaultTitleFontSize;
+}
+
+bool AppearancePage::overriddenButtonSize() const {
+  return effectiveButtonSize() != kDefaultButtonSize;
+}
+
+void AppearancePage::stageTitleBarHeight(int value) {
+  ensureLoaded();
+  if (value == titleBarHeightOnDisk()) {
+    m_pendingTitleBarHeight.reset();
+  } else {
+    m_pendingTitleBarHeight = value;
+  }
+}
+
+void AppearancePage::stageTitleFontSize(int value) {
+  ensureLoaded();
+  if (value == titleFontSizeOnDisk()) {
+    m_pendingTitleFontSize.reset();
+  } else {
+    m_pendingTitleFontSize = value;
+  }
+}
+
+void AppearancePage::stageButtonSize(int value) {
+  ensureLoaded();
+  if (value == buttonSizeOnDisk()) {
+    m_pendingButtonSize.reset();
+  } else {
+    m_pendingButtonSize = value;
+  }
+}
+
 bool AppearancePage::applyTitleBars() {
   // Reload first so edits applied from other pages in the meantime are kept.
   m_decorationsConfig.load();
@@ -185,6 +272,29 @@ bool AppearancePage::applyTitleBars() {
     // None (0) hides every title bar/frame; ClientPreference (1) shows the
     // client's requested decoration.
     m_decorationsConfig.setInt("Windows", "DefaultDecorationPolicy", *m_pendingHideTitleBars ? 0 : 1);
+  }
+  // Titlebar metrics: an explicit default removes the key so the compositor
+  // falls back to its font/grid-unit-derived value again.
+  if (m_pendingTitleBarHeight.has_value()) {
+    if (*m_pendingTitleBarHeight == kDefaultTitleBarHeight) {
+      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticTitleBarHeight");
+    } else {
+      m_decorationsConfig.setInt("org.kde.kdecoration2", "KineticTitleBarHeight", *m_pendingTitleBarHeight);
+    }
+  }
+  if (m_pendingTitleFontSize.has_value()) {
+    if (*m_pendingTitleFontSize == kDefaultTitleFontSize) {
+      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticTitleFontSize");
+    } else {
+      m_decorationsConfig.setInt("org.kde.kdecoration2", "KineticTitleFontSize", *m_pendingTitleFontSize);
+    }
+  }
+  if (m_pendingButtonSize.has_value()) {
+    if (*m_pendingButtonSize == kDefaultButtonSize) {
+      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticButtonSize");
+    } else {
+      m_decorationsConfig.setInt("org.kde.kdecoration2", "KineticButtonSize", *m_pendingButtonSize);
+    }
   }
   if (!m_decorationsConfig.save()) {
     m_errorNotice = "Failed to write kineticwe.kwe. Your changes were kept; try Apply again.";
@@ -425,6 +535,89 @@ namespace {
     return tile;
   }
 
+  // One numeric titlebar-metric row: bold title + caption on the left,
+  // [Override][Reset][slider][value] on the right, matching the other pages.
+  struct MetricRow {
+    std::string title;
+    std::string subtitle;
+    int minValue = 0;
+    int maxValue = 100;
+    int value = 0;
+    std::string suffix;
+    std::string keyPath;
+    bool overridden = false;
+    bool armedReset = false;
+    std::function<void(int)> onCommit;
+  };
+
+  [[nodiscard]] std::unique_ptr<Node> buildMetricRow(
+      const MetricRow& field, float scale, const AppearancePage::Callbacks& callbacks
+  ) {
+    Slider* sliderPtr = nullptr;
+    Label* valuePtr = nullptr;
+    auto slider = ui::slider({
+        .out = &sliderPtr,
+        .minValue = static_cast<double>(field.minValue),
+        .maxValue = static_cast<double>(field.maxValue),
+        .step = 1.0,
+        .value = static_cast<double>(field.value),
+        .trackHeight = Style::sliderTrackHeight * scale,
+        .thumbSize = Style::sliderThumbSize * scale,
+        .controlHeight = Style::controlHeight * scale,
+        .width = Style::sliderDefaultWidth * scale,
+    });
+    auto valueLabel = ui::label({
+        .out = &valuePtr,
+        .text = std::to_string(field.value) + field.suffix,
+        .fontSize = Style::fontSizeCaption * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        .minWidth = 56.0F * scale,
+        .textAlign = TextAlign::End,
+    });
+    slider->setOnValueChanged([valuePtr, suffix = field.suffix](double next) {
+      if (valuePtr != nullptr) {
+        valuePtr->setText(std::to_string(static_cast<int>(next)) + suffix);
+      }
+    });
+    slider->setOnDragEnd([sliderPtr, commit = field.onCommit]() {
+      if (sliderPtr != nullptr && commit) {
+        commit(static_cast<int>(sliderPtr->value()));
+      }
+    });
+
+    auto titleRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
+    titleRow->addChild(makeLabel(
+        field.title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+    ));
+    titleRow->addChild(ui::spacer());
+
+    auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
+    copy->addChild(std::move(titleRow));
+    copy->addChild(ui::label({
+        .text = field.subtitle,
+        .fontSize = Style::fontSizeCaption * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        .maxLines = 4,
+    }));
+
+    auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    if (field.overridden) {
+      actions->addChild(makeOverrideBadge(scale));
+      actions->addChild(makeResetButton(field.keyPath, field.armedReset, scale, callbacks));
+    }
+    actions->addChild(std::move(slider));
+    actions->addChild(std::move(valueLabel));
+
+    return ui::row(
+        {.align = FlexAlign::Center,
+         .justify = FlexJustify::SpaceBetween,
+         .gap = Style::spaceXs * scale,
+         .paddingV = 2.0F * scale,
+         .fillWidth = true},
+        std::move(copy), std::move(actions)
+    );
+  }
+
 } // namespace
 
 std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
@@ -469,6 +662,31 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
       || StringUtils::containsInsensitive("Show title bars", filter.searchQuery)
       || StringUtils::containsInsensitive("Hide title bars", filter.searchQuery)
       || StringUtils::containsInsensitive("Remove the title bar and frame on every window", filter.searchQuery);
+
+  // The size sliders: each matches independently so a search / the Overridden
+  // filter can narrow down to a single row.
+  const auto matchesAny = [&](std::initializer_list<std::string_view> words) {
+    if (!searchActive) {
+      return true;
+    }
+    for (const std::string_view word : words) {
+      if (StringUtils::containsInsensitive(word, filter.searchQuery)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const bool heightOverridden = overriddenTitleBarHeight();
+  const bool fontSizeOverridden = overriddenTitleFontSize();
+  const bool buttonSizeOverridden = overriddenButtonSize();
+  const bool heightVisible = (!filter.showOverriddenOnly || heightOverridden)
+      && (sectionTitleMatches || matchesAny({"Title bar height", "Title bar size"}));
+  const bool fontSizeVisible = (!filter.showOverriddenOnly || fontSizeOverridden)
+      && (sectionTitleMatches || matchesAny({"Title font size", "Title bar font", "Title bar size"}));
+  const bool buttonSizeVisible = (!filter.showOverriddenOnly || buttonSizeOverridden)
+      && (sectionTitleMatches || matchesAny({"Button size", "Title bar buttons", "Title bar size"}));
+  const bool showSizeSection = heightVisible || fontSizeVisible || buttonSizeVisible;
+
   const DecorationSelection current = effectiveDecoration();
 
   std::vector<const Tile*> visible;
@@ -483,7 +701,7 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     }
     visible.push_back(&tile);
   }
-  if (visible.empty() && !showToggleRow) {
+  if (visible.empty() && !showToggleRow && !showSizeSection) {
     return nullptr;
   }
 
@@ -562,6 +780,98 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
       ));
     }
     section->addChild(std::move(grid));
+  }
+
+  // Kinetic titlebar metrics, written to kineticwe.kwe on Apply. Left as an
+  // explicit value only when the user moves a slider; otherwise the compositor
+  // keeps deriving the size from the title font and grid unit.
+  if (showSizeSection) {
+    auto card = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .padding = Style::spaceMd * scale,
+        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
+        .radius = Style::scaledRadiusMd(scale),
+        .fillWidth = true,
+    });
+    card->addChild(makeLabel(
+        "Title bar size", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
+    ));
+
+    if (heightVisible) {
+      card->addChild(buildMetricRow(
+          MetricRow{
+              .title = "Title bar height",
+              .subtitle = "Height of the title bar in logical pixels. It never shrinks below what the "
+                          "buttons need.",
+              .minValue = 18,
+              .maxValue = 72,
+              .value = effectiveTitleBarHeight(),
+              .suffix = " px",
+              .keyPath = titleBarHeightKeyPath(),
+              .overridden = heightOverridden,
+              .armedReset = armedResetKey == titleBarHeightKeyPath(),
+              .onCommit =
+                  [this, callbacks](int value) {
+                    stageTitleBarHeight(value);
+                    if (callbacks.requestRebuild) {
+                      callbacks.requestRebuild();
+                    }
+                  },
+          },
+          scale, callbacks
+      ));
+    }
+
+    if (fontSizeVisible) {
+      card->addChild(buildMetricRow(
+          MetricRow{
+              .title = "Title font size",
+              .subtitle = "Point size of the window title.",
+              .minValue = 6,
+              .maxValue = 20,
+              .value = effectiveTitleFontSize(),
+              .suffix = " pt",
+              .keyPath = titleFontSizeKeyPath(),
+              .overridden = fontSizeOverridden,
+              .armedReset = armedResetKey == titleFontSizeKeyPath(),
+              .onCommit =
+                  [this, callbacks](int value) {
+                    stageTitleFontSize(value);
+                    if (callbacks.requestRebuild) {
+                      callbacks.requestRebuild();
+                    }
+                  },
+          },
+          scale, callbacks
+      ));
+    }
+
+    if (buttonSizeVisible) {
+      card->addChild(buildMetricRow(
+          MetricRow{
+              .title = "Button size",
+              .subtitle = "Side length of the minimize, maximize and close buttons in logical pixels.",
+              .minValue = 12,
+              .maxValue = 48,
+              .value = effectiveButtonSize(),
+              .suffix = " px",
+              .keyPath = buttonSizeKeyPath(),
+              .overridden = buttonSizeOverridden,
+              .armedReset = armedResetKey == buttonSizeKeyPath(),
+              .onCommit =
+                  [this, callbacks](int value) {
+                    stageButtonSize(value);
+                    if (callbacks.requestRebuild) {
+                      callbacks.requestRebuild();
+                    }
+                  },
+          },
+          scale, callbacks
+      ));
+    }
+
+    section->addChild(std::move(card));
   }
   return section;
 }

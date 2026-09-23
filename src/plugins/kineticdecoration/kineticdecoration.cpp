@@ -5,13 +5,17 @@
 */
 
 #include "kineticdecoration.h"
+
+#include "config-kwin.h"
 #include "kineticbutton.h"
 
 #include <KDecoration3/DecoratedWindow>
 #include <KDecoration3/DecorationButtonGroup>
 #include <KDecoration3/DecorationSettings>
 
+#include <KConfigGroup>
 #include <KPluginFactory>
+#include <KSharedConfig>
 
 #include <QFileInfo>
 #include <QFileSystemWatcher>
@@ -66,10 +70,27 @@ void KineticDecoration::reloadColors()
     updateBorders();
 }
 
+void KineticDecoration::loadMetrics()
+{
+    // KWIN_CONFIG is the compositor's own config file; KSharedConfig returns
+    // the same instance KWin itself re-parses on reconfigure, so Apply is
+    // picked up live. 0 (or absent) keeps the derived defaults.
+    const KConfigGroup group = KSharedConfig::openConfig(KWIN_CONFIG)->group(QStringLiteral("org.kde.kdecoration2"));
+    const int height = group.readEntry(QStringLiteral("KineticTitleBarHeight"), 0);
+    const int fontSize = group.readEntry(QStringLiteral("KineticTitleFontSize"), 0);
+    const int button = group.readEntry(QStringLiteral("KineticButtonSize"), 0);
+    m_titleBarHeight = height > 0 ? qBound(12, height, 200) : 0;
+    m_titleFontPointSize = fontSize > 0 ? qBound(5, fontSize, 32) : 0;
+    m_buttonSize = button > 0 ? qBound(8, button, 64) : 0;
+}
+
 qreal KineticDecoration::buttonSize() const
 {
-    const std::shared_ptr<KDecoration3::DecorationSettings> s = settings();
     const qreal scale = window() ? window()->scale() : 1.0;
+    if (m_buttonSize > 0) {
+        return m_buttonSize * scale;
+    }
+    const std::shared_ptr<KDecoration3::DecorationSettings> s = settings();
     const qreal unit = s ? s->gridUnit() : 18.0;
     return qBound<qreal>(14.0, unit * 1.2, 32.0) * scale;
 }
@@ -114,7 +135,7 @@ qreal KineticDecoration::frameThickness() const
     return t * scale;
 }
 
-bool KineticDecoration::init()
+void KineticDecoration::createButtonGroups()
 {
     auto creator = [](KDecoration3::DecorationButtonType type, KDecoration3::Decoration *decoration, QObject *parent) -> KDecoration3::DecorationButton * {
         return new KineticButton(type, decoration, parent);
@@ -127,6 +148,13 @@ bool KineticDecoration::init()
         m_leftButtons->setSpacing(spacing);
         m_rightButtons->setSpacing(spacing);
     }
+}
+
+bool KineticDecoration::init()
+{
+    loadMetrics();
+    createButtonGroups();
+    m_lastButtonSize = buttonSize();
 
     if (KDecoration3::DecoratedWindow *w = window()) {
         // update() is overloaded on Decoration, so disambiguate with lambdas.
@@ -142,6 +170,7 @@ bool KineticDecoration::init()
         // window, which repaints the decoration with the new colors.
         connect(w, &KDecoration3::DecoratedWindow::paletteChanged, this, [this] { update(); });
     }
+    const std::shared_ptr<KDecoration3::DecorationSettings> s = settings();
     if (s) {
         connect(s.get(), &KDecoration3::DecorationSettings::reconfigured, this, &KineticDecoration::updateBorders);
     }
@@ -188,9 +217,19 @@ void KineticDecoration::updateTitleBar()
 
 void KineticDecoration::updateBorders()
 {
+    loadMetrics();
+
     const std::shared_ptr<KDecoration3::DecorationSettings> s = settings();
     const qreal scale = window() ? window()->scale() : 1.0;
     const qreal padding = s ? qMax<qreal>(4.0, s->smallSpacing() * 1.5) : 6.0;
+
+    // Buttons only pick up their size when constructed, so a changed button
+    // size requires new button groups. updateTitleBar() below repositions them.
+    const qreal newButtonSize = buttonSize();
+    if (m_lastButtonSize > 0.0 && !qFuzzyCompare(newButtonSize, m_lastButtonSize)) {
+        createButtonGroups();
+    }
+    m_lastButtonSize = newButtonSize;
 
     qreal side = frameThickness();
     qreal bottom = side;
@@ -204,7 +243,11 @@ void KineticDecoration::updateBorders()
         bottom = 0.0;
     }
 
-    const qreal title = qMax(buttonSize() + padding, side);
+    // An explicit height never shrinks below what the buttons need.
+    qreal title = qMax(buttonSize() + padding, side);
+    if (m_titleBarHeight > 0) {
+        title = qMax<qreal>(title, m_titleBarHeight * scale);
+    }
     setBorders(QMarginsF(side, title, side, bottom));
     setOpaque(true);
 
@@ -246,9 +289,13 @@ void KineticDecoration::paint(QPainter *painter, const QRectF &repaintArea)
     // Caption.
     const std::shared_ptr<KDecoration3::DecorationSettings> s = settings();
     QFont font = s ? s->font() : painter->font();
-    // The default title font is a touch large for the short title bar, so
-    // scale it down ~10% (with a floor) to give the caption some breathing room.
-    if (font.pointSizeF() > 0) {
+    if (m_titleFontPointSize > 0) {
+        // Explicit user choice: use it verbatim.
+        font.setPointSizeF(m_titleFontPointSize);
+    } else if (font.pointSizeF() > 0) {
+        // The default title font is a touch large for the short title bar, so
+        // scale it down ~10% (with a floor) to give the caption some breathing
+        // room.
         font.setPointSizeF(qMax<qreal>(8.0, font.pointSizeF() * 0.9));
     } else if (font.pixelSize() > 0) {
         font.setPixelSize(qMax(10, qRound(font.pixelSize() * 0.9)));

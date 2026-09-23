@@ -164,6 +164,16 @@ bool migrateEmergeKeyNames(KConfigGroup &group)
     return changed;
 }
 
+// Key identifying one (output, desktop) pair for the float-only bookkeeping,
+// matching the [Tiling][DesktopOutput <n>:<out>] override group naming.
+QString floatOnlyKey(LogicalOutput *output, VirtualDesktop *desktop)
+{
+    if (!output || !desktop) {
+        return QString();
+    }
+    return output->name() + QLatin1Char(':') + QString::number(desktop->x11DesktopNumber());
+}
+
 } // namespace
 
 TilingController::TilingController(Workspace *workspace)
@@ -408,8 +418,19 @@ void TilingController::reconfigure()
         QGuiApplication::palette().color(QPalette::Active, QPalette::Highlight));
     m_borderColorInactive = tilingGroup.readEntry("TilingBorderColorInactive", QColor(128, 128, 128, 200));
 
-    initializeLayouts();
-    reconcileLayoutKinds();
+    if (!m_enabled) {
+        // Tiling is off (or stayed off): make sure nothing is left tiled, so
+        // disabling tiling floats every window immediately instead of leaving
+        // already-tiled windows snapped until they are moved by hand.
+        floatAllWindows();
+    } else {
+        initializeLayouts();
+        reconcileLayoutKinds();
+        // Restore any windows floated by a previous float-only pass or by the
+        // global disable; clearFloatOnly() only touches remembered windows, so
+        // this cannot disturb manual floats.
+        restoreFloatedWindows();
+    }
 
     if (m_dbusInterface) {
         if (m_enabledLayouts != previousEnabledLayouts) {
@@ -455,6 +476,10 @@ void TilingController::onOutputAdded(LogicalOutput *output)
         return;
     }
     for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+        // Float-only workspaces have no engine.
+        if (isFloatOnly(output, desktop)) {
+            continue;
+        }
         const LayoutEngine::LayoutKind kind = resolveLayoutKind(output, desktop);
         setupLayoutEngine(manager, desktop, kind);
     }
@@ -571,6 +596,11 @@ QString TilingController::currentLayoutKindString() const
     if (!desktop) {
         return QString();
     }
+    // A float-only workspace reports no layout, exactly like tiling being
+    // disabled globally.
+    if (isFloatOnly(output, desktop)) {
+        return QString();
+    }
     return LayoutEngine::layoutKindToString(layoutKindFor(output, desktop));
 }
 
@@ -607,6 +637,181 @@ LayoutEngine::LayoutKind TilingController::resolveLayoutKind(LogicalOutput *outp
         }
     }
     return kind;
+}
+
+bool TilingController::isFloatOnly(LogicalOutput *output, VirtualDesktop *desktop) const
+{
+    if (!output || !desktop) {
+        return false;
+    }
+    KSharedConfigPtr config = KSharedConfig::openConfig(KWIN_CONFIG);
+    KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
+    const KConfigGroup group(&tilingGroup,
+        QStringLiteral("DesktopOutput %1:%2").arg(desktop->x11DesktopNumber()).arg(output->name()));
+    return group.readEntry("FloatOnly", false);
+}
+
+void TilingController::applyFloatOnly(LogicalOutput *output, VirtualDesktop *desktop)
+{
+    if (!m_workspace || !output || !desktop) {
+        return;
+    }
+    TileManager *manager = m_workspace->tileManager(output);
+    if (!manager) {
+        return;
+    }
+    LayoutEngine *engine = manager->layoutEngine(desktop);
+    if (!engine) {
+        return;
+    }
+
+    // Remember the windows so toggling back on re-tiles exactly them (and not
+    // ones the user floated by hand). Each window keeps its current geometry —
+    // it simply stops being managed by the engine.
+    QList<QPointer<Window>> &remembered = m_floatOnlyWindows[floatOnlyKey(output, desktop)];
+    const QList<Window *> windows = engine->windows();
+    for (Window *window : windows) {
+        if (!window || window->isDeleted()) {
+            continue;
+        }
+        engine->removeWindow(window);
+        window->tilingState().mode = TilingState::Mode::Floating;
+        window->tilingState().userToggledFloat = false;
+        m_preTileGeometry.remove(window);
+        m_activeMoves.remove(window);
+        m_activeResizes.remove(window);
+        remembered.append(window);
+    }
+    engine->pruneEmptyLeaves();
+    manager->setLayoutEngine(desktop, nullptr);
+}
+
+void TilingController::clearFloatOnly(LogicalOutput *output, VirtualDesktop *desktop)
+{
+    if (!m_workspace || !output || !desktop) {
+        return;
+    }
+    TileManager *manager = m_workspace->tileManager(output);
+    if (!manager) {
+        return;
+    }
+
+    // Rebuild the engine the float-only pass tore down.
+    if (!manager->layoutEngine(desktop)) {
+        setupLayoutEngine(manager, desktop, resolveLayoutKind(output, desktop));
+    }
+
+    const auto it = m_floatOnlyWindows.find(floatOnlyKey(output, desktop));
+    if (it == m_floatOnlyWindows.end()) {
+        return;
+    }
+    const QList<QPointer<Window>> remembered = it.value();
+    m_floatOnlyWindows.erase(it);
+
+    for (const QPointer<Window> &window : remembered) {
+        if (!window || window->isDeleted()) {
+            continue;
+        }
+        // Respect a manual float (or a rule float applied while float-only
+        // was on).
+        if (window->tilingState().mode != TilingState::Mode::Floating
+            || window->tilingState().userToggledFloat) {
+            continue;
+        }
+        // A window that moved away, is minimized or maximized re-joins through
+        // the normal handlers when it returns to a tileable state.
+        if (window->output() != output
+            || (!window->desktops().isEmpty() && window->desktops().constFirst() != desktop)
+            || window->isMinimized() || window->maximizeMode() != MaximizeRestore) {
+            continue;
+        }
+        addWindowToLayout(window, output, desktop);
+    }
+}
+
+void TilingController::floatAllWindows()
+{
+    if (!m_workspace) {
+        return;
+    }
+    for (LogicalOutput *output : m_workspace->outputs()) {
+        if (!output) {
+            continue;
+        }
+        TileManager *manager = m_workspace->tileManager(output);
+        if (!manager) {
+            continue;
+        }
+        for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+            if (manager->layoutEngine(desktop)) {
+                applyFloatOnly(output, desktop);
+            }
+        }
+    }
+    updateBorders();
+}
+
+void TilingController::restoreFloatedWindows()
+{
+    if (!m_workspace) {
+        return;
+    }
+    for (LogicalOutput *output : m_workspace->outputs()) {
+        if (!output) {
+            continue;
+        }
+        for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
+            if (isFloatOnly(output, desktop)) {
+                continue;
+            }
+            if (m_floatOnlyWindows.contains(floatOnlyKey(output, desktop))) {
+                clearFloatOnly(output, desktop);
+            }
+        }
+    }
+    updateBorders();
+}
+
+void TilingController::toggleFloatOnly()
+{
+    if (!m_workspace) {
+        return;
+    }
+    LogicalOutput *output = m_workspace->activeOutput();
+    if (!output) {
+        return;
+    }
+    VirtualDesktop *desktop = VirtualDesktopManager::self()->currentDesktop(output);
+    if (!desktop) {
+        return;
+    }
+
+    KSharedConfigPtr config = KSharedConfig::openConfig(KWIN_CONFIG);
+    // Reparse so edits made outside the compositor (e.g. the settings page
+    // writing the file) are picked up before the key is flipped.
+    config->reparseConfiguration();
+    const bool enable = !isFloatOnly(output, desktop);
+
+    KConfigGroup tilingGroup(config, QStringLiteral("Tiling"));
+    KConfigGroup group(&tilingGroup,
+        QStringLiteral("DesktopOutput %1:%2").arg(desktop->x11DesktopNumber()).arg(output->name()));
+    if (enable) {
+        group.writeEntry("FloatOnly", true);
+    } else {
+        group.deleteEntry("FloatOnly");
+    }
+    config->sync();
+
+    if (enable) {
+        applyFloatOnly(output, desktop);
+    } else {
+        clearFloatOnly(output, desktop);
+    }
+    updateBorders();
+
+    if (m_dbusInterface) {
+        Q_EMIT m_dbusInterface->layoutChanged(currentLayoutKindString());
+    }
 }
 
 QList<LayoutEngine::LayoutKind> TilingController::enabledLayoutKinds() const
@@ -996,6 +1201,17 @@ void TilingController::onWindowAdded(Window *window)
         const bool initialFloating = (mode == TilingState::Mode::Floating);
         mode = window->rules()->checkFloating(initialFloating, true) ? TilingState::Mode::Floating : TilingState::Mode::Tiled;
     }
+    // A workspace the user marked float-only never tiles, even when the
+    // window's rules would otherwise allow it.
+    if (mode == TilingState::Mode::Tiled) {
+        LogicalOutput *floatOutput = window->output() ? window->output() : m_workspace->activeOutput();
+        VirtualDesktop *floatDesktop = window->desktops().isEmpty()
+            ? VirtualDesktopManager::self()->currentDesktop(floatOutput)
+            : window->desktops().constFirst();
+        if (isFloatOnly(floatOutput, floatDesktop)) {
+            mode = TilingState::Mode::Floating;
+        }
+    }
     window->tilingState().mode = mode;
 
     // The xwaylandvideobridge capture surface is documented to be fully
@@ -1032,6 +1248,11 @@ void TilingController::onWindowRemoved(Window *window)
     }
     m_preTileGeometry.remove(window);
     removeWindowFromLayouts(window);
+    // Drop the window from the float-only bookkeeping so a re-enable cannot
+    // try to re-tile a destroyed window.
+    for (auto &windows : m_floatOnlyWindows) {
+        windows.removeAll(window);
+    }
     updateBorders();
 }
 
@@ -1117,6 +1338,14 @@ void TilingController::onWindowFullScreenChanged(Window *window)
 void TilingController::addWindowToLayout(Window *window, LogicalOutput *output, VirtualDesktop *desktop)
 {
     if (!output || !desktop) {
+        return;
+    }
+
+    // Float-only workspace: the window stays floating. This is also the path a
+    // window takes when it is moved onto a float-only workspace.
+    if (isFloatOnly(output, desktop)) {
+        window->tilingState().mode = TilingState::Mode::Floating;
+        window->tilingState().userToggledFloat = false;
         return;
     }
 
@@ -2008,16 +2237,43 @@ void TilingController::reconcileLayoutKinds()
         if (!output) {
             continue;
         }
+        TileManager *manager = m_workspace->tileManager(output);
+        if (!manager) {
+            continue;
+        }
         for (VirtualDesktop *desktop : VirtualDesktopManager::self()->desktops()) {
             if (!desktop) {
                 continue;
             }
+            const QString key = output->name() + QLatin1Char(':') + QString::number(desktop->x11DesktopNumber());
+
+            // Float-only override (e.g. written by the settings page): float
+            // the workspace and drop its engine. Clearing the reconciled kind
+            // lets a later layout change rebuild the engine.
+            if (isFloatOnly(output, desktop)) {
+                if (manager->layoutEngine(desktop)) {
+                    applyFloatOnly(output, desktop);
+                }
+                m_reconciledLayoutKinds.remove(key);
+                continue;
+            }
+
+            // No engine for this (output, desktop): the float-only override
+            // was just cleared or tiling was re-enabled globally. Rebuild it
+            // and re-tile the windows the toggle floated.
+            if (!manager->layoutEngine(desktop)) {
+                const LayoutEngine::LayoutKind kind = resolveLayoutKind(output, desktop);
+                setLayoutOn(output, desktop, kind);
+                m_reconciledLayoutKinds.insert(key, kind);
+                clearFloatOnly(output, desktop);
+                continue;
+            }
+
             // Only rebuild the engine when the *configured* default actually
             // changed. An unrelated reconfigure (e.g. toggling title bars)
             // must not discard a runtime layout switch made with setLayout()
             // or cycleLayout().
             const LayoutEngine::LayoutKind kind = resolveLayoutKind(output, desktop);
-            const QString key = output->name() + QLatin1Char(':') + QString::number(desktop->x11DesktopNumber());
             if (m_reconciledLayoutKinds.contains(key) && m_reconciledLayoutKinds.value(key) == kind) {
                 continue;
             }

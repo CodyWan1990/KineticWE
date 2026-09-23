@@ -79,6 +79,13 @@ void TilingDBusInterface::toggleOuterGaps()
     }
 }
 
+void TilingDBusInterface::toggleFloatOnly()
+{
+    if (m_controller) {
+        m_controller->toggleFloatOnly();
+    }
+}
+
 static QStringList columnIndices(const QList<int> &indices)
 {
     QStringList out;

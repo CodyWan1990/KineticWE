@@ -72,6 +72,14 @@ public Q_SLOTS:
     Q_SCRIPTABLE void toggleOuterGaps();
 
     /**
+     * Toggle float-only tiling for the active output's current desktop (same
+     * action as the "Tiling Toggle Float Only Workspace" shortcut). Enabling
+     * it floats every tiled window on that workspace; disabling it re-tiles
+     * the windows it floated.
+     */
+    Q_SCRIPTABLE void toggleFloatOnly();
+
+    /**
      * Column indices of the active output's current-desktop Emerge strip that
      * sit fully off the leading (left/up) edge of the viewport, ordered from
      * the farthest column to the nearest. Empty when the active layout is not

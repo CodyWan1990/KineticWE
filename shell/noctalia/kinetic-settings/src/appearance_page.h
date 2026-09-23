@@ -16,10 +16,11 @@ class SessionBus;
 
 // The Appearance -> Title Bars settings page: the titlebar (window decoration)
 // picker, rendered as a tile grid holding the four Kinetic decoration variants
-// (standard/dots x dark/light). The selection is written to the compositor's
-// ~/.config/kineticwe/kineticwe.kwe ([org.kde.kdecoration2] library/theme) by
-// applyAll(), which the window's Apply button calls; the compositor is then
-// asked to reconfigure.
+// (standard/dots x dark/light), plus the Kinetic titlebar metrics (title bar
+// height, title font size, button size). The selection and metrics are written
+// to the compositor's ~/.config/kineticwe/kineticwe.kwe ([org.kde.kdecoration2]
+// library/theme + the Kinetic* metric keys) by applyAll(), which the window's
+// Apply button calls; the compositor is then asked to reconfigure.
 //
 // Theme COLORS are not handled here: the shell's theme service owns the
 // generated palette (qt5ct/qt6ct color schemes, ~/.config/kdeglobals, the GTK
@@ -56,7 +57,9 @@ public:
   void resetAll();
 
   [[nodiscard]] bool hasPending() const noexcept {
-    return m_pendingDecoration.has_value() || m_pendingHideTitleBars.has_value();
+    return m_pendingDecoration.has_value() || m_pendingHideTitleBars.has_value()
+        || m_pendingTitleBarHeight.has_value() || m_pendingTitleFontSize.has_value()
+        || m_pendingButtonSize.has_value();
   }
   // Writes the staged titlebar selection and "Toggle title bars" state to
   // kineticwe.kwe and asks the compositor to reconfigure. Returns false on
@@ -67,6 +70,9 @@ public:
     m_loaded = false;
     m_pendingDecoration.reset();
     m_pendingHideTitleBars.reset();
+    m_pendingTitleBarHeight.reset();
+    m_pendingTitleFontSize.reset();
+    m_pendingButtonSize.reset();
     m_errorNotice.clear();
   }
 
@@ -92,6 +98,11 @@ private:
   [[nodiscard]] static DecorationSelection defaultDecoration();
   [[nodiscard]] static std::string decorationKeyPath() { return "org.kde.kdecoration2.theme"; }
   [[nodiscard]] static std::string titleBarsKeyPath() { return "Windows/DefaultDecorationPolicy"; }
+  // Kinetic titlebar metrics ([org.kde.kdecoration2]); an absent key means the
+  // compositor derives the value from the font/grid unit.
+  [[nodiscard]] static std::string titleBarHeightKeyPath() { return "org.kde.kdecoration2.KineticTitleBarHeight"; }
+  [[nodiscard]] static std::string titleFontSizeKeyPath() { return "org.kde.kdecoration2.KineticTitleFontSize"; }
+  [[nodiscard]] static std::string buttonSizeKeyPath() { return "org.kde.kdecoration2.KineticButtonSize"; }
   [[nodiscard]] DecorationSelection fileBackedDecoration() const;
   [[nodiscard]] DecorationSelection effectiveDecoration() const;
   [[nodiscard]] bool overriddenDecoration() const;
@@ -107,6 +118,20 @@ private:
   [[nodiscard]] bool effectiveHideTitleBars() const;
   // Stages the toggle; clears it when it matches disk.
   void stageHideTitleBars(bool hide);
+  // Titlebar metrics (logical px / points). Each stage clears the pending edit
+  // when the value matches disk; an explicit default removes the key on Apply.
+  [[nodiscard]] int titleBarHeightOnDisk() const;
+  [[nodiscard]] int titleFontSizeOnDisk() const;
+  [[nodiscard]] int buttonSizeOnDisk() const;
+  [[nodiscard]] int effectiveTitleBarHeight() const;
+  [[nodiscard]] int effectiveTitleFontSize() const;
+  [[nodiscard]] int effectiveButtonSize() const;
+  [[nodiscard]] bool overriddenTitleBarHeight() const;
+  [[nodiscard]] bool overriddenTitleFontSize() const;
+  [[nodiscard]] bool overriddenButtonSize() const;
+  void stageTitleBarHeight(int value);
+  void stageTitleFontSize(int value);
+  void stageButtonSize(int value);
   // Writes the staged titlebar selection and toggle to kineticwe.kwe
   // ([org.kde.kdecoration2] + [Windows]) and asks the compositor to reconfigure.
   // Reloads the file first so concurrently applied edits on other pages are
@@ -123,6 +148,10 @@ private:
   std::optional<DecorationSelection> m_pendingDecoration;
   // Staged "Toggle title bars" value (kineticwe.kwe [Windows]); nullopt = no edit.
   std::optional<bool> m_pendingHideTitleBars;
+  // Staged Kinetic titlebar metrics ([org.kde.kdecoration2]); nullopt = no edit.
+  std::optional<int> m_pendingTitleBarHeight;
+  std::optional<int> m_pendingTitleFontSize;
+  std::optional<int> m_pendingButtonSize;
   // kineticwe.kwe reader/writer for the decoration keys.
   KineticweKwe m_decorationsConfig;
   CompositorDbus m_dbus;
