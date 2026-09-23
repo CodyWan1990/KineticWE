@@ -106,7 +106,6 @@ pkgbase = kineticwe
 	depends = noctalia-git
 	depends = plasma-workspace
 	depends = milou
-	depends = aurorae
 	depends = breeze
 	depends = kscreen
 	depends = systemsettings

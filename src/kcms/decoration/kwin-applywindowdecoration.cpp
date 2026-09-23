@@ -17,7 +17,6 @@
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDebug>
-#include <QFileInfo>
 #include <QTimer>
 
 int main(int argc, char **argv)
@@ -50,35 +49,10 @@ int main(int argc, char **argv)
             requestedTheme.remove(requestedTheme.length() - 2, 2);
         }
 
-        bool themeResolved{true};
-        if (requestedTheme.contains(QStringLiteral("/"))) {
-            themeResolved = false;
-            if (QFileInfo::exists(requestedTheme) && QFileInfo(requestedTheme).isDir()) {
-                // Since this is the name of a directory, let's do a bit of checking to see
-                // if we know enough about it to deduce that this is, in fact, a theme.
-                QStringList splitTheme = requestedTheme.split(QStringLiteral("/"), Qt::SkipEmptyParts);
-                if (splitTheme.count() > 3 && splitTheme[splitTheme.count() - 3] == QLatin1StringView("aurorae") && splitTheme[splitTheme.count() - 2] == QLatin1StringView("themes")) {
-                    // We think this is an aurorae theme, but let's just make a little more certain...
-                    QString file(QStringLiteral("aurorae/themes/%1/metadata.desktop").arg(splitTheme.last()));
-                    QString path = QStandardPaths::locate(QStandardPaths::GenericDataLocation, file);
-                    if (!path.isEmpty() && path == QStringLiteral("%1/metadata.desktop").arg(requestedTheme)) {
-                        requestedTheme = QString("__aurorae__svg__").append(splitTheme.last());
-                        themeResolved = true;
-                        ts << i18n("Resolved %1 to the KWin Aurorae theme \"%2\", and will attempt to set that as your current theme.")
-                                  .arg(parser->positionalArguments().first(), requestedTheme)
-                           << Qt::endl;
-                    }
-                }
-            } else {
-                ts << i18n("You attempted to pass a file path, but this could not be resolved to a theme, and we will have to abort, due to having no theme to set") << Qt::endl;
-                exitCode = -1;
-            }
-        }
-
         if (settings->theme() == requestedTheme) {
             ts << i18n("The requested theme \"%1\" is already set as the window decoration theme.", requestedTheme) << Qt::endl;
             // not an error condition, just nothing happens
-        } else if (themeResolved) {
+        } else {
             int index{-1};
             QStringList availableThemes;
             for (int i = 0; i < model->rowCount(); ++i) {

@@ -55,12 +55,10 @@ clean_local_build() {
            ~/.local/lib64/plugins/org.kde.kdecoration3 \
            ~/.local/lib64/qml/org/kde/kwin \
            ~/.local/lib64/libexec/xdg-desktop-portal-kwe \
-           ~/.local/lib64/libexec/plasma-apply-aurorae \
            ~/.local/lib64/kconf_update_bin
     rm -rf ~/.local/lib64/cmake/KGlobalAccelD \
            ~/.local/lib64/cmake/KDecoration3 \
-           ~/.local/lib64/cmake/KWin \
-           ~/.local/lib64/cmake/Aurorae
+           ~/.local/lib64/cmake/KWin
     rm -f ~/.local/bin/kinetic-we \
           ~/.local/bin/kinetic-we_wayland_wrapper \
           ~/.local/bin/kwin_wayland \
@@ -87,7 +85,6 @@ clean_local_build() {
           ~/.local/share/icons/hicolor/*/apps/kineticwe-logo.* \
           ~/.local/share/icons/hicolor/scalable/apps/noctalia.svg
     rm -f ~/.local/share/color-schemes/noctalia.colors
-    rm -rf ~/.local/share/aurorae
     rm -f ~/.local/share/systemd/user/kineticwe-session.target \
           ~/.local/share/systemd/user/kineticwe-workspace.target
     rm -rf ~/.local/lib/systemd/user/kineticwe-*.target
@@ -178,18 +175,15 @@ build_srpm() {
         HEAD
 
     # Pinned dependency sources
-    local kga_ref kdeco_ref aurorae_ref kconfig_ref
+    local kga_ref kdeco_ref kconfig_ref
     kga_ref=$(sed -n 's/.*%global kglobalacceld_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
     kdeco_ref=$(sed -n 's/.*%global kdecoration_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
-    aurorae_ref=$(sed -n 's/.*%global aurorae_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
     kconfig_ref=$(sed -n 's/.*%global kconfig_compiler_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
 
     download_archive "${RPM_DIR}/kglobalacceld-${kga_ref}.tar.gz" \
         "https://invent.kde.org/plasma/kglobalacceld/-/archive/${kga_ref}/kglobalacceld-${kga_ref}.tar.gz"
     download_archive "${RPM_DIR}/kdecoration-${kdeco_ref}.tar.gz" \
         "https://invent.kde.org/plasma/kdecoration/-/archive/${kdeco_ref}/kdecoration-${kdeco_ref}.tar.gz"
-    download_archive "${RPM_DIR}/aurorae-${aurorae_ref}.tar.gz" \
-        "https://invent.kde.org/plasma/aurorae/-/archive/${aurorae_ref}/aurorae-${aurorae_ref}.tar.gz"
     download_archive "${RPM_DIR}/kconfig-${kconfig_ref}.tar.gz" \
         "https://invent.kde.org/frameworks/kconfig/-/archive/${kconfig_ref}/kconfig-${kconfig_ref}.tar.gz"
 

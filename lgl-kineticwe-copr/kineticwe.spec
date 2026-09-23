@@ -1,12 +1,9 @@
 %global __cmake_in_source_build 0
-# Pinned KDE master commits. kinetic-we needs the post-6.7 KGlobalAccelD API,
-# the KDecoration3::Style enum (server-side drop shadows for CSD windows),
-# and an aurorae plugin compiled against our pinned kdecoration (ABI compat
-# with distro-packaged aurorae is not guaranteed). Bump all three pins on
-# each upstream sync.
+# Pinned KDE master commits. kinetic-we needs the post-6.7 KGlobalAccelD API
+# and the KDecoration3::Style enum (server-side drop shadows for CSD windows).
+# Bump both pins on each upstream sync.
 %{!?kglobalacceld_ref:%global kglobalacceld_ref 5cc88399d8e2a7951798f85127e23f73f1fa0889}
 %{!?kdecoration_ref:%global kdecoration_ref d13049250c0ea1afc279aa8dc99243565c0d83e8}
-%{!?aurorae_ref:%global aurorae_ref 6d55109d6e768263653456b539fb25d6d0d3a3b9}
 # kconfig_compiler from KConfig < 6.30 generates uncompilable setters for
 # enum-class kcfg entries (fixed in KConfig commit 41592cc, first released
 # in 6.30). Build the fixed compiler from this pinned KConfig commit and use
@@ -38,7 +35,6 @@ Source3:        kineticwe.desktop
 Source4:        kglobalacceld-mask.conf
 Source5:        kconfig-%{kconfig_compiler_ref}.tar.gz
 Source6:        kdecoration-%{kdecoration_ref}.tar.gz
-Source7:        aurorae-%{aurorae_ref}.tar.gz
 Source8:        noctalia-greeter-%{noctalia_greeter_ref}.tar.gz
 Source9:        kineticwe-setup-greeter.sh
 Source10:       start-kineticwe.sh
@@ -164,12 +160,9 @@ BuildRequires:  stb_image_write-devel
 BuildRequires:  wlroots-devel
 
 Requires:       plasma-milou
-# aurorae: built from pinned KDE master commit (Source7) for ABI compat with
-# our own kdecoration; do not require the distro package.
-# Requires:     aurorae
 # The window decoration is the first-party org.kineticwe.decoration plugin
 # (built in-tree from src/plugins/kineticdecoration); neither Breeze nor the
-# distro kdecoration/aurorae packages are required.
+# distro kdecoration package is required.
 Requires:       breeze-icons
 Requires:       kineticwe-noctalia = %{version}-%{release}
 Requires:       xorg-x11-server-Xwayland
@@ -246,27 +239,6 @@ tar xf %{SOURCE1} -C ../kglobalacceld --strip-components=1
 rm -rf ../kdecoration
 mkdir -p ../kdecoration
 tar xf %{SOURCE6} -C ../kdecoration --strip-components=1
-
-rm -rf ../aurorae
-mkdir -p ../aurorae
-tar xf %{SOURCE7} -C ../aurorae --strip-components=1
-
-# The namespace rewrite below changes the helper name in CMakeLists.txt; keep
-# the configure_file source template name in sync with that rewritten reference.
-mv %{_builddir}/aurorae/plasma-apply-aurorae.cmake \
-   %{_builddir}/aurorae/kineticwe-apply-aurorae.cmake
-
-# KineticWE coexistence: namespace every decorative artifact the vendored
-# aurorae installs so it does not collide with Fedora's stock aurorae package
-# (decoration plugin namespace, QML module URI, data dirs, helper binary).
-AURORAE_SRC=%{_builddir}/aurorae
-find "${AURORAE_SRC}" -type f \( -name 'CMakeLists.txt' -o -name '*.cpp' -o -name '*.h' -o -name '*.qml' -o -name '*.json' -o -name '*.desktop' -o -name '*.in' -o -name '*.xml' \) -print0 \
-    | xargs -0 sed -i \
-        -e 's/org\.kde\.kdecoration3/org.kineticwe.decoration/g' \
-        -e 's/org\.kde\.kwin\.decoration/org.kineticwe.decoration/g' \
-        -e 's#\bkwin/aurorae#kineticwe/aurorae#g' \
-        -e 's#\bkwin/decorations#kineticwe/decorations#g' \
-        -e 's/plasma-apply-aurorae/kineticwe-apply-aurorae/g'
 
 rm -rf ../kconfig
 mkdir -p ../kconfig
@@ -352,25 +324,6 @@ cmake --build "${KDECO_BUILD}"
 
 DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${KDECO_BUILD}" --prefix %{_prefix}
 
-# Build aurorae (pinned KDE master commit) and stage it next to
-# kglobalacceld and kdecoration. The distro-packaged aurorae plugin was
-# compiled against the system kdecoration ABI and may fail to load with
-# our pinned build.
-AURORAE_SRC=%{_builddir}/aurorae
-AURORAE_BUILD=%{_builddir}/aurorae-build
-
-cmake -S "${AURORAE_SRC}" \
-    -B "${AURORAE_BUILD}" \
-    -GNinja \
-    -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-    -DCMAKE_PREFIX_PATH="${KGA_TMP_PREFIX}%{_prefix}" \
-    -DCMAKE_SKIP_RPATH=ON \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DBUILD_TESTING=OFF
-cmake --build "${AURORAE_BUILD}"
-
-DESTDIR="${KGA_TMP_PREFIX}" cmake --install "${AURORAE_BUILD}" --prefix %{_prefix}
-
 # Build the fixed kconfig_compiler (build-time tool only, nothing is installed)
 KCFG_BUILD=%{_builddir}/kconfig-build
 cmake -S %{_builddir}/kconfig \
@@ -429,7 +382,6 @@ meson compile -C "${GREETER_BUILD}"
 KGA_BUILD=%{_builddir}/kglobalacceld-build
 DESTDIR=%{buildroot} cmake --install "${KGA_BUILD}" --prefix %{_prefix}
 DESTDIR=%{buildroot} cmake --install %{_builddir}/kdecoration-build --prefix %{_prefix}
-DESTDIR=%{buildroot} cmake --install %{_builddir}/aurorae-build --prefix %{_prefix}
 %cmake_install
 DESTDIR=%{buildroot} cmake --install %{_builddir}/portal-build --prefix %{_prefix}
 DESTDIR=%{buildroot} meson install -C %{_builddir}/shell-build
@@ -462,7 +414,6 @@ rm -f %{buildroot}%{_includedir}/KF6/kdecoration3_version.h
 rm -rf %{buildroot}%{_includedir}/kwin
 rm -rf %{buildroot}%{_libdir}/cmake/KGlobalAccelD
 rm -rf %{buildroot}%{_libdir}/cmake/KDecoration3
-rm -rf %{buildroot}%{_libdir}/cmake/Aurorae
 rm -rf %{buildroot}%{_libdir}/cmake/KWin
 rm -rf %{buildroot}%{_libdir}/cmake/KWinDBusInterface
 rm -f %{buildroot}%{_libdir}/libkineticwe-globalacceld.so
@@ -474,13 +425,9 @@ rm -f %{buildroot}%{_libdir}/libkineticwe.so
 rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc
 rm -rf %{buildroot}%{_datadir}/dbus-1/interfaces
 
-# Kinetic Settings owns all settings; drop every KDE System Settings module,
-# including the one vendored aurorae ships.
+# Kinetic Settings owns all settings; drop every KDE System Settings module.
 rm -rf %{buildroot}%{_qt6_plugindir}/org.kde.kdecoration3.kcm
 rm -f %{buildroot}%{_datadir}/applications/kcm_*.desktop
-
-# We do not ship KDE "get new decorations" (KNewStuff) data.
-rm -f %{buildroot}%{_datadir}/knsrcfiles/aurorae.knsrc
 
 %post
 systemctl daemon-reload 2>/dev/null || true
@@ -502,7 +449,7 @@ echo "Run kineticwe-setup-greeter to configure the Noctalia greeter as your disp
 echo
 
 %files
-%license LICENSES/* ../kglobalacceld/LICENSES/* ../kdecoration/LICENSES/* ../aurorae/LICENSES/* data/aurorae-themes/LICENSE data/icon-themes/LICENSE
+%license LICENSES/* ../kglobalacceld/LICENSES/* ../kdecoration/LICENSES/* data/icon-themes/LICENSE
 %doc README.md CONTRIBUTING.md
 %{_bindir}/kinetic-we
 %{_bindir}/kineticwe_windowprop
@@ -518,7 +465,6 @@ echo
 %{_qt6_plugindir}/kf6/packagestructure/kineticwe/
 %{_qt6_plugindir}/org.kineticwe.decoration/
 %{_qt6_qmldir}/org/kineticwe/
-%{_qt6_qmldir}/org/kde/kineticwe/decorations/plastik/
 %{_libdir}/libexec/kineticwe*
 %{_datadir}/applications/org.kineticwe.*.desktop
 %{_datadir}/icons/hicolor/*/apps/kineticwe.*
@@ -527,10 +473,6 @@ echo
 %{_datadir}/qlogging-categories6/
 %exclude %{_datadir}/qlogging-categories6/xdp-kwe.categories
 %{_datadir}/kineticwe-wayland/
-%{_datadir}/kineticwe/aurorae/
-%{_datadir}/kineticwe/decorations/kwin4_decoration_qml_plastik/
-%{_datadir}/aurorae/themes/Layan/
-%{_datadir}/aurorae/themes/Layan-solid/
 %{_datadir}/icons/Breeze-Round-Chameleon*
 %{_datadir}/krunner/
 %{_datadir}/locale/

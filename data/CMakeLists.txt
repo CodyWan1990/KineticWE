@@ -6,17 +6,6 @@ add_subdirectory(icons)
 
 install(FILES kineticwe.categories DESTINATION ${KDE_INSTALL_LOGGINGCATEGORIESDIR})
 
-# Aurorae decoration themes vendored from the upstream Layan-kde release (see
-# aurorae-themes/README.md for the pin and the update commands). Installed to
-# <datadir>/aurorae/themes/<Name>/, where the Aurorae plugin and Kinetic
-# Settings -> Title Bars find them. Only the theme dirs are installed; the
-# LICENSE/AUTHORS/README stay in the source tree.
-install(DIRECTORY
-    aurorae-themes/Layan
-    aurorae-themes/Layan-solid
-    DESTINATION ${KDE_INSTALL_DATADIR}/aurorae/themes
-)
-
 # Default icon theme vendored from the upstream L4ki/Breeze-Chameleon-Icons
 # repo (see icon-themes/README.md for the license, hash and update commands).
 # Shipped as a compressed archive rather than ~9k loose files; extracted into

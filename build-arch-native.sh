@@ -65,7 +65,6 @@ PACKAGE=$(awk '/^Name:/ {print $2; exit}' "$SPEC_FILE")
 # Pinned KDE-source refs
 SPEC_KGA_REF=$(sed -n 's/.*%global kglobalacceld_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
 SPEC_KDECO_REF=$(sed -n 's/.*%global kdecoration_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
-SPEC_AURORAE_REF=$(sed -n 's/.*%global aurorae_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
 SPEC_KCONFIG_REF=$(sed -n 's/.*%global kconfig_compiler_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
 
 NEXT_DEV=1
@@ -121,7 +120,6 @@ GREETER_DEPS=(
 SESSION_PKGS=(
     breeze-icons
     breeze
-    aurorae
     qt5ct
     qt6ct
     xorg-xwayland
@@ -430,26 +428,6 @@ build_pinned_deps() {
         rm -rf "$kdeco_build"
     else
         info "kdecoration already installed."
-    fi
-
-    # Build aurorae if not already installed (must be built against our own
-    # kdecoration for ABI compatibility)
-    if [[ ! -f "${TEST_PREFIX}/lib/qt6/plugins/org.kde.kdecoration3/org.kde.kwin.aurorae.v2.so" ]]; then
-        info "Building aurorae (pinned master for KDecoration3 ABI compat)..."
-        local aurorae_build
-        aurorae_build=$(mktemp -d /tmp/aurorae-build.XXXXXX)
-        curl -fsSL "https://invent.kde.org/plasma/aurorae/-/archive/${SPEC_AURORAE_REF}/aurorae-${SPEC_AURORAE_REF}.tar.gz" \
-            | tar xz -C "$aurorae_build" --strip-components=1
-        cmake -B "$aurorae_build/build" -S "$aurorae_build" \
-            -DCMAKE_INSTALL_PREFIX="${TEST_PREFIX}" \
-            -DCMAKE_PREFIX_PATH="${TEST_PREFIX}" \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DBUILD_TESTING=OFF
-        cmake --build "$aurorae_build/build" --parallel "$(nproc)"
-        cmake --install "$aurorae_build/build"
-        rm -rf "$aurorae_build"
-    else
-        info "aurorae already installed."
     fi
 
     # kconfig_compiler from KConfig < 6.30 generates uncompilable setters
@@ -1031,8 +1009,6 @@ reset_local() {
         "$TEST_PREFIX/lib64/qt6/qml/org/kde/kwin"
         "$TEST_PREFIX/lib/qt6/qml/org/kde/kwin"
         "$TEST_PREFIX/share/kwin-wayland"
-        "$TEST_PREFIX/share/kwin/aurorae"
-        "$TEST_PREFIX/libexec/plasma-apply-aurorae"
         "$TEST_PREFIX/share/config.kcfg"
         "$TEST_PREFIX/share/kconf_update"
         "$TEST_PREFIX/share/knsrcfiles"

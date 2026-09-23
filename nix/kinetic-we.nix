@@ -48,7 +48,7 @@ let
     kirigami
     kscreenlocker kwayland knighttime
     libplasma plasma-activities plasma-wayland-protocols
-    aurorae breeze breeze-icons milou
+    breeze breeze-icons milou
     libqaccessibilityclient
     ;
 in
@@ -121,7 +121,6 @@ stdenv.mkDerivation {
     libplasma
     plasma-activities
     plasma-wayland-protocols
-    aurorae
     breeze
     breeze-icons
     milou

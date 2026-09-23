@@ -42,7 +42,6 @@ RuntimeDependencies:
  - 'on': ['@all']
    'require':
     'frameworks/kirigami': '@latest-kf6'
-    'plasma/aurorae': '@same'
     'plasma/breeze': '@same'
     'plasma/libplasma': '@same'
     'plasma/plasma-workspace': '@same' # kscreenlocker needs it

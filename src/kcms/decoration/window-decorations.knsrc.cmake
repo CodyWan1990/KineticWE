@@ -64,6 +64,5 @@ Name[zh_TW]=視窗裝飾
 ProvidersUrl=https://autoconfig.kde.org/ocs/providers.xml
 ContentWarning=Executables
 Categories=Plasma 6 Window Decorations
-TargetDir=aurorae/themes
 Uncompress=archive
 AdoptionCommand=@KDE_INSTALL_FULL_LIBEXECDIR@/kwin-applywindowdecoration %f

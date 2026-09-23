@@ -338,7 +338,7 @@ namespace {
 
   // How the drawn window mock renders its titlebar: which side(s) carry
   // buttons, whether the title is centered, the titlebar height and whether
-  // the buttons are Layan-style dots or flat glyphs.
+  // the buttons are dots or flat glyphs.
   struct TitlebarStyle {
     std::string leftButtons;  // KDE button letters, e.g. "XIA"
     std::string rightButtons; // ... e.g. "IAX"
@@ -633,7 +633,7 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
   std::vector<Tile> tiles;
   // The Kinetic decoration is drawn by the compositor itself, so its tiles use
   // a mock layout: title on the left, minimize/maximize/close on the right.
-  // Standard draws flat glyphs, Dots the Layan-style solid circles.
+  // Standard draws flat glyphs, Dots the solid circles.
   tiles.push_back(Tile{
       .displayName = "Kinetic Standard Dark",
       .selection = DecorationSelection{.library = "kineticwe", .theme = "dark"},

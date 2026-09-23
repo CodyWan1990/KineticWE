@@ -99,7 +99,6 @@ Likely explicit runtime dependencies:
 - `xdg-desktop-portal`
 - `xdg-desktop-portal-kwe`
 - `hwdata`
-- `aurorae`
 - `plasma-breeze`
 - `plasma-milou`
 - `kineticwe-kglobalacceld%{?_isa} = %{version}-%{release}`

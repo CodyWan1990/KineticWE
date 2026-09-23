@@ -87,9 +87,9 @@ BASELINE_RPM_PKGS=(
 # cursor theme, the Qt5/Qt6 configuration tools that theme Qt apps via
 # QT_QPA_PLATFORMTHEME=qt5ct, Xwayland (so X11 clients and Electron apps can
 # open windows), and a terminal the user can launch. The window decoration is
-# the first-party org.kineticwe.decoration plugin built with KineticWE, and the
-# aurorae theme engine is vendored, so neither plasma-breeze nor the distro
-# aurorae package is needed. Installed idempotently by
+# the first-party org.kineticwe.decoration plugin built with KineticWE, so
+# neither plasma-breeze nor any other window-decoration engine is needed.
+# Installed idempotently by
 # install_default_session_packages.
 DEFAULT_RPM_PKGS=(
     breeze-icon-theme

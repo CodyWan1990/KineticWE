@@ -64,17 +64,20 @@ We looked at three kinds of window decorations:
 - **QML decorations** (like "Plastik") are small programs, so they *can* read
   the shared color file and recolor live.
 
-**We are building our own QML decoration ("Kinetic").** This gives us:
+**We built our own decoration ("Kinetic").** It is a first-party KDecoration3
+C++ plugin (`src/plugins/kineticdecoration`, plugin id `kineticwe`) compiled
+into the compositor. This gives us:
 
 - A standard-looking title bar we fully own.
 - **Real-time recoloring** as the theme changes (Noctalia already writes the
   color file and signals the desktop).
 - Server-side window **shadows** preserved.
-- No dependency on KDE's Breeze package.
+- No dependency on KDE's Breeze package, the **aurorae** engine, or any other
+  decoration theme engine.
 
-The decoration engine (the plumbing that lets QML draw title bars) comes from
-the **aurorae** source, which we already build ourselves from a pinned commit —
-so we do not depend on the distro's copy either.
+The Aurorae engine (previously built from a pinned commit), its vendored Layan
+themes and the Plastik QML decoration it shipped have been **removed**; the
+Kinetic plugin is the only window decoration.
 
 ## What we lose
 
@@ -125,7 +128,7 @@ and:
 | KF6 libraries | **Keep** linking | Shared libs, no conflict, from-scratch rewrite out of scope |
 | KCMs | **Drop** | Owned settings app; large collision surface |
 | Decorations | First-party **Kinetic C++ decoration** (`org.kineticwe.decoration`); drop Breeze requirement | Full ownership + live recolor |
-| Decoration engine | Keep building pinned **aurorae**; **rename** its plugin namespace and QML module to `org.kineticwe.decoration` | Full ownership of the engine |
+| Decoration engine | **Drop aurorae** entirely; the first-party **Kinetic** KDecoration3 plugin is the only window decoration | No external engine needed |
 | kdecoration library | Vendor + **rename** (keep `KDecoration3::Style` shadow support) | Cross-distro consistency; keep server-side shadows |
 | kglobalacceld | Vendor + **rename** the private lib | Only used by us; keep `org.kde.kglobalaccel` API |
 | Upstream strategy | **Hard fork** — freeze base, cherry-pick deliberately | User decision |
@@ -177,7 +180,6 @@ Everything else stays.
 | `kwin_dialog_helper` | `kineticwe_dialog_helper` | `src/helpers/dialoghelper/` |
 | `kwin_eis_prompter` | `kineticwe_eis_prompter` | `src/helpers/` |
 | `kwin_killer_helper` | `kineticwe_killer_helper` | `src/helpers/killer/` |
-| `plasma-apply-aurorae` | `kineticwe-apply-aurorae` | aurorae source |
 | `kwin-applywindowdecoration` | `kineticwe-applywindowdecoration` | `src/kcms/decoration/` |
 | `kwin-tabbox-preview` | `kineticwe-tabbox-preview` | `src/kcms/tabbox/` (drop with KCMs) |
 
@@ -223,10 +225,12 @@ Corresponding source changes:
 | Current | New | Source |
 |---|---|---|
 | `%{_datadir}/kwin-wayland/` | `%{_datadir}/kineticwe-wayland/` | `src/plugins/CMakeLists.txt:30`, effect/script data |
-| `%{_datadir}/kwin/aurorae/` | `%{_datadir}/kineticwe/aurorae/` | aurorae KPackage structures |
 | `%{_datadir}/kwin/decorations/...` | `%{_datadir}/kineticwe/decorations/...` | decoration packages (see B3) |
 | `%{_datadir}/krunner/` | `%{_datadir}/krunner/kineticwe-*` | unique filenames only |
-| `%{_datadir}/aurorae/themes/Layan{,-solid}/` | keep or move (see open Q) | vendored themes |
+
+(The `%{_datadir}/kwin/aurorae/` and `%{_datadir}/aurorae/themes/Layan{,-solid}/`
+entries are gone — the Aurorae engine and its vendored themes were removed, see
+B3.3.)
 
 The compositor resolves `kwin-wayland` data through `QStandardPaths`; the
 search path/name must be updated in-tree where it hardcodes `kwin-wayland`.
@@ -307,9 +311,9 @@ through `DecorationPalette` (watching `kdeglobals`) and republishes through
 ### B3.2 Wiring changes
 
 - `src/decorations/decorationbridge.cpp`: `s_pluginName =
-  "org.kineticwe.decoration"`, `s_defaultPlugin = "kineticwe"`. The Aurorae
-  fallback (`org.kde.kwin.aurorae.v2`) is kept and resolves under the renamed
-  namespace.
+  "org.kineticwe.decoration"`, `s_defaultPlugin = "kineticwe"`, with an
+  unloadable configured plugin falling back to `kineticwe` (no Aurorae
+  fallback).
 - `src/plugins/kpackage/decoration/decoration.cpp`: default package root
   `kwin/decorations/` to `kineticwe/decorations/`.
 - `shell/noctalia/kinetic-settings/src/appearance_page.cpp`: default decoration
@@ -318,22 +322,18 @@ through `DecorationPalette` (watching `kdeglobals`) and republishes through
 - Drop `Requires: plasma-breeze` and `plasma-breeze-common` (both specs and
   `install-runtime-deps.sh`).
 
-### B3.3 Vendored aurorae namespacing (optional extras)
+### B3.3 Decoration engine removal (done)
 
-Layan/Layan-solid and Plastik are kept for now. The vendored aurorae source is
-renamed during `%prep`/prep so it does not collide with Fedora's `aurorae`:
+The Aurorae engine is no longer built or shipped. It used to be vendored from a
+pinned KDE commit and namespaced in `%prep`/prep (plugin namespace, QML URI,
+data dirs, helper, KNS) to coexist with Fedora's `aurorae`; its vendored Layan
+themes and the Plastik QML decoration it shipped are gone too. The first-party
+Kinetic plugin (B3.1/B3.2) is now the only window decoration.
 
-- plugin namespace `org.kde.kdecoration3` -> `org.kineticwe.decoration`
-- QML engine URI `org.kde.kwin.decoration` -> `org.kineticwe.decoration`
-- data dirs `kwin/aurorae` -> `kineticwe/aurorae`,
-  `kwin/decorations` -> `kineticwe/decorations`
-- helper `plasma-apply-aurorae` -> `kineticwe-apply-aurorae`
-- KNewStuff `aurorae.knsrc` is not shipped (removed in `%install`)
-
-Applied in `lgl-kineticwe-copr/kineticwe.spec` and `kineticwe.spec` `%prep`,
-and in `PKGBUILD` `prepare()`. These are best-effort substitutions against the
-pinned aurorae commit and are verified only by a build. The Debian rules do not
-build aurorae yet, so Debian ships the Kinetic decoration but not the themes.
+Applied across both RPM specs, `lgl-kineticwe-copr/build-rpms.sh`, `PKGBUILD`,
+`.SRCINFO`, `build-arch-native.sh`, `debian/control`, the Nix package,
+`install-runtime-deps.sh`, `PACKAGING-COPR.md`, `.kde-ci.yml`, the integration
+tests and `data/kineticwe.categories`.
 
 ## B4. Session & config identity
 
@@ -381,11 +381,11 @@ filenames, crash ID, and window identity before doing it.
 2. Keep an `upstream` git remote for reference; **never** rebase/merge wholesale.
 3. Cherry-pick upstream fixes/features individually into `src/`, each as its own
    commit with a note in `docs/upstream-sync.md`.
-4. Keep the vendored subprojects (kglobalacceld, kdecoration, aurorae, kconfig
+4. Keep the vendored subprojects (kglobalacceld, kdecoration, kconfig
    compiler, greeter) pinned by commit in the spec/PKGBUILD/debian/nix; bump
    deliberately, not automatically.
 5. Add a CI check that fails if a build installs any path owned by the distro
-   `kwin`, `kwin-libs`, `kdecoration`, `kglobalacceld`, or `aurorae` packages.
+   `kwin`, `kwin-libs`, `kdecoration`, or `kglobalacceld` packages.
 
 ## B6. Phased task breakdown
 
@@ -416,9 +416,12 @@ filenames, crash ID, and window identity before doing it.
 - [x] `kpackage/decoration` root -> `kineticwe/decorations/`.
 - [x] Kinetic Settings default -> `("org.kineticwe.decoration", "kineticwe")`, label "Kinetic".
 - [x] Drop `plasma-breeze*` (specs + `install-runtime-deps.sh`).
-- [x] Namespace vendored aurorae (plugin ns, QML URI, data dirs, helper) in
-      `%prep`/prep; delete `aurorae.knsrc` in `%install`.
-- [ ] Verified by the user's next build (aurorae seds are best-effort).
+- [x] Remove the Aurorae engine from all packagings and dev scripts, its
+      vendored Layan themes, the Plastik QML decoration it shipped, the aurorae
+      KPackage structure and the `org.kde.kwin.aurorae.v2` fallback (which now
+      resolves to `kineticwe`).
+- [ ] Verified by the user's next build (the removal is verified only by a
+      build).
 
 ### Phase 4 — Identity & session
 - [ ] Session env changes (B4).
@@ -457,8 +460,9 @@ On a clean Fedora VM with **stock KDE installed**:
 ### Resolved (locked)
 
 - **QML engine URI** → rename to `org.kineticwe.decoration` (full ownership).
-- **Aurorae themes / Plastik** → keep Layan/Layan-solid and Plastik for now;
-  revisit dropping them later.
+- **Aurorae themes / Plastik** → dropped. The Aurorae engine, its vendored
+  Layan themes and the Plastik QML decoration are gone; the Kinetic plugin is
+  the only window decoration.
 - **`kconf_update` / `knsrcfiles` / `config.kcfg`** → drop (KCM-only / retired).
 - **Effect plugin IDs** (`kwin4_effect_*`) → leave as-is; they contain "kwin",
   not "kde", and are config strings.

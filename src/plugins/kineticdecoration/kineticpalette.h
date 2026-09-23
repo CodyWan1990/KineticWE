@@ -30,7 +30,7 @@ enum class KineticTheme {
 
 /**
  * How the decoration buttons are drawn. Standard paints the flat outline
- * glyphs; Dots paints Layan-style solid circles that reveal the glyph on hover.
+ * glyphs; Dots paints solid circles that reveal the glyph on hover.
  * The choice is encoded in the theme string ("dots-dark" / "dots-light").
  */
 enum class KineticButtonStyle {
