@@ -17,7 +17,8 @@ class SessionBus;
 // The Appearance -> Title Bars settings page: the titlebar (window decoration)
 // picker, rendered as a tile grid holding the four Kinetic decoration variants
 // (standard/dots x dark/light), plus the Kinetic titlebar metrics (title bar
-// height, title font size, button size). The selection and metrics are written
+// height, title font size, button size) and the left/right title bar button
+// selection (ButtonsOnLeft/ButtonsOnRight). The selection and metrics are written
 // to the compositor's ~/.config/kineticwe/kineticwe.kwe ([org.kde.kdecoration2]
 // library/theme + the Kinetic* metric keys) by applyAll(), which the window's
 // Apply button calls; the compositor is then asked to reconfigure.
@@ -59,7 +60,8 @@ public:
   [[nodiscard]] bool hasPending() const noexcept {
     return m_pendingDecoration.has_value() || m_pendingHideTitleBars.has_value()
         || m_pendingTitleBarHeight.has_value() || m_pendingTitleFontSize.has_value()
-        || m_pendingButtonSize.has_value();
+        || m_pendingButtonSize.has_value() || m_pendingButtonsOnLeft.has_value()
+        || m_pendingButtonsOnRight.has_value();
   }
   // Writes the staged titlebar selection and "Toggle title bars" state to
   // kineticwe.kwe and asks the compositor to reconfigure. Returns false on
@@ -73,6 +75,8 @@ public:
     m_pendingTitleBarHeight.reset();
     m_pendingTitleFontSize.reset();
     m_pendingButtonSize.reset();
+    m_pendingButtonsOnLeft.reset();
+    m_pendingButtonsOnRight.reset();
     m_errorNotice.clear();
   }
 
@@ -103,6 +107,8 @@ private:
   [[nodiscard]] static std::string titleBarHeightKeyPath() { return "org.kde.kdecoration2.KineticTitleBarHeight"; }
   [[nodiscard]] static std::string titleFontSizeKeyPath() { return "org.kde.kdecoration2.KineticTitleFontSize"; }
   [[nodiscard]] static std::string buttonSizeKeyPath() { return "org.kde.kdecoration2.KineticButtonSize"; }
+  [[nodiscard]] static std::string buttonsOnLeftKeyPath() { return "org.kde.kdecoration2.ButtonsOnLeft"; }
+  [[nodiscard]] static std::string buttonsOnRightKeyPath() { return "org.kde.kdecoration2.ButtonsOnRight"; }
   [[nodiscard]] DecorationSelection fileBackedDecoration() const;
   [[nodiscard]] DecorationSelection effectiveDecoration() const;
   [[nodiscard]] bool overriddenDecoration() const;
@@ -132,6 +138,20 @@ private:
   void stageTitleBarHeight(int value);
   void stageTitleFontSize(int value);
   void stageButtonSize(int value);
+  // Title bar buttons: the KDE letter-code run the compositor reads from
+  // [org.kde.kdecoration2] ButtonsOnLeft/ButtonsOnRight. A value equal to the
+  // compiled-in default clears the pending edit (and removes the key on Apply).
+  [[nodiscard]] std::string buttonsOnLeftOnDisk() const;
+  [[nodiscard]] std::string buttonsOnRightOnDisk() const;
+  [[nodiscard]] std::string effectiveButtonsOnLeft() const;
+  [[nodiscard]] std::string effectiveButtonsOnRight() const;
+  [[nodiscard]] bool overriddenButtonsOnLeft() const;
+  [[nodiscard]] bool overriddenButtonsOnRight() const;
+  void stageButtonsOnLeft(std::string value);
+  void stageButtonsOnRight(std::string value);
+  // Inserts (on) or removes (off) a single letter in a button string, preserving
+  // the order of the other letters.
+  [[nodiscard]] static std::string toggleButton(std::string_view current, char letter, bool on);
   // Writes the staged titlebar selection and toggle to kineticwe.kwe
   // ([org.kde.kdecoration2] + [Windows]) and asks the compositor to reconfigure.
   // Reloads the file first so concurrently applied edits on other pages are
@@ -152,6 +172,8 @@ private:
   std::optional<int> m_pendingTitleBarHeight;
   std::optional<int> m_pendingTitleFontSize;
   std::optional<int> m_pendingButtonSize;
+  std::optional<std::string> m_pendingButtonsOnLeft;
+  std::optional<std::string> m_pendingButtonsOnRight;
   // kineticwe.kwe reader/writer for the decoration keys.
   KineticweKwe m_decorationsConfig;
   CompositorDbus m_dbus;

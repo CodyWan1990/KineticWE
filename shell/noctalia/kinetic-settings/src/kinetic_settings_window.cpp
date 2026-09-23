@@ -1366,7 +1366,8 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
 std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
   switch (page) {
   case ActivePage::AppearanceTitleBars:
-    return "appearance title bars titlebar dynamic neutral look and feel window decorations decoration";
+    return "appearance title bars titlebar dynamic neutral look and feel window decorations decoration "
+           "title bar buttons minimize maximize close window menu";
   case ActivePage::AppearanceIcons:
     return "appearance icons icon theme";
   case ActivePage::AppearanceCursors:

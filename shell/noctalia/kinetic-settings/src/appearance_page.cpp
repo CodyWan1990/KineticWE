@@ -39,6 +39,38 @@ namespace {
   constexpr int kDefaultTitleFontSize = 9;   // points
   constexpr int kDefaultButtonSize = 22;     // logical px
 
+  // Default title-bar button-code runs (the KDE letters the compositor reads
+  // from [org.kde.kdecoration2] ButtonsOnLeft/ButtonsOnRight). An explicit value
+  // equal to these removes the .kwe key again.
+  constexpr std::string_view kDefaultButtonsOnLeft = "MSE";
+  constexpr std::string_view kDefaultButtonsOnRight = "HIAX";
+
+  // One configurable title-bar button: the KDecoration letter code and its
+  // user-facing label.
+  struct ButtonOption {
+    char letter;
+    std::string_view label;
+  };
+
+  // The configurable title-bar buttons, matching the compositor's letter codes
+  // (src/decorations/settings.cpp s_buttonNames) and the labels used by the
+  // stock KWin decoration KCM.
+  const std::vector<ButtonOption>& buttonOptions() {
+    static const std::vector<ButtonOption> v{
+        {'M', "Window menu"},
+        {'N', "Application menu"},
+        {'S', "On all desktops"},
+        {'I', "Minimize"},
+        {'A', "Maximize"},
+        {'X', "Close"},
+        {'H', "Context help"},
+        {'B', "Keep below other windows"},
+        {'F', "Keep above other windows"},
+        {'E', "Hide from screenshots and screen recordings"},
+    };
+    return v;
+  }
+
   [[nodiscard]] std::unique_ptr<Label>
   makeLabel(std::string_view text, float fontSize, const ColorSpec& color, FontWeight fontWeight = FontWeight::Normal) {
     return ui::label({
@@ -90,7 +122,8 @@ void AppearancePage::ensureLoaded() {
 bool AppearancePage::applyAll() {
   if (!m_pendingDecoration.has_value() && !m_pendingHideTitleBars.has_value()
       && !m_pendingTitleBarHeight.has_value() && !m_pendingTitleFontSize.has_value()
-      && !m_pendingButtonSize.has_value()) {
+      && !m_pendingButtonSize.has_value() && !m_pendingButtonsOnLeft.has_value()
+      && !m_pendingButtonsOnRight.has_value()) {
     return true;
   }
   ensureLoaded();
@@ -104,12 +137,22 @@ bool AppearancePage::applyAll() {
   m_pendingTitleBarHeight.reset();
   m_pendingTitleFontSize.reset();
   m_pendingButtonSize.reset();
+  m_pendingButtonsOnLeft.reset();
+  m_pendingButtonsOnRight.reset();
   m_errorNotice.clear();
   return true;
 }
 
 std::vector<std::string> AppearancePage::resettableKeyPaths() const {
-  return {decorationKeyPath(), titleBarsKeyPath(), titleBarHeightKeyPath(), titleFontSizeKeyPath(), buttonSizeKeyPath()};
+  return {
+      decorationKeyPath(),
+      titleBarsKeyPath(),
+      titleBarHeightKeyPath(),
+      titleFontSizeKeyPath(),
+      buttonSizeKeyPath(),
+      buttonsOnLeftKeyPath(),
+      buttonsOnRightKeyPath(),
+  };
 }
 
 void AppearancePage::resetKeyPath(std::string_view path) {
@@ -123,6 +166,10 @@ void AppearancePage::resetKeyPath(std::string_view path) {
     stageTitleFontSize(kDefaultTitleFontSize);
   } else if (path == buttonSizeKeyPath()) {
     stageButtonSize(kDefaultButtonSize);
+  } else if (path == buttonsOnLeftKeyPath()) {
+    stageButtonsOnLeft(std::string(kDefaultButtonsOnLeft));
+  } else if (path == buttonsOnRightKeyPath()) {
+    stageButtonsOnRight(std::string(kDefaultButtonsOnRight));
   }
 }
 
@@ -132,6 +179,8 @@ void AppearancePage::resetAll() {
   stageTitleBarHeight(kDefaultTitleBarHeight);
   stageTitleFontSize(kDefaultTitleFontSize);
   stageButtonSize(kDefaultButtonSize);
+  stageButtonsOnLeft(std::string(kDefaultButtonsOnLeft));
+  stageButtonsOnRight(std::string(kDefaultButtonsOnRight));
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +306,66 @@ void AppearancePage::stageButtonSize(int value) {
   }
 }
 
+std::string AppearancePage::buttonsOnLeftOnDisk() const {
+  return m_decorationsConfig.readString("org.kde.kdecoration2", "ButtonsOnLeft")
+      .value_or(std::string(kDefaultButtonsOnLeft));
+}
+
+std::string AppearancePage::buttonsOnRightOnDisk() const {
+  return m_decorationsConfig.readString("org.kde.kdecoration2", "ButtonsOnRight")
+      .value_or(std::string(kDefaultButtonsOnRight));
+}
+
+std::string AppearancePage::effectiveButtonsOnLeft() const {
+  return m_pendingButtonsOnLeft.value_or(buttonsOnLeftOnDisk());
+}
+
+std::string AppearancePage::effectiveButtonsOnRight() const {
+  return m_pendingButtonsOnRight.value_or(buttonsOnRightOnDisk());
+}
+
+bool AppearancePage::overriddenButtonsOnLeft() const {
+  return std::string_view(effectiveButtonsOnLeft()) != kDefaultButtonsOnLeft;
+}
+
+bool AppearancePage::overriddenButtonsOnRight() const {
+  return std::string_view(effectiveButtonsOnRight()) != kDefaultButtonsOnRight;
+}
+
+std::string AppearancePage::toggleButton(std::string_view current, char letter, bool on) {
+  std::string out;
+  bool present = false;
+  for (const char c : current) {
+    if (c == letter) {
+      present = true;
+      continue;
+    }
+    out.push_back(c);
+  }
+  if (on && !present) {
+    out.push_back(letter);
+  }
+  return out;
+}
+
+void AppearancePage::stageButtonsOnLeft(std::string value) {
+  ensureLoaded();
+  if (value == buttonsOnLeftOnDisk()) {
+    m_pendingButtonsOnLeft.reset();
+  } else {
+    m_pendingButtonsOnLeft = std::move(value);
+  }
+}
+
+void AppearancePage::stageButtonsOnRight(std::string value) {
+  ensureLoaded();
+  if (value == buttonsOnRightOnDisk()) {
+    m_pendingButtonsOnRight.reset();
+  } else {
+    m_pendingButtonsOnRight = std::move(value);
+  }
+}
+
 bool AppearancePage::applyTitleBars() {
   // Reload first so edits applied from other pages in the meantime are kept.
   m_decorationsConfig.load();
@@ -294,6 +403,22 @@ bool AppearancePage::applyTitleBars() {
       m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticButtonSize");
     } else {
       m_decorationsConfig.setInt("org.kde.kdecoration2", "KineticButtonSize", *m_pendingButtonSize);
+    }
+  }
+  // Title bar buttons: an explicit default removes the key so the compositor
+  // falls back to its own default code run again.
+  if (m_pendingButtonsOnLeft.has_value()) {
+    if (std::string_view(*m_pendingButtonsOnLeft) == kDefaultButtonsOnLeft) {
+      m_decorationsConfig.removeKey("org.kde.kdecoration2", "ButtonsOnLeft");
+    } else {
+      m_decorationsConfig.setString("org.kde.kdecoration2", "ButtonsOnLeft", *m_pendingButtonsOnLeft);
+    }
+  }
+  if (m_pendingButtonsOnRight.has_value()) {
+    if (std::string_view(*m_pendingButtonsOnRight) == kDefaultButtonsOnRight) {
+      m_decorationsConfig.removeKey("org.kde.kdecoration2", "ButtonsOnRight");
+    } else {
+      m_decorationsConfig.setString("org.kde.kdecoration2", "ButtonsOnRight", *m_pendingButtonsOnRight);
     }
   }
   if (!m_decorationsConfig.save()) {
@@ -684,8 +809,30 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
   const bool fontSizeVisible = (!filter.showOverriddenOnly || fontSizeOverridden)
       && (sectionTitleMatches || matchesAny({"Title font size", "Title bar font", "Title bar size"}));
   const bool buttonSizeVisible = (!filter.showOverriddenOnly || buttonSizeOverridden)
-      && (sectionTitleMatches || matchesAny({"Button size", "Title bar buttons", "Title bar size"}));
+      && (sectionTitleMatches || matchesAny({"Button size", "Title bar size"}));
   const bool showSizeSection = heightVisible || fontSizeVisible || buttonSizeVisible;
+
+  // The Title bar buttons section: two side-by-side columns, each a per-button
+  // toggle row. It matches the section title, an individual button label, or the
+  // Overridden filter when either side differs from the default.
+  const bool buttonsOverridden = overriddenButtonsOnLeft() || overriddenButtonsOnRight();
+  const auto matchesButtonOption = [&]() {
+    if (!searchActive) {
+      return true;
+    }
+    if (StringUtils::containsInsensitive("Title bar buttons", filter.searchQuery)
+        || StringUtils::containsInsensitive("Title bar button", filter.searchQuery)) {
+      return true;
+    }
+    for (const auto& option : buttonOptions()) {
+      if (StringUtils::containsInsensitive(option.label, filter.searchQuery)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const bool buttonsVisible =
+      (!filter.showOverriddenOnly || buttonsOverridden) && (sectionTitleMatches || matchesButtonOption());
 
   const DecorationSelection current = effectiveDecoration();
 
@@ -701,7 +848,7 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     }
     visible.push_back(&tile);
   }
-  if (visible.empty() && !showToggleRow && !showSizeSection) {
+  if (visible.empty() && !showToggleRow && !showSizeSection && !buttonsVisible) {
     return nullptr;
   }
 
@@ -871,6 +1018,89 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
       ));
     }
 
+    section->addChild(std::move(card));
+  }
+
+  if (buttonsVisible) {
+    auto card = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .padding = Style::spaceMd * scale,
+        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
+        .radius = Style::scaledRadiusMd(scale),
+        .fillWidth = true,
+    });
+    card->addChild(makeLabel(
+        "Title bar buttons", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
+    ));
+
+    const auto buildButtonSide = [&](bool left, std::string_view sideLabel) -> std::unique_ptr<Node> {
+      const std::string path = left ? buttonsOnLeftKeyPath() : buttonsOnRightKeyPath();
+      const std::string current = left ? effectiveButtonsOnLeft() : effectiveButtonsOnRight();
+      const bool sideOverridden = left ? overriddenButtonsOnLeft() : overriddenButtonsOnRight();
+
+      auto column = ui::column({
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+          .flexGrow = 1.0F,
+      });
+
+      auto header = ui::row({
+          .align = FlexAlign::Center,
+          .gap = Style::spaceSm * scale,
+          .fillWidth = true,
+      });
+      header->addChild(makeLabel(
+          sideLabel, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+      ));
+      if (sideOverridden) {
+        header->addChild(makeOverrideBadge(scale));
+        header->addChild(makeResetButton(path, armedResetKey == path, scale, callbacks));
+      }
+      header->addChild(ui::spacer());
+      column->addChild(std::move(header));
+
+      for (const auto& option : buttonOptions()) {
+        const bool checked = current.find(option.letter) != std::string::npos;
+
+        auto row = ui::row({
+            .align = FlexAlign::Center,
+            .justify = FlexJustify::SpaceBetween,
+            .gap = Style::spaceXs * scale,
+            .paddingV = 2.0F * scale,
+            .fillWidth = true,
+        });
+        row->addChild(ui::label({
+            .text = std::string(option.label),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+        }));
+        row->addChild(ui::toggle({
+            .checked = checked,
+            .scale = scale,
+            .onChange = [this, left, letter = option.letter, callbacks](bool on) {
+              const std::string currentSide = left ? effectiveButtonsOnLeft() : effectiveButtonsOnRight();
+              const std::string next = toggleButton(currentSide, letter, on);
+              if (left) {
+                stageButtonsOnLeft(next);
+              } else {
+                stageButtonsOnRight(next);
+              }
+              if (callbacks.requestRebuild) {
+                callbacks.requestRebuild();
+              }
+            },
+        }));
+        column->addChild(std::move(row));
+      }
+      return column;
+    };
+
+    card->addChild(ui::row(
+        {.align = FlexAlign::Stretch, .gap = Style::spaceLg * scale, .fillWidth = true},
+        buildButtonSide(true, "Left side"),
+        buildButtonSide(false, "Right side")
+    ));
     section->addChild(std::move(card));
   }
   return section;
