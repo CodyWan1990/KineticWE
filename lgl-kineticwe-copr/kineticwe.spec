@@ -572,6 +572,11 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Wed Sep 23 2026 LGL <lgl@localhost> - 0.0.1-10
+- Search both KineticWE and KWin data namespaces when discovering desktop effects.
+- Add json-devel as a build dependency for Kinetic Settings.
+- Recommend kf6-qqc2-desktop-style for the KineticWE desktop session.
+
 * Mon Sep 21 2026 LGL <lgl@localhost> - 0.0.1-7
 - Remove nested rpm queries from posttrans scriptlets to avoid RPM database lock errors.
 - Require matching main, Noctalia, portal, and installed greeter package releases.
