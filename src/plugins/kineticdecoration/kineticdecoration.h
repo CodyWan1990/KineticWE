@@ -90,6 +90,8 @@ private:
     int m_titleBarHeight = 0;     // logical pixels
     int m_titleFontPointSize = 0; // points
     int m_buttonSize = 0;         // logical pixels
+    // Whether the window caption text is painted (KineticShowTitle; default on).
+    bool m_showTitle = true;
     // Cached button size (device pixels) so a size change can rebuild the
     // button groups; 0 before the first updateBorders().
     qreal m_lastButtonSize = 0.0;

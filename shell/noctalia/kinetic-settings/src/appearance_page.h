@@ -61,7 +61,7 @@ public:
     return m_pendingDecoration.has_value() || m_pendingHideTitleBars.has_value()
         || m_pendingTitleBarHeight.has_value() || m_pendingTitleFontSize.has_value()
         || m_pendingButtonSize.has_value() || m_pendingButtonsOnLeft.has_value()
-        || m_pendingButtonsOnRight.has_value();
+        || m_pendingButtonsOnRight.has_value() || m_pendingShowTitle.has_value();
   }
   // Writes the staged titlebar selection and "Toggle title bars" state to
   // kineticwe.kwe and asks the compositor to reconfigure. Returns false on
@@ -77,6 +77,7 @@ public:
     m_pendingButtonSize.reset();
     m_pendingButtonsOnLeft.reset();
     m_pendingButtonsOnRight.reset();
+    m_pendingShowTitle.reset();
     m_errorNotice.clear();
   }
 
@@ -109,6 +110,7 @@ private:
   [[nodiscard]] static std::string buttonSizeKeyPath() { return "org.kde.kdecoration2.KineticButtonSize"; }
   [[nodiscard]] static std::string buttonsOnLeftKeyPath() { return "org.kde.kdecoration2.ButtonsOnLeft"; }
   [[nodiscard]] static std::string buttonsOnRightKeyPath() { return "org.kde.kdecoration2.ButtonsOnRight"; }
+  [[nodiscard]] static std::string showTitleKeyPath() { return "org.kde.kdecoration2.KineticShowTitle"; }
   [[nodiscard]] DecorationSelection fileBackedDecoration() const;
   [[nodiscard]] DecorationSelection effectiveDecoration() const;
   [[nodiscard]] bool overriddenDecoration() const;
@@ -149,6 +151,12 @@ private:
   [[nodiscard]] bool overriddenButtonsOnRight() const;
   void stageButtonsOnLeft(std::string value);
   void stageButtonsOnRight(std::string value);
+  // Whether the decoration paints the window caption text (KineticShowTitle;
+  // default on). An explicit default clears the pending edit on Apply.
+  [[nodiscard]] bool showTitleOnDisk() const;
+  [[nodiscard]] bool effectiveShowTitle() const;
+  [[nodiscard]] bool overriddenShowTitle() const;
+  void stageShowTitle(bool show);
   // Inserts (on) or removes (off) a single letter in a button string, preserving
   // the order of the other letters.
   [[nodiscard]] static std::string toggleButton(std::string_view current, char letter, bool on);
@@ -174,6 +182,7 @@ private:
   std::optional<int> m_pendingButtonSize;
   std::optional<std::string> m_pendingButtonsOnLeft;
   std::optional<std::string> m_pendingButtonsOnRight;
+  std::optional<bool> m_pendingShowTitle;
   // kineticwe.kwe reader/writer for the decoration keys.
   KineticweKwe m_decorationsConfig;
   CompositorDbus m_dbus;

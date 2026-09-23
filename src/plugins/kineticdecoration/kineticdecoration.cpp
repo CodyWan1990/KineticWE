@@ -82,6 +82,7 @@ void KineticDecoration::loadMetrics()
     m_titleBarHeight = height > 0 ? qBound(12, height, 200) : 0;
     m_titleFontPointSize = fontSize > 0 ? qBound(5, fontSize, 32) : 0;
     m_buttonSize = button > 0 ? qBound(8, button, 64) : 0;
+    m_showTitle = group.readEntry(QStringLiteral("KineticShowTitle"), true);
 }
 
 qreal KineticDecoration::buttonSize() const
@@ -306,7 +307,7 @@ void KineticDecoration::paint(QPainter *painter, const QRectF &repaintArea)
     const qreal leftGroup = m_leftButtons ? m_leftButtons->geometry().width() : 0.0;
     const qreal rightGroup = m_rightButtons ? m_rightButtons->geometry().width() : 0.0;
     const QRectF captionRect = titleBar().adjusted(leftGroup + padding * 2.0, 0.0, -(rightGroup + padding * 2.0), 0.0);
-    if (w && captionRect.width() > 0) {
+    if (w && m_showTitle && captionRect.width() > 0) {
         const QFontMetricsF fm(font);
         const QString elided = fm.elidedText(w->caption(), Qt::ElideMiddle, captionRect.width());
         painter->drawText(captionRect, Qt::AlignVCenter | Qt::AlignLeft, elided);
