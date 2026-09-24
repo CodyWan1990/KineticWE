@@ -173,6 +173,7 @@ Requires:       bash
 Requires:       systemd
 Requires:       procps-ng
 Requires:       psmisc
+Recommends:     xdg-user-dirs
 Recommends:     alacritty
 Recommends:     qt5ct
 Recommends:     qt6ct
