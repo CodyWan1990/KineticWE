@@ -24,7 +24,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        11%{?dist}
+Release:        12%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -240,6 +240,23 @@ tar xf %{SOURCE1} -C ../kglobalacceld --strip-components=1
 rm -rf ../kdecoration
 mkdir -p ../kdecoration
 tar xf %{SOURCE6} -C ../kdecoration --strip-components=1
+
+# Rebrand kdecoration translations so they coexist with Fedora's package.
+sed -i \
+    's/TRANSLATION_DOMAIN=\\"kdecoration\\"/TRANSLATION_DOMAIN=\\"kineticwe-decoration\\"/' \
+    ../kdecoration/src/CMakeLists.txt
+
+for po_file in ../kdecoration/po/*/kdecoration.po; do
+    [[ -e "${po_file}" ]] || continue
+    mv "${po_file}" "${po_file%/kdecoration.po}/kineticwe-decoration.po"
+done
+
+for po_file in ../kdecoration/po/*/kineticwe-decoration.po; do
+    [[ -e "${po_file}" ]] || continue
+    sed -i \
+        's/Project-Id-Version: kdecoration/Project-Id-Version: kineticwe-decoration/' \
+        "${po_file}"
+done
 
 rm -rf ../kconfig
 mkdir -p ../kconfig
