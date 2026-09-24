@@ -24,7 +24,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
