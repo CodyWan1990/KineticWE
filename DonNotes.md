@@ -2,7 +2,7 @@
 ## Add
 fonts
 Make it so window rules can pin an app to all desktops 
-add qt6-qttools for kineticwe layouts. 
+
 
 # Need attention
 Update Fullscreen animation to be off by default and remove the setting from animations 
@@ -21,3 +21,4 @@ FIX OVERVIEW WITH NEW CHANGES!!!!
 Change all desktop references to workspace
 tiltebar font settings
 Swap Scroll Modifier for the invert workspaces switching
+add qt6-qttools for kineticwe layouts.

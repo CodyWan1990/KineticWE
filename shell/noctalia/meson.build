@@ -1253,6 +1253,7 @@ if build_tests
     'ipc_service',
     'jxl_decoder',
     'kde_color_scheme',
+    'keybind_codec',
     'keyboard_layout_label',
     'lane_selection_token',
     'location_service',

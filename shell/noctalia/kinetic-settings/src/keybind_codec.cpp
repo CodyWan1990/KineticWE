@@ -289,6 +289,20 @@ constexpr std::uint32_t kXkbKpLast = XKB_KEY_KP_Equal;  // 0xffbd
   return it == kKeyDefs.end() ? nullptr : &*it;
 }
 
+// "F1".."F35" (case-insensitive) -> XKB function keysym. Mirrors the
+// "F<number>" form toChordString() emits; F-keys are not in kKeyDefs.
+[[nodiscard]] std::optional<std::uint32_t> functionKeySym(std::string_view name) noexcept {
+  if (name.size() < 2 || (name[0] != 'F' && name[0] != 'f')) {
+    return std::nullopt;
+  }
+  std::uint32_t value = 0;
+  const auto [ptr, ec] = std::from_chars(name.data() + 1, name.data() + name.size(), value);
+  if (ec != std::errc{} || ptr != name.data() + name.size() || value < 1 || value > kXkbFCount) {
+    return std::nullopt;
+  }
+  return kXkbF1 + (value - 1);
+}
+
 [[nodiscard]] std::string_view nameOfSym(std::uint32_t sym) noexcept {
   if (sym >= kXkbF1 && sym < kXkbF1 + kXkbFCount) {
     return {}; // handled by caller
@@ -449,6 +463,8 @@ std::optional<KeyChord> fromChordString(std::string_view spec) {
           sawKey = true;
           if (const auto* def = findByName(token); def != nullptr) {
             chord.sym = def->sym;
+          } else if (const auto fkey = functionKeySym(token); fkey.has_value()) {
+            chord.sym = *fkey;
           } else if (token.size() == 1 && token[0] >= 0x20 && token[0] <= 0x7e) {
             chord.sym = upperAscii(static_cast<std::uint32_t>(static_cast<unsigned char>(token[0])));
           } else if (const auto hex = parseHexKey(token); hex.has_value()) {
