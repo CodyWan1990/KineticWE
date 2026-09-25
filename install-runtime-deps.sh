@@ -98,6 +98,9 @@ DEFAULT_RPM_PKGS=(
     qt5ct
     qt6ct
     xorg-x11-server-Xwayland
+    # qdbus-qt6 lives in qt6-qttools; the Noctalia kineticwe-layouts plugin
+    # shells out to it to read/switch the compositor's /Tiling layouts.
+    qt6-qttools
     alacritty
 )
 

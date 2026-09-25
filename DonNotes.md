@@ -2,14 +2,14 @@
 ## Add
 fonts
 Make it so window rules can pin an app to all desktops 
+add qt6-qttools for kineticwe layouts. 
 
 # Need attention
 Update Fullscreen animation to be off by default and remove the setting from animations 
-tiltebar font settings
 Virtual keyboard
 
 
-Swap Scroll Modifier for the invert workspaces switching 
+ 
 
 # Completed
 power managerment 
@@ -19,3 +19,5 @@ Toggle Float ALL Keybind | Per desktop as well.
 UPDATE KEYBINDS TO KWEBINDS!!! MOST IMPORTANT CHANGE!!! PRIORITY 1!!!
 FIX OVERVIEW WITH NEW CHANGES!!!!
 Change all desktop references to workspace
+tiltebar font settings
+Swap Scroll Modifier for the invert workspaces switching

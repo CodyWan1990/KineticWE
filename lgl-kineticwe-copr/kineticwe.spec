@@ -24,7 +24,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        12%{?dist}
+Release:        13%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -210,6 +210,9 @@ started in a KineticWE session.
 %package -n kineticwe-noctalia
 Summary:        Noctalia fork shell for KineticWE (noctalia-kwe)
 License:        MIT AND BSD-3-Clause AND CC0-1.0
+# qdbus-qt6 (from qt6-qttools) is used at runtime by the Noctalia
+# kineticwe-layouts plugin to read/switch the compositor's /Tiling layouts.
+Requires:       qt6-qttools
 
 %description -n kineticwe-noctalia
 The Noctalia v5 shell fork for KineticWE, vendored at shell/noctalia and
@@ -532,6 +535,10 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Thu Sep 24 2026 LGL <lgl@localhost> - 0.0.1-13
+- Require qt6-qttools so qdbus-qt6 is present at runtime for the Noctalia
+  kineticwe-layouts plugin (bar layout indicator/switcher).
+
 * Wed Sep 23 2026 LGL <lgl@localhost> - 0.0.1-10
 - Search both KineticWE and KWin data namespaces when discovering desktop effects.
 - Add json-devel as a build dependency for Kinetic Settings.
