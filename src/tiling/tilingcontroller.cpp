@@ -1946,6 +1946,11 @@ void TilingController::onWindowMoveFinished(Window *window)
     if (layoutEngineForWindow(window)) {
         return;
     }
+    // The window is detached from every engine (e.g. an earlier interactive
+    // resize freed it via Tile::unmanage()). Drop any orphaned empty leaf the
+    // detach left behind before re-adding, otherwise addWindowToLayout() would
+    // create a second leaf and the stale one would linger as a ghost tile.
+    removeWindowFromLayouts(window);
     LogicalOutput *output = window->output() ? window->output() : m_workspace->activeOutput();
     VirtualDesktop *desktop = window->desktops().isEmpty()
         ? VirtualDesktopManager::self()->currentDesktop(output)
@@ -2497,6 +2502,21 @@ void TilingController::endInteractiveResize(Window *window, const RectF &finalGe
     }
     ResizeContext context = it.value();
     m_activeResizes.erase(it);
+
+    // An interactive resize can detach the window from its leaf: when the user
+    // grabs a handle that would push past the output edge,
+    // CustomTile::supportsResizeGravity() returns false and
+    // Window::updateInteractiveMoveResize() calls
+    // setQuickTileModeAtCurrentPosition(None) -> Tile::unmanage(). That removes
+    // the window from its leaf but leaves the now-empty leaf in the engine, so
+    // reflow() keeps reserving its slot — and every later move/resize that
+    // re-adds the window leaves a ghost tile behind. Prune the orphaned leaf now
+    // so the layout reflows to fill the freed space immediately.
+    if (!layoutEngineForWindow(window)) {
+        removeWindowFromLayouts(window);
+        updateBorders();
+        return;
+    }
 
     if (!context.engine || !context.engine->supportsPerTileResize()) {
         return;

@@ -159,6 +159,15 @@ private:
   // the daemon and drops its definition, then reloads and rebuilds.
   void removeCustomAction(const std::string& component, const std::string& action, const Callbacks& callbacks);
 
+  // The persisted definition backing a custom-command action, or nullptr when
+  // the action is not a stored custom command. Used to render the editable
+  // command line and its one-click copy.
+  [[nodiscard]] const CustomKeybinds::Definition* findCustomCommand(std::string_view action) const;
+  // Persists an edited custom-command action (re-registering it under the new
+  // friendly name) and rebuilds. An empty command is ignored so the row falls
+  // back to the committed value.
+  void updateCustomCommand(const std::string& action, const std::string& command, const Callbacks& callbacks);
+
   // "Add Application" / "Add Custom Command" flows.
   [[nodiscard]] std::unique_ptr<Node> buildAddMenu(float scale, const Callbacks& callbacks);
   [[nodiscard]] std::unique_ptr<Node> buildAppPicker(float scale, const Callbacks& callbacks);

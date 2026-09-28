@@ -48,6 +48,12 @@ public:
   [[nodiscard]] bool addApp(const std::string& appId, const std::string& friendlyName, const std::string& exec);
   [[nodiscard]] bool addCommand(const std::string& command);
 
+  // Replaces a command action's stored shell line (and the friendly name the
+  // page displays) in place, re-registering it so the daemon picks up the new
+  // name while keeping the action's bound chords. Returns false for an unknown
+  // action or an empty command.
+  [[nodiscard]] bool updateCommand(std::string_view action, const std::string& command);
+
   // Unregisters the action from the daemon and drops its definition (and its
   // mirror entry, if any).
   [[nodiscard]] bool remove(std::string_view component, std::string_view action);

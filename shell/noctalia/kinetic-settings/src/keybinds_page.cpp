@@ -764,11 +764,52 @@ void KeybindsPage::buildActionRow(
       .gap = Style::spaceSm * scale,
       .fillWidth = true,
   });
-  titleRow->addChild(makeLabel(
-      displayActionName(component, action), Style::fontSizeBody * scale,
-      colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
-  ));
-  titleRow->addChild(ui::spacer());
+  if (component.uniqueName == CustomKeybinds::kCommandsComponent) {
+    // Custom commands are user-owned shell lines: edit the command in place
+    // and copy it with one click. The stored definition is the source of truth
+    // (its friendly name is what the rest of the page shows); fall back to the
+    // daemon's name when the definition is missing.
+    const auto* definition = findCustomCommand(action.actionUnique);
+    const std::string command = definition != nullptr ? definition->command : displayActionName(component, action);
+    Input* commandInput = nullptr;
+    titleRow->addChild(ui::input({
+        .out = &commandInput,
+        .value = command,
+        .placeholder = i18n::tr("settings.keybinds.command-placeholder"),
+        .fontSize = Style::fontSizeBody * scale,
+        .controlHeight = Style::controlHeight * scale,
+        .horizontalPadding = Style::spaceSm * scale,
+        .flexGrow = 1.0F,
+        .onSubmit =
+            [this, actionId = action.actionUnique, callbacks](const std::string& value) {
+              updateCustomCommand(actionId, value, callbacks);
+            },
+        .submitOnFocusLoss = true,
+    }));
+    titleRow->addChild(ui::button({
+        .glyph = "copy",
+        .fontSize = Style::fontSizeCaption * scale,
+        .glyphSize = Style::fontSizeBody * scale,
+        .variant = ButtonVariant::Ghost,
+        .tooltip = i18n::tr("settings.keybinds.copy-command"),
+        .minWidth = Style::controlHeight * scale,
+        .minHeight = Style::controlHeight * scale,
+        .padding = Style::spaceXs * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .onClick =
+            [commandInput]() {
+              if (commandInput != nullptr) {
+                Input::copyToClipboard(commandInput->value());
+              }
+            },
+    }));
+  } else {
+    titleRow->addChild(makeLabel(
+        displayActionName(component, action), Style::fontSizeBody * scale,
+        colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+    ));
+    titleRow->addChild(ui::spacer());
+  }
   if (isOverridden) {
     titleRow->addChild(makeOverrideBadge(scale));
   }
@@ -780,6 +821,28 @@ void KeybindsPage::buildActionRow(
 
 bool KeybindsPage::isCustomComponent(std::string_view component) {
   return component == CustomKeybinds::kAppsComponent || component == CustomKeybinds::kCommandsComponent;
+}
+
+const CustomKeybinds::Definition* KeybindsPage::findCustomCommand(std::string_view action) const {
+  const auto& definitions = m_customKeybinds.definitions();
+  const auto it = std::ranges::find_if(definitions, [action](const CustomKeybinds::Definition& definition) {
+    return definition.component == CustomKeybinds::kCommandsComponent && definition.action == action;
+  });
+  return it == definitions.end() ? nullptr : &*it;
+}
+
+void KeybindsPage::updateCustomCommand(
+    const std::string& action, const std::string& command, const Callbacks& callbacks
+) {
+  // Persist the edit (re-registering under the new friendly name) and drop the
+  // cached component list so the row shows the new text. An empty command is
+  // ignored; the rebuild restores the committed value.
+  if (!command.empty() && m_customKeybinds.updateCommand(action, command)) {
+    m_loaded = false;
+  }
+  if (callbacks.requestRebuild) {
+    callbacks.requestRebuild();
+  }
 }
 
 void KeybindsPage::removeCustomAction(

@@ -275,6 +275,25 @@ bool CustomKeybinds::addCommand(const std::string& command) {
   return save();
 }
 
+bool CustomKeybinds::updateCommand(std::string_view action, const std::string& command) {
+  const auto it = std::ranges::find_if(m_definitions, [&](const Definition& d) {
+    return d.component == kCommandsComponent && d.action == action;
+  });
+  if (it == m_definitions.end() || command.empty()) {
+    return false;
+  }
+  if (it->friendlyName == command && it->command == command) {
+    return true;
+  }
+  // The command line is both what runs and what the page displays (the daemon's
+  // action friendly name). Re-register so doRegister updates the existing
+  // action's friendly name in place; its bound chords are untouched.
+  it->friendlyName = command;
+  it->command = command;
+  registerAction(*it);
+  return save();
+}
+
 bool CustomKeybinds::remove(std::string_view component, std::string_view action) {
   const auto it = std::ranges::find_if(m_definitions, [&](const Definition& d) {
     return d.component == component && d.action == action;
