@@ -87,7 +87,14 @@ _KWE_LIBDIRS=()
 for _d in "$INSTALL_PREFIX/lib64" "$INSTALL_PREFIX/lib" "$INSTALL_PREFIX/lib/x86_64-linux-gnu"; do
     [[ -d "$_d" ]] && _KWE_LIBDIRS+=("$_d")
 done
-export LD_LIBRARY_PATH="$(IFS=:; echo "${_KWE_LIBDIRS[*]}")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# KWE_SCOPED_ENV=1: for prefix builds whose Qt/KF6 differ from the distro's
+# (e.g. Debian stable). The prefix paths below are then NOT exported to the
+# session -- distro Qt apps would otherwise load the prefix's libraries/QML
+# and fail. Our binaries find their libraries via RUNPATH; kinetic-we gets its
+# plugin/QML dirs in-process from KWE_QT_PLUGIN_PATH / KWE_QML_IMPORT_PATH.
+if [[ "${KWE_SCOPED_ENV:-0}" != 1 ]]; then
+    export LD_LIBRARY_PATH="$(IFS=:; echo "${_KWE_LIBDIRS[*]}")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 
 # Qt plugin roots. KWin discovers its plugins (including the screencast plugin
 # that exports zkde_screencast_unstable_v1 -- required for portal screen
@@ -99,7 +106,11 @@ _qt_plugin_paths=()
 for _d in "${_KWE_LIBDIRS[@]}"; do
     _qt_plugin_paths+=("$_d/qt6/plugins" "$_d/plugins")
 done
-export QT_PLUGIN_PATH="$(IFS=:; echo "${_qt_plugin_paths[*]}")"
+if [[ "${KWE_SCOPED_ENV:-0}" == 1 ]]; then
+    export KWE_QT_PLUGIN_PATH="$(IFS=:; echo "${_qt_plugin_paths[*]}")"
+else
+    export QT_PLUGIN_PATH="$(IFS=:; echo "${_qt_plugin_paths[*]}")"
+fi
 
 # QML import roots. ECM installs KWin's private QML modules
 # (org.kde.kwin.private.effects -- WindowHeap/WindowHeapDelegate, imported by
@@ -115,8 +126,12 @@ _qml_import_paths=()
 for _d in "${_KWE_LIBDIRS[@]}"; do
     _qml_import_paths+=("$_d/qml" "$_d/qt6/qml")
 done
-export QML_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")"
-export QML2_IMPORT_PATH="$QML_IMPORT_PATH"
+if [[ "${KWE_SCOPED_ENV:-0}" == 1 ]]; then
+    export KWE_QML_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")"
+else
+    export QML_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")"
+    export QML2_IMPORT_PATH="$QML_IMPORT_PATH"
+fi
 unset _qt_plugin_paths _qml_import_paths _KWE_LIBDIRS _d
 export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 # Traditional-WM Qt theming (Hyprland/Niri style): tell Qt apps to load the
@@ -1133,12 +1148,19 @@ done
 # WAYLAND_DISPLAY/DISPLAY and without QT_QPA_PLATFORMTHEME and fall back to the
 # unthemed default Qt style. systemctl is always present; dbus-update-activation-environment lives
 # in dbus-tools, which is not a hard dependency.
+_kwe_prefix_env_vars=(QT_PLUGIN_PATH QML_IMPORT_PATH QML2_IMPORT_PATH LD_LIBRARY_PATH)
+if [[ "${KWE_SCOPED_ENV:-0}" == 1 ]]; then
+    # Keep the prefix paths out of the user manager, including stale values
+    # left by an earlier unscoped login.
+    systemctl --user unset-environment "${_kwe_prefix_env_vars[@]}" 2>/dev/null || true
+    _kwe_prefix_env_vars=()
+fi
 systemctl --user import-environment \
     WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
     XDG_SESSION_TYPE XDG_DATA_DIRS \
-    QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QML_IMPORT_PATH QML2_IMPORT_PATH \
-    LD_LIBRARY_PATH PATH \
+    QT_QPA_PLATFORMTHEME "${_kwe_prefix_env_vars[@]}" PATH \
     2>/dev/null || true
+unset _kwe_prefix_env_vars
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
     dbus-update-activation-environment --systemd --all 2>/dev/null || true
 fi

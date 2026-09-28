@@ -313,6 +313,13 @@ int main(int argc, char *argv[])
     qunsetenv("QT_QPA_PLATFORM");
     qunsetenv("QT_NO_XDG_DESKTOP_PORTAL");
 
+    // KineticWE: plugin dirs of a prefix install, passed by start-kineticwe.sh
+    // (KWE_SCOPED_ENV=1) instead of QT_PLUGIN_PATH so children don't inherit them.
+    const QStringList kwePluginPaths = qEnvironmentVariable("KWE_QT_PLUGIN_PATH").split(QLatin1Char(':'), Qt::SkipEmptyParts);
+    for (auto it = kwePluginPaths.crbegin(); it != kwePluginPaths.crend(); ++it) {
+        QCoreApplication::addLibraryPath(*it);
+    }
+
     KSignalHandler::self()->watchSignal(SIGTERM);
     KSignalHandler::self()->watchSignal(SIGINT);
     KSignalHandler::self()->watchSignal(SIGHUP);

@@ -631,6 +631,13 @@ KWin::Scripting::Scripting(QObject *parent)
     , m_declarativeScriptSharedContext(new QQmlContext(m_qmlEngine, this))
     , m_workspaceWrapper(new QtScriptWorkspaceWrapper(this))
 {
+    // KineticWE: QML dirs of a prefix install, passed by start-kineticwe.sh
+    // (KWE_SCOPED_ENV=1) instead of QML_IMPORT_PATH so children don't inherit them.
+    const QStringList kweQmlPaths = qEnvironmentVariable("KWE_QML_IMPORT_PATH").split(QLatin1Char(':'), Qt::SkipEmptyParts);
+    for (auto it = kweQmlPaths.crbegin(); it != kweQmlPaths.crend(); ++it) {
+        m_qmlEngine->addImportPath(*it);
+    }
+
     // For plain JavaScript extensions. There's no Rect factory function, we accept any object
     // with x, y, width, and height properties as rects.
     if (!QMetaType::hasRegisteredConverterFunction<QJSValue, Rect>()) {

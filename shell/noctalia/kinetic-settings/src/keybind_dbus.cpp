@@ -112,7 +112,7 @@ std::vector<KeybindDbus::Component> KeybindDbus::components() {
         component.friendlyName = proxy->getProperty("friendlyName").onInterface(kComponentInterface).get<std::string>();
         std::vector<ShortcutInfo> infos;
         proxy->callMethod("allShortcutInfos").onInterface(kComponentInterface).storeResultsTo(infos);
-        kLog.debug("kglobalaccel: {} -> {} action(s)", path, infos.size());
+        kLog.debug("kglobalaccel: {} -> {} action(s)", path.c_str(), infos.size());
         for (const auto& info : infos) {
           KeybindDbus::Action action;
           action.actionUnique = info.get<0>();
@@ -123,7 +123,7 @@ std::vector<KeybindDbus::Component> KeybindDbus::components() {
         }
         result.push_back(std::move(component));
       } catch (const sdbus::Error& e) {
-        kLog.warn("kglobalaccel: component {} failed: {}", path, e.what());
+        kLog.warn("kglobalaccel: component {} failed: {}", path.c_str(), e.what());
       }
     }
   } catch (const sdbus::Error& e) {
