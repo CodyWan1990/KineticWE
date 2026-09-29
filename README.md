@@ -85,13 +85,7 @@ systemctl reboot
 
 The fastest way to install KineticWE on Arch-based distros (Arch, CachyOS, EndeavourOS, Manjaro, etc.) is the pre-built binary repo hosted on GitLab Pages — no compiling needed.
 
-The repo only ships the `kineticwe` package itself; its shell dependency `noctalia-git` comes from the AUR, so install that first with your AUR helper:
-
-```bash
-paru -S noctalia-git   # or: yay -S noctalia-git
-```
-
-Then add the repo to `/etc/pacman.conf` (e.g. `sudo nano /etc/pacman.conf`):
+Add the repo to `/etc/pacman.conf` (e.g. `sudo nano /etc/pacman.conf`):
 
 ```ini
 [kineticwe]
@@ -105,13 +99,33 @@ and install:
 sudo pacman -Sy kineticwe
 ```
 
-#### AUR (alternative)
+This also pulls in the `xdg-desktop-portal-kwe` portal backend and the `kineticwe-noctalia` shell.
 
-If you prefer to build from source, the [AUR package](https://aur.archlinux.org/packages/kineticwe) remains available — the AUR helper resolves `noctalia-git` automatically:
+Optionally, install the Noctalia greeter (greetd) and run its interactive setup (it asks for `sudo` itself when needed):
 
 ```bash
-yay -S kineticwe
+sudo pacman -S kineticwe-greeter
+kineticwe-setup-greeter
 ```
+
+#### Build from source
+
+To build the split packages (`kineticwe`, `xdg-desktop-portal-kwe`, `kineticwe-noctalia`, `kineticwe-greeter`) from your working tree and install them with pacman:
+
+```bash
+./build-arch-native.sh
+```
+
+For a development loop, the same script can instead install into `~/.local`:
+
+```bash
+./build-arch-native.sh --binary     # compositor, portal and shell
+./build-arch-native.sh --kwin-only  # compositor only (no portal/shell)
+./build-arch-native.sh --noct-only  # Noctalia shell only
+./build-arch-native.sh --full       # everything, and also builds + activates the greeter
+```
+
+> **Note:** KWin uses Qt private APIs, so a source build is tied to the exact Qt version it was built against. After every Arch Qt update, rebuild (the binary repo is rebuilt automatically for this).
 
 ### NixOS / Nix
 
