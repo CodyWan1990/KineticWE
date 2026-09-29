@@ -4,6 +4,7 @@
 #include "core/process/process.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
+#include "ini_config.h"
 #include "render/core/renderer.h"
 #include "render/core/texture_manager.h"
 #include "theme/kde_color_scheme.h"
@@ -69,6 +70,111 @@ namespace {
       return std::filesystem::path(home) / ".config";
     }
     return std::filesystem::path(".");
+  }
+
+  // The user's real home ($HOME), used for paths XDG does not cover (the
+  // traditional ~/.icons cursor theme root).
+  [[nodiscard]] std::filesystem::path realHome() {
+    if (const char* home = std::getenv("HOME"); home != nullptr && *home != '\0') {
+      return std::filesystem::path(home);
+    }
+    return std::filesystem::path(".");
+  }
+
+  // X11/Xwayland (libXcursor), GTK and xsettingsd each keep their own copy of
+  // the cursor theme; update them all so apps that do not consult the
+  // compositor or gsettings (e.g. Steam) follow the selection. Best effort: a
+  // read-only or hand-edited file must not fail the whole Apply.
+  void syncCursorFallbackFiles(std::string_view theme, int size, const std::filesystem::path& configHome) {
+    const std::string themeValue(theme);
+    const std::string sizeValue = std::to_string(size);
+    const auto report = [](const char* label, const std::string& message) {
+      kLog.warn("kinetic-settings: failed to update {} cursor setting: {}", label, message);
+    };
+
+    // kcminputrc: the X11/KDE input config (Xwayland and KDE consumers read it).
+    {
+      const auto path = configHome / "kcminputrc";
+      std::string err;
+      if (themeValue.empty()) {
+        if (!kinetic_settings::setKey(path, "Mouse", "cursorTheme", "", false, &err)) {
+          report("kcminputrc", err);
+        }
+      } else if (!kinetic_settings::setKey(path, "Mouse", "cursorTheme", themeValue, true, &err)) {
+        report("kcminputrc", err);
+      }
+      err.clear();
+      if (!kinetic_settings::setKey(path, "Mouse", "cursorSize", sizeValue, true, &err)) {
+        report("kcminputrc", err);
+      }
+    }
+
+    // ~/.icons/default/index.theme: libXcursor's "default" theme — what Xwayland
+    // apps (Steam) resolve when XCURSOR_THEME is unset.
+    {
+      const auto path = realHome() / ".icons" / "default" / "index.theme";
+      std::string err;
+      if (themeValue.empty()) {
+        if (!kinetic_settings::setKey(path, "Icon Theme", "Inherits", "", false, &err)) {
+          report("~/.icons/default/index.theme", err);
+        }
+      } else if (!kinetic_settings::setKey(path, "Icon Theme", "Inherits", themeValue, true, &err)) {
+        report("~/.icons/default/index.theme", err);
+      }
+    }
+
+    // GTK 3/4 read the cursor from their settings.ini; gsettings covers distros
+    // with the schema installed, the ini is the reliable fallback.
+    for (const char* tool : {"gtk-3.0", "gtk-4.0"}) {
+      const auto path = configHome / tool / "settings.ini";
+      std::string err;
+      if (themeValue.empty()) {
+        if (!kinetic_settings::setKey(path, "Settings", "gtk-cursor-theme-name", "", false, &err)) {
+          report(tool, err);
+        }
+      } else if (!kinetic_settings::setKey(path, "Settings", "gtk-cursor-theme-name", themeValue, true, &err)) {
+        report(tool, err);
+      }
+      err.clear();
+      if (!kinetic_settings::setKey(path, "Settings", "gtk-cursor-theme-size", sizeValue, true, &err)) {
+        report(tool, err);
+      }
+    }
+
+    // xsettingsd: the XSETTINGS properties X11 GTK apps read.
+    {
+      const auto path = configHome / "xsettingsd" / "xsettingsd.conf";
+      std::string err;
+      if (themeValue.empty()) {
+        if (!kinetic_settings::setFlatKey(path, "Gtk/CursorThemeName", "", " ", true, false, &err)) {
+          report("xsettingsd.conf", err);
+        }
+      } else if (!kinetic_settings::setFlatKey(path, "Gtk/CursorThemeName", themeValue, " ", true, true, &err)) {
+        report("xsettingsd.conf", err);
+      }
+      err.clear();
+      if (!kinetic_settings::setFlatKey(path, "Gtk/CursorThemeSize", sizeValue, " ", false, true, &err)) {
+        report("xsettingsd.conf", err);
+      }
+    }
+
+    // environment.d: XCURSOR_THEME/XCURSOR_SIZE for GUI apps started by the
+    // systemd user session (takes effect at next login).
+    {
+      const auto path = configHome / "environment.d" / "90-cursor.conf";
+      std::string err;
+      if (themeValue.empty()) {
+        if (!kinetic_settings::setFlatKey(path, "XCURSOR_THEME", "", "=", false, false, &err)) {
+          report("environment.d", err);
+        }
+      } else if (!kinetic_settings::setFlatKey(path, "XCURSOR_THEME", themeValue, "=", false, true, &err)) {
+        report("environment.d", err);
+      }
+      err.clear();
+      if (!kinetic_settings::setFlatKey(path, "XCURSOR_SIZE", sizeValue, "=", false, true, &err)) {
+        report("environment.d", err);
+      }
+    }
   }
 
   [[nodiscard]] std::unique_ptr<Button> makeResetButton(
@@ -238,6 +344,15 @@ bool CursorsPage::applyTheme(std::string_view theme, int size, std::string* erro
     return false;
   }
 
+  // The merge above only ever writes keys; clear a stale cursorTheme override
+  // when the user reverts to the system default.
+  if (theme.empty()) {
+    std::string removeError;
+    if (!kinetic_settings::setKey(kdeGlobals, "KDE", "cursorTheme", "", false, &removeError)) {
+      kLog.warn("kinetic-settings: failed to clear the kdeglobals cursor theme: {}", removeError);
+    }
+  }
+
   // 3. Notify KGlobalSettings (type 5 = CursorChanged) so the compositor
   // re-reads its config and swaps the cursor live.
   if (const std::string notifyError = noctalia::theme::notifyKdeChange(5, 0); !notifyError.empty()) {
@@ -260,6 +375,10 @@ bool CursorsPage::applyTheme(std::string_view theme, int size, std::string* erro
     }
     (void)process::runAsync("dconf write /org/gnome/desktop/interface/cursor-size " + std::to_string(size));
   }
+
+  // 5. X11/Xwayland, GTK ini and xsettingsd copies, so apps that bypass the
+  // compositor/gsettings (notably Steam under Xwayland) follow the selection.
+  syncCursorFallbackFiles(theme, size, realConfigHome());
 
   return true;
 }

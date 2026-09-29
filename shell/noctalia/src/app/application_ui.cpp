@@ -765,7 +765,7 @@ void Application::initNotificationAndOsd() {
   TooltipManager::instance().initialize(m_wayland, &m_configService, &m_renderContext);
   m_osdOverlay.initialize(m_wayland, &m_configService, &m_renderContext);
   m_windowSwitcher.initialize(
-      m_wayland, &m_renderContext, m_compositorPlatform, &m_configService, &m_asyncTextureCache
+      m_wayland, &m_renderContext, m_compositorPlatform, &m_configService, &m_asyncTextureCache, m_bus.get()
   );
   m_configService.addReloadCallback([this]() { m_windowSwitcher.onConfigReload(); });
   m_configService.addReloadCallback([this]() { m_osdOverlay.onConfigReload(); });

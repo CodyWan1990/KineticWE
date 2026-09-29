@@ -1,5 +1,6 @@
 #pragma once
 
+#include "capture/toplevel_thumbnail_source.h"
 #include "shell/switcher/window_switcher_tile.h"
 #include "system/icon_resolver.h"
 #include "wayland/wayland_seat.h"
@@ -16,7 +17,8 @@ class CompositorPlatform;
 class ConfigService;
 class IpcService;
 class RenderContext;
-class ToplevelThumbnailCapture;
+class SessionBus;
+class ToplevelThumbnailSource;
 class WaylandConnection;
 struct wl_output;
 
@@ -28,7 +30,7 @@ public:
 
   void initialize(
       WaylandConnection& wayland, RenderContext* renderContext, CompositorPlatform& platform, ConfigService* config,
-      AsyncTextureCache* asyncTextures
+      AsyncTextureCache* asyncTextures, SessionBus* sessionBus
   );
   void registerIpc(IpcService& ipc);
   void onConfigReload();
@@ -44,6 +46,8 @@ private:
   struct Instance;
 
   void hide();
+  void finishClose();
+  void cancelCloseAnimation();
   void refreshWindows();
   void setSelectedIndex(std::size_t index);
   void cycleSelection(int delta);
@@ -78,12 +82,13 @@ private:
   std::vector<WindowSwitcherEntry> m_windows;
   struct ThumbnailRequest {
     std::string windowKey;
-    std::uintptr_t captureHandle = 0;
+    ToplevelCaptureSource source;
   };
-  std::unique_ptr<ToplevelThumbnailCapture> m_thumbnailCapture;
+  std::unique_ptr<ToplevelThumbnailSource> m_thumbnailCapture;
   std::deque<ThumbnailRequest> m_thumbnailQueue;
   std::deque<std::string> m_mruKeys;
   std::size_t m_selectedIndex = 0;
   wl_output* m_output = nullptr;
+  bool m_closing = false;
   bool m_active = false;
 };

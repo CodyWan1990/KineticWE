@@ -1,10 +1,10 @@
 #include "icons_page.h"
 
-#include "config/atomic_file.h"
 #include "core/log.h"
 #include "core/process/process.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
+#include "ini_config.h"
 #include "render/core/renderer.h"
 #include "theme/kde_color_scheme.h"
 #include "theme_discovery.h"
@@ -65,97 +65,6 @@ namespace {
       return std::filesystem::path(home) / ".config";
     }
     return std::filesystem::path(".");
-  }
-
-  // Sets `key` in the `[section]` of an INI-style config file (qt5ct/qt6ct),
-  // preserving every other line. A missing file is left alone (the session
-  // script seeds the tool configs on first run) and an unchanged value means no
-  // write, so this is safe to run on every Apply.
-  [[nodiscard]] bool updateIniKey(
-      const std::filesystem::path& path, std::string_view section, std::string_view key, std::string_view value,
-      std::string* error
-  ) {
-    std::error_code ec;
-    if (!std::filesystem::is_regular_file(path, ec)) {
-      return true;
-    }
-    std::ifstream in(path);
-    if (!in) {
-      if (error != nullptr) {
-        *error = "failed to read " + path.string();
-      }
-      return false;
-    }
-
-    const std::string wanted = std::string(key) + '=' + std::string(value);
-    bool inSection = false;
-    bool found = false;
-    bool changed = false;
-    std::vector<std::string> out;
-    // Append the key at the end of the section, keeping its trailing blank lines
-    // where they were.
-    const auto flushMissing = [&]() {
-      std::vector<std::string> trailing;
-      while (!out.empty() && StringUtils::trim(out.back()).empty()) {
-        trailing.push_back(std::move(out.back()));
-        out.pop_back();
-      }
-      out.push_back(wanted);
-      changed = true;
-      for (auto it = trailing.rbegin(); it != trailing.rend(); ++it) {
-        out.push_back(std::move(*it));
-      }
-    };
-    for (std::string line; std::getline(in, line);) {
-      if (!line.empty() && line.back() == '\r') {
-        line.pop_back();
-      }
-      const std::string trimmed = StringUtils::trim(line);
-      if (trimmed.size() >= 2 && trimmed.front() == '[' && trimmed.back() == ']') {
-        if (inSection && !found) {
-          flushMissing();
-          found = true;
-        }
-        inSection = std::string_view(trimmed).substr(1, trimmed.size() - 2) == section;
-        out.push_back(std::move(line));
-        continue;
-      }
-      if (inSection && !found && !trimmed.empty() && trimmed.front() != '#') {
-        const std::size_t equals = trimmed.find('=');
-        if (equals != std::string::npos) {
-          const std::string name = StringUtils::trim(std::string_view(trimmed).substr(0, equals));
-          if (std::string_view(name) == key) {
-            found = true;
-            if (trimmed != wanted) {
-              out.push_back(wanted);
-              changed = true;
-              continue;
-            }
-          }
-        }
-      }
-      out.push_back(std::move(line));
-    }
-    if (inSection && !found) {
-      flushMissing();
-    }
-    if (!changed) {
-      return true;
-    }
-
-    std::string content;
-    content.reserve(out.size() * 32);
-    for (const std::string& line : out) {
-      content += line;
-      content += '\n';
-    }
-    if (!writeTextFileAtomic(path, content)) {
-      if (error != nullptr) {
-        *error = "failed to write " + path.string();
-      }
-      return false;
-    }
-    return true;
   }
 
   // A preview icon for a theme: tries a few well-known names so themes that
@@ -303,7 +212,7 @@ bool IconsPage::applyTheme(std::string_view theme, std::string* error) {
   for (const std::string_view tool : {"qt5ct", "qt6ct"}) {
     const std::filesystem::path config = realConfigHome() / std::string(tool) / (std::string(tool) + ".conf");
     std::string iniError;
-    if (!updateIniKey(config, "Appearance", "icon_theme", theme, &iniError)) {
+    if (!kinetic_settings::setKey(config, "Appearance", "icon_theme", theme, false, &iniError)) {
       kLog.warn("kinetic-settings: failed to sync the {} icon theme: {}", tool, iniError);
     }
   }

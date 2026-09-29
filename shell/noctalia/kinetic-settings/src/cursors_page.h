@@ -18,9 +18,11 @@ class Renderer;
 // and lets the user pick the theme (and its size) to apply. Persists to
 // appearance.kwe ([Appearance] CursorTheme / CursorSize) and, on Apply, writes
 // the choice into the compositor's kineticwe.kwe ([Mouse] cursorTheme /
-// cursorSize — what KWin actually reads) plus kdeglobals and gsettings so Qt,
-// KDE and GTK apps pick it up, and notifies KGlobalSettings (type 5 =
-// CursorChanged) so the compositor reloads the cursor live.
+// cursorSize — what KWin actually reads), kdeglobals, gsettings/dconf, and the
+// X11/Xwayland + GTK fallbacks (kcminputrc, ~/.icons/default/index.theme, GTK
+// 3/4 settings.ini, xsettingsd.conf, environment.d/90-cursor.conf) so Qt, KDE,
+// GTK and Xwayland apps (e.g. Steam) pick it up. Notifies KGlobalSettings
+// (type 5 = CursorChanged) so the compositor reloads the cursor live.
 //
 // Like the other pages, edits are STAGED. An empty theme (the "System default"
 // tile) clears the override; the size still applies.

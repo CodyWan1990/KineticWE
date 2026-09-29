@@ -1,5 +1,6 @@
 #include "shell/switcher/window_switcher.h"
 
+#include "capture/kwin_thumbnail_capture.h"
 #include "capture/toplevel_thumbnail_capture.h"
 #include "compositors/compositor_detect.h"
 #include "compositors/compositor_platform.h"
@@ -11,6 +12,7 @@
 #include "core/input/keybind_matcher.h"
 #include "core/log.h"
 #include "core/ui_phase.h"
+#include "dbus/session_bus.h"
 #include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
 #include "render/animation/animation_manager.h"
@@ -589,6 +591,7 @@ struct WindowSwitcher::Instance {
   InputDispatcher inputDispatcher;
   WindowSwitcherStyleLayout styleLayout;
   AnimationManager::Id carouselAnimId = 0;
+  AnimationManager::Id closeAnimId = 0;
   bool contentSyncPending = false;
   bool pointerInside = false;
   bool revealStarted = false;
@@ -600,14 +603,21 @@ struct WindowSwitcher::Instance {
 
 void WindowSwitcher::initialize(
     WaylandConnection& wayland, RenderContext* renderContext, CompositorPlatform& platform, ConfigService* config,
-    AsyncTextureCache* asyncTextures
+    AsyncTextureCache* asyncTextures, SessionBus* sessionBus
 ) {
   m_wayland = &wayland;
   m_renderContext = renderContext;
   m_platform = &platform;
   m_config = config;
   m_asyncTextures = asyncTextures;
-  m_thumbnailCapture = std::make_unique<ToplevelThumbnailCapture>(wayland);
+  // KWin exposes no ext-foreign-toplevel / ext-image-copy-capture, so thumbnails
+  // come from org.kde.KWin.ScreenShot2 using the internal window UUIDs the KWin
+  // script integration reports.
+  if (compositors::isKde() && sessionBus != nullptr) {
+    m_thumbnailCapture = std::make_unique<KwinThumbnailCapture>(*sessionBus);
+  } else {
+    m_thumbnailCapture = std::make_unique<ToplevelThumbnailCapture>(wayland);
+  }
 }
 
 void WindowSwitcher::registerIpc(IpcService& ipc) {
@@ -707,6 +717,7 @@ void WindowSwitcher::show(wl_output* output) {
     return;
   }
 
+  cancelCloseAnimation();
   const bool wasActive = m_active;
   const bool outputChanged = output != m_output;
   if (!wasActive) {
@@ -743,16 +754,79 @@ void WindowSwitcher::show(wl_output* output) {
 }
 
 void WindowSwitcher::hide() {
+  if (m_closing) {
+    return;
+  }
   if (!m_active && m_instance == nullptr) {
     return;
   }
 
+  cancelThumbnailCaptures();
+  if (m_instance == nullptr || m_instance->panel == nullptr || m_instance->dimmer == nullptr) {
+    m_active = false;
+    m_output = nullptr;
+    m_windows.clear();
+    m_selectedIndex = 0;
+    destroySurface();
+    return;
+  }
+
+  // Fade the overlay out before tearing it down so the close matches the subtle
+  // open cross-fade instead of the compositor's window close animation.
   m_active = false;
+  m_closing = true;
+  if (m_instance->closeAnimId != 0) {
+    m_instance->animations.cancel(m_instance->closeAnimId);
+  }
+  m_instance->closeAnimId = m_instance->animations.animate(
+      1.0F, 0.0F, Style::animNormal, Easing::EaseInQuad,
+      [this](float value) {
+        if (m_instance == nullptr) {
+          return;
+        }
+        m_instance->panel->setOpacity(value);
+        m_instance->dimmer->setOpacity(Style::windowSwitcherDimOpacity * value);
+      },
+      [this]() {
+        if (m_instance != nullptr) {
+          m_instance->closeAnimId = 0;
+        }
+        DeferredCall::callLater([this]() { finishClose(); });
+      },
+      m_instance->panel
+  );
+  requestSceneUpdate();
+}
+
+void WindowSwitcher::finishClose() {
+  if (!m_closing) {
+    return;
+  }
+  m_closing = false;
   m_output = nullptr;
   m_windows.clear();
   m_selectedIndex = 0;
-  cancelThumbnailCaptures();
   destroySurface();
+}
+
+void WindowSwitcher::cancelCloseAnimation() {
+  if (!m_closing) {
+    return;
+  }
+  m_closing = false;
+  if (m_instance == nullptr) {
+    return;
+  }
+  if (m_instance->closeAnimId != 0) {
+    m_instance->animations.cancel(m_instance->closeAnimId);
+    m_instance->closeAnimId = 0;
+  }
+  if (m_instance->panel != nullptr) {
+    m_instance->panel->setOpacity(1.0F);
+  }
+  if (m_instance->dimmer != nullptr) {
+    m_instance->dimmer->setOpacity(Style::windowSwitcherDimOpacity);
+  }
 }
 
 void WindowSwitcher::refreshWindows() {
@@ -823,8 +897,13 @@ void WindowSwitcher::startThumbnailCaptures() {
     queued[index] = true;
     const WindowSwitcherEntry& entry = m_windows[index];
     const std::string key = identityKeyForEntry(entry);
-    if (!key.empty() && entry.captureHandle != 0 && entry.thumbnail == nullptr) {
-      m_thumbnailQueue.push_back(ThumbnailRequest{.windowKey = key, .captureHandle = entry.captureHandle});
+    ToplevelCaptureSource source;
+    source.extHandle = entry.captureHandle;
+    if (compositors::isKde()) {
+      source.windowId = entry.windowId;
+    }
+    if (!key.empty() && (source.extHandle != 0 || !source.windowId.empty()) && entry.thumbnail == nullptr) {
+      m_thumbnailQueue.push_back(ThumbnailRequest{.windowKey = key, .source = std::move(source)});
     }
   };
   if (m_selectedIndex < m_windows.size()) {
@@ -850,15 +929,17 @@ void WindowSwitcher::captureNextThumbnail() {
   while (!m_thumbnailQueue.empty()) {
     ThumbnailRequest request = std::move(m_thumbnailQueue.front());
     m_thumbnailQueue.pop_front();
-    auto* handle = reinterpret_cast<ext_foreign_toplevel_handle_v1*>(request.captureHandle);
-    bool handleIsLive = false;
-    m_wayland->visitExtToplevelHandles([&](ext_foreign_toplevel_handle_v1* live) { handleIsLive |= live == handle; });
-    if (!handleIsLive) {
-      continue;
+    if (request.source.extHandle != 0) {
+      auto* handle = reinterpret_cast<ext_foreign_toplevel_handle_v1*>(request.source.extHandle);
+      bool handleIsLive = false;
+      m_wayland->visitExtToplevelHandles([&](ext_foreign_toplevel_handle_v1* live) { handleIsLive |= live == handle; });
+      if (!handleIsLive) {
+        continue;
+      }
     }
 
     m_thumbnailCapture->capture(
-        handle, 640, 400,
+        request.source, 640, 400,
         [this, windowKey = std::move(request.windowKey)](std::optional<ScreencopyImage> image, std::string error) {
           if (!error.empty()) {
             kLog.debug("thumbnail capture skipped for {}: {}", windowKey, error);
@@ -1414,13 +1495,13 @@ void WindowSwitcher::ensureSurface() {
     }
   });
   inst->surface->setPrepareFrameCallback([this, instPtr](bool needsUpdate, bool needsLayout) {
-    if (!m_active || m_instance != instPtr) {
+    if ((!m_active && !m_closing) || m_instance != instPtr) {
       return;
     }
     prepareFrame(*instPtr, needsUpdate, needsLayout);
   });
   inst->surface->setFrameTickCallback([this, instPtr](float /*deltaMs*/) {
-    if (!m_active || m_instance != instPtr || instPtr->surface == nullptr) {
+    if ((!m_active && !m_closing) || m_instance != instPtr || instPtr->surface == nullptr) {
       return;
     }
     positionPanel(
@@ -1456,7 +1537,7 @@ void WindowSwitcher::destroySurface() {
 }
 
 void WindowSwitcher::prepareFrame(Instance& instance, bool /*needsUpdate*/, bool /*needsLayout*/) {
-  if (!m_active || m_renderContext == nullptr || instance.surface == nullptr) {
+  if ((!m_active && !m_closing) || m_renderContext == nullptr || instance.surface == nullptr) {
     return;
   }
 
@@ -1489,7 +1570,7 @@ void WindowSwitcher::prepareFrame(Instance& instance, bool /*needsUpdate*/, bool
   } else {
     const bool layoutChanged = !instance.styleLayout.sameGeometryAs(layout);
     instance.styleLayout = layout;
-    if ((instance.contentSyncPending || layoutChanged) && instance.carouselAnimId == 0) {
+    if (!m_closing && (instance.contentSyncPending || layoutChanged) && instance.carouselAnimId == 0) {
       syncSelection(layoutChanged);
     }
     if (instance.sceneRoot != nullptr && instance.sceneRoot->layoutDirty()) {
@@ -1747,13 +1828,11 @@ void WindowSwitcher::buildScene(Instance& instance, std::uint32_t width, std::ui
   if (!instance.revealStarted && instance.panel != nullptr && instance.dimmer != nullptr) {
     instance.revealStarted = true;
     instance.panel->setOpacity(0.0F);
-    instance.panel->setScale(Style::windowSwitcherRevealScale);
     instance.dimmer->setOpacity(0.0F);
     instance.animations.animate(
         0.0F, 1.0F, Style::animNormal, Easing::EaseOutCubic,
         [panelNode = instance.panel, dimmer = instance.dimmer](float value) {
           panelNode->setOpacity(value);
-          panelNode->setScale(Style::windowSwitcherRevealScale + (1.0F - Style::windowSwitcherRevealScale) * value);
           dimmer->setOpacity(Style::windowSwitcherDimOpacity * value);
         },
         {}, instance.panel

@@ -1,9 +1,8 @@
 #pragma once
 
-#include "capture/screencopy_capture.h"
+#include "capture/toplevel_thumbnail_source.h"
 #include "core/timer_manager.h"
 
-#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -21,17 +20,16 @@ namespace capture {
 }
 
 // One-shot, bounded-size snapshots sourced directly from an ext-foreign-toplevel handle.
-class ToplevelThumbnailCapture {
+class ToplevelThumbnailCapture final : public ToplevelThumbnailSource {
 public:
-  using CompletionCallback = std::function<void(std::optional<ScreencopyImage>, std::string error)>;
-
   explicit ToplevelThumbnailCapture(WaylandConnection& wayland);
-  ~ToplevelThumbnailCapture();
+  ~ToplevelThumbnailCapture() override;
 
-  [[nodiscard]] bool available() const noexcept;
-  [[nodiscard]] bool busy() const noexcept { return m_pending != nullptr; }
-  void capture(ext_foreign_toplevel_handle_v1* handle, int maxWidth, int maxHeight, CompletionCallback onComplete);
-  void cancelInFlight();
+  [[nodiscard]] bool available() const noexcept override;
+  [[nodiscard]] bool busy() const noexcept override { return m_pending != nullptr; }
+  void capture(const ToplevelCaptureSource& source, int maxWidth, int maxHeight, CompletionCallback onComplete)
+      override;
+  void cancelInFlight() override;
 
 private:
   friend struct ToplevelThumbnailCapturePending;

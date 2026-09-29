@@ -335,8 +335,9 @@ bool ToplevelThumbnailCapture::available() const noexcept {
 }
 
 void ToplevelThumbnailCapture::capture(
-    ext_foreign_toplevel_handle_v1* handle, int maxWidth, int maxHeight, CompletionCallback onComplete
+    const ToplevelCaptureSource& source, int maxWidth, int maxHeight, CompletionCallback onComplete
 ) {
+  auto* handle = reinterpret_cast<ext_foreign_toplevel_handle_v1*>(source.extHandle);
   if (busy() || !available() || handle == nullptr || maxWidth <= 0 || maxHeight <= 0) {
     if (onComplete) {
       onComplete(std::nullopt, busy() ? "toplevel capture already in progress" : "toplevel capture unavailable");

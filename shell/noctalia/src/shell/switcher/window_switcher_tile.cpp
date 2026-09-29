@@ -64,7 +64,7 @@ WindowSwitcherTile::WindowSwitcherTile(float contentScale, AsyncTextureCache* as
   m_previewHost->addChild(
       ui::image({
           .out = &m_thumbnail,
-          .fit = ImageFit::Contain,
+          .fit = ImageFit::Cover,
           .radius = previewRadius,
           .visible = false,
           .participatesInLayout = false,

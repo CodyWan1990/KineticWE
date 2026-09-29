@@ -75,7 +75,6 @@ namespace Style {
   inline constexpr float windowSwitcherIncomingCardScale = 0.9F;
   inline constexpr float windowSwitcherIncomingCardSlide = 0.25F;
   inline constexpr float windowSwitcherOutgoingCardSlide = 0.3F;
-  inline constexpr float windowSwitcherRevealScale = 0.95F;
 
   // Toggle preset geometry. Track height = thumb + 2 * inset; track width = thumb + 2 * inset + travel.
   inline constexpr float toggleThumbSizeSm = 14.0F;
