@@ -5,10 +5,13 @@
 #   * schedule "weekly-rebuild" .. ABI refresh against current Arch; pkgrel gets
 #                                  a .YYYYMMDD suffix so pacman offers it as an
 #                                  upgrade (e.g. 15 -> 15.20260803)
-#   * schedule "daily-smoke" ..... installs the published package on a fully
+#   * schedule "daily-smoke" ..... installs the published packages on a fully
 #                                  updated Arch container and link-checks it;
 #                                  a failure emails you (GitLab default)
 #   * manual "Run pipeline" ...... on-demand rebuild
+#
+# The PKGBUILD is a split package (kineticwe, xdg-desktop-portal-kwe,
+# kineticwe-noctalia, kineticwe-greeter); all four are published here.
 #
 # Users add this to /etc/pacman.conf:
 #   [kineticwe]
@@ -57,7 +60,7 @@ build-package:
       - .ccache/
   script:
     - *arch-sync
-    - pacman -S --noconfirm --needed pacman-contrib ccache
+    - pacman -S --noconfirm --needed pacman-contrib ccache git
     # no -debug split packages: 200+ MB each, useless in a binary repo
     - echo 'OPTIONS+=( !debug )' >> /etc/makepkg.conf
     # ccache between runs: recurring (ABI-refresh) builds drop to ~20 min
@@ -72,8 +75,10 @@ build-package:
         sed -i "s/^pkgrel=.*/&.$(date +%Y%m%d)/" PKGBUILD
         grep '^pkgrel' PKGBUILD
       fi
-    # Install every dependency the PKGBUILD declares that exists in the Arch
-    # repos. AUR-only entries (noctalia-git) are runtime-only and skipped.
+    # Install every build dependency the PKGBUILD declares that exists in the
+    # Arch repos. Runtime depends live inside the package_*() functions, so
+    # only the top-level makedepends (which cover the whole build) show up
+    # here; anything not in the Arch repos is reported and skipped.
     - |
       mapfile -t deps < <(bash -c 'source PKGBUILD; printf "%s\n" "${depends[@]}" "${makedepends[@]}"' | sed 's/[<>=].*$//' | sort -u)
       todo=()
@@ -87,10 +92,18 @@ build-package:
       pacman -S --noconfirm --needed "${todo[@]}"
     # makepkg refuses to run as root; runuser is in util-linux (base).
     - useradd -m builder
-    - cp PKGBUILD /home/builder/ && chown -R builder:builder /home/builder
-    - runuser -u builder -- bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
+    # Build this exact CI checkout (not the PKGBUILD's pinned _commit): the
+    # PKGBUILD picks up KWE_LOCAL_TARBALL, whose single top-level dir must be
+    # kineticwe-$pkgver/.
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - |
+      pkgver=$(bash -c 'source PKGBUILD; echo "$pkgver"')
+      git archive --format=tar.gz --prefix="kineticwe-$pkgver/" -o /home/builder/kineticwe-src.tar.gz HEAD
+    - cp PKGBUILD kineticwe.install /home/builder/ && chown -R builder:builder /home/builder
+    - runuser -u builder -- env KWE_LOCAL_TARBALL=/home/builder/kineticwe-src.tar.gz bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
     - mkdir -p public/x86_64
-    - cp /home/builder/kineticwe-*.pkg.tar.zst public/x86_64/
+    # every split package (!debug above keeps -debug packages out)
+    - cp /home/builder/*.pkg.tar.zst public/x86_64/
     - ci/repo.sh public/x86_64
   artifacts:
     paths:
@@ -132,6 +145,9 @@ pages:
       <pre>[kineticwe]
       SigLevel = Never
       Server = https://theblackdon.gitlab.io/kineticwe/$arch</pre>
-      <p>Then: <code>sudo pacman -Sy kineticwe</code></p>
+      <p>Then: <code>sudo pacman -Sy kineticwe</code> (pulls in
+      <code>xdg-desktop-portal-kwe</code> and <code>kineticwe-noctalia</code>)</p>
+      <p>Optional greeter: <code>sudo pacman -S kineticwe-greeter</code>, then
+      run <code>kineticwe-setup-greeter</code></p>
       HTML
   publish: public

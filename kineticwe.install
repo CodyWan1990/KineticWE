@@ -1,0 +1,21 @@
+# KineticWE post-install hooks (mirrors the spec's %post / %posttrans / %postun)
+
+post_install() {
+    systemctl daemon-reload 2>/dev/null || true
+    echo
+    echo "KineticWE installed. Select 'KineticWE' at your display manager to start."
+    if [ ! -x /usr/bin/kineticwe-setup-greeter ]; then
+        echo "For the Noctalia greeter: pacman -S kineticwe-greeter, then run kineticwe-setup-greeter"
+    else
+        echo "Run kineticwe-setup-greeter to configure the Noctalia greeter as your display manager."
+    fi
+    echo
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    systemctl daemon-reload 2>/dev/null || true
+}
