@@ -36,7 +36,8 @@ fi
 #
 # Dependencies are read from PKGBUILD: top-level makedepends are the build
 # deps; the depends of kineticwe, xdg-desktop-portal-kwe and kineticwe-noctalia
-# (plus kineticwe-greeter for --full) are the dev-session runtime deps. Before
+# (plus kineticwe-greeter for --full), together with kineticwe's optdepends,
+# are the dev-session runtime deps. Before
 # any build, PKGBUILD's pkgver/pkgrel and pinned commits are checked against
 # lgl-kineticwe-copr/kineticwe.spec (the source of truth).
 #
@@ -476,10 +477,12 @@ install_build_deps() {
 }
 
 # Dev-session runtime packages: depends of the compositor, portal and shell
-# packages (plus the greeter for --full) and the media extras.
+# packages (plus the greeter for --full), the compositor's optdepends
+# (PKGBUILD optdepends mirror the spec's Recommends: spectacle, qt5ct, ...),
+# and the media extras.
 runtime_pkgs() {
     local with_greeter="${1:-false}"
-    local -a kinds=(depends:kineticwe depends:xdg-desktop-portal-kwe depends:kineticwe-noctalia)
+    local -a kinds=(depends:kineticwe depends:xdg-desktop-portal-kwe depends:kineticwe-noctalia optdepends:kineticwe)
     [[ "$with_greeter" != true ]] || kinds+=(depends:kineticwe-greeter)
     local out
     out=$(pkgbuild_deps "${kinds[@]}") || die "Cannot read runtime dependencies from PKGBUILD"
