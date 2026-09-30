@@ -354,6 +354,17 @@ package_kineticwe() {
         'procps-ng'
         'psmisc'
         'adw-gtk-theme'
+        # Required by start-kineticwe. The spec lists some of these as
+        # Recommends, which dnf installs by default; pacman never installs
+        # optdepends, so they are hard dependencies here.
+        #   breeze    - Qt widget style (style=Breeze) and BreezeDark.colors
+        #   python    - config migrations (keybinds, Spectacle, appearance sync)
+        #   qt6ct     - QT_QPA_PLATFORMTHEME=qt6ct (Noctalia colors in Qt apps)
+        #   alacritty - default terminal and default custom keybind (cmd-1)
+        'breeze'
+        'python'
+        'qt6ct'
+        'alacritty'
         # Shared-library runtime deps
         'qt6-base'
         'qt6-declarative'
@@ -416,10 +427,9 @@ package_kineticwe() {
     )
     optdepends=(
         'xdg-user-dirs: create standard user directories on first login'
-        'alacritty: default terminal emulator'
         'qt5ct: Qt5 theming in the KineticWE session'
-        'qt6ct: Qt6 theming in the KineticWE session'
         'spectacle: screenshot tool'
+        'pipewire-pulse: PulseAudio-compatible audio (conflicts with pulseaudio)'
         'qqc2-desktop-style: desktop style for Qt Quick Controls apps'
     )
     # KineticWE installs beside KWin instead of replacing it: no
@@ -571,6 +581,7 @@ package_kineticwe-noctalia() {
 package_kineticwe-greeter() {
     pkgdesc="Noctalia greeter for KineticWE (greetd)"
     license=('MIT')
+    install=kineticwe-greeter.install
     depends=(
         "kineticwe=$epoch:$pkgver-$pkgrel"
         'greetd'
@@ -596,7 +607,9 @@ package_kineticwe-greeter() {
     # No tmpfiles user rewrite here: Arch's greetd runs the greeter as the
     # 'greeter' user, which the upstream tmpfiles entry already uses (the spec
     # rewrites it to greetd:greetd for Fedora only).
-    install -Dm755 "$srcdir/$_sourcebase/lgl-kineticwe-copr/kineticwe-setup-greeter.sh" \
+    # Arch-only copy (pacman, exact-path greetd check); the Fedora RPM keeps
+    # lgl-kineticwe-copr/kineticwe-setup-greeter.sh.
+    install -Dm755 "$srcdir/$_sourcebase/arch/kineticwe-setup-greeter.sh" \
         "$pkgdir/usr/bin/kineticwe-setup-greeter"
 
     install -Dm644 "$srcdir/noctalia-greeter/LICENSE" \

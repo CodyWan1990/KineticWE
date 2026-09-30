@@ -99,7 +99,7 @@ build-package:
     - |
       pkgver=$(bash -c 'source PKGBUILD; echo "$pkgver"')
       git archive --format=tar.gz --prefix="kineticwe-$pkgver/" -o /home/builder/kineticwe-src.tar.gz HEAD
-    - cp PKGBUILD kineticwe.install /home/builder/ && chown -R builder:builder /home/builder
+    - cp PKGBUILD kineticwe.install kineticwe-greeter.install /home/builder/ && chown -R builder:builder /home/builder
     - runuser -u builder -- env KWE_LOCAL_TARBALL=/home/builder/kineticwe-src.tar.gz bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
     - mkdir -p public/x86_64
     # every split package (!debug above keeps -debug packages out)

@@ -17,26 +17,26 @@ fi
 # and record manifests so --reset-local can remove exactly what was installed.
 #
 # Usage:
-#   ./build-arch-native.sh                 # Default (= --pkg)
-#   ./build-arch-native.sh --pkg           # makepkg from the working tree, then pacman -U
-#   ./build-arch-native.sh --binary        # Dev: compositor + portal + shell into TEST_PREFIX
-#   ./build-arch-native.sh --full          # Dev: --binary + Noctalia greeter (greetd, /usr/local)
-#   ./build-arch-native.sh --kwin-only     # Dev: incremental compositor-only build
-#   ./build-arch-native.sh --noct-only     # Dev: incremental Noctalia shell-only build
-#   ./build-arch-native.sh --reset-local   # Remove unchanged dev files from TEST_PREFIX + session entry
-#   ./build-arch-native.sh --clean-deps    # Report dependencies (never removes packages)
-#   ./build-arch-native.sh --help          # Show usage
+#   ./install-arch.sh                 # Default (= --pkg)
+#   ./install-arch.sh --pkg           # makepkg from the working tree, then pacman -U
+#   ./install-arch.sh --binary        # Dev: compositor + portal + shell into TEST_PREFIX
+#   ./install-arch.sh --local-dev     # Dev: --binary + Noctalia greeter setup (--full is a deprecated alias)
+#   ./install-arch.sh --kwin-only     # Dev: incremental compositor-only build
+#   ./install-arch.sh --noct-only     # Dev: incremental Noctalia shell-only build
+#   ./install-arch.sh --reset-local   # Remove unchanged dev files from TEST_PREFIX + session entry
+#   ./install-arch.sh --clean-deps    # Report dependencies (never removes packages)
+#   ./install-arch.sh --help          # Show usage
 #
 # Modifiers:
 #   --no-session         Dev modes: skip installing the KineticWE-Dev login-screen entry
 #   --no-greeter         --pkg only: do not install the kineticwe-greeter package
 #   --install-host-deps  Deprecated alias for --binary
 #
-# Only one mode may be given; --full together with --binary means --full.
+# Only one mode may be given; --local-dev together with --binary means --local-dev.
 #
 # Dependencies are read from PKGBUILD: top-level makedepends are the build
 # deps; the depends of kineticwe, xdg-desktop-portal-kwe and kineticwe-noctalia
-# (plus kineticwe-greeter for --full), together with kineticwe's optdepends,
+# (plus kineticwe-greeter for --local-dev), together with kineticwe's optdepends,
 # are the dev-session runtime deps. Before
 # any build, PKGBUILD's pkgver/pkgrel and pinned commits are checked against
 # lgl-kineticwe-copr/kineticwe.spec (the source of truth).
@@ -44,7 +44,7 @@ fi
 # Environment variables:
 #   TEST_PREFIX           - Dev-mode install prefix (default: $HOME/.local)
 #   NOCTALIA_GREETER_REPO - Git URL of the noctalia-greeter fork (default: KineticWE fork)
-#   NOCTALIA_GREETER_REF  - Greeter revision for --full (default: the spec's
+#   NOCTALIA_GREETER_REF  - Greeter revision for --local-dev (default: the spec's
 #                           noctalia_greeter_ref; a non-commit value is cloned
 #                           as a branch/tag)
 # =============================================================================
@@ -54,6 +54,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_DIR="${SCRIPT_DIR}/lgl-kineticwe-copr"
 PKGBUILD_FILE="${SCRIPT_DIR}/PKGBUILD"
 PKGBUILD_INSTALL_FILE="${SCRIPT_DIR}/kineticwe.install"
+PKGBUILD_GREETER_INSTALL_FILE="${SCRIPT_DIR}/kineticwe-greeter.install"
 PKG_WORK_DIR="${SCRIPT_DIR}/build.arch-pkg"
 NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO:-https://gitlab.com/theblackdon/noctalia-greeter-kwe}"
 
@@ -477,7 +478,7 @@ install_build_deps() {
 }
 
 # Dev-session runtime packages: depends of the compositor, portal and shell
-# packages (plus the greeter for --full), the compositor's optdepends
+# packages (plus the greeter for --local-dev), the compositor's optdepends
 # (PKGBUILD optdepends mirror the spec's Recommends: spectacle, qt5ct, ...),
 # and the media extras.
 runtime_pkgs() {
@@ -996,7 +997,34 @@ resolve_greeter_user() {
 }
 
 # ---------------------------------------------------------------------------
-# Build/install the Noctalia greeter at the pinned revision (--full)
+# Print the greetd [default_session] command value (quotes stripped)
+# ---------------------------------------------------------------------------
+# Read-only. Prints nothing when the file, the block or an active (uncommented)
+# command line is missing. Shared by --local-dev and the package-mode migration
+# check so both agree on what "configured" means.
+greetd_default_command() {
+    local cfg="${1:-/etc/greetd/config.toml}"
+    [[ -f "$cfg" && -r "$cfg" ]] || return 0
+    awk '
+        /^[[:space:]]*\[default_session\][[:space:]]*(#.*)?$/ { in_block = 1; next }
+        /^[[:space:]]*\[/ { in_block = 0 }
+        in_block && /^[[:space:]]*command[[:space:]]*=/ {
+            v = $0
+            sub(/^[[:space:]]*command[[:space:]]*=[[:space:]]*/, "", v)
+            if (v ~ /^"/) {
+                v = substr(v, 2); sub(/".*$/, "", v)
+            } else if (v ~ /^\047/) {
+                v = substr(v, 2); sub(/\047.*$/, "", v)
+            } else {
+                sub(/[[:space:]]*#.*$/, "", v); sub(/[[:space:]]+$/, "", v)
+            }
+            print v; exit
+        }
+    ' "$cfg" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# Build/install the Noctalia greeter at the pinned revision (--local-dev)
 # ---------------------------------------------------------------------------
 # Pinned commits are fetched as a GitLab archive; a non-commit ref (branch or
 # tag from NOCTALIA_GREETER_REF) is shallow-cloned and always rebuilt. The
@@ -1049,18 +1077,33 @@ build_noctalia_greeter() {
 }
 
 # ---------------------------------------------------------------------------
-# Install and activate the Noctalia greeter (greetd + noctalia-greeter from source)
+# Install and activate the Noctalia greeter (greetd + noctalia-greeter)
 # ---------------------------------------------------------------------------
+# When the kineticwe-greeter package is installed it is used as-is: nothing is
+# built into /usr/local (which would shadow the packaged greeter). Otherwise
+# the pinned source revision is built and installed into /usr/local.
 setup_noctalia_greeter() {
-    step "Setting up Noctalia greeter (greetd + noctalia-greeter from source)..."
-
     install_missing greetd greetd
-    build_noctalia_greeter
 
-    local session_bin
-    if ! session_bin=$(command -v noctalia-greeter-session); then
-        error "noctalia-greeter-session was not found after installation."
-        return 1
+    local session_bin setup_script
+    if pacman -Q kineticwe-greeter &>/dev/null; then
+        step "Setting up Noctalia greeter (greetd + packaged kineticwe-greeter)..."
+        info "kineticwe-greeter package is installed; using it instead of building into /usr/local."
+        session_bin="/usr/bin/noctalia-greeter-session"
+        setup_script="/usr/share/noctalia-greeter/setup_greeter_system.sh"
+        if [[ ! -x "$session_bin" ]]; then
+            error "$session_bin is missing although kineticwe-greeter is installed (reinstall the package)."
+            return 1
+        fi
+    else
+        step "Setting up Noctalia greeter (greetd + noctalia-greeter from source)..."
+        build_noctalia_greeter
+        session_bin="/usr/local/bin/noctalia-greeter-session"
+        setup_script="/usr/local/share/noctalia-greeter/setup_greeter_system.sh"
+        if [[ ! -x "$session_bin" ]]; then
+            error "$session_bin was not found after installation."
+            return 1
+        fi
     fi
 
     local greeter_user
@@ -1100,11 +1143,15 @@ setup_noctalia_greeter() {
         fi
     fi
 
-    local greetd_cfg="/etc/greetd/config.toml"
-    if [[ -f "$greetd_cfg" ]] && grep -q "noctalia-greeter-session" "$greetd_cfg"; then
-        info "greetd already configured to use noctalia-greeter-session."
+    local greetd_cfg="/etc/greetd/config.toml" current_cmd
+    current_cmd=$(greetd_default_command "$greetd_cfg")
+    if [[ "$current_cmd" == "$session_bin" ]]; then
+        info "greetd already configured to use ${session_bin}."
     else
-        info "Configuring greetd to launch the Noctalia greeter..."
+        if [[ -n "$current_cmd" ]]; then
+            info "greetd default_session currently runs: ${current_cmd}"
+        fi
+        info "Configuring greetd to launch the Noctalia greeter (${session_bin})..."
         new_temp
         local tmp_cfg="$TEMP_DIR/config.toml"
         if [[ -f "$greetd_cfg" ]]; then
@@ -1154,7 +1201,6 @@ EOF
         info "Wrote ${greetd_cfg}: default_session -> ${session_bin}"
     fi
 
-    local setup_script="/usr/local/share/noctalia-greeter/setup_greeter_system.sh"
     if [[ -x "$setup_script" ]]; then
         info "Running Noctalia greeter system setup..."
         sudo "$setup_script"
@@ -1302,93 +1348,280 @@ check_qt_abi() {
 }
 
 # ---------------------------------------------------------------------------
+# Migration check (package mode): report ~/.local and /usr/local leftovers
+# ---------------------------------------------------------------------------
+# Strictly read-only: never deletes, moves or rewrites anything, takes no lock
+# and creates no directories. Each finding prints a warning plus the command
+# that fixes it.
+# Findings of check_migration_leftovers, collected so print_usage can group them.
+MIGRATION_LEFTOVERS=()
+leftover() { MIGRATION_LEFTOVERS+=("$*"); }
+
+check_migration_leftovers() {
+    local prefix data_home found=0 p
+    MIGRATION_LEFTOVERS=()
+    prefix=$(realpath -m -- "$TEST_PREFIX")
+    data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+    local greeter_pkg=false
+    pacman -Q kineticwe-greeter &>/dev/null && greeter_pkg=true
+
+    # a. Recorded dev install in TEST_PREFIX.
+    local -a manifests=()
+    if [[ -d "$prefix/share/kineticwe/arch-native-state" ]]; then
+        for p in "$prefix/share/kineticwe/arch-native-state/"*.manifest; do
+            if [[ -f "$p" ]]; then manifests+=("$p"); fi
+        done
+    fi
+    if (( ${#manifests[@]} )) && [[ -e "$prefix/bin/kinetic-we" || -e "$prefix/bin/noctalia-kwe" ]]; then
+        found=1
+        leftover "A recorded dev install is still present in $prefix (it shadows the packages)."
+        leftover "  Fix: log into 'KineticWE' (not 'KineticWE-Dev') and run: ./install-arch.sh --reset-local"
+    fi
+
+    # b. User D-Bus service overriding the packaged portal.
+    local portal_svc="$HOME/.local/share/dbus-1/services/org.freedesktop.impl.portal.desktop.kwe.service"
+    if [[ -e "$portal_svc" || -L "$portal_svc" ]]; then
+        found=1
+        leftover "User D-Bus service overrides the packaged portal: $portal_svc"
+        leftover "  Fix: ./install-arch.sh --reset-local (or rm -f '$portal_svc'),"
+        leftover "       then: pkill -f 'libexec/xdg-desktop-portal-kwe'"
+    fi
+
+    # c. Pre-manifest dev leftovers (not tracked by --reset-local).
+    local -a stale=()
+    if [[ -d "$prefix/lib/libexec" ]]; then
+        for p in "$prefix/lib/libexec/"kineticwe_* "$prefix/lib/libexec/xdg-desktop-portal-kwe"; do
+            if [[ -e "$p" || -L "$p" ]]; then stale+=("$p"); fi
+        done
+    fi
+    for p in "$prefix/lib/plugins/kineticwe" "$prefix/lib/plugins/org.kineticwe.decoration"; do
+        if [[ -e "$p" || -L "$p" ]]; then stale+=("$p"); fi
+    done
+    if (( ${#stale[@]} )); then
+        found=1
+        leftover "Untracked files from an older dev build (not removed by --reset-local):"
+        for p in "${stale[@]}"; do leftover "    $p"; done
+        leftover "  Fix: rm -rf$(printf " '%s'" "${stale[@]}")"
+    fi
+
+    # d. User systemd unit overriding the packaged session target.
+    local user_target="$data_home/systemd/user/kineticwe-session.target"
+    if [[ -e "$user_target" || -L "$user_target" ]] && [[ -e /usr/lib/systemd/user/kineticwe-session.target ]]; then
+        found=1
+        leftover "User unit overrides the packaged kineticwe-session.target: $user_target"
+        leftover "  Fix: rm -f '$user_target' && systemctl --user daemon-reload"
+    fi
+
+    if [[ "$greeter_pkg" == true ]]; then
+        # e. Source-built greeter in /usr/local shadowing the package.
+        local -a local_greeter=()
+        for p in /usr/local/bin/noctalia-greeter* \
+                 /usr/local/share/noctalia-greeter \
+                 /usr/local/lib/tmpfiles.d/noctalia-greeter.conf \
+                 /usr/local/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy; do
+            if [[ -e "$p" || -L "$p" ]]; then local_greeter+=("$p"); fi
+        done
+        if (( ${#local_greeter[@]} )); then
+            found=1
+            leftover "A source-built greeter in /usr/local shadows the kineticwe-greeter package:"
+            for p in "${local_greeter[@]}"; do leftover "    $p"; done
+            leftover "  Fix: sudo rm -rf$(printf " '%s'" "${local_greeter[@]}")"
+        fi
+    fi
+
+    # greetd not using the packaged greeter is shown by print_usage's greeter
+    # box instead of here.
+    (( ! found ))
+}
+
+# ---------------------------------------------------------------------------
 # Print usage info
 # ---------------------------------------------------------------------------
 PKG_DEV_RELEASE=""
 PKG_INSTALLED=()
 
+# ---------------------------------------------------------------------------
+# End-of-run summary
+# ---------------------------------------------------------------------------
+# Colour and box-drawing glyphs only on a UTF-8 terminal without NO_COLOR;
+# plain ASCII otherwise, so logs and pipes stay readable.
+SUMMARY_WIDTH=60
+ui_init() {
+    local charmap="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
+    if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+        U_B=$'\033[1m' U_DIM=$'\033[2m' U_OK=$'\033[1;32m' U_WARN=$'\033[1;33m'
+        U_CMD=$'\033[1;36m' U_R=$'\033[0m'
+    else
+        U_B='' U_DIM='' U_OK='' U_WARN='' U_CMD='' U_R=''
+    fi
+    if [[ -t 1 && "${charmap,,}" == *utf-8* || -t 1 && "${charmap,,}" == *utf8* ]]; then
+        G_OK='✔' G_WARN='⚠' G_RULE='─' G_H='═' G_V='║' G_TL='╔' G_TR='╗' G_BL='╚' G_BR='╝'
+    else
+        G_OK='[ok]' G_WARN='[!]' G_RULE='-' G_H='-' G_V='|' G_TL='+' G_TR='+' G_BL='+' G_BR='+'
+    fi
+}
+
+# repeat <char> <count>
+repeat() { local out='' i; for (( i = 0; i < $2; i++ )); do out+="$1"; done; printf '%s' "$out"; }
+
+summary_rule() { printf '%s%s%s\n' "$U_DIM" "$(repeat "$G_RULE" "$SUMMARY_WIDTH")" "$U_R"; }
+
+# summary_title <text>: a heading between two rules.
+summary_title() {
+    echo
+    summary_rule
+    printf '  %s%s %s%s\n' "$U_OK" "$G_OK" "$1" "$U_R"
+    summary_rule
+}
+
+# summary_box <line>...: an emphasised box. A line starting with "$ " is shown
+# as a command. Padding is computed on the plain text before colour is added,
+# so the right border always lines up.
+summary_box() {
+    local inner=$(( SUMMARY_WIDTH - 6 )) line text colour pad
+    printf '  %s%s%s%s%s\n' "$U_WARN" "$G_TL" "$(repeat "$G_H" $(( inner + 2 )))" "$G_TR" "$U_R"
+    for line in "$@"; do
+        colour="$U_B"
+        text="$line"
+        if [[ "$line" == '$ '* ]]; then
+            text="     ${line#\$ }"
+            colour="$U_CMD"
+        fi
+        pad=$(( inner - ${#text} ))
+        (( pad >= 0 )) || pad=0
+        printf '  %s%s%s %s%s%s%*s %s%s%s\n' "$U_WARN" "$G_V" "$U_R" \
+            "$colour" "$text" "$U_R" "$pad" '' "$U_WARN" "$G_V" "$U_R"
+    done
+    printf '  %s%s%s%s%s\n' "$U_WARN" "$G_BL" "$(repeat "$G_H" $(( inner + 2 )))" "$G_BR" "$U_R"
+}
+
+summary_ok()   { printf '  %s%s%s %s\n' "$U_OK" "$G_OK" "$U_R" "$*"; }
+summary_warn() { printf '  %s%s %s%s\n' "$U_WARN" "$G_WARN" "$*" "$U_R"; }
+# summary_row <label> <value>
+summary_row()  { printf '    %-14s %s\n' "$1" "$2"; }
+
+# greeter_state <expected session binary>: prints none | ok | todo.
+greeter_state() {
+    pacman -Q kineticwe-greeter &>/dev/null || [[ -x "${1:-}" ]] || { echo none; return 0; }
+    if [[ "$(greetd_default_command /etc/greetd/config.toml)" == "$1" ]]; then echo ok; else echo todo; fi
+}
+
+# summary_greeter <expected session binary> [setup command]
+summary_greeter() {
+    local setup="${2:-kineticwe-setup-greeter}"
+    case "$(greeter_state "$1")" in
+        ok)
+            summary_ok "Greeter configured: log out or reboot to use it"
+            ;;
+        todo)
+            summary_box \
+                "ONE MORE STEP: set up the login screen" \
+                "" \
+                "\$ $setup" \
+                "" \
+                "Then reboot. Enabling greetd.service alone is not" \
+                "enough: Arch's default greetd config is a text" \
+                "login (agreety) that drops you into a shell."
+            ;;
+    esac
+}
+
+summary_qt() {
+    local file="$1"
+    [[ -f "$file" && ! -L "$file" ]] || return 0
+    local built now
+    built=$(<"$file")
+    now=$(current_qt)
+    if [[ -n "$now" && "$built" != "$now" ]]; then
+        summary_warn "Qt changed since this build ($built -> $now): rebuild before starting the session."
+    else
+        summary_row "Built for" "$built  (rebuild after Qt updates)"
+    fi
+}
+
+summary_leftovers() {
+    if check_migration_leftovers; then
+        summary_ok "No leftovers from older local builds"
+        return 0
+    fi
+    summary_warn "Leftovers from older local builds (they override the packages):"
+    local line
+    for line in "${MIGRATION_LEFTOVERS[@]}"; do printf '    %s\n' "$line"; done
+    printf '    See README: "Migrating from a local (~/.local) build to the packages".\n'
+}
+
+# print_usage pkg | dev [with_greeter]
 print_usage() {
-    local mode="${1:-dev}"
-    echo
-    echo "=========================================="
-    echo "  Build complete! Usage:"
-    echo "=========================================="
-    echo
+    local mode="${1:-dev}" with_greeter="${2:-false}"
+    ui_init
 
     if [[ "$mode" == pkg ]]; then
-        info "  Installed packages (pkgrel ${PKG_DEV_RELEASE}):"
-        local f
-        for f in "${PKG_INSTALLED[@]}"; do info "    ${f##*/}"; done
-        if [[ -f "$PKG_WORK_DIR/qt-abi" ]]; then
-            info "  Built against: $(<"$PKG_WORK_DIR/qt-abi")"
-            check_qt_abi "$PKG_WORK_DIR/qt-abi"
+        local version
+        version=$(pacman -Q kineticwe 2>/dev/null | awk '{print $2}')
+        summary_title "KineticWE ${version:-$PKG_DEV_RELEASE} installed"
+        # Package names in split order, two per row.
+        local -a names=() rows=()
+        local name f
+        for name in "${KWE_PACKAGES[@]}"; do
+            for f in "${PKG_INSTALLED[@]}"; do
+                if [[ "${f##*/}" == "$name"-[0-9]* ]]; then names+=("$name"); break; fi
+            done
+        done
+        local i
+        for (( i = 0; i < ${#names[@]}; i += 2 )); do
+            rows+=("${names[i]}${names[i+1]:+  ${names[i+1]}}")
+        done
+        summary_row "Packages" "${rows[0]:-}"
+        for (( i = 1; i < ${#rows[@]}; i++ )); do summary_row "" "${rows[i]}"; done
+        summary_qt "$PKG_WORK_DIR/qt-abi"
+        echo
+
+        summary_greeter /usr/bin/noctalia-greeter-session
+        echo
+
+        printf '  %sStart KineticWE%s\n' "$U_B" "$U_R"
+        summary_row "Login screen" "choose \"KineticWE\""
+        summary_row "From a TTY" "/usr/bin/start-kineticwe"
+        local resolved
+        resolved=$(command -v start-kineticwe 2>/dev/null || true)
+        if [[ -n "$resolved" && "$resolved" != /usr/bin/start-kineticwe ]]; then
+            summary_warn "'start-kineticwe' in your PATH is a dev build: $resolved"
         fi
         echo
-        info "  TTY:          /usr/bin/start-kineticwe"
-        info "  Login screen: KineticWE"
-        info "  /usr/bin/start-kineticwe is used when no ~/.local dev build shadows it."
-        if [[ -x "$TEST_PREFIX/bin/start-kineticwe" ]]; then
-            local resolved
-            resolved=$(command -v start-kineticwe || true)
-            if [[ -n "$resolved" && "$resolved" != /usr/bin/start-kineticwe ]]; then
-                warn "  A dev build shadows the packaged launcher: $resolved"
-                warn "  Run /usr/bin/start-kineticwe explicitly, or remove the dev install with --reset-local."
-            fi
-        fi
+
+        summary_leftovers
         echo
+        printf '  More options: %s./install-arch.sh --help%s\n' "$U_CMD" "$U_R"
     else
-        if [[ -x "$TEST_PREFIX/bin/kinetic-we" ]]; then
-            echo "  ┌─────────────────────────────────────────────────────┐"
-            echo "  │  DEV BUILD  (local install)                         │"
-            echo "  │    TTY:          start-kineticwe                    │"
-            echo "  │    Login screen: KineticWE-Dev                      │"
-            echo "  └─────────────────────────────────────────────────────┘"
-        else
-            echo "  No dev build found at $TEST_PREFIX"
-            echo "  (run ./build-arch-native.sh --binary first)"
-        fi
+        summary_title "KineticWE dev build installed to $TEST_PREFIX"
+        if [[ -n "${STATE_DIR:-}" ]]; then summary_qt "$STATE_DIR/qt-abi"; fi
         echo
 
-        if [[ -f "$SESSION_DIR/$SESSION_DESKTOP" ]]; then
-            info "  Login-screen entry: $SESSION_DIR/$SESSION_DESKTOP"
-        else
-            info "  No login-screen entry installed (skipped or sudo declined)."
-        fi
-        echo
-
-        if [[ -n "${STATE_DIR:-}" && -f "$STATE_DIR/qt-abi" ]]; then
-            info "  Built against: $(<"$STATE_DIR/qt-abi")"
-            check_qt_abi "$STATE_DIR/qt-abi"
+        if [[ "$with_greeter" == true ]]; then
+            if pacman -Q kineticwe-greeter &>/dev/null; then
+                summary_greeter /usr/bin/noctalia-greeter-session
+            else
+                # Source-built greeter: no kineticwe-setup-greeter to point at.
+                summary_greeter /usr/local/bin/noctalia-greeter-session "./install-arch.sh --local-dev"
+            fi
             echo
         fi
 
-        if [[ ":$PATH:" == *":$TEST_PREFIX/bin:"* ]]; then
-            info "  $TEST_PREFIX/bin is in your PATH, so just type:"
-            info "    start-kineticwe"
+        printf '  %sStart the dev build%s\n' "$U_B" "$U_R"
+        if [[ -f "$SESSION_DIR/$SESSION_DESKTOP" ]]; then
+            summary_row "Login screen" "choose \"KineticWE-Dev\""
         else
-            warn "  $TEST_PREFIX/bin is not in your PATH; start the session with:"
-            warn "    $TEST_PREFIX/bin/start-kineticwe"
+            summary_row "Login screen" "no KineticWE-Dev entry (skipped or sudo declined)"
+        fi
+        if [[ ":$PATH:" == *":$TEST_PREFIX/bin:"* ]]; then
+            summary_row "From a TTY" "start-kineticwe"
+        else
+            summary_row "From a TTY" "$TEST_PREFIX/bin/start-kineticwe"
         fi
         echo
+        printf '  Back to the packages: %s./install-arch.sh --reset-local%s\n' "$U_CMD" "$U_R"
+        printf '  More options:         %s./install-arch.sh --help%s\n' "$U_CMD" "$U_R"
     fi
-
-    info "Build and install packages from the working tree:"
-    info "  ./build-arch-native.sh                # same as --pkg"
-    echo
-
-    info "Dev build into $TEST_PREFIX (incremental):"
-    info "  ./build-arch-native.sh --binary"
-    info "  ./build-arch-native.sh --full         # + Noctalia greeter"
-    info "  ./build-arch-native.sh --kwin-only    # kwin only"
-    info "  ./build-arch-native.sh --noct-only    # noctalia shell only"
-    echo
-
-    info "To remove local dev files:"
-    info "  ./build-arch-native.sh --reset-local"
-    echo
-
-    info "To report dependencies (no removal):"
-    info "  ./build-arch-native.sh --clean-deps"
     echo
 }
 
@@ -1402,6 +1635,7 @@ pkg_build() {
     [[ -n "$pkgver" ]] || die "Cannot read pkgver from $PKGBUILD_FILE"
     [[ "$SPEC_RELEASE" =~ ^[0-9]+$ ]] || die "Spec Release must be an integer for dev pkgrel numbering: $SPEC_RELEASE"
     [[ -f "$PKGBUILD_INSTALL_FILE" ]] || die "Missing $PKGBUILD_INSTALL_FILE (PKGBUILD install= file)"
+    [[ -f "$PKGBUILD_GREETER_INSTALL_FILE" ]] || die "Missing $PKGBUILD_GREETER_INSTALL_FILE (kineticwe-greeter install= file)"
 
     install_missing "packaging tool" base-devel git
     for tool in makepkg git tar; do
@@ -1443,12 +1677,20 @@ pkg_build() {
 
     cp -f -- "$PKGBUILD_FILE" "$work/PKGBUILD"
     cp -f -- "$PKGBUILD_INSTALL_FILE" "$work/kineticwe.install"
+    cp -f -- "$PKGBUILD_GREETER_INSTALL_FILE" "$work/kineticwe-greeter.install"
     sed -i "s/^pkgrel=.*/pkgrel=${PKG_DEV_RELEASE}/" "$work/PKGBUILD"
     grep -qx "pkgrel=${PKG_DEV_RELEASE}" "$work/PKGBUILD" || die "Could not set pkgrel in $work/PKGBUILD"
 
+    # makepkg reuses a source file that already exists in SRCDEST instead of
+    # fetching it again, so a cached kineticwe-$pkgver.tar.gz from an earlier
+    # run would silently replace the fresh working-tree tarball. Pin SRCDEST
+    # to $work (a makepkg.conf SRCDEST would move the cache elsewhere) and drop
+    # the cached copy. The pinned KDE/greeter tarballs stay cached.
+    rm -f -- "$work/kineticwe-$pkgver.tar.gz"
+
     step "Building packages with makepkg (installs missing makedepends via sudo)..."
     # -C: start from a clean srcdir so files deleted from the tree never linger.
-    (cd "$work" && KWE_LOCAL_TARBALL="$tarball" PKGDEST="$work/pkgs" makepkg -sfC --noconfirm)
+    (cd "$work" && KWE_LOCAL_TARBALL="$tarball" SRCDEST="$work" PKGDEST="$work/pkgs" makepkg -sfC --noconfirm)
 
     local list
     list=$(cd "$work" && KWE_LOCAL_TARBALL="$tarball" PKGDEST="$work/pkgs" makepkg --packagelist) \
@@ -1480,7 +1722,7 @@ dev_build() {
     local mode="$1" do_session="$2" title
     case "$mode" in
         binary)    title="Binary Dev Build" ;;
-        full)      title="Full Dev Build (binaries + Noctalia greeter)" ;;
+        local-dev) title="Local Dev Build (binaries + Noctalia greeter)" ;;
         kwin-only) title="KWin-Only Dev Build" ;;
         noct-only) title="Noctalia-Only Dev Build" ;;
         *)         die "Unknown dev mode: $mode" ;;
@@ -1518,7 +1760,7 @@ dev_build() {
     esac
 
     local with_greeter=false
-    [[ "$mode" != full ]] || with_greeter=true
+    [[ "$mode" != local-dev ]] || with_greeter=true
     binary_build
     install_host_deps_arch "$with_greeter"
     verify_host_deps
@@ -1528,11 +1770,11 @@ dev_build() {
         install_dev_session_entry
     fi
     if [[ "$with_greeter" == true ]]; then
-        # Hard-fail: a broken greeter must abort --full instead of leaving
+        # Hard-fail: a broken greeter must abort --local-dev instead of leaving
         # the session without a login screen.
         setup_noctalia_greeter
     fi
-    print_usage dev
+    print_usage dev "$with_greeter"
 }
 
 # ---------------------------------------------------------------------------
@@ -1547,20 +1789,21 @@ Modes (at most one; default --pkg):
                        (makepkg -s) in build.arch-pkg/, then install with pacman -U.
   --binary             Dev build: compositor + portal + shell into TEST_PREFIX
                        (default \$HOME/.local), incremental.
-  --full               --binary plus build/activate the Noctalia greeter (greetd,
-                       /usr/local) at the spec's pinned revision.
+  --local-dev          --binary plus build/activate the Noctalia greeter (greetd,
+                       /usr/local, or the installed kineticwe-greeter package).
   --kwin-only          Dev build: compositor only (incremental).
   --noct-only          Dev build: Noctalia shell only (incremental).
   --reset-local        Remove only unchanged manifest-owned files from TEST_PREFIX;
                        sudo is used only for the recorded system login entry.
   --clean-deps         Report build/runtime dependencies (never removes packages).
   -h, --help           Show this help.
-  --full together with --binary is accepted and means --full.
+  --local-dev together with --binary is accepted and means --local-dev.
 
 Modifiers:
   --no-session         Dev modes: do not install the KineticWE-Dev login-screen entry.
   --no-greeter         --pkg only: do not install the kineticwe-greeter package.
   --install-host-deps  Deprecated alias for --binary.
+  --full               Deprecated alias for --local-dev.
 
 Dependencies come from PKGBUILD (makedepends; depends of the split packages).
 PKGBUILD must match lgl-kineticwe-copr/kineticwe.spec (version, release,
@@ -1578,7 +1821,11 @@ main() {
         case "$arg" in
             --pkg)         modes+=(pkg) ;;
             --binary)      modes+=(binary) ;;
-            --full)        modes+=(full) ;;
+            --local-dev)   modes+=(local-dev) ;;
+            --full)
+                warn "--full is deprecated; use --local-dev."
+                modes+=(local-dev)
+                ;;
             --kwin-only)   modes+=(kwin-only) ;;
             --noct-only)   modes+=(noct-only) ;;
             --reset-local) modes+=(reset-local) ;;
@@ -1601,8 +1848,8 @@ main() {
     if (( ${#modes[@]} )); then
         mapfile -t modes < <(printf '%s\n' "${modes[@]}" | sort -u)
     fi
-    if (( ${#modes[@]} == 2 )) && [[ " ${modes[*]} " == *" binary "* && " ${modes[*]} " == *" full "* ]]; then
-        modes=(full)
+    if (( ${#modes[@]} == 2 )) && [[ " ${modes[*]} " == *" binary "* && " ${modes[*]} " == *" local-dev "* ]]; then
+        modes=(local-dev)
     fi
     if (( ${#modes[@]} > 1 )); then
         error "Only one mode may be given (got: ${modes[*]})"

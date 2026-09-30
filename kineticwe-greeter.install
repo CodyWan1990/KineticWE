@@ -1,0 +1,39 @@
+# kineticwe-greeter post-install hooks. greetd's config is never rewritten
+# here; kineticwe-setup-greeter does that interactively (like the COPR RPM).
+
+_kwe_greeter_status() {
+    local bin=/usr/bin/noctalia-greeter-session cfg=/etc/greetd/config.toml cmd=""
+    if [ -f "$cfg" ]; then
+        cmd=$(awk '
+            /^\[default_session\]/ { in_block = 1; next }
+            /^\[/                  { in_block = 0 }
+            in_block && /^[[:space:]]*command[[:space:]]*=/ {
+                sub(/^[[:space:]]*command[[:space:]]*=[[:space:]]*/, "")
+                gsub(/^"|"[[:space:]]*$/, "")
+                print; exit
+            }
+        ' "$cfg")
+    fi
+    echo
+    if [ "$cmd" = "$bin" ]; then
+        echo "greetd is configured for the Noctalia greeter. Reboot to use it."
+    else
+        echo "==> greetd is NOT configured for the Noctalia greeter yet."
+        case "$cmd" in
+            *agreety*) echo "    It still runs the default text login (agreety), which drops to a shell." ;;
+            "")        ;;
+            *)         echo "    It currently runs: $cmd" ;;
+        esac
+        echo "    Run: kineticwe-setup-greeter   (then reboot)"
+        echo "    Enabling greetd.service alone is not enough."
+    fi
+    echo
+}
+
+post_install() {
+    _kwe_greeter_status
+}
+
+post_upgrade() {
+    _kwe_greeter_status
+}

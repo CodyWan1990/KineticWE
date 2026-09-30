@@ -11,7 +11,7 @@ The user builds and tests locally on their own machine. An agent's job ends at
 "code is written and statically verified." Under no circumstances run anything
 that compiles, links, packages, installs, or launches binaries.
 
-Always tell me the exact build command to run after changes: `./build-rpm-dev.sh --kwin-only` for kwin-only, `./build-rpm-dev.sh --noct-only` for noctalia-only, or `./build-rpm-dev.sh --binary` / `--full` for the full build.
+Always tell me the exact build command to run after changes: `./build-rpm-dev.sh --kwin-only` for kwin-only, `./build-rpm-dev.sh --noct-only` for noctalia-only, or `./build-rpm-dev.sh --binary` / `--full` for the full build. On Arch: `./install-arch.sh` (packages + pacman -U), `./install-arch.sh --kwin-only`, `./install-arch.sh --noct-only`, or `./install-arch.sh --binary` / `--local-dev`.
 
 ### Forbidden — never run, in any form
 
@@ -23,6 +23,11 @@ Always tell me the exact build command to run after changes: `./build-rpm-dev.sh
   `install-build-deps.sh`, `debian-deps.sh`, and
   never `distrobox enter` (or `podman`/`docker exec`) into a container to build.
   Distrobox containers are the user's build environment — hands off.
+- **Arch native builds:** never run `install-arch.sh` (formerly
+  `build-arch-native.sh`) in any mode, including `--reset-local`; it builds,
+  installs with sudo/pacman, or deletes installed files. `--help` is the only
+  exception. Its build dirs `build.arch-native*/` and `build.arch-pkg/` are
+  user-owned like the ones below.
 - **User-owned build dirs:** `build/`, `build.deb-quick/`,
   `build.deb-quick-noctalia/`, `build.rpm-quick/`, `build.rpm-quick-noctalia/`,
   `build-nix-dev/`, `build.TI47zXjW/`, `result-kwin` are the user's build
@@ -126,6 +131,7 @@ Work in this repo follows an orchestrator / sub-agent model.
 | `scripts/` | Session/systemd scripts — never execute |
 | `docs/kineticwe-2.0.md` | The KineticWE 2.0 plan — source of truth for direction |
 | `build-*.sh`, `*-deps.sh` | User-only distrobox build scripts — never run |
+| `install-arch.sh`, `PKGBUILD`, `arch/`, `ci/` | Arch native build script and packaging — edit allowed, never run |
 | `flake.nix`, `nix/`, `PKGBUILD`, `kineticwe.spec`, `debian/` | Packaging — edit allowed, build forbidden |
 
 ## 5. General conventions
