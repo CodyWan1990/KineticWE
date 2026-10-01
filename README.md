@@ -141,18 +141,14 @@ Enabling `greetd.service` on its own is not enough: Arch's default greetd config
 
 #### Migrating from a local (`~/.local`) build to the packages
 
-If you previously used `--binary`, `--kwin-only`, `--noct-only` or `--local-dev` (formerly `--full`), remove those local files after installing the packages, otherwise the old copies take priority. `./install-arch.sh` ends with a read-only check that lists any leftovers below.
+> **Used the old `build-arch-native.sh`?** It didn't record what it installed, so `--reset-local` can't remove it, and its leftovers can break every portal. Follow [docs/arch-migration.md](docs/arch-migration.md) instead of the steps below.
+
+If you used `install-arch.sh --binary`, `--kwin-only`, `--noct-only` or `--local-dev`, remove those local files after installing the packages, otherwise the dev copies take priority. `./install-arch.sh` ends with a read-only check that lists any leftovers.
 
 1. **Build and install the packages**
 
    ```bash
    ./install-arch.sh
-   ```
-
-   If pacman reports `/usr/include/stb/... exists in filesystem`, an older script placed stb headers there by hand. Let the package take them over:
-
-   ```bash
-   sudo pacman -S --overwrite '/usr/include/stb/*' stb
    ```
 
 2. **Log out and pick "KineticWE"** (not "KineticWE-Dev") at the login screen. Don't remove the dev install while it is running.
@@ -161,50 +157,33 @@ If you previously used `--binary`, `--kwin-only`, `--noct-only` or `--local-dev`
 
    ```bash
    ./install-arch.sh --reset-local
-   pkill -f 'libexec/xdg-desktop-portal-kwe'   # the portal restarts from /usr on next use
+   pkill -f 'libexec/xdg-desktop-portal-kwe'      # stop the old portal backend
+   systemctl --user restart xdg-desktop-portal.service
    ```
 
-   This removes only files the script recorded as installed, plus the KineticWE-Dev login entry. Your settings (`~/.config/noctalia`, `~/.config/kineticwe`, `~/.local/state/noctalia`) are not touched.
+   `--reset-local` removes only the files the script recorded when it installed them: the dev compositor, shell and portal (including its D-Bus activation file and user units) and the KineticWE-Dev login entry. Files you edited since are kept. Your settings (`~/.config/kineticwe`, `~/.local/state/noctalia`) are not touched.
 
-4. **Remove leftovers from older builds** (made before the script recorded installs; check the contents first):
-
-   ```bash
-   ls ~/.local/lib/libexec ~/.local/lib/plugins
-   rm -rf ~/.local/lib/libexec ~/.local/lib/plugins \
-          ~/.local/share/systemd/user/kineticwe-session.target
-   systemctl --user daemon-reload
-   ```
-
-5. **If you used `--local-dev` / `--full`** (greeter built into `/usr/local`), switch to the packaged greeter:
+4. **If you used `--local-dev` without the `kineticwe-greeter` package**, the greeter was built into `/usr/local`. Install the packaged greeter, remove the old copy and point greetd at the package:
 
    ```bash
-   # Back up greetd's config and point it at the packaged greeter
-   sudo cp -a /etc/greetd/config.toml /etc/greetd/config.toml.bak
-   sudo sed -i 's|/usr/local/bin/noctalia-greeter-session|/usr/bin/noctalia-greeter-session|' /etc/greetd/config.toml
-   grep -E '^(command|user)' /etc/greetd/config.toml   # command = "/usr/bin/noctalia-greeter-session"
-
-   # Remove the old /usr/local greeter
+   sudo pacman -S --needed kineticwe-greeter    # skip if ./install-arch.sh already installed it
    sudo rm -f /usr/local/bin/noctalia-greeter{,-apply-appearance,-compositor,-session,-print-greetd-config} \
               /usr/local/lib/tmpfiles.d/noctalia-greeter.conf \
               /usr/local/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
    sudo rm -rf /usr/local/share/noctalia-greeter
-
-   # Re-run the greeter's system setup from the packaged files
    sudo /usr/share/noctalia-greeter/setup_greeter_system.sh
+   kineticwe-setup-greeter    # points greetd at /usr/bin/noctalia-greeter-session (backs up config.toml)
    ```
 
-   Ignore the "copy and paste the block below" part of the setup output; the config is already correct, and its `systemctl enable --now greetd` could end your session.
+   Then reboot. Don't restart greetd while logged in; that ends your session. If the greeter doesn't come up, switch to a TTY (Ctrl+Alt+F2) and restore `/etc/greetd/config.toml.bak`. With the package installed, `--local-dev` uses the packaged greeter and this step isn't needed.
 
-   Then reboot. Don't restart greetd while logged in; that ends your session. If the greeter doesn't come up, switch to a TTY (Ctrl+Alt+F2) and restore `/etc/greetd/config.toml.bak`.
-
-   With newer `kineticwe-greeter` packages, running `kineticwe-setup-greeter` after removing the old files also fixes the path (and backs up the config).
-
-6. **Verify**
+5. **Verify**
 
    ```bash
    pacman -Qkk kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter
    for p in kinetic-we noctalia-kwe; do readlink /proc/$(pgrep -x $p)/exe; done   # both /usr/bin/...
    grep '^command' /etc/greetd/config.toml   # /usr/bin/noctalia-greeter-session
+   systemctl --user status xdg-desktop-portal.service   # active (running)
    ```
 
 ### NixOS / Nix
