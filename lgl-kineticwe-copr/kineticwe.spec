@@ -24,7 +24,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        14%{?dist}
+Release:        15%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -535,6 +535,12 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Thu Oct 1 2026 LGL <lgl@localhost> - 0.0.1-15
+- Fix KineticWE window-switcher thumbnails using KWin's ScreenShot2 interface.
+- Improve cursor-theme propagation for KDE, GTK, XWayland, Steam, and systemd-launched applications.
+- Add smoother window-switcher closing transitions.
+- Change Noctalia's default palette to Catppuccin and update the default wallpaper.
+
 * Mon Sep 28 2026 LGL <lgl@localhost> - 0.0.1-14
 - Sync the vendored Noctalia shell with upstream, including calendar reminders,
   lock-screen transitions, expanded window switcher styles, and shell fixes.
