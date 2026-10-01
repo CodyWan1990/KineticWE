@@ -1258,18 +1258,33 @@ manifest_intact() {
     done < "$manifest"
 }
 
+# --reset-local found no install records: either nothing was ever installed,
+# or the files came from the old build-arch-native.sh, which kept no records
+# (and whose files --reset-local therefore can't identify safely).
+reset_without_records() {
+    if [[ -e "$TEST_PREFIX/bin/kinetic-we" || -e "$TEST_PREFIX/bin/noctalia-kwe" \
+          || -e "$HOME/.local/share/dbus-1/services/org.freedesktop.impl.portal.desktop.kwe.service" ]]; then
+        error "Found KineticWE dev files in $TEST_PREFIX, but no install records."
+        error "They come from the old build-arch-native.sh, which --reset-local can't remove safely."
+        error "Follow docs/arch-migration.md to remove them (it also fixes broken portals)."
+        exit 1
+    fi
+    info "Nothing to reset: no local dev install found in $TEST_PREFIX."
+    exit 0
+}
+
 reset_local() {
     # Do not create an installation prefix just to discover there is no record.
     TEST_PREFIX=$(realpath -m -- "$TEST_PREFIX")
     STATE_DIR="$TEST_PREFIX/share/kineticwe/arch-native-state"
     safe_path "share/kineticwe/arch-native-state/.lock"
-    [[ -d "$STATE_DIR" ]] || die "No installation manifest; refusing deletion. Rebuild to record current outputs (historical leftovers remain unknown)."
+    [[ -d "$STATE_DIR" ]] || reset_without_records
     local -a manifests=()
     local manifest kind value rel file parent
     shopt -s nullglob
     manifests=("$STATE_DIR/"*.manifest "$STATE_DIR/"*.pending)
     shopt -u nullglob
-    (( ${#manifests[@]} )) || die "No installation manifests; refusing deletion"
+    (( ${#manifests[@]} )) || reset_without_records
     prepare_prefix
     # Validate every record before deleting anything.
     for manifest in "${manifests[@]}"; do
@@ -1383,8 +1398,13 @@ check_migration_leftovers() {
     if [[ -e "$portal_svc" || -L "$portal_svc" ]]; then
         found=1
         leftover "User D-Bus service overrides the packaged portal: $portal_svc"
-        leftover "  Fix: ./install-arch.sh --reset-local (or rm -f '$portal_svc'),"
-        leftover "       then: pkill -f 'libexec/xdg-desktop-portal-kwe'"
+        if (( ${#manifests[@]} )); then
+            leftover "  Fix: ./install-arch.sh --reset-local, then: pkill -f 'libexec/xdg-desktop-portal-kwe'"
+            leftover "       and: systemctl --user restart xdg-desktop-portal.service"
+        else
+            leftover "  From the old build-arch-native.sh; it can break every portal (203/EXEC)."
+            leftover "  Fix: docs/arch-migration.md, Step 1 (removes it and restarts the portal)."
+        fi
     fi
 
     # c. Pre-manifest dev leftovers (not tracked by --reset-local).
@@ -1397,11 +1417,19 @@ check_migration_leftovers() {
     for p in "$prefix/lib/plugins/kineticwe" "$prefix/lib/plugins/org.kineticwe.decoration"; do
         if [[ -e "$p" || -L "$p" ]]; then stale+=("$p"); fi
     done
+    # Old-script user units: inert (systemd never reads ~/.local/lib/systemd/user)
+    # but they point at removed files. Recorded installs remove their own copies.
+    if (( ! ${#manifests[@]} )); then
+        for p in "$prefix/lib/systemd/user/kineticwe.service" \
+                 "$prefix/lib/systemd/user/plasma-xdg-desktop-portal-kwe.service"; do
+            if [[ -e "$p" || -L "$p" ]]; then stale+=("$p"); fi
+        done
+    fi
     if (( ${#stale[@]} )); then
         found=1
-        leftover "Untracked files from an older dev build (not removed by --reset-local):"
+        leftover "Untracked files from the old build-arch-native.sh (not removed by --reset-local):"
         for p in "${stale[@]}"; do leftover "    $p"; done
-        leftover "  Fix: rm -rf$(printf " '%s'" "${stale[@]}")"
+        leftover "  Fix: follow docs/arch-migration.md (removes these and the rest of the old install)."
     fi
 
     # d. User systemd unit overriding the packaged session target.
@@ -1547,7 +1575,8 @@ summary_leftovers() {
     summary_warn "Leftovers from older local builds (they override the packages):"
     local line
     for line in "${MIGRATION_LEFTOVERS[@]}"; do printf '    %s\n' "$line"; done
-    printf '    See README: "Migrating from a local (~/.local) build to the packages".\n'
+    printf '    See docs/arch-migration.md (old build-arch-native.sh installs) or README:\n'
+    printf '    "Migrating from a local (~/.local) build to the packages".\n'
 }
 
 # print_usage pkg | dev [with_greeter]
