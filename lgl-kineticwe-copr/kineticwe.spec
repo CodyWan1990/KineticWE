@@ -442,8 +442,8 @@ rm -f %{buildroot}%{_libdir}/libkineticwe-decoration.so
 rm -f %{buildroot}%{_libdir}/libkineticwe-decoration-private.so
 rm -f %{buildroot}%{_libdir}/libkineticwe.so
 
-# Avoid owning files that conflict with Fedora's stock KWin notification data.
-rm -f %{buildroot}%{_datadir}/knotifications6/*.notifyrc
+# Only drop KWin's notifyrc, which conflicts with stock KWin.
+rm -f %{buildroot}%{_datadir}/knotifications6/kwin.notifyrc
 rm -rf %{buildroot}%{_datadir}/dbus-1/interfaces
 
 # Kinetic Settings owns all settings; drop every KDE System Settings module.
@@ -512,6 +512,7 @@ echo
 %{_userunitdir}/plasma-xdg-desktop-portal-kwe.service
 %{_datadir}/locale/*/LC_MESSAGES/xdg-desktop-portal-kwe.mo
 %{_datadir}/qlogging-categories6/xdp-kwe.categories
+%{_datadir}/knotifications6/xdg-desktop-portal-kwe.notifyrc
 
 %files -n kineticwe-noctalia
 %license shell/noctalia/LICENSE
