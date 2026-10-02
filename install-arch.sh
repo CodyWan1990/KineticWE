@@ -30,16 +30,22 @@ fi
 # Modifiers:
 #   --no-session         Dev modes: skip installing the KineticWE-Dev login-screen entry
 #   --no-greeter         --pkg only: do not install the kineticwe-greeter package
+#   --yes, -y            Skip the confirmation prompt (required when not run
+#                        from a terminal)
 #   --install-host-deps  Deprecated alias for --binary
+#
+# Every mode except --clean-deps and --help first shows what it will do and
+# asks to continue ([Y/n] for builds; [y/N] for --local-dev and --reset-local).
 #
 # Only one mode may be given; --local-dev together with --binary means --local-dev.
 #
 # Dependencies are read from PKGBUILD: top-level makedepends are the build
 # deps; the depends of kineticwe, xdg-desktop-portal-kwe and kineticwe-noctalia
 # (plus kineticwe-greeter for --local-dev), together with kineticwe's optdepends,
-# are the dev-session runtime deps. Before
-# any build, PKGBUILD's pkgver/pkgrel and pinned commits are checked against
-# lgl-kineticwe-copr/kineticwe.spec (the source of truth).
+# are the dev-session runtime deps. Builds always use the version, release and
+# pinned commits from lgl-kineticwe-copr/kineticwe.spec (the source of truth);
+# if the committed PKGBUILD lags behind, the build warns and continues
+# (arch/sync-from-spec.sh PKGBUILD updates it).
 #
 # Environment variables:
 #   TEST_PREFIX           - Dev-mode install prefix (default: $HOME/.local)
@@ -353,10 +359,13 @@ pkgbuild_value() {
     sed -n "s/^$1=[\"']\\{0,1\\}\\([^\"'[:space:]#]*\\).*/\\1/p" "$PKGBUILD_FILE" | head -1
 }
 
+# Compare the committed PKGBUILD with the spec. Drift only warns: builds use
+# the spec's values (pkg mode syncs its build copy with arch/sync-from-spec.sh;
+# dev modes read the spec's pins directly). Only an unreadable spec stops.
+PKGBUILD_DRIFT=()
 check_pkgbuild_drift() {
     [[ -f "$PKGBUILD_FILE" ]] || die "PKGBUILD not found: $PKGBUILD_FILE"
     [[ -f "$SPEC_FILE" ]] || die "Spec not found: $SPEC_FILE"
-    local -a mismatches=()
     local key spec_value pkg_value
     local -a pairs=(
         "pkgver:$SPEC_VERSION"
@@ -367,20 +376,23 @@ check_pkgbuild_drift() {
         "_greeter_commit:$SPEC_GREETER_REF"
     )
     local pair
+    PKGBUILD_DRIFT=()
     for pair in "${pairs[@]}"; do
         key="${pair%%:*}"
         spec_value="${pair#*:}"
+        [[ -n "$spec_value" ]] || die "Cannot read $key from $SPEC_FILE"
         pkg_value=$(pkgbuild_value "$key")
-        if [[ -z "$spec_value" || "$pkg_value" != "$spec_value" ]]; then
-            mismatches+=("$key: PKGBUILD='${pkg_value:-<missing>}' spec='${spec_value:-<missing>}'")
+        if [[ "$pkg_value" != "$spec_value" ]]; then
+            PKGBUILD_DRIFT+=("$key ${pkg_value:-<missing>} -> $spec_value")
         fi
     done
-    if (( ${#mismatches[@]} )); then
-        error "PKGBUILD has drifted from $SPEC_FILE (the spec is the source of truth):"
-        printf '    %s\n' "${mismatches[@]}" >&2
-        die "Update PKGBUILD to match the spec before building."
+    if (( ${#PKGBUILD_DRIFT[@]} )); then
+        warn "PKGBUILD is behind $SPEC_FILE; building with the spec's values:"
+        printf '    %s\n' "${PKGBUILD_DRIFT[@]}"
+        warn "To update the committed PKGBUILD: arch/sync-from-spec.sh PKGBUILD"
+    else
+        info "PKGBUILD matches spec: ${SPEC_VERSION}-${SPEC_RELEASE}, pinned revisions agree."
     fi
-    info "PKGBUILD matches spec: ${SPEC_VERSION}-${SPEC_RELEASE}, pinned revisions agree."
 }
 
 # ---------------------------------------------------------------------------
@@ -1483,9 +1495,9 @@ ui_init() {
         U_B='' U_DIM='' U_OK='' U_WARN='' U_CMD='' U_R=''
     fi
     if [[ -t 1 && "${charmap,,}" == *utf-8* || -t 1 && "${charmap,,}" == *utf8* ]]; then
-        G_OK='✔' G_WARN='⚠' G_RULE='─' G_H='═' G_V='║' G_TL='╔' G_TR='╗' G_BL='╚' G_BR='╝'
+        G_BULLET='•' G_OK='✔' G_WARN='⚠' G_RULE='─' G_H='═' G_V='║' G_TL='╔' G_TR='╗' G_BL='╚' G_BR='╝'
     else
-        G_OK='[ok]' G_WARN='[!]' G_RULE='-' G_H='-' G_V='|' G_TL='+' G_TR='+' G_BL='+' G_BR='+'
+        G_BULLET='-' G_OK='[ok]' G_WARN='[!]' G_RULE='-' G_H='-' G_V='|' G_TL='+' G_TR='+' G_BL='+' G_BR='+'
     fi
 }
 
@@ -1579,6 +1591,109 @@ summary_leftovers() {
     printf '    "Migrating from a local (~/.local) build to the packages".\n'
 }
 
+# ---------------------------------------------------------------------------
+# Welcome screen + confirmation (before any build, sudo or change)
+# ---------------------------------------------------------------------------
+welcome_title() {
+    echo
+    summary_rule
+    printf '  %sKineticWE for Arch: %s%s\n' "$U_B" "$1" "$U_R"
+    summary_rule
+}
+
+# confirm_start <mode> <assume_yes> <do_greeter>
+# Shows what the chosen mode is about to do and asks before continuing.
+# Default answer: Y for builds, N for --local-dev (display manager) and
+# --reset-local (deletes files). Without a terminal, --yes is required.
+confirm_start() {
+    local mode="$1" assume_yes="$2" do_greeter="$3" default=Y
+    ui_init
+    case "$mode" in
+        pkg)
+            welcome_title "install packages"
+            summary_row "Version" "${SPEC_VERSION}-${SPEC_RELEASE} (from lgl-kineticwe-copr/kineticwe.spec)"
+            summary_row "Source" "this checkout ($SCRIPT_DIR)"
+            echo
+            echo "  This will:"
+            echo "    ${G_BULLET} build kineticwe, xdg-desktop-portal-kwe, kineticwe-noctalia"
+            if [[ "$do_greeter" == true ]]; then
+                echo "      and kineticwe-greeter with makepkg"
+            else
+                echo "      with makepkg (kineticwe-greeter is skipped: --no-greeter)"
+            fi
+            echo "    ${G_BULLET} install missing build dependencies and the packages"
+            echo "      with pacman (asks for your sudo password)"
+            echo
+            echo "  A first build takes roughly 10-30 minutes."
+            ;;
+        binary|kwin-only|noct-only|local-dev)
+            local what
+            case "$mode" in
+                binary)    what="compositor, portal and shell" ;;
+                kwin-only) what="compositor only (incremental)" ;;
+                noct-only) what="Noctalia shell only (incremental)" ;;
+                local-dev) what="compositor, portal, shell + greeter setup" ;;
+            esac
+            welcome_title "development build"
+            summary_row "Installs" "$what"
+            summary_row "Into" "$TEST_PREFIX (overrides the packages)"
+            echo
+            summary_warn "For testing and development only, not for daily use."
+            echo "    For daily use, install the packages: ./install-arch.sh"
+            if [[ "$mode" == binary || "$mode" == local-dev ]]; then
+                echo "    Adds a \"KineticWE-Dev\" login entry (asks for sudo)."
+            fi
+            echo "    Undo later with: ./install-arch.sh --reset-local"
+            if [[ "$mode" == local-dev ]]; then
+                default=N
+                echo
+                summary_box \
+                    "This also changes your display manager:" \
+                    "" \
+                    "  - sets up greetd with the Noctalia greeter" \
+                    "  - disables your current display manager" \
+                    "  - edits /etc/greetd/config.toml (backup kept)" \
+                    "" \
+                    "Uses sudo. Reboot afterwards."
+            fi
+            ;;
+        reset-local)
+            default=N
+            welcome_title "remove local dev build"
+            echo "  This will remove:"
+            echo "    ${G_BULLET} the dev build files this script recorded in $TEST_PREFIX"
+            echo "    ${G_BULLET} the \"KineticWE-Dev\" login entry (asks for sudo)"
+            echo
+            echo "  Kept: your settings (~/.config/kineticwe, ~/.local/state/noctalia),"
+            echo "  files you edited since, the packages and the greeter."
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+    echo
+
+    if [[ "$assume_yes" == true ]]; then
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        error "Not running in a terminal; re-run with --yes to proceed without confirmation."
+        exit 1
+    fi
+    local prompt='[Y/n]' answer
+    [[ "$default" == Y ]] || prompt='[y/N]'
+    read -r -p "  Continue? $prompt " answer || answer=""
+    answer="${answer:-$default}"
+    case "${answer,,}" in
+        y|yes) echo ;;
+        *)
+            echo
+            info "Cancelled. Nothing was changed."
+            exit 0
+            ;;
+    esac
+}
+
 # print_usage pkg | dev [with_greeter]
 print_usage() {
     local mode="${1:-dev}" with_greeter="${2:-false}"
@@ -1603,6 +1718,10 @@ print_usage() {
         summary_row "Packages" "${rows[0]:-}"
         for (( i = 1; i < ${#rows[@]}; i++ )); do summary_row "" "${rows[i]}"; done
         summary_qt "$PKG_WORK_DIR/qt-abi"
+        if (( ${#PKGBUILD_DRIFT[@]} )); then
+            summary_warn "PKGBUILD is behind the spec; built with the spec's values."
+            printf '    Update it: %sarch/sync-from-spec.sh PKGBUILD%s\n' "$U_CMD" "$U_R"
+        fi
         echo
 
         summary_greeter /usr/bin/noctalia-greeter-session
@@ -1660,8 +1779,10 @@ print_usage() {
 pkg_build() {
     local install_greeter="$1"
     local work="$PKG_WORK_DIR" pkgver tool
-    pkgver=$(pkgbuild_value pkgver)
-    [[ -n "$pkgver" ]] || die "Cannot read pkgver from $PKGBUILD_FILE"
+    # The spec's Version, not the committed PKGBUILD's: the build copy is synced
+    # to the spec, and the tarball prefix must match its pkgver.
+    pkgver="$SPEC_VERSION"
+    [[ -n "$pkgver" ]] || die "Cannot read Version from $SPEC_FILE"
     [[ "$SPEC_RELEASE" =~ ^[0-9]+$ ]] || die "Spec Release must be an integer for dev pkgrel numbering: $SPEC_RELEASE"
     [[ -f "$PKGBUILD_INSTALL_FILE" ]] || die "Missing $PKGBUILD_INSTALL_FILE (PKGBUILD install= file)"
     [[ -f "$PKGBUILD_GREETER_INSTALL_FILE" ]] || die "Missing $PKGBUILD_GREETER_INSTALL_FILE (kineticwe-greeter install= file)"
@@ -1705,6 +1826,9 @@ pkg_build() {
     mv -f -- "$tarball.tmp" "$tarball"
 
     cp -f -- "$PKGBUILD_FILE" "$work/PKGBUILD"
+    # Build what the spec says even if the committed PKGBUILD lags behind.
+    "$SCRIPT_DIR/arch/sync-from-spec.sh" "$work/PKGBUILD" >/dev/null \
+        || die "Cannot sync $work/PKGBUILD with $SPEC_FILE"
     cp -f -- "$PKGBUILD_INSTALL_FILE" "$work/kineticwe.install"
     cp -f -- "$PKGBUILD_GREETER_INSTALL_FILE" "$work/kineticwe-greeter.install"
     sed -i "s/^pkgrel=.*/pkgrel=${PKG_DEV_RELEASE}/" "$work/PKGBUILD"
@@ -1756,11 +1880,7 @@ dev_build() {
         noct-only) title="Noctalia-Only Dev Build" ;;
         *)         die "Unknown dev mode: $mode" ;;
     esac
-    echo "=========================================="
-    echo "  KineticWE ${title} (Arch Native)"
-    echo "  Install prefix: ${TEST_PREFIX}"
-    echo "=========================================="
-    echo
+    step "KineticWE ${title} into ${TEST_PREFIX}"
 
     check_bootstrap
     check_pkgbuild_drift
@@ -1831,6 +1951,8 @@ Modes (at most one; default --pkg):
 Modifiers:
   --no-session         Dev modes: do not install the KineticWE-Dev login-screen entry.
   --no-greeter         --pkg only: do not install the kineticwe-greeter package.
+  --yes, -y            Skip the confirmation prompt (required when not run
+                       from a terminal).
   --install-host-deps  Deprecated alias for --binary.
   --full               Deprecated alias for --local-dev.
 
@@ -1843,7 +1965,7 @@ EOF
 }
 
 main() {
-    local do_session=true do_greeter=true arg
+    local do_session=true do_greeter=true assume_yes=false arg
     local -a modes=()
 
     for arg in "$@"; do
@@ -1865,6 +1987,7 @@ main() {
                 ;;
             --no-session)  do_session=false ;;
             --no-greeter)  do_greeter=false ;;
+            --yes|-y)      assume_yes=true ;;
             --help|-h)     usage; exit 0 ;;
             *)
                 error "Unknown option: $arg"
@@ -1891,12 +2014,10 @@ main() {
         die "--no-greeter only applies to --pkg"
     fi
 
+    confirm_start "$mode" "$assume_yes" "$do_greeter"
+
     case "$mode" in
         reset-local)
-            echo "=========================================="
-            echo "  KineticWE Arch - Reset Local Dev Install"
-            echo "=========================================="
-            echo
             reset_local
             ;;
         clean-deps)
@@ -1907,11 +2028,6 @@ main() {
             clean_build_deps
             ;;
         pkg)
-            echo "=========================================="
-            echo "  KineticWE Package Build (Arch Native)"
-            echo "  Work dir: ${PKG_WORK_DIR}"
-            echo "=========================================="
-            echo
             [[ "$do_session" == true ]] || warn "--no-session has no effect in --pkg mode."
             check_bootstrap
             check_pkgbuild_drift

@@ -68,6 +68,9 @@ build-package:
     - export CCACHE_DIR="$CI_PROJECT_DIR/.ccache"
     - mkdir -p "$CCACHE_DIR" && chmod 777 "$CCACHE_DIR"
     - sed -i "s|^#CacheDir.*|CacheDir = $CI_PROJECT_DIR/.pkg-cache/|" /etc/pacman.conf
+    # Build the spec's version and pinned commits even if the committed
+    # PKGBUILD lags behind lgl-kineticwe-copr/kineticwe.spec.
+    - arch/sync-from-spec.sh PKGBUILD
     # ABI refreshes between releases get a CI-only pkgrel suffix so pacman
     # offers them as upgrades; the next source release (e.g. 16) sorts higher.
     - |

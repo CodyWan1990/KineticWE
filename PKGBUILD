@@ -442,6 +442,13 @@ package_kineticwe() {
     DESTDIR="$pkgdir" cmake --install kdeco-build --prefix /usr
     DESTDIR="$pkgdir" cmake --install kwin-build --prefix /usr
 
+    # The private kglobalacceld installs its kdebugsettings categories file
+    # under the stock name, which KDE's kglobalacceld package owns, so pacman
+    # refuses to install next to Plasma. Rename it like the private library
+    # (libkineticwe-globalacceld); kdebugsettings reads every *.categories file.
+    mv "$pkgdir/usr/share/qlogging-categories6/kglobalacceld.categories" \
+       "$pkgdir/usr/share/qlogging-categories6/kineticwe-globalacceld.categories"
+
     # Session launcher: the packaging-local copy the spec ships (SOURCE10),
     # which intentionally overrides scripts/start-kineticwe.sh.
     sed -e 's|@INSTALL_PREFIX@|/usr|g' \
