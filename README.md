@@ -129,6 +129,8 @@ For a development loop, the same script can instead install into `~/.local`:
 
 > **Note:** KWin uses Qt private APIs, so a source build is tied to the exact Qt version it was built against. After every Arch Qt update, rebuild (the binary repo is rebuilt automatically for this).
 
+> **Note:** The Fedora spec (`lgl-kineticwe-copr/kineticwe.spec`) is the source of truth for the version, release and pinned commits. Builds always use the spec's values; if the committed `PKGBUILD` lags behind, the build prints a warning and continues. Run `arch/sync-from-spec.sh PKGBUILD` to update it. Changes beyond version and pins (dependencies, files, patches) still need a manual `PKGBUILD` edit.
+
 #### Setting up the greeter
 
 Installing `kineticwe-greeter` does not change your display manager. Run the setup once, then reboot:

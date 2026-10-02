@@ -37,9 +37,10 @@ fi
 # Dependencies are read from PKGBUILD: top-level makedepends are the build
 # deps; the depends of kineticwe, xdg-desktop-portal-kwe and kineticwe-noctalia
 # (plus kineticwe-greeter for --local-dev), together with kineticwe's optdepends,
-# are the dev-session runtime deps. Before
-# any build, PKGBUILD's pkgver/pkgrel and pinned commits are checked against
-# lgl-kineticwe-copr/kineticwe.spec (the source of truth).
+# are the dev-session runtime deps. Builds always use the version, release and
+# pinned commits from lgl-kineticwe-copr/kineticwe.spec (the source of truth);
+# if the committed PKGBUILD lags behind, the build warns and continues
+# (arch/sync-from-spec.sh PKGBUILD updates it).
 #
 # Environment variables:
 #   TEST_PREFIX           - Dev-mode install prefix (default: $HOME/.local)
@@ -353,10 +354,13 @@ pkgbuild_value() {
     sed -n "s/^$1=[\"']\\{0,1\\}\\([^\"'[:space:]#]*\\).*/\\1/p" "$PKGBUILD_FILE" | head -1
 }
 
+# Compare the committed PKGBUILD with the spec. Drift only warns: builds use
+# the spec's values (pkg mode syncs its build copy with arch/sync-from-spec.sh;
+# dev modes read the spec's pins directly). Only an unreadable spec stops.
+PKGBUILD_DRIFT=()
 check_pkgbuild_drift() {
     [[ -f "$PKGBUILD_FILE" ]] || die "PKGBUILD not found: $PKGBUILD_FILE"
     [[ -f "$SPEC_FILE" ]] || die "Spec not found: $SPEC_FILE"
-    local -a mismatches=()
     local key spec_value pkg_value
     local -a pairs=(
         "pkgver:$SPEC_VERSION"
@@ -367,20 +371,23 @@ check_pkgbuild_drift() {
         "_greeter_commit:$SPEC_GREETER_REF"
     )
     local pair
+    PKGBUILD_DRIFT=()
     for pair in "${pairs[@]}"; do
         key="${pair%%:*}"
         spec_value="${pair#*:}"
+        [[ -n "$spec_value" ]] || die "Cannot read $key from $SPEC_FILE"
         pkg_value=$(pkgbuild_value "$key")
-        if [[ -z "$spec_value" || "$pkg_value" != "$spec_value" ]]; then
-            mismatches+=("$key: PKGBUILD='${pkg_value:-<missing>}' spec='${spec_value:-<missing>}'")
+        if [[ "$pkg_value" != "$spec_value" ]]; then
+            PKGBUILD_DRIFT+=("$key ${pkg_value:-<missing>} -> $spec_value")
         fi
     done
-    if (( ${#mismatches[@]} )); then
-        error "PKGBUILD has drifted from $SPEC_FILE (the spec is the source of truth):"
-        printf '    %s\n' "${mismatches[@]}" >&2
-        die "Update PKGBUILD to match the spec before building."
+    if (( ${#PKGBUILD_DRIFT[@]} )); then
+        warn "PKGBUILD is behind $SPEC_FILE; building with the spec's values:"
+        printf '    %s\n' "${PKGBUILD_DRIFT[@]}"
+        warn "To update the committed PKGBUILD: arch/sync-from-spec.sh PKGBUILD"
+    else
+        info "PKGBUILD matches spec: ${SPEC_VERSION}-${SPEC_RELEASE}, pinned revisions agree."
     fi
-    info "PKGBUILD matches spec: ${SPEC_VERSION}-${SPEC_RELEASE}, pinned revisions agree."
 }
 
 # ---------------------------------------------------------------------------
@@ -1603,6 +1610,10 @@ print_usage() {
         summary_row "Packages" "${rows[0]:-}"
         for (( i = 1; i < ${#rows[@]}; i++ )); do summary_row "" "${rows[i]}"; done
         summary_qt "$PKG_WORK_DIR/qt-abi"
+        if (( ${#PKGBUILD_DRIFT[@]} )); then
+            summary_warn "PKGBUILD is behind the spec; built with the spec's values."
+            printf '    Update it: %sarch/sync-from-spec.sh PKGBUILD%s\n' "$U_CMD" "$U_R"
+        fi
         echo
 
         summary_greeter /usr/bin/noctalia-greeter-session
@@ -1660,8 +1671,10 @@ print_usage() {
 pkg_build() {
     local install_greeter="$1"
     local work="$PKG_WORK_DIR" pkgver tool
-    pkgver=$(pkgbuild_value pkgver)
-    [[ -n "$pkgver" ]] || die "Cannot read pkgver from $PKGBUILD_FILE"
+    # The spec's Version, not the committed PKGBUILD's: the build copy is synced
+    # to the spec, and the tarball prefix must match its pkgver.
+    pkgver="$SPEC_VERSION"
+    [[ -n "$pkgver" ]] || die "Cannot read Version from $SPEC_FILE"
     [[ "$SPEC_RELEASE" =~ ^[0-9]+$ ]] || die "Spec Release must be an integer for dev pkgrel numbering: $SPEC_RELEASE"
     [[ -f "$PKGBUILD_INSTALL_FILE" ]] || die "Missing $PKGBUILD_INSTALL_FILE (PKGBUILD install= file)"
     [[ -f "$PKGBUILD_GREETER_INSTALL_FILE" ]] || die "Missing $PKGBUILD_GREETER_INSTALL_FILE (kineticwe-greeter install= file)"
@@ -1705,6 +1718,9 @@ pkg_build() {
     mv -f -- "$tarball.tmp" "$tarball"
 
     cp -f -- "$PKGBUILD_FILE" "$work/PKGBUILD"
+    # Build what the spec says even if the committed PKGBUILD lags behind.
+    "$SCRIPT_DIR/arch/sync-from-spec.sh" "$work/PKGBUILD" >/dev/null \
+        || die "Cannot sync $work/PKGBUILD with $SPEC_FILE"
     cp -f -- "$PKGBUILD_INSTALL_FILE" "$work/kineticwe.install"
     cp -f -- "$PKGBUILD_GREETER_INSTALL_FILE" "$work/kineticwe-greeter.install"
     sed -i "s/^pkgrel=.*/pkgrel=${PKG_DEV_RELEASE}/" "$work/PKGBUILD"
