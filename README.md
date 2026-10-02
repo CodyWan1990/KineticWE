@@ -118,13 +118,17 @@ To build the split packages (`kineticwe`, `xdg-desktop-portal-kwe`, `kineticwe-n
 ./install-arch.sh
 ```
 
+The script shows what it will do and asks before starting. Pass `--yes` to skip the question (required when it isn't run from a terminal).
+
 For a development loop, the same script can instead install into `~/.local`:
+
+> **For testing and development only.** `--binary`, `--kwin-only`, `--noct-only` and `--local-dev` install a development build into `~/.local` that overrides the packages. They're not recommended for regular use, and `--local-dev` also reconfigures your display manager. For daily use, install the packages (`./install-arch.sh` or the binary repo above). Undo a dev build with `./install-arch.sh --reset-local`.
 
 ```bash
 ./install-arch.sh --binary     # compositor, portal and shell
 ./install-arch.sh --kwin-only  # compositor only (no portal/shell)
 ./install-arch.sh --noct-only  # Noctalia shell only
-./install-arch.sh --local-dev  # everything, and also sets up the greeter
+./install-arch.sh --local-dev  # everything + greeter setup (development only)
 ```
 
 > **Note:** KWin uses Qt private APIs, so a source build is tied to the exact Qt version it was built against. After every Arch Qt update, rebuild (the binary repo is rebuilt automatically for this).

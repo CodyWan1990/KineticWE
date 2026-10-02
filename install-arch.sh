@@ -30,7 +30,12 @@ fi
 # Modifiers:
 #   --no-session         Dev modes: skip installing the KineticWE-Dev login-screen entry
 #   --no-greeter         --pkg only: do not install the kineticwe-greeter package
+#   --yes, -y            Skip the confirmation prompt (required when not run
+#                        from a terminal)
 #   --install-host-deps  Deprecated alias for --binary
+#
+# Every mode except --clean-deps and --help first shows what it will do and
+# asks to continue ([Y/n] for builds; [y/N] for --local-dev and --reset-local).
 #
 # Only one mode may be given; --local-dev together with --binary means --local-dev.
 #
@@ -1490,9 +1495,9 @@ ui_init() {
         U_B='' U_DIM='' U_OK='' U_WARN='' U_CMD='' U_R=''
     fi
     if [[ -t 1 && "${charmap,,}" == *utf-8* || -t 1 && "${charmap,,}" == *utf8* ]]; then
-        G_OK='✔' G_WARN='⚠' G_RULE='─' G_H='═' G_V='║' G_TL='╔' G_TR='╗' G_BL='╚' G_BR='╝'
+        G_BULLET='•' G_OK='✔' G_WARN='⚠' G_RULE='─' G_H='═' G_V='║' G_TL='╔' G_TR='╗' G_BL='╚' G_BR='╝'
     else
-        G_OK='[ok]' G_WARN='[!]' G_RULE='-' G_H='-' G_V='|' G_TL='+' G_TR='+' G_BL='+' G_BR='+'
+        G_BULLET='-' G_OK='[ok]' G_WARN='[!]' G_RULE='-' G_H='-' G_V='|' G_TL='+' G_TR='+' G_BL='+' G_BR='+'
     fi
 }
 
@@ -1584,6 +1589,109 @@ summary_leftovers() {
     for line in "${MIGRATION_LEFTOVERS[@]}"; do printf '    %s\n' "$line"; done
     printf '    See docs/arch-migration.md (old build-arch-native.sh installs) or README:\n'
     printf '    "Migrating from a local (~/.local) build to the packages".\n'
+}
+
+# ---------------------------------------------------------------------------
+# Welcome screen + confirmation (before any build, sudo or change)
+# ---------------------------------------------------------------------------
+welcome_title() {
+    echo
+    summary_rule
+    printf '  %sKineticWE for Arch: %s%s\n' "$U_B" "$1" "$U_R"
+    summary_rule
+}
+
+# confirm_start <mode> <assume_yes> <do_greeter>
+# Shows what the chosen mode is about to do and asks before continuing.
+# Default answer: Y for builds, N for --local-dev (display manager) and
+# --reset-local (deletes files). Without a terminal, --yes is required.
+confirm_start() {
+    local mode="$1" assume_yes="$2" do_greeter="$3" default=Y
+    ui_init
+    case "$mode" in
+        pkg)
+            welcome_title "install packages"
+            summary_row "Version" "${SPEC_VERSION}-${SPEC_RELEASE} (from lgl-kineticwe-copr/kineticwe.spec)"
+            summary_row "Source" "this checkout ($SCRIPT_DIR)"
+            echo
+            echo "  This will:"
+            echo "    ${G_BULLET} build kineticwe, xdg-desktop-portal-kwe, kineticwe-noctalia"
+            if [[ "$do_greeter" == true ]]; then
+                echo "      and kineticwe-greeter with makepkg"
+            else
+                echo "      with makepkg (kineticwe-greeter is skipped: --no-greeter)"
+            fi
+            echo "    ${G_BULLET} install missing build dependencies and the packages"
+            echo "      with pacman (asks for your sudo password)"
+            echo
+            echo "  A first build takes roughly 10-30 minutes."
+            ;;
+        binary|kwin-only|noct-only|local-dev)
+            local what
+            case "$mode" in
+                binary)    what="compositor, portal and shell" ;;
+                kwin-only) what="compositor only (incremental)" ;;
+                noct-only) what="Noctalia shell only (incremental)" ;;
+                local-dev) what="compositor, portal, shell + greeter setup" ;;
+            esac
+            welcome_title "development build"
+            summary_row "Installs" "$what"
+            summary_row "Into" "$TEST_PREFIX (overrides the packages)"
+            echo
+            summary_warn "For testing and development only, not for daily use."
+            echo "    For daily use, install the packages: ./install-arch.sh"
+            if [[ "$mode" == binary || "$mode" == local-dev ]]; then
+                echo "    Adds a \"KineticWE-Dev\" login entry (asks for sudo)."
+            fi
+            echo "    Undo later with: ./install-arch.sh --reset-local"
+            if [[ "$mode" == local-dev ]]; then
+                default=N
+                echo
+                summary_box \
+                    "This also changes your display manager:" \
+                    "" \
+                    "  - sets up greetd with the Noctalia greeter" \
+                    "  - disables your current display manager" \
+                    "  - edits /etc/greetd/config.toml (backup kept)" \
+                    "" \
+                    "Uses sudo. Reboot afterwards."
+            fi
+            ;;
+        reset-local)
+            default=N
+            welcome_title "remove local dev build"
+            echo "  This will remove:"
+            echo "    ${G_BULLET} the dev build files this script recorded in $TEST_PREFIX"
+            echo "    ${G_BULLET} the \"KineticWE-Dev\" login entry (asks for sudo)"
+            echo
+            echo "  Kept: your settings (~/.config/kineticwe, ~/.local/state/noctalia),"
+            echo "  files you edited since, the packages and the greeter."
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+    echo
+
+    if [[ "$assume_yes" == true ]]; then
+        return 0
+    fi
+    if [[ ! -t 0 ]]; then
+        error "Not running in a terminal; re-run with --yes to proceed without confirmation."
+        exit 1
+    fi
+    local prompt='[Y/n]' answer
+    [[ "$default" == Y ]] || prompt='[y/N]'
+    read -r -p "  Continue? $prompt " answer || answer=""
+    answer="${answer:-$default}"
+    case "${answer,,}" in
+        y|yes) echo ;;
+        *)
+            echo
+            info "Cancelled. Nothing was changed."
+            exit 0
+            ;;
+    esac
 }
 
 # print_usage pkg | dev [with_greeter]
@@ -1772,11 +1880,7 @@ dev_build() {
         noct-only) title="Noctalia-Only Dev Build" ;;
         *)         die "Unknown dev mode: $mode" ;;
     esac
-    echo "=========================================="
-    echo "  KineticWE ${title} (Arch Native)"
-    echo "  Install prefix: ${TEST_PREFIX}"
-    echo "=========================================="
-    echo
+    step "KineticWE ${title} into ${TEST_PREFIX}"
 
     check_bootstrap
     check_pkgbuild_drift
@@ -1847,6 +1951,8 @@ Modes (at most one; default --pkg):
 Modifiers:
   --no-session         Dev modes: do not install the KineticWE-Dev login-screen entry.
   --no-greeter         --pkg only: do not install the kineticwe-greeter package.
+  --yes, -y            Skip the confirmation prompt (required when not run
+                       from a terminal).
   --install-host-deps  Deprecated alias for --binary.
   --full               Deprecated alias for --local-dev.
 
@@ -1859,7 +1965,7 @@ EOF
 }
 
 main() {
-    local do_session=true do_greeter=true arg
+    local do_session=true do_greeter=true assume_yes=false arg
     local -a modes=()
 
     for arg in "$@"; do
@@ -1881,6 +1987,7 @@ main() {
                 ;;
             --no-session)  do_session=false ;;
             --no-greeter)  do_greeter=false ;;
+            --yes|-y)      assume_yes=true ;;
             --help|-h)     usage; exit 0 ;;
             *)
                 error "Unknown option: $arg"
@@ -1907,12 +2014,10 @@ main() {
         die "--no-greeter only applies to --pkg"
     fi
 
+    confirm_start "$mode" "$assume_yes" "$do_greeter"
+
     case "$mode" in
         reset-local)
-            echo "=========================================="
-            echo "  KineticWE Arch - Reset Local Dev Install"
-            echo "=========================================="
-            echo
             reset_local
             ;;
         clean-deps)
@@ -1923,11 +2028,6 @@ main() {
             clean_build_deps
             ;;
         pkg)
-            echo "=========================================="
-            echo "  KineticWE Package Build (Arch Native)"
-            echo "  Work dir: ${PKG_WORK_DIR}"
-            echo "=========================================="
-            echo
             [[ "$do_session" == true ]] || warn "--no-session has no effect in --pkg mode."
             check_bootstrap
             check_pkgbuild_drift
