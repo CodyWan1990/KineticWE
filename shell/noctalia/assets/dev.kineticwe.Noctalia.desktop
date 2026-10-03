@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Noctalia
+Name=Noctalia (KineticWE)
 Comment=A sleek, customizable desktop shell crafted for Wayland.
 Exec=noctalia-kwe --daemon
 Icon=noctalia-kwe
