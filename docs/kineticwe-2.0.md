@@ -85,7 +85,7 @@ All of the following are owned by the `kinetic-we` process itself; a settings ap
 
 - C++23 / Wayland / OpenGL ES; **no Qt, no GTK, no KDE dependencies**. Deps include sdbus-cpp, pipewire, wireplumber, polkit (own agent), pam, libsecret, libsndfile, tomlplusplus, upower (optional), ddcutil (optional), libqalculate.
 - Own surfaces/services: bars, dock, launcher, control center, notification daemon, wallpaper picker, OSDs, **lock screen**, session actions (logind), clipboard history, tray, settings UI, IPC (`noctalia-kwe msg ...`).
-- Config: `~/.config/noctalia/config.toml`, hot-reloaded via inotify. Upstream already ships `[lockscreen]`, `[idle.behavior.lock]` / `[idle.behavior.screen-off]` (timeout + action), `[nightlight]`, `[brightness]` (sysfs backlight + optional ddcutil), `[audio]`, power-profile hooks, and `[hooks]` for `session_locked`/`session_unlocked` etc.
+- Config: `~/.config/noctalia-kwe/config.toml`, hot-reloaded via inotify. Upstream already ships `[lockscreen]`, `[idle.behavior.lock]` / `[idle.behavior.screen-off]` (timeout + action), `[nightlight]`, `[brightness]` (sysfs backlight + optional ddcutil), `[audio]`, power-profile hooks, and `[hooks]` for `session_locked`/`session_unlocked` etc.
 - Compositor backends in `src/compositors/`: niri, hyprland, sway, dwl, labwc, mango, triad, ext_workspace, **kde** (`kwin_workspace_backend.cpp` via the `org_kde_plasma_virtual_desktop` protocol; `kwin_active_window.cpp`).
   - **Gap:** the `kde/` backend has **no output backend** and no session-lock path.
 - Existing kineticwe↔noctalia bridge: `src/noctaliasettings.cpp` registers shell shortcuts through the embedded KGlobalAccel and executes `noctalia-kwe msg <args>`; the compositor reads `color-schemes/noctalia.colors` for tiling accent colors (`src/tiling/tilingcontroller.cpp`). In 2.0 the shortcut/settings part of this bridge moves into the Kinetic Settings module (Phase 4); the `noctalia-kwe msg` IPC path stays for compositor-triggered shell actions.
@@ -137,7 +137,7 @@ All of the following are owned by the `kinetic-we` process itself; a settings ap
 
 The plugin system is **shell code**; forking does not touch it:
 
-- Plugin locations are user-side and runtime-loaded: `~/.local/share/noctalia/plugins/` (manual/path sources) and git sources cached in `~/.local/state/noctalia/plugins/sources/`.
+- Plugin locations are user-side and runtime-loaded: `~/.local/share/noctalia-kwe/plugins/` (manual/path sources) and git sources cached in `~/.local/state/noctalia-kwe/plugins/sources/`.
 - `plugin.toml` manifests, Luau entry scripts (isolated VMs, off the UI thread), hot-reload, the `noctalia-kwe msg plugins ...` IPC, and the Settings → Plugins UI all ship inside the fork.
 - Plugin types (widgets, launcher providers, panels, shortcuts, background services) and their settings surfaces are preserved.
 
@@ -150,13 +150,13 @@ The plugin system is **shell code**; forking does not touch it:
 **Caveats:**
 
 - Compositor-specific plugins remain compositor-specific (a hyprland-IPC plugin won't run on kinetic-we — true today, not a fork regression). Generic plugins gain the new KDE output backend for free (additive).
-- Shared paths with upstream: the fork uses `~/.config/noctalia/` + the plugin dirs by default. If side-by-side install with upstream Noctalia is ever wanted, Noctalia honors `NOCTALIA_STATE_HOME`-style overrides — point the fork at its own dirs. Decision later, not a blocker.
+- Own paths, side by side with upstream: the fork uses its own `noctalia-kwe` install paths (`/usr/share/noctalia-kwe/`), desktop ID `dev.kineticwe.Noctalia`, icon (`noctalia-kwe.svg`) and XDG dirs (`~/.config/noctalia-kwe/`, `~/.local/state/noctalia-kwe/`, `~/.local/share/noctalia-kwe/`, `~/.cache/noctalia-kwe/`), so it installs and runs side by side with upstream Noctalia. On first launch it copies existing `~/.config/noctalia/`, `~/.local/state/noctalia/` and `~/.local/share/noctalia/` (minus its bundled `assets/`) into the new dirs when those don't exist yet; the originals are left untouched. `NOCTALIA_CONFIG_HOME`/`NOCTALIA_STATE_HOME`/`NOCTALIA_DATA_HOME` overrides still apply and resolve to `<override>/noctalia-kwe`.
 
 ### 5.2 Community templates & palettes — compatible
 
 Templates/palettes are **network catalogs**, not code:
 
-- Fetched from `api.noctalia.dev`, cached in `~/.local/state/noctalia/community-*/`, re-fetchable; built-in and user-defined templates are declared in config (`[theme.templates]`).
+- Fetched from `api.noctalia.dev`, cached in `~/.local/state/noctalia-kwe/community-*/`, re-fetchable; built-in and user-defined templates are declared in config (`[theme.templates]`).
 - Template post actions (`kde-color-scheme`, `firefox-theme`, etc.) only write files — no KDE service or compositor dependency.
 - The `kde-color-scheme` template is an existing shell→compositor link we rely on: it writes `color-schemes/noctalia.colors`, which the compositor reads for tiling accent colors (`src/tiling/tilingcontroller.cpp`).
 
@@ -200,7 +200,7 @@ The script also redirects `XDG_CACHE_HOME` to `~/.cache/kineticwe` for the compo
 | `~/.config/kineticwe/session/` | `~/.config/session/` | Compositor session-restore state. |
 | `~/.config/kineticwe/kinetic-settings.kwe` | new in 2.0 | Kinetic Settings UI state that must survive a restart: `[PointingDevices] Mouse=<sysName>` / `Touchpad=<sysName>`, the device last selected on the Mouse / Touchpad pages. Written when the picker changes; kept by the session script's `_KWE_KEEP` list. |
 | `~/.config/kdeglobals` | (unchanged) | **Shared** theme state. One copy, in the user's real config home: the shell's theme service writes it, KDE apps read it, and the compositor opens it by absolute path (`kineticweKdeGlobalsPath()`, `src/config-kwin.h.cmake`) via `KWE_REAL_CONFIG_HOME`. No mirror. The session script seeds **Breeze Dark** here when no color scheme is configured (step 4e) so the default window decoration and KDE apps are dark out of the box. |
-| `~/.config/noctalia/config.toml` | (unchanged) | Shell-owned UI: bars, dock, launcher, notifications, wallpaper, **lock screen**, idle actions, brightness, nightlight UI, power-profile hooks. Already hot-reloaded. |
+| `~/.config/noctalia-kwe/config.toml` | (unchanged) | Shell-owned UI: bars, dock, launcher, notifications, wallpaper, **lock screen**, idle actions, brightness, nightlight UI, power-profile hooks. Already hot-reloaded. |
 
 The session script also **prunes stale user-app entries** from the config root on startup (step 4d): earlier builds redirected the whole session's `XDG_CONFIG_HOME`, so user applications (yazi, zed, fish, kitty, ...) wrote configs inside the root; only compositor-owned files are kept now. The real configs in `~/.config` are untouched duplicates.
 
@@ -420,7 +420,7 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 | `~/.config/kglobalaccelrc` | `~/.config/kineticwe/kglobalaccelrc` (migrated by session script) | embedded KGlobalAccelD (in compositor) |
 | `~/.config/kglobalshortcutsrc` | `~/.config/kineticwe/kglobalshortcutsrc` | embedded KGlobalAccelD (in compositor) |
 | `~/.config/kdeglobals` | unchanged — one shared copy in the real config home; the compositor opens it via `KWE_REAL_CONFIG_HOME` (`kineticweKdeGlobalsPath()`) | shell theme service / KDE apps / compositor |
-| `~/.config/noctalia/config.toml` | unchanged | shell |
+| `~/.config/noctalia-kwe/config.toml` | unchanged | shell |
 | `~/.config/fontconfig/fonts.conf` | unchanged | fontconfig / Kinetic Settings |
 
 User applications (yazi, zed, kitty, ...) are **not** affected: they keep reading/writing `~/.config` exactly as outside the KineticWE session.

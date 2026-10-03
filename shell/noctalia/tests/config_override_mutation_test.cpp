@@ -5,6 +5,7 @@
 
 #include "config/config_service.h"
 #include "config/config_types.h"
+#include "util/file_utils.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -43,7 +44,7 @@ int main() {
   const std::filesystem::path root =
       std::filesystem::temp_directory_path() / ("noctalia-override-mutation-" + std::to_string(::getpid()));
   std::filesystem::remove_all(root);
-  writeFile(root / "config" / "noctalia" / "config.toml", "\n");
+  writeFile(root / "config" / FileUtils::kAppDirName / "config.toml", "\n");
 
   ::setenv("NOCTALIA_CONFIG_HOME", (root / "config").c_str(), 1);
   ::setenv("XDG_STATE_HOME", (root / "state").c_str(), 1);

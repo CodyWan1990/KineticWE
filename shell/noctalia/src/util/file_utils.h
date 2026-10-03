@@ -14,6 +14,10 @@
 
 namespace FileUtils {
 
+  // Directory/socket name component for this fork, distinct from upstream
+  // Noctalia so both can coexist (config/state/data/cache dirs, runtime sockets).
+  inline constexpr std::string_view kAppDirName = NOCTALIA_APP_NAME;
+
   [[nodiscard]] constexpr std::filesystem::perms privateFileMode() {
     return std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
   }
@@ -373,15 +377,15 @@ namespace FileUtils {
   [[nodiscard]] inline std::string configDir() {
     const char* noctalia = std::getenv("NOCTALIA_CONFIG_HOME");
     if (noctalia != nullptr && noctalia[0] != '\0') {
-      return std::string(noctalia) + "/noctalia";
+      return std::string(noctalia) + "/" + std::string(kAppDirName);
     }
     const char* xdg = std::getenv("XDG_CONFIG_HOME");
     if (xdg != nullptr && xdg[0] != '\0') {
-      return std::string(xdg) + "/noctalia";
+      return std::string(xdg) + "/" + std::string(kAppDirName);
     }
     const char* home = std::getenv("HOME");
     if (home != nullptr && home[0] != '\0') {
-      return std::string(home) + "/.config/noctalia";
+      return std::string(home) + "/.config/" + std::string(kAppDirName);
     }
     return {};
   }
@@ -389,15 +393,15 @@ namespace FileUtils {
   [[nodiscard]] inline std::string stateDir() {
     const char* noctalia = std::getenv("NOCTALIA_STATE_HOME");
     if (noctalia != nullptr && noctalia[0] != '\0') {
-      return std::string(noctalia) + "/noctalia";
+      return std::string(noctalia) + "/" + std::string(kAppDirName);
     }
     const char* xdg = std::getenv("XDG_STATE_HOME");
     if (xdg != nullptr && xdg[0] != '\0') {
-      return std::string(xdg) + "/noctalia";
+      return std::string(xdg) + "/" + std::string(kAppDirName);
     }
     const char* home = std::getenv("HOME");
     if (home != nullptr && home[0] != '\0') {
-      return std::string(home) + "/.local/state/noctalia";
+      return std::string(home) + "/.local/state/" + std::string(kAppDirName);
     }
     return {};
   }
@@ -405,17 +409,92 @@ namespace FileUtils {
   [[nodiscard]] inline std::string dataDir() {
     const char* noctalia = std::getenv("NOCTALIA_DATA_HOME");
     if (noctalia != nullptr && noctalia[0] != '\0') {
-      return std::string(noctalia) + "/noctalia";
+      return std::string(noctalia) + "/" + std::string(kAppDirName);
     }
     const char* xdg = std::getenv("XDG_DATA_HOME");
     if (xdg != nullptr && xdg[0] != '\0') {
-      return std::string(xdg) + "/noctalia";
+      return std::string(xdg) + "/" + std::string(kAppDirName);
     }
     const char* home = std::getenv("HOME");
     if (home != nullptr && home[0] != '\0') {
-      return std::string(home) + "/.local/share/noctalia";
+      return std::string(home) + "/.local/share/" + std::string(kAppDirName);
     }
     return {};
+  }
+
+  // One-time import of upstream Noctalia's config/state/data dirs (<base>/noctalia)
+  // into this fork's dirs (<base>/<kAppDirName>). Copies (never moves) so upstream
+  // keeps working, runs only while the target is absent, and never throws. Bases
+  // overridden through NOCTALIA_*_HOME are skipped; cache is not migrated, nor is
+  // the data dir's assets/ (bundled assets of an old ~/.local dev install).
+  // Returns one human-readable line per directory touched.
+  [[nodiscard]] inline std::vector<std::string> migrateLegacyDirs() {
+    struct LegacyDirSpec {
+      const char* overrideEnv;
+      const char* xdgEnv;
+      const char* homeSuffix;
+      bool skipAssets;
+    };
+    static constexpr std::array<LegacyDirSpec, 3> kSpecs{{
+        {"NOCTALIA_CONFIG_HOME", "XDG_CONFIG_HOME", ".config", false},
+        {"NOCTALIA_STATE_HOME", "XDG_STATE_HOME", ".local/state", false},
+        {"NOCTALIA_DATA_HOME", "XDG_DATA_HOME", ".local/share", true},
+    }};
+    constexpr std::string_view kLegacyDirName = "noctalia";
+
+    std::vector<std::string> messages;
+    if (kAppDirName == kLegacyDirName) {
+      return messages;
+    }
+
+    for (const auto& spec : kSpecs) {
+      if (const char* overrideHome = std::getenv(spec.overrideEnv);
+          overrideHome != nullptr && overrideHome[0] != '\0') {
+        continue;
+      }
+
+      std::filesystem::path base;
+      if (const char* xdg = std::getenv(spec.xdgEnv); xdg != nullptr && xdg[0] != '\0') {
+        base = xdg;
+      } else if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
+        base = std::filesystem::path(home) / spec.homeSuffix;
+      } else {
+        continue;
+      }
+
+      const std::filesystem::path legacy = base / kLegacyDirName;
+      const std::filesystem::path target = base / kAppDirName;
+
+      std::error_code ec;
+      if (std::filesystem::exists(target, ec) || ec) {
+        continue;
+      }
+      if (!std::filesystem::is_directory(legacy, ec) || ec) {
+        continue;
+      }
+
+      constexpr auto kCopyOptions =
+          std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks;
+      if (spec.skipAssets) {
+        std::filesystem::create_directories(target, ec);
+        for (std::filesystem::directory_iterator it(legacy, ec), end; !ec && it != end; it.increment(ec)) {
+          if (it->path().filename() == "assets") {
+            continue;
+          }
+          std::filesystem::copy(it->path(), target / it->path().filename(), kCopyOptions, ec);
+        }
+      } else {
+        std::filesystem::copy(legacy, target, kCopyOptions, ec);
+      }
+      if (ec) {
+        messages.push_back(
+            "warning: partially migrated " + legacy.string() + " to " + target.string() + ": " + ec.message()
+        );
+      } else {
+        messages.push_back("migrated " + legacy.string() + " to " + target.string());
+      }
+    }
+    return messages;
   }
 
   // Git-source repo caches. Host-managed, re-fetchable, so they live under the

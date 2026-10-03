@@ -16,6 +16,7 @@
 #include "net/url_open.h"
 #include "notification/notification_manager.h"
 #include "security/secret_store.h"
+#include "util/file_utils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -1342,7 +1343,7 @@ std::filesystem::path CalendarService::cacheFilePath() {
   } else {
     base = "/tmp";
   }
-  return base / "noctalia" / "calendar" / "events.enc";
+  return base / FileUtils::kAppDirName / "calendar" / "events.enc";
 }
 
 std::filesystem::path CalendarService::legacyCacheFilePath() {

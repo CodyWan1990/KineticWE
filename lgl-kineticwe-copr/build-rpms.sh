@@ -74,16 +74,20 @@ clean_local_build() {
            ~/.local/share/kineticwe \
            ~/.local/share/noctalia \
            ~/.local/share/noctalia.log \
+           ~/.local/share/noctalia-kwe/assets \
+           ~/.local/share/noctalia-kwe.log \
            ~/.local/share/dbus-1/interfaces
     rm -f ~/.local/share/knotifications6/kwin.notifyrc \
           ~/.local/share/knotifications6/xdg-desktop-portal-kwe.notifyrc
     rm -f ~/.local/share/applications/kcm_*.desktop \
           ~/.local/share/applications/org.kde.kwin.*.desktop \
           ~/.local/share/applications/dev.noctalia.Noctalia.desktop \
+          ~/.local/share/applications/dev.kineticwe.Noctalia.desktop \
           ~/.local/share/applications/dev.kineticwe.Settings.desktop
     rm -f ~/.local/share/icons/hicolor/*/apps/kwin.* \
           ~/.local/share/icons/hicolor/*/apps/kineticwe-logo.* \
-          ~/.local/share/icons/hicolor/scalable/apps/noctalia.svg
+          ~/.local/share/icons/hicolor/scalable/apps/noctalia.svg \
+          ~/.local/share/icons/hicolor/scalable/apps/noctalia-kwe.svg
     rm -f ~/.local/share/color-schemes/noctalia.colors
     rm -f ~/.local/share/systemd/user/kineticwe-session.target \
           ~/.local/share/systemd/user/kineticwe-workspace.target

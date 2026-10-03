@@ -517,10 +517,10 @@ echo
 %files -n kineticwe-noctalia
 %license shell/noctalia/LICENSE
 %{_bindir}/noctalia-kwe
-%{_datadir}/noctalia/
-%{_datadir}/applications/dev.noctalia.Noctalia.desktop
+%{_datadir}/noctalia-kwe/
+%{_datadir}/applications/dev.kineticwe.Noctalia.desktop
 %{_datadir}/applications/dev.kineticwe.Settings.desktop
-%{_datadir}/icons/hicolor/scalable/apps/noctalia.svg
+%{_datadir}/icons/hicolor/scalable/apps/noctalia-kwe.svg
 %{_datadir}/icons/hicolor/512x512/apps/kineticwe-logo.png
 
 %files -n kineticwe-greeter

@@ -1760,7 +1760,7 @@
           "label": "Arredondamento dos Cantos"
         },
         "custom-palette": {
-          "description": "Escolha uma paleta em ~/.config/noctalia/palettes/",
+          "description": "Escolha uma paleta em ~/.config/noctalia-kwe/palettes/",
           "label": "Paleta Personalizada",
           "search-placeholder": "Busque paletas personalizadas..."
         },

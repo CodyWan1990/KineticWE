@@ -13,6 +13,7 @@
 #include "scripting/plugin_lint.h"
 #include "theme/cli.h"
 #include "theme/firefox_theme/firefox_theme.h"
+#include "util/file_utils.h"
 
 #include <array>
 #include <cerrno>
@@ -318,6 +319,13 @@ int main(int argc, char* argv[]) {
     if (home != nullptr && home[0] != '\0' && ::chdir(home) != 0) {
       std::println(stderr, "warning: failed to chdir to HOME ({}): {}", home, std::strerror(errno));
     }
+  }
+
+  // Import upstream Noctalia's config/state/data on first start of this fork,
+  // before the daemon fork so messages reach the launching terminal and before
+  // Application loads config or opens the log file.
+  for (const std::string& message : FileUtils::migrateLegacyDirs()) {
+    std::println(stderr, "{}", message);
   }
 
   if (shouldDaemonize && !isDaemonChild) {

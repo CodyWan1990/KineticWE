@@ -96,7 +96,7 @@ namespace {
   }
 
   void focusExistingSettingsWindow(WaylandConnection& wayland, wl_surface* surface) {
-    static constexpr std::string_view kSettingsAppId = "dev.noctalia.Noctalia";
+    static constexpr std::string_view kSettingsAppId = "dev.kineticwe.Noctalia";
     wayland.activateSurface(surface);
     wayland.activateToplevelForAppId(kSettingsAppId);
   }
@@ -453,7 +453,7 @@ void SettingsWindow::open(std::string context) {
       .minWidth = minWidth,
       .minHeight = minHeight,
       .title = i18n::tr("settings.window.native-title"),
-      .appId = "dev.noctalia.Noctalia",
+      .appId = "dev.kineticwe.Noctalia",
       .decorated = true,
   };
 

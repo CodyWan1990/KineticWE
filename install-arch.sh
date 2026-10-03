@@ -1664,7 +1664,7 @@ confirm_start() {
             echo "    ${G_BULLET} the dev build files this script recorded in $TEST_PREFIX"
             echo "    ${G_BULLET} the \"KineticWE-Dev\" login entry (asks for sudo)"
             echo
-            echo "  Kept: your settings (~/.config/kineticwe, ~/.local/state/noctalia),"
+            echo "  Kept: your settings (~/.config/kineticwe, ~/.local/state/noctalia-kwe),"
             echo "  files you edited since, the packages and the greeter."
             ;;
         *)

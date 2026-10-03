@@ -181,7 +181,7 @@ main() {
     echo
     info "To test: log out, pick 'KineticWE-Dev' at the greeter."
     info "Session log: journalctl --user -b -f   (compositor output, SDDM session scope)"
-    info "Shell log:   ~/.local/share/noctalia.log"
+    info "Shell log:   ~/.local/share/noctalia-kwe.log"
     echo
 }
 

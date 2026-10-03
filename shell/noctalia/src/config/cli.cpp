@@ -208,8 +208,8 @@ namespace noctalia::config {
 
       const std::filesystem::path configHome = target / "config-home";
       const std::filesystem::path stateHome = target / "state-home";
-      const std::filesystem::path configDir = configHome / "noctalia";
-      const std::filesystem::path stateDir = stateHome / "noctalia";
+      const std::filesystem::path configDir = configHome / FileUtils::kAppDirName;
+      const std::filesystem::path stateDir = stateHome / FileUtils::kAppDirName;
 
       if (options.force) {
         std::error_code ec;

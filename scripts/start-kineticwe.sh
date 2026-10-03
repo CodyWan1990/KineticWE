@@ -1216,7 +1216,7 @@ systemctl --user start --no-block xdg-desktop-portal.service 2>/dev/null || true
 # ---------------------------------------------------------------------------
 (
     while true; do
-        noctalia-kwe >>"$HOME/.local/share/noctalia.log" 2>&1
+        noctalia-kwe >>"$HOME/.local/share/noctalia-kwe.log" 2>&1
         echo "noctalia-kwe exited (code $?), restarting in 2s..." >&2
         sleep 2
     done

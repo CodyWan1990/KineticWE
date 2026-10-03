@@ -1274,7 +1274,7 @@
           "label": "Zaokrąglenie narożników"
         },
         "custom-palette": {
-          "description": "Wybierz paletę z ~/.config/noctalia/palettes/",
+          "description": "Wybierz paletę z ~/.config/noctalia-kwe/palettes/",
           "label": "Niestandardowa paleta",
           "search-placeholder": "Szukaj niestandardowych palet…"
         },

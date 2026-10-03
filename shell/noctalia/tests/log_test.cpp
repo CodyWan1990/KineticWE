@@ -1,4 +1,5 @@
 #include "core/log.h"
+#include "util/file_utils.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -70,7 +71,7 @@ namespace {
     initLogFile();
     logWarn("{}", std::string(10'000, 'x'));
 
-    const auto logPath = cacheRoot / "noctalia" / "noctalia.log";
+    const auto logPath = cacheRoot / FileUtils::kAppDirName / "noctalia.log";
     std::error_code ec;
     const auto size = std::filesystem::file_size(logPath, ec);
     bool ok = expect(!ec, "failed to stat capped log file");
@@ -89,7 +90,7 @@ namespace {
       return false;
     }
 
-    const auto logDir = cacheRoot / "noctalia";
+    const auto logDir = cacheRoot / FileUtils::kAppDirName;
     std::filesystem::create_directories(logDir);
 
     const auto logPath = logDir / "noctalia.log";

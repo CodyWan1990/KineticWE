@@ -1464,7 +1464,7 @@
           "label": "Redondez dos cantos"
         },
         "custom-palette": {
-          "description": "Escolle unha paleta de ~/.config/noctalia/palettes/",
+          "description": "Escolle unha paleta de ~/.config/noctalia-kwe/palettes/",
           "label": "Paleta personalizada",
           "search-placeholder": "Buscar paletas personalizadas..."
         },

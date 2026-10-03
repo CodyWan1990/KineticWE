@@ -4,6 +4,7 @@
 #include "core/log.h"
 #include "i18n/i18n.h"
 #include "net/http_client.h"
+#include "util/file_utils.h"
 #include "util/string_utils.h"
 
 #include <cmath>
@@ -290,10 +291,10 @@ std::filesystem::path LocationService::transportCacheDir() {
 
 std::filesystem::path LocationService::stateCacheFilePath() {
   if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg != nullptr && xdg[0] != '\0') {
-    return std::filesystem::path(xdg) / "noctalia" / "location.json";
+    return std::filesystem::path(xdg) / FileUtils::kAppDirName / "location.json";
   }
   if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
-    return std::filesystem::path(home) / ".cache" / "noctalia" / "location.json";
+    return std::filesystem::path(home) / ".cache" / FileUtils::kAppDirName / "location.json";
   }
   return std::filesystem::path("/tmp") / "noctalia-location-cache.json";
 }

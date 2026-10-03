@@ -1,5 +1,7 @@
 #include "core/log.h"
 
+#include "util/file_utils.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -278,9 +280,9 @@ void initLogFile() {
 
   std::string dir;
   if (cacheHome != nullptr && cacheHome[0] != '\0') {
-    dir = std::string(cacheHome) + "/noctalia";
+    dir = std::string(cacheHome) + "/" + std::string(FileUtils::kAppDirName);
   } else if (home != nullptr && home[0] != '\0') {
-    dir = std::string(home) + "/.cache/noctalia";
+    dir = std::string(home) + "/.cache/" + std::string(FileUtils::kAppDirName);
   } else {
     return; // no writable location available
   }

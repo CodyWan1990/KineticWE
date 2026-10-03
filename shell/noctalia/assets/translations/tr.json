@@ -1628,7 +1628,7 @@
           "label": "Köşe Yuvarlaklığı"
         },
         "custom-palette": {
-          "description": "~/.config/noctalia/palettes/ klasöründen özel bir palet seç",
+          "description": "~/.config/noctalia-kwe/palettes/ klasöründen özel bir palet seç",
           "label": "Özel Palet",
           "search-placeholder": "Özel paletlerde ara..."
         },

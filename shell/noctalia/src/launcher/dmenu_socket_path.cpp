@@ -1,5 +1,7 @@
 #include "launcher/dmenu_socket_path.h"
 
+#include "util/file_utils.h"
+
 #include <cstdlib>
 
 namespace noctalia::launcher {
@@ -15,7 +17,10 @@ namespace noctalia::launcher {
       return {.path = {}, .error = "WAYLAND_DISPLAY is not set"};
     }
 
-    return {.path = std::string(runtime) + "/noctalia-dmenu-" + display + ".sock", .error = {}};
+    return {
+        .path = std::string(runtime) + "/" + std::string(FileUtils::kAppDirName) + "-dmenu-" + display + ".sock",
+        .error = {}
+    };
   }
 
 } // namespace noctalia::launcher

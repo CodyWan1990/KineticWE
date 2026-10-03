@@ -1661,7 +1661,7 @@
           "label": "Скругленасць кутоў"
         },
         "custom-palette": {
-          "description": "Выберыце палітру з ~/.config/noctalia/palettes/",
+          "description": "Выберыце палітру з ~/.config/noctalia-kwe/palettes/",
           "label": "Уласная палітра",
           "search-placeholder": "Шукаць карыстальніцкія палітры…"
         },

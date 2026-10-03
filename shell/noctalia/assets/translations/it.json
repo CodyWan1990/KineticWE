@@ -1760,7 +1760,7 @@
           "label": "Arrotondamento angoli"
         },
         "custom-palette": {
-          "description": "Scegli una palette da ~/.config/noctalia/palettes/",
+          "description": "Scegli una palette da ~/.config/noctalia-kwe/palettes/",
           "label": "Palette personalizzata",
           "search-placeholder": "Cerca palette personalizzate..."
         },

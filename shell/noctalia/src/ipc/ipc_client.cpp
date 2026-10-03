@@ -1,5 +1,7 @@
 #include "ipc/ipc_client.h"
 
+#include "util/file_utils.h"
+
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -25,7 +27,7 @@ namespace {
     if (display == nullptr || display[0] == '\0') {
       display = "wayland-0";
     }
-    return std::string(runtime) + "/noctalia-" + display + ".sock";
+    return std::string(runtime) + "/" + std::string(FileUtils::kAppDirName) + "-" + display + ".sock";
   }
 
 } // namespace

@@ -1596,7 +1596,7 @@
           "label": "Arrondi des coins"
         },
         "custom-palette": {
-          "description": "Choisir une palette depuis ~/.config/noctalia/palettes/",
+          "description": "Choisir une palette depuis ~/.config/noctalia-kwe/palettes/",
           "label": "Palette personnalisée",
           "search-placeholder": "Chercher des palettes personnalisées..."
         },

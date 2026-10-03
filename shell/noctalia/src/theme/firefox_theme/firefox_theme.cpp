@@ -8,6 +8,7 @@
 #include "theme/firefox_theme/manifest.h"
 #include "theme/firefox_theme/native_messaging.h"
 #include "theme/firefox_theme/settings.h"
+#include "util/file_utils.h"
 
 #include <array>
 #include <cerrno>
@@ -107,7 +108,7 @@ namespace noctalia::theme {
     // reach all Firefox profiles, not only the process that owns the Unix socket.
     [[nodiscard]] std::filesystem::path commandNotifyDir() {
       if (const char* runtime = std::getenv("XDG_RUNTIME_DIR"); runtime != nullptr && runtime[0] != '\0') {
-        return std::filesystem::path(runtime) / "noctalia" / "firefox-theme";
+        return std::filesystem::path(runtime) / FileUtils::kAppDirName / "firefox-theme";
       }
       return std::filesystem::temp_directory_path() / ("noctalia-firefox-theme-" + std::to_string(::getuid()));
     }

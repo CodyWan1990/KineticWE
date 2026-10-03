@@ -30,7 +30,7 @@ If you only ever used the packages, or only the current `install-arch.sh`, you d
 
 2. **Log out and pick "KineticWE"** at the login screen, not "KineticWE-Dev". You can also switch to a TTY (Ctrl+Alt+F2). Don't remove files from a session that is running them.
 
-Your settings are **not** touched by anything below: `~/.config/kineticwe` (keybinds, appearance, window rules) and `~/.local/state/noctalia` (shell settings, plugins).
+Your settings are **not** touched by anything below: `~/.config/kineticwe` (keybinds, appearance, window rules) and the shell settings and plugins, now in `~/.local/state/noctalia-kwe` (copied automatically from the old `~/.local/state/noctalia` on the first launch; the old dir is left as is).
 
 ## Step 1: Fix the portal first
 
@@ -90,7 +90,7 @@ cd ~/.local && rm -rfv \
 cd ~ && systemctl --user daemon-reload
 ```
 
-`~/.local/share/noctalia` only held the dev shell's bundled assets. Noctalia's settings are in `~/.local/state/noctalia`, which this doesn't touch.
+`~/.local/share/noctalia` only held the dev shell's bundled assets. The shell's settings are in `~/.local/state/noctalia-kwe` (and the old `~/.local/state/noctalia`), which this doesn't touch.
 
 ## Step 4: Remove the old dev login entry
 

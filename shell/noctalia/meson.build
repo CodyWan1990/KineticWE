@@ -1144,6 +1144,7 @@ _noctalia_compile_definitions = [
   '-DNOCTALIA_INSTALL_PREFIX="' + get_option('prefix') + '"',
   '-DNOCTALIA_INSTALL_DATADIR="' + get_option('datadir') + '"',
   '-DNOCTALIA_VERSION="' + meson.project_version() + '"',
+  '-DNOCTALIA_APP_NAME="noctalia-kwe"',
 ] + jemalloc_cpp_args
 
 _noctalia_cpp_args = [
@@ -1178,18 +1179,19 @@ noctalia_exe = executable('noctalia-kwe',
 )
 
 install_subdir('assets',
-  install_dir: get_option('datadir') / 'noctalia',
-  exclude_files: ['dev.noctalia.Noctalia.desktop'],
+  install_dir: get_option('datadir') / 'noctalia-kwe',
+  exclude_files: ['dev.kineticwe.Noctalia.desktop'],
 )
 
 install_data(
-  'assets/dev.noctalia.Noctalia.desktop',
+  'assets/dev.kineticwe.Noctalia.desktop',
   install_dir: get_option('datadir') / 'applications',
 )
 
 install_data(
   'assets/noctalia.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
+  rename: 'noctalia-kwe.svg',
 )
 
 install_data(
