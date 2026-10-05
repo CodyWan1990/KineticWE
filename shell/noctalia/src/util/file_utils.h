@@ -424,10 +424,13 @@ namespace FileUtils {
 
   // One-time import of upstream Noctalia's config/state/data dirs (<base>/noctalia)
   // into this fork's dirs (<base>/<kAppDirName>). Copies (never moves) so upstream
-  // keeps working, runs only while the target is absent, and never throws. Bases
-  // overridden through NOCTALIA_*_HOME are skipped; cache is not migrated, nor is
-  // the data dir's assets/ (bundled assets of an old ~/.local dev install).
-  // Returns one human-readable line per directory touched.
+  // keeps working, never overwrites files already in the target, and never throws.
+  // Runs on every launch: entries missing from a partially-migrated target are
+  // filled in, so an interrupted copy (e.g. a leftover runtime socket) does not
+  // strand the user's settings. Symlinks are preserved; sockets, FIFOs and device
+  // nodes are skipped. Bases overridden through NOCTALIA_*_HOME are skipped; cache
+  // is not migrated, nor is the data dir's assets/ (bundled assets of an old
+  // ~/.local dev install). Returns one human-readable line per directory touched.
   [[nodiscard]] inline std::vector<std::string> migrateLegacyDirs() {
     struct LegacyDirSpec {
       const char* overrideEnv;
@@ -466,31 +469,110 @@ namespace FileUtils {
       const std::filesystem::path target = base / kAppDirName;
 
       std::error_code ec;
-      if (std::filesystem::exists(target, ec) || ec) {
-        continue;
-      }
       if (!std::filesystem::is_directory(legacy, ec) || ec) {
         continue;
       }
 
-      constexpr auto kCopyOptions =
-          std::filesystem::copy_options::recursive | std::filesystem::copy_options::copy_symlinks;
-      if (spec.skipAssets) {
-        std::filesystem::create_directories(target, ec);
-        for (std::filesystem::directory_iterator it(legacy, ec), end; !ec && it != end; it.increment(ec)) {
-          if (it->path().filename() == "assets") {
+      bool copiedAny = false;
+      std::string failure;
+      std::vector<std::filesystem::path> pendingDirs{legacy};
+
+      while (!pendingDirs.empty()) {
+        const std::filesystem::path sourceDir = pendingDirs.back();
+        pendingDirs.pop_back();
+
+        std::filesystem::directory_iterator it(
+            sourceDir, std::filesystem::directory_options::skip_permission_denied, ec
+        );
+        const std::filesystem::directory_iterator end;
+        if (ec) {
+          if (failure.empty()) {
+            failure = ec.message();
+          }
+          ec.clear();
+          continue;
+        }
+
+        for (; it != end; it.increment(ec)) {
+          if (ec) {
+            if (failure.empty()) {
+              failure = ec.message();
+            }
+            ec.clear();
+            break;
+          }
+
+          // lexically_relative (not std::filesystem::relative): the latter
+          // canonicalizes and would resolve symlinks out of the tree.
+          const std::filesystem::path source = it->path();
+          const std::filesystem::path relative = source.lexically_relative(legacy);
+          if (relative.empty()) {
             continue;
           }
-          std::filesystem::copy(it->path(), target / it->path().filename(), kCopyOptions, ec);
+          if (spec.skipAssets && relative.begin()->string() == "assets") {
+            continue;
+          }
+
+          const std::filesystem::file_type type = it->symlink_status(ec).type();
+          if (ec) {
+            ec.clear();
+            continue;
+          }
+
+          const std::filesystem::path destination = target / relative;
+          if (type == std::filesystem::file_type::directory) {
+            std::filesystem::create_directories(destination, ec);
+            if (ec && failure.empty()) {
+              failure = ec.message();
+            }
+            ec.clear();
+            pendingDirs.push_back(source);
+            continue;
+          }
+          // Skip anything that is not a regular file or symlink (sockets,
+          // FIFOs, device nodes). Copying a socket fails with EINVAL and used
+          // to abort the whole migration.
+          if (type != std::filesystem::file_type::regular && type != std::filesystem::file_type::symlink) {
+            continue;
+          }
+
+          // Do not follow symlinks here: a dangling symlink already exists in
+          // the target and must be left alone (copying over it fails with EEXIST).
+          std::error_code existsEc;
+          if (std::filesystem::symlink_status(destination, existsEc).type() !=
+              std::filesystem::file_type::not_found) {
+            continue;
+          }
+
+          std::filesystem::create_directories(destination.parent_path(), ec);
+          if (ec && failure.empty()) {
+            failure = ec.message();
+          }
+          ec.clear();
+
+          if (type == std::filesystem::file_type::symlink) {
+            std::filesystem::copy_symlink(source, destination, ec);
+          } else {
+            std::filesystem::copy_file(
+                source, destination, std::filesystem::copy_options::skip_existing, ec
+            );
+          }
+          if (ec) {
+            if (failure.empty()) {
+              failure = ec.message();
+            }
+          } else {
+            copiedAny = true;
+          }
+          ec.clear();
         }
-      } else {
-        std::filesystem::copy(legacy, target, kCopyOptions, ec);
       }
-      if (ec) {
+
+      if (!failure.empty()) {
         messages.push_back(
-            "warning: partially migrated " + legacy.string() + " to " + target.string() + ": " + ec.message()
+            "warning: partially migrated " + legacy.string() + " to " + target.string() + ": " + failure
         );
-      } else {
+      } else if (copiedAny) {
         messages.push_back("migrated " + legacy.string() + " to " + target.string());
       }
     }
