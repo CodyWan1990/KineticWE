@@ -4,6 +4,17 @@ Before the Arch rework, `build-arch-native.sh` installed KineticWE into `~/.loca
 
 Old-script files take priority over the packages. The worst case is a stale portal file that **breaks every portal** (file dialogs, screen sharing, screenshots). Follow this guide once, after installing the packages.
 
+## Renamed script and flags
+
+| Old | Now |
+|---|---|
+| `build-arch-native.sh` | `install-arch.sh` (old installs: follow the rest of this guide) |
+| `--full` | `--local-dev` (deprecated alias, still works) |
+| `--binary`, `--install-host-deps` | `--local-dev --no-greeter` (deprecated aliases, still work) |
+| `--kwin-only`, `--noct-only` | removed: `--local-dev --update` rebuilds only the changed components (`--update` for the packages rebuilds all of them, only if something changed) |
+
+The first `--update` after upgrading the script does one full build, because there are no saved fingerprints yet; after that it only rebuilds what changed.
+
 ## Do you need this?
 
 You need this guide if either of these is true:
@@ -30,7 +41,7 @@ If you only ever used the packages, or only the current `install-arch.sh`, you d
 
 2. **Log out and pick "KineticWE"** at the login screen, not "KineticWE-Dev". You can also switch to a TTY (Ctrl+Alt+F2). Don't remove files from a session that is running them.
 
-Your settings are **not** touched by anything below: `~/.config/kineticwe` (keybinds, appearance, window rules) and the shell settings and plugins, now in `~/.local/state/noctalia-kwe` (copied automatically from the old `~/.local/state/noctalia` on the first launch; the old dir is left as is).
+Your settings are **not** touched by anything below: `~/.config/kineticwe` (keybinds, appearance, window rules) and the shell settings and plugins, now in `~/.local/state/noctalia-kwe`.
 
 ## Step 1: Fix the portal first
 
