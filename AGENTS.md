@@ -11,7 +11,7 @@ The user builds and tests locally on their own machine. An agent's job ends at
 "code is written and statically verified." Under no circumstances run anything
 that compiles, links, packages, installs, or launches binaries.
 
-Always tell me the exact build command to run after changes: `./build-rpm-dev.sh --kwin-only` for kwin-only, `./build-rpm-dev.sh --noct-only` for noctalia-only, or `./build-rpm-dev.sh --binary` / `--full` for the full build. On Arch: `./install-arch.sh` (packages + pacman -U), `./install-arch.sh --kwin-only`, `./install-arch.sh --noct-only`, or `./install-arch.sh --binary` / `--local-dev`.
+Always tell me the exact build command to run after changes: `./build-rpm-dev.sh --kwin-only` for kwin-only, `./build-rpm-dev.sh --noct-only` for noctalia-only, or `./build-rpm-dev.sh --binary` / `--full` for the full build. On Arch: `./install-arch.sh --update` (rebuilds + pacman -U all packages, only if something changed), `./install-arch.sh` (all packages), or `./install-arch.sh --local-dev --update` for dev builds into ~/.local (drop `--update` to rebuild everything; add `--no-greeter` to skip the greeter in either mode).
 
 ### Forbidden — never run, in any form
 

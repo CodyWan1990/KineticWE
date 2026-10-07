@@ -110,30 +110,48 @@ kineticwe-setup-greeter
 
 #### Build from source
 
-> The script was renamed from `build-arch-native.sh` to `install-arch.sh`, and `--full` is now `--local-dev` (`--full` still works but prints a deprecation warning).
-
 To build the split packages (`kineticwe`, `xdg-desktop-portal-kwe`, `kineticwe-noctalia`, `kineticwe-greeter`) from your working tree and install them with pacman:
 
 ```bash
 ./install-arch.sh
 ```
 
+Already have a display manager you want to keep (e.g. SDDM from Plasma or GDM from GNOME)? Add `--no-greeter`: `kineticwe-greeter` isn't built or installed, and your login screen is left alone.
+
+```bash
+./install-arch.sh --no-greeter
+```
+
+If `kineticwe-greeter` is already installed, remove it first (`sudo pacman -R kineticwe-greeter`): it requires the exact `kineticwe` version, so `kineticwe` can't be rebuilt without it.
+
+After that first install, rebuild only when something changed:
+
+```bash
+./install-arch.sh --update
+```
+
+`--update` compares each component's sources (compositor, portal, shell, greeter; uncommitted edits count) with what they were last built from and exits without building anything when nothing changed. Otherwise it rebuilds all packages together, because they require each other's exact version. The build uses ccache (kept in `build.arch-pkg/ccache`), so code that didn't change compiles from the cache; the first build only fills it. A Qt update counts as a change for the compositor and the portal.
+
 The script shows what it will do and asks before starting. Pass `--yes` to skip the question (required when it isn't run from a terminal).
 
 For a development loop, the same script can instead install into `~/.local`:
 
-> **For testing and development only.** `--binary`, `--kwin-only`, `--noct-only` and `--local-dev` install a development build into `~/.local` that overrides the packages. They're not recommended for regular use, and `--local-dev` also reconfigures your display manager. For daily use, install the packages (`./install-arch.sh` or the binary repo above). Undo a dev build with `./install-arch.sh --reset-local`.
+> **For testing and development only.** `--local-dev` installs a development build into `~/.local` that overrides the packages. It's not recommended for regular use, and unless you pass `--no-greeter` it also reconfigures your display manager. For daily use, install the packages (`./install-arch.sh` or the binary repo above). Undo a dev build with `./install-arch.sh --reset-local`.
 
 ```bash
-./install-arch.sh --binary     # compositor, portal and shell
-./install-arch.sh --kwin-only  # compositor only (no portal/shell)
-./install-arch.sh --noct-only  # Noctalia shell only
-./install-arch.sh --local-dev  # everything + greeter setup (development only)
+./install-arch.sh --local-dev                         # compositor, portal, shell + greeter setup
+./install-arch.sh --local-dev --update                # only the components that changed
+./install-arch.sh --local-dev --no-greeter            # no greeter: your display manager is left alone
+./install-arch.sh --local-dev --no-greeter --update   # both
 ```
+
+`--no-greeter` works the same way as for the packages (see above): it keeps your current display manager.
 
 > **Note:** KWin uses Qt private APIs, so a source build is tied to the exact Qt version it was built against. After every Arch Qt update, rebuild (the binary repo is rebuilt automatically for this).
 
 > **Note:** The Fedora spec (`lgl-kineticwe-copr/kineticwe.spec`) is the source of truth for the version, release and pinned commits. Builds always use the spec's values; if the committed `PKGBUILD` lags behind, the build prints a warning and continues. Run `arch/sync-from-spec.sh PKGBUILD` to update it. Changes beyond version and pins (dependencies, files, patches) still need a manual `PKGBUILD` edit.
+
+Used an older version of the script (`build-arch-native.sh`, `--full`, `--binary`, `--kwin-only`, `--noct-only`)? See [docs/arch-migration.md](docs/arch-migration.md).
 
 #### Setting up the greeter
 
@@ -147,9 +165,7 @@ Enabling `greetd.service` on its own is not enough: Arch's default greetd config
 
 #### Migrating from a local (`~/.local`) build to the packages
 
-> **Used the old `build-arch-native.sh`?** It didn't record what it installed, so `--reset-local` can't remove it, and its leftovers can break every portal. Follow [docs/arch-migration.md](docs/arch-migration.md) instead of the steps below.
-
-If you used `install-arch.sh --binary`, `--kwin-only`, `--noct-only` or `--local-dev`, remove those local files after installing the packages, otherwise the dev copies take priority. `./install-arch.sh` ends with a read-only check that lists any leftovers.
+If you used `install-arch.sh --local-dev`, remove those local files after installing the packages, otherwise the dev copies take priority. `./install-arch.sh` ends with a read-only check that lists any leftovers.
 
 1. **Build and install the packages**
 

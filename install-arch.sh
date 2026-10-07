@@ -19,25 +19,30 @@ fi
 # Usage:
 #   ./install-arch.sh                 # Default (= --pkg)
 #   ./install-arch.sh --pkg           # makepkg from the working tree, then pacman -U
-#   ./install-arch.sh --binary        # Dev: compositor + portal + shell into TEST_PREFIX
-#   ./install-arch.sh --local-dev     # Dev: --binary + Noctalia greeter setup (--full is a deprecated alias)
-#   ./install-arch.sh --kwin-only     # Dev: incremental compositor-only build
-#   ./install-arch.sh --noct-only     # Dev: incremental Noctalia shell-only build
+#   ./install-arch.sh --local-dev     # Dev: compositor + portal + shell into TEST_PREFIX
+#                                     #      + Noctalia greeter setup (--full is a deprecated alias)
 #   ./install-arch.sh --reset-local   # Remove unchanged dev files from TEST_PREFIX + session entry
 #   ./install-arch.sh --clean-deps    # Report dependencies (never removes packages)
 #   ./install-arch.sh --help          # Show usage
 #
 # Modifiers:
+#   --update             Only rebuild when sources changed since the last
+#                        install: --pkg rebuilds all packages together (they
+#                        require each other's exact version), --local-dev only
+#                        the changed components (compositor, portal, shell)
 #   --no-session         Dev modes: skip installing the KineticWE-Dev login-screen entry
-#   --no-greeter         --pkg only: do not install the kineticwe-greeter package
+#   --no-greeter         Skip the greeter: --pkg does not build/install the
+#                        kineticwe-greeter package, --local-dev does not set up
+#                        greetd (your display manager is left alone)
 #   --yes, -y            Skip the confirmation prompt (required when not run
 #                        from a terminal)
-#   --install-host-deps  Deprecated alias for --binary
+#   --binary             Deprecated alias for --local-dev --no-greeter
+#   --install-host-deps  Deprecated alias for --local-dev --no-greeter
 #
 # Every mode except --clean-deps and --help first shows what it will do and
 # asks to continue ([Y/n] for builds; [y/N] for --local-dev and --reset-local).
 #
-# Only one mode may be given; --local-dev together with --binary means --local-dev.
+# Only one mode may be given.
 #
 # Dependencies are read from PKGBUILD: top-level makedepends are the build
 # deps; the depends of kineticwe, xdg-desktop-portal-kwe and kineticwe-noctalia
@@ -741,27 +746,39 @@ build_pinned_deps() {
     fi
 }
 
+# Builds and installs every component, or with --update only the planned ones;
+# each installed component's fingerprint is stored for the next --update.
 binary_build() {
-    local build_portal="${1:-true}" build_shell="${2:-true}"
-    local build_dir="$SCRIPT_DIR/build.arch-native"
-    build_pinned_deps
-    configure_cmake "$build_dir" "$SCRIPT_DIR" \
-        -DKWIN_KCONFIG_COMPILER="$KCFG_COMPILER_OVERRIDE" -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
-        -DKGlobalAccelD_DIR="$TEST_PREFIX/lib/cmake/KGlobalAccelD" \
-        -DKDecoration3_DIR="$TEST_PREFIX/lib/cmake/KDecoration3"
-    cmake --build "$build_dir" --parallel "$(nproc)"
-    stage_cmake_install compositor "$build_dir"
-    if [[ "$build_portal" == true ]]; then
+    if component_planned compositor; then
+        local build_dir="$SCRIPT_DIR/build.arch-native"
+        build_pinned_deps
+        configure_cmake "$build_dir" "$SCRIPT_DIR" \
+            -DKWIN_KCONFIG_COMPILER="$KCFG_COMPILER_OVERRIDE" -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
+            -DKGlobalAccelD_DIR="$TEST_PREFIX/lib/cmake/KGlobalAccelD" \
+            -DKDecoration3_DIR="$TEST_PREFIX/lib/cmake/KDecoration3"
+        cmake --build "$build_dir" --parallel "$(nproc)"
+        stage_cmake_install compositor "$build_dir"
+        fingerprint_store dev compositor
+    else
+        info "Compositor up to date, skipped"
+    fi
+    if component_planned portal; then
         local portal_build="$SCRIPT_DIR/build.arch-native-portal"
         configure_cmake "$portal_build" "$SCRIPT_DIR/portal/xdg-desktop-portal-kwe"
         cmake --build "$portal_build" --parallel "$(nproc)"
         stage_cmake_install portal "$portal_build"
+        fingerprint_store dev portal
+    else
+        info "Portal up to date, skipped"
     fi
-    if [[ "$build_shell" == true ]]; then noctalia_only_build; fi
+    if component_planned shell; then
+        noctalia_only_build
+        fingerprint_store dev shell
+    else
+        info "Shell up to date, skipped"
+    fi
     [[ -x "$TEST_PREFIX/bin/kinetic-we" ]] || die "Compositor installation is missing"
 }
-
-kwin_only_build() { binary_build false false; }
 
 # stb headers come from the Arch `stb` package (/usr/include/stb/*), which is
 # part of PKGBUILD makedepends.
@@ -1375,6 +1392,262 @@ check_qt_abi() {
 }
 
 # ---------------------------------------------------------------------------
+# --update: per-component source fingerprints
+# ---------------------------------------------------------------------------
+# A component is rebuilt when its fingerprint differs from the one stored at its
+# last successful install, when there is no stored one, or when it is no longer
+# installed as recorded. Fingerprints are stored after every install (with or
+# without --update) so the next --update has a baseline.
+#
+# The file set is the one pkg_build tars: tracked plus untracked-but-not-ignored
+# files of the working tree, so uncommitted edits count and deleted files drop
+# out. Each file is identified by its git blob id: taken from the index for
+# files git sees as unchanged, recomputed with git hash-object for the rest, so
+# the result does not depend on index stat freshness. Nothing is written to the
+# repository.
+
+# Components in build order, and the split package each one produces.
+UPDATE_ORDER=(compositor portal shell greeter)
+declare -A COMPONENT_PACKAGE=(
+    [compositor]=kineticwe
+    [portal]=xdg-desktop-portal-kwe
+    [shell]=kineticwe-noctalia
+    [greeter]=kineticwe-greeter
+)
+declare -A COMPONENT_LABEL=(
+    [compositor]="Compositor"
+    [portal]="Portal"
+    [shell]="Shell"
+    [greeter]="Greeter"
+)
+DO_UPDATE=false
+# Filled by plan_update: fingerprint and rebuild reason ("" = up to date) per
+# component, and the components to rebuild in build order.
+declare -A COMPONENT_FP=() COMPONENT_REASON=()
+UPDATE_COMPONENTS=()
+# pkg | dev: which kind of install plan_update last planned.
+UPDATE_KIND=""
+
+# component_pathspecs <component>: git pathspecs of the component's own files.
+# The compositor is "everything else" so a new top-level file is never missed;
+# only paths that cannot change any package are excluded.
+component_pathspecs() {
+    case "$1" in
+        compositor)
+            printf '%s\n' . \
+                ':(exclude)shell' ':(exclude)portal' ':(exclude)docs' ':(exclude)ci' \
+                ':(exclude)debian' ':(exclude)nix' ':(glob,exclude)flake.*' \
+                ':(glob,exclude)build-*.sh' ':(glob,exclude)*-deps.sh' \
+                ':(exclude)install-arch.sh' ':(exclude)migrate-noctalia-config.sh' \
+                ':(exclude)PKGBUILD' ':(exclude)kineticwe-greeter.install' \
+                ':(exclude)arch/kineticwe-setup-greeter.sh' ':(exclude).gitlab-ci.yml' \
+                ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md'
+            ;;
+        portal)  printf '%s\n' portal/xdg-desktop-portal-kwe ;;
+        shell)   printf '%s\n' shell/noctalia ;;
+        greeter) printf '%s\n' arch/kineticwe-setup-greeter.sh kineticwe-greeter.install ;;
+        *)       die "Unknown component: $1" ;;
+    esac
+}
+
+# source_fingerprint_lines <pathspec>...: one "<blob id> <path>" line per file.
+source_fingerprint_lines() {
+    local f p line blob
+    local -A dirty=()
+    while IFS= read -r -d '' f; do
+        dirty["$f"]=1
+    done < <(git -C "$SCRIPT_DIR" diff-files --name-only -z -- "$@"
+             git -C "$SCRIPT_DIR" ls-files -o --exclude-standard -z -- "$@")
+
+    while IFS= read -r -d '' line; do
+        f="${line#*$'\t'}"
+        [[ -z "${dirty[$f]:-}" ]] || continue
+        blob="${line#* }"
+        printf '%s %s\n' "${blob%% *}" "$f"
+    done < <(git -C "$SCRIPT_DIR" ls-files -s -z -- "$@")
+
+    for f in "${!dirty[@]}"; do
+        p="$SCRIPT_DIR/$f"
+        if [[ -L "$p" ]]; then
+            blob=$(readlink -- "$p" | tr -d '\n' | git -C "$SCRIPT_DIR" hash-object --stdin)
+        elif [[ -f "$p" ]]; then
+            blob=$(git -C "$SCRIPT_DIR" hash-object -- "$p")
+        else
+            continue    # deleted in the working tree: not part of the build
+        fi
+        printf '%s %s\n' "$blob" "$f"
+    done
+}
+
+# pkgbuild_fingerprint: the PKGBUILD makepkg would build (synced to the spec),
+# minus pkgrel, which pkg_build bumps on every run.
+pkgbuild_fingerprint() {
+    new_temp
+    local tmp="$TEMP_DIR/PKGBUILD" sum
+    cp -f -- "$PKGBUILD_FILE" "$tmp"
+    "$SCRIPT_DIR/arch/sync-from-spec.sh" "$tmp" >/dev/null || die "Cannot sync a PKGBUILD copy with $SPEC_FILE"
+    sum=$(grep -v '^pkgrel=' "$tmp" | sha256sum)
+    remove_temp "$TEMP_DIR"
+    printf '%s\n' "${sum%% *}"
+}
+
+# component_fingerprint <component> <pkg|dev> [pkgbuild fingerprint]
+component_fingerprint() {
+    local component="$1" kind="$2" pkgbuild="${3:-}" sum
+    local -a specs
+    mapfile -t specs < <(component_pathspecs "$component")
+    sum=$(
+        {
+            printf 'kind %s\n' "$kind"
+            [[ -z "$pkgbuild" ]] || printf 'pkgbuild %s\n' "$pkgbuild"
+            case "$component" in
+                compositor)
+                    printf 'ref kglobalacceld %s\nref kdecoration %s\nref kconfig %s\n' \
+                        "$SPEC_KGA_REF" "$SPEC_KDECO_REF" "$SPEC_KCONFIG_REF"
+                    printf 'qt %s\n' "$(current_qt)"
+                    ;;
+                portal)  printf 'qt %s\n' "$(current_qt)" ;;
+                greeter) printf 'ref greeter %s\n' "$NOCTALIA_GREETER_REF" ;;
+            esac
+            source_fingerprint_lines "${specs[@]}" | LC_ALL=C sort
+        } | sha256sum
+    )
+    printf '%s\n' "${sum%% *}"
+}
+
+# fingerprint_dir <pkg|dev>: where the fingerprints of that install kind live.
+fingerprint_dir() {
+    if [[ "$1" == pkg ]]; then
+        printf '%s\n' "$PKG_WORK_DIR/state"
+    else
+        printf '%s\n' "$(realpath -m -- "$TEST_PREFIX")/share/kineticwe/arch-native-state"
+    fi
+}
+
+# fingerprint_load <pkg|dev> <component>: prints "<fingerprint> <version>" or nothing.
+fingerprint_load() {
+    local file
+    file="$(fingerprint_dir "$1")/$2.fingerprint"
+    [[ -f "$file" && ! -L "$file" ]] || return 0
+    head -n 1 -- "$file"
+}
+
+# fingerprint_store <pkg|dev> <component> [installed version]
+fingerprint_store() {
+    local dir file tmp
+    dir=$(fingerprint_dir "$1")
+    file="$dir/$2.fingerprint"
+    [[ -n "${COMPONENT_FP[$2]:-}" ]] || return 0
+    mkdir -p -- "$dir"
+    [[ ! -L "$file" ]] || die "Symlinked fingerprint record: $file"
+    tmp=$(mktemp "$dir/.fingerprint.XXXXXXXX")
+    printf '%s %s\n' "${COMPONENT_FP[$2]}" "${3:--}" > "$tmp"
+    mv -f -- "$tmp" "$file"
+}
+
+# plan_update <pkg|dev> <with greeter: true|false>: fills COMPONENT_FP,
+# COMPONENT_REASON and UPDATE_COMPONENTS (the changed components). Read-only.
+# Package mode only uses the result to decide whether to build at all: the
+# split packages require each other's exact version, so they are always built
+# and installed together.
+plan_update() {
+    local kind="$1" with_greeter="$2" component pkgbuild="" stored fp version installed
+    local -a components=(compositor portal shell)
+    if [[ "$kind" == pkg && "$with_greeter" == true ]]; then components+=(greeter); fi
+    if [[ "$kind" == pkg ]]; then pkgbuild=$(pkgbuild_fingerprint); fi
+    local saved_prefix="$TEST_PREFIX"
+    [[ "$kind" == pkg ]] || TEST_PREFIX=$(realpath -m -- "$TEST_PREFIX")
+
+    COMPONENT_FP=() COMPONENT_REASON=() UPDATE_COMPONENTS=()
+    for component in "${components[@]}"; do
+        fp=$(component_fingerprint "$component" "$kind" "$pkgbuild")
+        COMPONENT_FP[$component]="$fp"
+        stored=$(fingerprint_load "$kind" "$component")
+        if [[ "$kind" == pkg ]]; then
+            installed=$(pacman -Q "${COMPONENT_PACKAGE[$component]}" 2>/dev/null | awk '{print $2}' || true)
+        else
+            installed=""
+            if [[ -f "$(fingerprint_dir dev)/$component.manifest" ]] \
+                && manifest_intact "$(fingerprint_dir dev)/$component.manifest"; then
+                installed=yes
+            fi
+        fi
+        version="${stored#* }"
+        if [[ -z "$installed" ]]; then
+            COMPONENT_REASON[$component]="not installed"
+        elif [[ -z "$stored" ]]; then
+            COMPONENT_REASON[$component]="no record of the last build"
+        elif [[ "$kind" == pkg && "$installed" != "$version" ]]; then
+            COMPONENT_REASON[$component]="installed version changed ($installed)"
+        elif [[ "${stored%% *}" != "$fp" ]]; then
+            COMPONENT_REASON[$component]="source changed"
+        else
+            COMPONENT_REASON[$component]=""
+        fi
+    done
+
+    UPDATE_KIND="$kind"
+    for component in "${UPDATE_ORDER[@]}"; do
+        if [[ -n "${COMPONENT_FP[$component]:-}" && -n "${COMPONENT_REASON[$component]}" ]]; then
+            UPDATE_COMPONENTS+=("$component")
+        fi
+    done
+    TEST_PREFIX="$saved_prefix"
+}
+
+# component_planned <component>: true when the component will be built.
+# Without --update, and in package mode (all packages in lockstep), that is
+# every component; with --local-dev --update only the changed ones.
+component_planned() {
+    [[ "$DO_UPDATE" != true || "$UPDATE_KIND" == pkg ]] && return 0
+    [[ " ${UPDATE_COMPONENTS[*]} " == *" $1 "* ]]
+}
+
+# summary_update_result: with --update, which components were rebuilt/skipped.
+summary_update_result() {
+    [[ "$DO_UPDATE" == true ]] || return 0
+    local component
+    if [[ "$UPDATE_KIND" == pkg ]]; then
+        local -a changed=()
+        for component in "${UPDATE_COMPONENTS[@]}"; do
+            changed+=("${COMPONENT_LABEL[$component],,}")
+        done
+        summary_row "Changed" "${changed[*]:-nothing}"
+        return 0
+    fi
+    local -a rebuilt=() skipped=()
+    for component in "${UPDATE_ORDER[@]}"; do
+        [[ -n "${COMPONENT_FP[$component]:-}" ]] || continue
+        if component_planned "$component"; then
+            rebuilt+=("${COMPONENT_LABEL[$component],,}")
+        else
+            skipped+=("${COMPONENT_LABEL[$component],,}")
+        fi
+    done
+    summary_row "Rebuilt" "${rebuilt[*]:-nothing}"
+    summary_row "Up to date" "${skipped[*]:-nothing}"
+}
+
+# summary_update_plan: one row per planned component (confirmation screen).
+summary_update_plan() {
+    local component
+    for component in "${UPDATE_ORDER[@]}"; do
+        [[ -n "${COMPONENT_FP[$component]:-}" ]] || continue
+        if [[ "$UPDATE_KIND" == pkg ]]; then
+            if [[ -n "${COMPONENT_REASON[$component]}" ]]; then
+                summary_row "${COMPONENT_LABEL[$component]}" "changed: ${COMPONENT_REASON[$component]}"
+            else
+                summary_row "${COMPONENT_LABEL[$component]}" "unchanged"
+            fi
+        elif [[ -n "${COMPONENT_REASON[$component]}" ]]; then
+            summary_row "${COMPONENT_LABEL[$component]}" "rebuild: ${COMPONENT_REASON[$component]}"
+        else
+            summary_row "${COMPONENT_LABEL[$component]}" "up to date, skipped"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
 # Migration check (package mode): report ~/.local and /usr/local leftovers
 # ---------------------------------------------------------------------------
 # Strictly read-only: never deletes, moves or rewrites anything, takes no lock
@@ -1610,15 +1883,26 @@ confirm_start() {
     ui_init
     case "$mode" in
         pkg)
-            welcome_title "install packages"
+            if [[ "$DO_UPDATE" == true ]]; then
+                welcome_title "update packages"
+            else
+                welcome_title "install packages"
+            fi
             summary_row "Version" "${SPEC_VERSION}-${SPEC_RELEASE} (from lgl-kineticwe-copr/kineticwe.spec)"
             summary_row "Source" "this checkout ($SCRIPT_DIR)"
+            [[ "$DO_UPDATE" != true ]] || summary_update_plan
             echo
+            if [[ "$DO_UPDATE" == true ]]; then
+                echo "  All packages are rebuilt together: they require each other's"
+                echo "  exact version. ccache keeps unchanged code fast."
+                echo
+            fi
             echo "  This will:"
-            echo "    ${G_BULLET} build kineticwe, xdg-desktop-portal-kwe, kineticwe-noctalia"
             if [[ "$do_greeter" == true ]]; then
+                echo "    ${G_BULLET} build kineticwe, xdg-desktop-portal-kwe, kineticwe-noctalia"
                 echo "      and kineticwe-greeter with makepkg"
             else
+                echo "    ${G_BULLET} build kineticwe, xdg-desktop-portal-kwe, kineticwe-noctalia"
                 echo "      with makepkg (kineticwe-greeter is skipped: --no-greeter)"
             fi
             echo "    ${G_BULLET} install missing build dependencies and the packages"
@@ -1626,25 +1910,21 @@ confirm_start() {
             echo
             echo "  A first build takes roughly 10-30 minutes."
             ;;
-        binary|kwin-only|noct-only|local-dev)
-            local what
-            case "$mode" in
-                binary)    what="compositor, portal and shell" ;;
-                kwin-only) what="compositor only (incremental)" ;;
-                noct-only) what="Noctalia shell only (incremental)" ;;
-                local-dev) what="compositor, portal, shell + greeter setup" ;;
-            esac
+        local-dev)
+            local what="compositor, portal and shell"
+            [[ "$do_greeter" != true ]] || what+=" + greeter setup"
+            [[ "$DO_UPDATE" != true ]] || what="changed components only (--update)"
             welcome_title "development build"
             summary_row "Installs" "$what"
             summary_row "Into" "$TEST_PREFIX (overrides the packages)"
+            [[ "$DO_UPDATE" != true ]] || summary_update_plan
+            [[ "$do_greeter" == true ]] || summary_row "Greeter" "skipped (--no-greeter)"
             echo
             summary_warn "For testing and development only, not for daily use."
             echo "    For daily use, install the packages: ./install-arch.sh"
-            if [[ "$mode" == binary || "$mode" == local-dev ]]; then
-                echo "    Adds a \"KineticWE-Dev\" login entry (asks for sudo)."
-            fi
+            echo "    Adds a \"KineticWE-Dev\" login entry (asks for sudo)."
             echo "    Undo later with: ./install-arch.sh --reset-local"
-            if [[ "$mode" == local-dev ]]; then
+            if [[ "$do_greeter" == true ]]; then
                 default=N
                 echo
                 summary_box \
@@ -1717,6 +1997,7 @@ print_usage() {
         done
         summary_row "Packages" "${rows[0]:-}"
         for (( i = 1; i < ${#rows[@]}; i++ )); do summary_row "" "${rows[i]}"; done
+        summary_update_result
         summary_qt "$PKG_WORK_DIR/qt-abi"
         if (( ${#PKGBUILD_DRIFT[@]} )); then
             summary_warn "PKGBUILD is behind the spec; built with the spec's values."
@@ -1742,6 +2023,7 @@ print_usage() {
         printf '  More options: %s./install-arch.sh --help%s\n' "$U_CMD" "$U_R"
     else
         summary_title "KineticWE dev build installed to $TEST_PREFIX"
+        summary_update_result
         if [[ -n "${STATE_DIR:-}" ]]; then summary_qt "$STATE_DIR/qt-abi"; fi
         echo
 
@@ -1841,9 +2123,17 @@ pkg_build() {
     # the cached copy. The pinned KDE/greeter tarballs stay cached.
     rm -f -- "$work/kineticwe-$pkgver.tar.gz"
 
+    # ccache, enabled the way makepkg's own BUILDENV=(ccache) does it (its
+    # compiler wrappers first in PATH), with the cache kept next to the build.
+    # Rebuilds of unchanged code become cache hits; the first build fills it.
+    install_missing ccache ccache
+    local ccache_path="/usr/lib/ccache/bin"
+    [[ -d "$ccache_path" ]] || die "ccache wrappers missing: $ccache_path"
+    mkdir -p -- "$work/ccache"
+
     step "Building packages with makepkg (installs missing makedepends via sudo)..."
     # -C: start from a clean srcdir so files deleted from the tree never linger.
-    (cd "$work" && KWE_LOCAL_TARBALL="$tarball" SRCDEST="$work" PKGDEST="$work/pkgs" makepkg -sfC --noconfirm)
+    (cd "$work" && PATH="$ccache_path:$PATH" CCACHE_DIR="$work/ccache" KWE_LOCAL_TARBALL="$tarball" SRCDEST="$work" PKGDEST="$work/pkgs" makepkg -sfC --noconfirm)
 
     local list
     list=$(cd "$work" && KWE_LOCAL_TARBALL="$tarball" PKGDEST="$work/pkgs" makepkg --packagelist) \
@@ -1864,6 +2154,19 @@ pkg_build() {
     printf '    %s\n' "${PKG_INSTALLED[@]##*/}"
     sudo pacman -U --needed "${PKG_INSTALLED[@]}"
 
+    # Baseline for the next --update: the fingerprint each installed package
+    # was built from, plus the version pacman now reports for it.
+    local component version
+    for component in "${UPDATE_ORDER[@]}"; do
+        for f in "${PKG_INSTALLED[@]}"; do
+            if [[ "${f##*/}" == "${COMPONENT_PACKAGE[$component]}"-[0-9]* ]]; then
+                version=$(pacman -Q "${COMPONENT_PACKAGE[$component]}" 2>/dev/null | awk '{print $2}' || true)
+                fingerprint_store pkg "$component" "$version"
+                break
+            fi
+        done
+    done
+
     record_qt_abi "$work/qt-abi"
     print_usage pkg
 }
@@ -1871,15 +2174,29 @@ pkg_build() {
 # ---------------------------------------------------------------------------
 # Dev modes: incremental build into TEST_PREFIX
 # ---------------------------------------------------------------------------
+
+# dev_greeter_current: true when --local-dev --update can skip the greeter
+# setup: greetd already starts it, and a source-built greeter is at the
+# requested pinned revision.
+dev_greeter_current() {
+    if pacman -Q kineticwe-greeter &>/dev/null; then
+        [[ "$(greeter_state /usr/bin/noctalia-greeter-session)" == ok ]]
+        return
+    fi
+    [[ "$(greeter_state /usr/local/bin/noctalia-greeter-session)" == ok ]] || return 1
+    local record
+    record="$(fingerprint_dir dev)/greeter.revision"
+    [[ -f "$record" && ! -L "$record" && "$(cat -- "$record")" == "$NOCTALIA_GREETER_REF" ]]
+}
 dev_build() {
-    local mode="$1" do_session="$2" title
-    case "$mode" in
-        binary)    title="Binary Dev Build" ;;
-        local-dev) title="Local Dev Build (binaries + Noctalia greeter)" ;;
-        kwin-only) title="KWin-Only Dev Build" ;;
-        noct-only) title="Noctalia-Only Dev Build" ;;
-        *)         die "Unknown dev mode: $mode" ;;
-    esac
+    local mode="$1" do_session="$2" with_greeter="$3" title
+    [[ "$mode" == local-dev ]] || die "Unknown dev mode: $mode"
+    if [[ "$with_greeter" == true ]]; then
+        title="Local Dev Build (binaries + Noctalia greeter)"
+    else
+        title="Local Dev Build (binaries, no greeter)"
+    fi
+    [[ "$DO_UPDATE" != true ]] || title+=" (--update)"
     step "KineticWE ${title} into ${TEST_PREFIX}"
 
     check_bootstrap
@@ -1889,27 +2206,6 @@ dev_build() {
     install_build_deps
     check_prereqs
 
-    case "$mode" in
-        noct-only)
-            # Shell-only: build requirements only; the compositor was not
-            # rebuilt, so the Qt ABI record is left untouched.
-            noctalia_only_build
-            return 0
-            ;;
-        kwin-only)
-            kwin_only_build
-            # Effect QML modules (Overview/Grid View, Window View, Tiles
-            # Editor) are hard runtime requirements that ldd cannot see, so
-            # install and verify them even on an incremental kwin-only build.
-            install_host_deps_arch false
-            verify_host_deps
-            record_qt_abi "$STATE_DIR/qt-abi"
-            return 0
-            ;;
-    esac
-
-    local with_greeter=false
-    [[ "$mode" != local-dev ]] || with_greeter=true
     binary_build
     install_host_deps_arch "$with_greeter"
     verify_host_deps
@@ -1919,9 +2215,13 @@ dev_build() {
         install_dev_session_entry
     fi
     if [[ "$with_greeter" == true ]]; then
-        # Hard-fail: a broken greeter must abort --local-dev instead of leaving
-        # the session without a login screen.
-        setup_noctalia_greeter
+        if [[ "$DO_UPDATE" == true ]] && dev_greeter_current; then
+            info "Greeter up to date, skipped"
+        else
+            # Hard-fail: a broken greeter must abort --local-dev instead of
+            # leaving the session without a login screen.
+            setup_noctalia_greeter
+        fi
     fi
     print_usage dev "$with_greeter"
 }
@@ -1936,24 +2236,31 @@ Usage: $0 [MODE] [MODIFIERS]
 Modes (at most one; default --pkg):
   --pkg                Build pacman packages from the working tree with PKGBUILD
                        (makepkg -s) in build.arch-pkg/, then install with pacman -U.
-  --binary             Dev build: compositor + portal + shell into TEST_PREFIX
-                       (default \$HOME/.local), incremental.
-  --local-dev          --binary plus build/activate the Noctalia greeter (greetd,
-                       /usr/local, or the installed kineticwe-greeter package).
-  --kwin-only          Dev build: compositor only (incremental).
-  --noct-only          Dev build: Noctalia shell only (incremental).
+  --local-dev          Dev build: compositor + portal + shell into TEST_PREFIX
+                       (default \$HOME/.local), incremental, plus build/activate
+                       the Noctalia greeter (greetd, /usr/local, or the installed
+                       kineticwe-greeter package) unless --no-greeter is given.
   --reset-local        Remove only unchanged manifest-owned files from TEST_PREFIX;
                        sudo is used only for the recorded system login entry.
   --clean-deps         Report build/runtime dependencies (never removes packages).
   -h, --help           Show this help.
-  --local-dev together with --binary is accepted and means --local-dev.
 
 Modifiers:
+  --update             Exit early when no sources changed since the last install
+                       (uncommitted edits count). Otherwise --pkg (default)
+                       rebuilds all packages together, since they require each
+                       other's exact version (ccache keeps unchanged code fast),
+                       and --local-dev rebuilds only the changed components
+                       (compositor, portal, shell).
   --no-session         Dev modes: do not install the KineticWE-Dev login-screen entry.
-  --no-greeter         --pkg only: do not install the kineticwe-greeter package.
+  --no-greeter         Skip the greeter. --pkg: do not build/install the
+                       kineticwe-greeter package. --local-dev: do not set up
+                       greetd; your display manager is left alone (e.g. when
+                       running next to Plasma). Combines with --update.
   --yes, -y            Skip the confirmation prompt (required when not run
                        from a terminal).
-  --install-host-deps  Deprecated alias for --binary.
+  --binary             Deprecated alias for --local-dev --no-greeter.
+  --install-host-deps  Deprecated alias for --local-dev --no-greeter.
   --full               Deprecated alias for --local-dev.
 
 Dependencies come from PKGBUILD (makedepends; depends of the split packages).
@@ -1971,19 +2278,24 @@ main() {
     for arg in "$@"; do
         case "$arg" in
             --pkg)         modes+=(pkg) ;;
-            --binary)      modes+=(binary) ;;
+            --binary)
+                warn "--binary is deprecated; use --local-dev --no-greeter."
+                modes+=(local-dev); do_greeter=false
+                ;;
             --local-dev)   modes+=(local-dev) ;;
             --full)
                 warn "--full is deprecated; use --local-dev."
                 modes+=(local-dev)
                 ;;
-            --kwin-only)   modes+=(kwin-only) ;;
-            --noct-only)   modes+=(noct-only) ;;
+            --kwin-only|--noct-only)
+                die "$arg was removed; use --local-dev --update (rebuilds only what changed)"
+                ;;
+            --update)      DO_UPDATE=true ;;
             --reset-local) modes+=(reset-local) ;;
             --clean-deps)  modes+=(clean-deps) ;;
             --install-host-deps)
-                warn "--install-host-deps is deprecated; use --binary."
-                modes+=(binary)
+                warn "--install-host-deps is deprecated; use --local-dev --no-greeter."
+                modes+=(local-dev); do_greeter=false
                 ;;
             --no-session)  do_session=false ;;
             --no-greeter)  do_greeter=false ;;
@@ -2000,9 +2312,6 @@ main() {
     if (( ${#modes[@]} )); then
         mapfile -t modes < <(printf '%s\n' "${modes[@]}" | sort -u)
     fi
-    if (( ${#modes[@]} == 2 )) && [[ " ${modes[*]} " == *" binary "* && " ${modes[*]} " == *" local-dev "* ]]; then
-        modes=(local-dev)
-    fi
     if (( ${#modes[@]} > 1 )); then
         error "Only one mode may be given (got: ${modes[*]})"
         usage >&2
@@ -2010,8 +2319,43 @@ main() {
     fi
     local mode="${modes[0]:-pkg}"
 
-    if [[ "$do_greeter" != true && "$mode" != pkg ]]; then
-        die "--no-greeter only applies to --pkg"
+    if [[ "$do_greeter" != true && "$mode" != pkg && "$mode" != local-dev ]]; then
+        die "--no-greeter only applies to --pkg (default) and --local-dev"
+    fi
+    if [[ "$DO_UPDATE" == true && "$mode" != pkg && "$mode" != local-dev ]]; then
+        die "--update only applies to --pkg (default) and --local-dev"
+    fi
+
+    # Fingerprints are computed for every build (stored after install as the
+    # baseline for the next --update); with --update they also pick what to build.
+    case "$mode" in
+        pkg)
+            plan_update pkg "$do_greeter"
+            ;;
+        local-dev)
+            plan_update dev false
+            ;;
+    esac
+    if [[ "$DO_UPDATE" == true && ${#UPDATE_COMPONENTS[@]} -eq 0 ]]; then
+        if [[ "$mode" != local-dev || "$do_greeter" != true ]] || dev_greeter_current; then
+            ui_init
+            welcome_title "everything is up to date"
+            summary_update_plan
+            echo
+            info "Nothing to rebuild; no changes made."
+            exit 0
+        fi
+    fi
+
+    # An installed kineticwe-greeter depends on the exact kineticwe version, so
+    # pacman -U of a new kineticwe without a matching greeter would fail after
+    # the whole build. Every package build makes a new kineticwe, and
+    # --no-greeter never touches the greeter: stop up front.
+    if [[ "$mode" == pkg && "$do_greeter" != true ]] && pacman -Q kineticwe-greeter &>/dev/null; then
+        error "kineticwe-greeter is installed and requires this exact kineticwe version,"
+        error "so kineticwe cannot be rebuilt without it. Drop --no-greeter, or remove it first:"
+        error "  sudo pacman -R kineticwe-greeter"
+        exit 1
     fi
 
     confirm_start "$mode" "$assume_yes" "$do_greeter"
@@ -2034,7 +2378,7 @@ main() {
             pkg_build "$do_greeter"
             ;;
         *)
-            dev_build "$mode" "$do_session"
+            dev_build "$mode" "$do_session" "$do_greeter"
             ;;
     esac
 }
