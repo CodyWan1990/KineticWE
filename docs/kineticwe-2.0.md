@@ -150,7 +150,7 @@ The plugin system is **shell code**; forking does not touch it:
 **Caveats:**
 
 - Compositor-specific plugins remain compositor-specific (a hyprland-IPC plugin won't run on kinetic-we — true today, not a fork regression). Generic plugins gain the new KDE output backend for free (additive).
-- Own paths, side by side with upstream: the fork uses its own `noctalia-kwe` install paths (`/usr/share/noctalia-kwe/`), desktop ID `dev.kineticwe.Noctalia`, icon (`noctalia-kwe.svg`) and XDG dirs (`~/.config/noctalia-kwe/`, `~/.local/state/noctalia-kwe/`, `~/.local/share/noctalia-kwe/`, `~/.cache/noctalia-kwe/`), so it installs and runs side by side with upstream Noctalia. On first launch it copies existing `~/.config/noctalia/`, `~/.local/state/noctalia/` and `~/.local/share/noctalia/` (minus its bundled `assets/`) into the new dirs when those don't exist yet; the originals are left untouched. `NOCTALIA_CONFIG_HOME`/`NOCTALIA_STATE_HOME`/`NOCTALIA_DATA_HOME` overrides still apply and resolve to `<override>/noctalia-kwe`.
+- Own paths, side by side with upstream: the fork uses its own `noctalia-kwe` install paths (`/usr/share/noctalia-kwe/`), desktop ID `dev.kineticwe.Noctalia`, icon (`noctalia-kwe.svg`) and XDG dirs (`~/.config/noctalia-kwe/`, `~/.local/state/noctalia-kwe/`, `~/.local/share/noctalia-kwe/`, `~/.cache/noctalia-kwe/`), so it installs and runs side by side with upstream Noctalia. Upstream Noctalia's dirs are not read or imported; the fork starts from its own defaults. `NOCTALIA_CONFIG_HOME`/`NOCTALIA_STATE_HOME`/`NOCTALIA_DATA_HOME` overrides still apply and resolve to `<override>/noctalia-kwe`.
 
 ### 5.2 Community templates & palettes — compatible
 
