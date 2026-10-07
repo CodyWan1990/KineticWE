@@ -321,13 +321,6 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // Import upstream Noctalia's config/state/data on first start of this fork,
-  // before the daemon fork so messages reach the launching terminal and before
-  // Application loads config or opens the log file.
-  for (const std::string& message : FileUtils::migrateLegacyDirs()) {
-    std::println(stderr, "{}", message);
-  }
-
   if (shouldDaemonize && !isDaemonChild) {
     pid_t pid = -1;
     int parentPipe = -1;
