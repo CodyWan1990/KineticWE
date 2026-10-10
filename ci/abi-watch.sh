@@ -17,6 +17,7 @@
 # predefined CI_API_V4_URL and CI_PROJECT_ID. The rebuild runs on the ref
 # recorded in the manifest (the release tag), with REBUILD=1.
 # --dry-run prints the decision and never triggers.
+# KWE_WATCH_FORCE=1 always requests a rebuild (tests the trigger path).
 set -euo pipefail
 
 manifest_url="${1:?usage: abi-watch.sh <manifest-url> [--dry-run]}"
@@ -116,6 +117,8 @@ while read -r _ pkg built path; do
         reasons+=("${path##*/} gone from $pkg $now")
     fi
 done < <(awk '$1 == "soname"' "$work/manifest")
+
+[[ "${KWE_WATCH_FORCE:-}" != 1 ]] || reasons+=("forced by KWE_WATCH_FORCE=1")
 
 if ((${#reasons[@]} == 0)); then
     echo ">> Published packages match current Arch; no rebuild needed"

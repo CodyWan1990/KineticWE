@@ -20,7 +20,11 @@
 # on the exact qt6-base version they were built with (Qt private API). Users'
 # pacman -Syu holds a Qt update until the matching rebuild is published.
 # Setup (GitLab UI): a pipeline trigger token in the masked CI/CD variable
-# KWE_TRIGGER_TOKEN, and a daily schedule with WATCH=1.
+# KWE_TRIGGER_TOKEN, a daily schedule with WATCH=1, and Settings -> CI/CD ->
+# Variables -> "Minimum role to use pipeline variables" set to Maintainer
+# (newer projects block pipeline variables, which would reject WATCH/REBUILD).
+# Testing the trigger: run the WATCH=1 schedule with KWE_WATCH_FORCE=1 added.
+# Job URLs use $CI_PAGES_URL, so a fork reads and publishes its own repo.
 #
 # The PKGBUILD is a split package (kineticwe, xdg-desktop-portal-kwe,
 # kineticwe-noctalia, kineticwe-greeter); all four are published here.
@@ -62,7 +66,7 @@ abi-watch:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $WATCH == "1"
   script:
     - apk add --no-cache bash curl jq libarchive-tools
-    - ci/abi-watch.sh "https://theblackdon.gitlab.io/$CI_PROJECT_NAME/x86_64/kineticwe-abi.txt"
+    - ci/abi-watch.sh "${CI_PAGES_URL:?Pages not enabled}/x86_64/kineticwe-abi.txt"
 
 build-package:
   stage: build
@@ -160,7 +164,7 @@ smoke-test:
     # binaries need is gone from current Arch (soname bump). ldd cannot see Qt
     # private-API breaks; the exact qt6-base pin and abi-watch cover those.
     # Rebuild via Build -> Pipelines -> Run pipeline.
-    - ci/smoke.sh "https://theblackdon.gitlab.io/$CI_PROJECT_NAME/x86_64"
+    - ci/smoke.sh "${CI_PAGES_URL:?Pages not enabled}/x86_64"
 
 pages:
   stage: deploy
@@ -181,10 +185,12 @@ pages:
       <p>Add this to <code>/etc/pacman.conf</code>:</p>
       <pre>[kineticwe]
       SigLevel = Never
-      Server = https://theblackdon.gitlab.io/kineticwe/$arch</pre>
+      Server = @PAGES_URL@/$arch</pre>
       <p>Then: <code>sudo pacman -Sy kineticwe</code> (pulls in
       <code>xdg-desktop-portal-kwe</code> and <code>kineticwe-noctalia</code>)</p>
       <p>Optional greeter: <code>sudo pacman -S kineticwe-greeter</code>, then
       run <code>kineticwe-setup-greeter</code></p>
       HTML
+    # Quoted heredoc keeps pacman's literal $arch; fill in this project's URL.
+    - sed -i "s|@PAGES_URL@|${CI_PAGES_URL:?Pages not enabled}|" public/index.html
   publish: public

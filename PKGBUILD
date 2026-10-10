@@ -313,6 +313,9 @@ build() {
 
     # --- Phase 4: kinetic-we compositor ---
     echo "==> Building kinetic-we..."
+    # CMAKE_INSTALL_MESSAGE=NEVER (here and for the portal): the per-file
+    # "-- Installing:" lines of the icon themes alone push the CI job log past
+    # GitLab's 4 MB limit, hiding everything after package().
     cmake -S "$_sourcebase" -B kwin-build -GNinja \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_PREFIX_PATH="$srcdir/kga-staging/usr" \
@@ -323,6 +326,7 @@ build() {
         -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
         -DKWIN_BUILD_KCMS=OFF \
         -DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=ON \
+        -DCMAKE_INSTALL_MESSAGE=NEVER \
         -Wno-dev
     cmake --build kwin-build
 
@@ -334,6 +338,7 @@ build() {
         -DCMAKE_SKIP_RPATH=ON \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DBUILD_TESTING=OFF \
+        -DCMAKE_INSTALL_MESSAGE=NEVER \
         -Wno-dev
     cmake --build portal-build
 
