@@ -2,13 +2,25 @@
 #
 # Triggers (plain branch pushes never run a pipeline - see workflow:rules):
 #   * tag push ................... release build, pkgrel exactly as committed
-#   * schedule "weekly-rebuild" .. ABI refresh against current Arch; pkgrel gets
-#                                  a .YYYYMMDD suffix so pacman offers it as an
-#                                  upgrade (e.g. 15 -> 15.20260803)
-#   * schedule "daily-smoke" ..... installs the published packages on a fully
-#                                  updated Arch container and link-checks it;
-#                                  a failure emails you (GitLab default)
+#   * schedule "abi-watch" ....... (WATCH=1, daily) compares the published
+#                                  kineticwe-abi.txt with current Arch
+#                                  (ci/abi-watch.sh) and, only when Qt /
+#                                  private-API KF6 versions changed or a linked
+#                                  soname is gone, triggers a REBUILD=1 pipeline
+#                                  on the released tag
+#   * trigger REBUILD=1 .......... ABI refresh against current Arch; pkgrel gets
+#                                  a .YYYYMMDDHHMM suffix so pacman offers it as
+#                                  an upgrade (e.g. 15 -> 15.202608031200)
+#   * schedule "daily-smoke" ..... (SMOKE=1) installs the published packages on
+#                                  a fully updated Arch container and checks
+#                                  every library resolves; a failure emails you
 #   * manual "Run pipeline" ...... on-demand rebuild
+#
+# CI builds set KWE_ABI_PIN=1, so kineticwe and xdg-desktop-portal-kwe depend
+# on the exact qt6-base version they were built with (Qt private API). Users'
+# pacman -Syu holds a Qt update until the matching rebuild is published.
+# Setup (GitLab UI): a pipeline trigger token in the masked CI/CD variable
+# KWE_TRIGGER_TOKEN, and a daily schedule with WATCH=1.
 #
 # The PKGBUILD is a split package (kineticwe, xdg-desktop-portal-kwe,
 # kineticwe-noctalia, kineticwe-greeter); all four are published here.
@@ -22,9 +34,11 @@ workflow:
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "trigger"
     - if: $CI_PIPELINE_SOURCE == "web"
 
 stages:
+  - watch
   - build
   - smoke
   - deploy
@@ -41,6 +55,15 @@ variables:
   - pacman -Sy --noconfirm archlinux-keyring
   - pacman -Su --noconfirm
 
+abi-watch:
+  stage: watch
+  image: alpine:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $WATCH == "1"
+  script:
+    - apk add --no-cache bash curl jq libarchive-tools
+    - ci/abi-watch.sh "https://theblackdon.gitlab.io/$CI_PROJECT_NAME/x86_64/kineticwe-abi.txt"
+
 build-package:
   stage: build
   image: archlinux:base-devel
@@ -50,6 +73,7 @@ build-package:
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "schedule" && $REBUILD == "1"
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $REBUILD == "1"
     - if: $CI_PIPELINE_SOURCE == "web"
   # Keep downloaded packages + ccache between runs (GitLab cache is limited
   # to paths inside the project dir, so point pacman's CacheDir there).
@@ -73,9 +97,13 @@ build-package:
     - arch/sync-from-spec.sh PKGBUILD
     # ABI refreshes between releases get a CI-only pkgrel suffix so pacman
     # offers them as upgrades; the next source release (e.g. 16) sorts higher.
+    # Triggered rebuilds run on the release tag, so REBUILD=1 counts too.
+    # YYYYMMDDHHMM: two rebuilds in a day stay ordered, and it sorts above the
+    # older .YYYYMMDD suffixes.
     - |
-      if [ -z "$CI_COMMIT_TAG" ]; then
-        sed -i "s/^pkgrel=.*/&.$(date +%Y%m%d)/" PKGBUILD
+      if [ -z "$CI_COMMIT_TAG" ] || [ "$REBUILD" = 1 ]; then
+        echo "Rebuild reason: ${KWE_REBUILD_REASON:-manual}"
+        sed -i "s/^pkgrel=.*/&.$(date +%Y%m%d%H%M)/" PKGBUILD
         grep '^pkgrel' PKGBUILD
       fi
     # Install every build dependency the PKGBUILD declares that exists in the
@@ -103,11 +131,15 @@ build-package:
       pkgver=$(bash -c 'source PKGBUILD; echo "$pkgver"')
       git archive --format=tar.gz --prefix="kineticwe-$pkgver/" -o /home/builder/kineticwe-src.tar.gz HEAD
     - cp PKGBUILD kineticwe.install kineticwe-greeter.install /home/builder/ && chown -R builder:builder /home/builder
-    - runuser -u builder -- env KWE_LOCAL_TARBALL=/home/builder/kineticwe-src.tar.gz bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
+    # KWE_ABI_PIN=1: pin the exact qt6-base version (see PKGBUILD _kwe_qt_pin).
+    - runuser -u builder -- env KWE_ABI_PIN=1 KWE_LOCAL_TARBALL=/home/builder/kineticwe-src.tar.gz bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
     - mkdir -p public/x86_64
     # every split package (!debug above keeps -debug packages out)
     - cp /home/builder/*.pkg.tar.zst public/x86_64/
     - ci/repo.sh public/x86_64
+    # Qt / KF6 versions and linked sonames of this build, read by abi-watch.
+    - ci/abi-manifest.sh /home/builder/*.pkg.tar.zst > public/x86_64/kineticwe-abi.txt
+    - cat public/x86_64/kineticwe-abi.txt
   artifacts:
     paths:
       - public/
@@ -124,8 +156,9 @@ smoke-test:
   script:
     - *arch-sync
     - sed -i "s|^#CacheDir.*|CacheDir = $CI_PROJECT_DIR/.pkg-cache/|" /etc/pacman.conf
-    # If this fails, GitLab emails the schedule owner: the published binary no
-    # longer links against current Arch (Qt private API or a soname bump).
+    # If this fails, GitLab emails the schedule owner: a library the published
+    # binaries need is gone from current Arch (soname bump). ldd cannot see Qt
+    # private-API breaks; the exact qt6-base pin and abi-watch cover those.
     # Rebuild via Build -> Pipelines -> Run pipeline.
     - ci/smoke.sh "https://theblackdon.gitlab.io/$CI_PROJECT_NAME/x86_64"
 
@@ -136,6 +169,7 @@ pages:
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "schedule" && $REBUILD == "1"
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $REBUILD == "1"
     - if: $CI_PIPELINE_SOURCE == "web"
   script:
     - |

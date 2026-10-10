@@ -173,6 +173,9 @@ Requires:       bash
 Requires:       systemd
 Requires:       procps-ng
 Requires:       psmisc
+# KWin uses Qt private API, so it must run against the exact Qt it was built
+# with (Fedora Qt packaging guidelines).
+%{?_qt6:Requires: %{_qt6}%{?_isa} = %{_qt6_version}}
 Recommends:     xdg-user-dirs
 Recommends:     alacritty
 Recommends:     qt5ct
@@ -196,6 +199,8 @@ subpackage (noctalia-kwe binary).
 %package -n xdg-desktop-portal-kwe
 Summary:        KineticWE portal backend (rebranded xdg-desktop-portal-kde)
 License:        LGPL-2.0-or-later
+# Uses Qt private API (QtGui, QtPrintSupport): exact Qt version required.
+%{?_qt6:Requires: %{_qt6}%{?_isa} = %{_qt6_version}}
 
 %description -n xdg-desktop-portal-kwe
 The xdg-desktop-portal backend for KineticWE sessions: a fork of KDE's

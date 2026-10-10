@@ -180,6 +180,24 @@ _kwe_normalize() {
     fi
 }
 
+# CI release builds (KWE_ABI_PIN=1) pin the exact upstream qt6-base version,
+# like Fedora's %{_qt6_version} Requires: kineticwe and the portal use Qt
+# private API, which has no compatibility guarantee between Qt releases. pkgrel
+# is left out so an Arch rebuild of the same Qt still satisfies it. Local
+# builds (install-arch.sh) stay unpinned so a Qt update never blocks pacman
+# before the user can rebuild.
+_kwe_qt_pin() {
+    [[ "${KWE_ABI_PIN:-}" == 1 ]] || return 0
+    local qtver
+    qtver=$(pacman -Q qt6-base | awk '{print $2}')
+    qtver=${qtver%-*}
+    if [[ -z "$qtver" ]]; then
+        error "KWE_ABI_PIN=1 but the qt6-base version could not be read"
+        return 1
+    fi
+    depends+=("qt6-base=$qtver")
+}
+
 prepare() {
     cd "$srcdir"
 
@@ -425,6 +443,7 @@ package_kineticwe() {
         'xcb-util-cursor'
         'xcb-util-wm'
     )
+    _kwe_qt_pin
     optdepends=(
         'xdg-user-dirs: create standard user directories on first login'
         'qt5ct: Qt5 theming in the KineticWE session'
@@ -533,6 +552,7 @@ package_xdg-desktop-portal-kwe() {
         'qt6-declarative'
         'qt6-wayland'
     )
+    _kwe_qt_pin
 
     cd "$srcdir"
     DESTDIR="$pkgdir" cmake --install portal-build --prefix /usr
