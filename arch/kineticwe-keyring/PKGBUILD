@@ -1,0 +1,31 @@
+# Maintainer: TheBlackDon <theblackdon@codeberg.org>
+# Contributor: KineticWE project
+#
+# Signing keys of the KineticWE pacman repo, installed as a pacman keyring
+# (same layout as archlinux-keyring). Built and published by CI next to the
+# kineticwe packages.
+#
+# Changing the key (new subkey, rotation, revocation): replace kineticwe.gpg,
+# kineticwe-trusted (primary fingerprint, "<FPR>:4:") and/or kineticwe-revoked
+# (one fingerprint per line), bump pkgver to the date of the change, then run
+# updpkgsums.
+
+pkgname=kineticwe-keyring
+pkgver=20261010
+pkgrel=1
+pkgdesc="KineticWE pacman repository signing keys"
+arch=('any')
+url="https://gitlab.com/theblackdon/kineticwe"
+license=('GPL-2.0-or-later')
+install=kineticwe-keyring.install
+source=('kineticwe.gpg'
+        'kineticwe-trusted'
+        'kineticwe-revoked')
+sha256sums=('9b27302450fad2e95222684f63ea7c9025d5758cd42c02ef25c248139f09d463'
+            '92e1f9c4aff796c5330c6159ce9c4fda1c6f725ab8ee0fa5f4f0917eef4594bc'
+            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+
+package() {
+    install -Dm644 -t "$pkgdir/usr/share/pacman/keyrings/" \
+        kineticwe.gpg kineticwe-trusted kineticwe-revoked
+}

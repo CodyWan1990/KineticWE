@@ -8,6 +8,8 @@
 set -euo pipefail
 
 server="${1:?usage: smoke.sh <repo-server-url>}"   # e.g. https://theblackdon.gitlab.io/kineticwe/x86_64
+# Trusted key comes from the checkout, not from the server being checked.
+keyring_dir="$(cd "$(dirname "$0")/../arch/kineticwe-keyring" && pwd)"
 work="$(mktemp -d)"
 cd "$work"
 
@@ -16,7 +18,7 @@ pacman -S --noconfirm --needed libarchive curl >/dev/null
 echo ">> Fetching repo database from $server"
 curl -sfL "$server/kineticwe.db.tar.gz" -o db.tar.gz
 
-pkgnames=(kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter)
+pkgnames=(kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter kineticwe-keyring)
 
 # Map each db entry to its %NAME% / %VERSION% / %FILENAME%. %FILENAME% is used
 # as-is for the download (epoch colons etc. are already encoded there).
@@ -45,6 +47,32 @@ for name in "${pkgnames[@]}"; do
     curl -sfL "$server/$file" -o "pkgs/$name.pkg.tar.zst"
     bsdtar -xf "pkgs/$name.pkg.tar.zst" -C root
 done
+
+# Signatures: once the repo is signed (kineticwe.db.sig published), the
+# database and every package must verify against the keyring in the checkout.
+# KWE_REQUIRE_SIGNING=1 also fails an unsigned repo.
+export GNUPGHOME="$work/gnupg"
+mkdir -m 700 "$GNUPGHOME"
+if curl -sfL "$server/kineticwe.db.sig" -o db.tar.gz.sig; then
+    echo ">> Verifying signatures"
+    gpg --batch --quiet --import "$keyring_dir/kineticwe.gpg"
+    gpg --batch --quiet --verify db.tar.gz.sig db.tar.gz 2>/dev/null ||
+        { echo 'FAIL: bad repo database signature'; exit 1; }
+    for name in "${pkgnames[@]}"; do
+        if ! curl -sfL "$server/${latest_file[$name]}.sig" -o "pkgs/$name.pkg.tar.zst.sig"; then
+            echo "FAIL: $name has no signature"
+            exit 1
+        fi
+        gpg --batch --quiet --verify "pkgs/$name.pkg.tar.zst.sig" "pkgs/$name.pkg.tar.zst" 2>/dev/null ||
+            { echo "FAIL: bad signature on $name"; exit 1; }
+    done
+    echo ">> Signatures OK"
+elif [[ "${KWE_REQUIRE_SIGNING:-}" == 1 ]]; then
+    echo 'FAIL: repo is unsigned but KWE_REQUIRE_SIGNING=1'
+    exit 1
+else
+    echo ">> Repo is unsigned; skipping signature checks"
+fi
 
 # Assert the packaged portal backend is present and KDE-free.
 echo ">> Checking portal backend packaging"
