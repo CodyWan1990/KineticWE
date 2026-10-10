@@ -21,8 +21,8 @@ install=kineticwe-keyring.install
 source=('kineticwe.gpg'
         'kineticwe-trusted'
         'kineticwe-revoked')
-sha256sums=('9b27302450fad2e95222684f63ea7c9025d5758cd42c02ef25c248139f09d463'
-            '92e1f9c4aff796c5330c6159ce9c4fda1c6f725ab8ee0fa5f4f0917eef4594bc'
+sha256sums=('465a7423c2ae80aca91c535b043aaa3705f8bb5bb579543c6a0f9a3c82dac750'
+            'e5619c8f0770828b31439b9e4123b9277387586fdad9e0213a71de038df73ad1'
             'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
 
 package() {

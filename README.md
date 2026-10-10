@@ -85,11 +85,11 @@ systemctl reboot
 
 The fastest way to install KineticWE on Arch-based distros (Arch, CachyOS, EndeavourOS, Manjaro, etc.) is the pre-built binary repo hosted on GitLab Pages — no compiling needed.
 
-Packages are signed with the KineticWE repo key `BA903B64A45FE8BDD349F6346796890FCA5C9FE6`. Trust it once:
+Packages are signed with the KineticWE repo key `FD258A99CDC5F61B04A335EEE163D34B273AE987`. Trust it once:
 
 ```bash
-sudo pacman-key --recv-keys BA903B64A45FE8BDD349F6346796890FCA5C9FE6 --keyserver hkps://keys.openpgp.org
-sudo pacman-key --lsign-key BA903B64A45FE8BDD349F6346796890FCA5C9FE6
+sudo pacman-key --recv-keys FD258A99CDC5F61B04A335EEE163D34B273AE987 --keyserver hkps://keys.openpgp.org
+sudo pacman-key --lsign-key FD258A99CDC5F61B04A335EEE163D34B273AE987
 ```
 
 Add the repo to `/etc/pacman.conf` (e.g. `sudo nano /etc/pacman.conf`):
