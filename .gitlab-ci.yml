@@ -26,12 +26,20 @@
 # Testing the trigger: run the WATCH=1 schedule with KWE_WATCH_FORCE=1 added.
 # Job URLs use $CI_PAGES_URL, so a fork reads and publishes its own repo.
 #
-# The PKGBUILD is a split package (kineticwe, xdg-desktop-portal-kwe,
-# kineticwe-noctalia, kineticwe-greeter); all four are published here.
+# Signing (ci/sign.sh): packages and the database are signed with the repo's
+# signing subkey from KWE_SIGNING_KEY ("gpg --export-secret-subkeys <primary> |
+# base64 -w0"; masked, hidden and PROTECTED, so only protected branches/tags
+# sign). It must belong to the key in arch/kineticwe-keyring/. Without it the
+# repo is published unsigned; set KWE_REQUIRE_SIGNING=1 once signing is live so
+# that becomes an error instead.
 #
-# Users add this to /etc/pacman.conf:
+# The PKGBUILD is a split package (kineticwe, xdg-desktop-portal-kwe,
+# kineticwe-noctalia, kineticwe-greeter); all four are published here, plus
+# kineticwe-keyring from arch/kineticwe-keyring/.
+#
+# Users trust the key once (pacman-key --recv-keys + --lsign-key), then add
+# this to /etc/pacman.conf (pacman's default SigLevel requires signatures):
 #   [kineticwe]
-#   SigLevel = Never
 #   Server = https://theblackdon.gitlab.io/kineticwe/$arch
 
 workflow:
@@ -137,10 +145,17 @@ build-package:
     - cp PKGBUILD kineticwe.install kineticwe-greeter.install /home/builder/ && chown -R builder:builder /home/builder
     # KWE_ABI_PIN=1: pin the exact qt6-base version (see PKGBUILD _kwe_qt_pin).
     - runuser -u builder -- env KWE_ABI_PIN=1 KWE_LOCAL_TARBALL=/home/builder/kineticwe-src.tar.gz bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
+    # Repo keyring package (arch=any, no dependencies).
+    - cp -r arch/kineticwe-keyring /home/builder/keyring && chown -R builder:builder /home/builder/keyring
+    - runuser -u builder -- bash -c 'cd /home/builder/keyring && makepkg -f --nodeps --noconfirm'
     - mkdir -p public/x86_64
     # every split package (!debug above keeps -debug packages out)
-    - cp /home/builder/*.pkg.tar.zst public/x86_64/
-    - ci/repo.sh public/x86_64
+    - cp /home/builder/*.pkg.tar.zst /home/builder/keyring/*.pkg.tar.zst public/x86_64/
+    # Sign every package (unsigned without KWE_SIGNING_KEY, see top); repo.sh
+    # then checks each signature and signs the database.
+    - export GNUPGHOME="$(mktemp -d)"
+    - KWE_SIGN_FPR=$(ci/sign.sh arch/kineticwe-keyring public/x86_64/*.pkg.tar.zst)
+    - GPGKEY="$KWE_SIGN_FPR" ci/repo.sh public/x86_64
     # Qt / KF6 versions and linked sonames of this build, read by abi-watch.
     - ci/abi-manifest.sh /home/builder/*.pkg.tar.zst > public/x86_64/kineticwe-abi.txt
     - cat public/x86_64/kineticwe-abi.txt
@@ -182,15 +197,23 @@ pages:
       <meta charset="utf-8">
       <title>KineticWE pacman repo</title>
       <h1>KineticWE pacman repo</h1>
+      <p>Packages are signed with key <code>@FPR@</code>
+      (check it against the project README). Trust it once:</p>
+      <pre>sudo pacman-key --recv-keys @FPR@ --keyserver hkps://keys.openpgp.org
+      sudo pacman-key --lsign-key @FPR@</pre>
+      <p>If the keyserver is unreachable, download <a href="kineticwe.gpg">kineticwe.gpg</a>
+      and run <code>sudo pacman-key --add kineticwe.gpg</code>, then lsign as above.</p>
       <p>Add this to <code>/etc/pacman.conf</code>:</p>
       <pre>[kineticwe]
-      SigLevel = Never
       Server = @PAGES_URL@/$arch</pre>
-      <p>Then: <code>sudo pacman -Sy kineticwe</code> (pulls in
+      <p>Then: <code>sudo pacman -Sy kineticwe-keyring kineticwe</code> (pulls in
       <code>xdg-desktop-portal-kwe</code> and <code>kineticwe-noctalia</code>)</p>
       <p>Optional greeter: <code>sudo pacman -S kineticwe-greeter</code>, then
       run <code>kineticwe-setup-greeter</code></p>
       HTML
     # Quoted heredoc keeps pacman's literal $arch; fill in this project's URL.
     - sed -i "s|@PAGES_URL@|${CI_PAGES_URL:?Pages not enabled}|" public/index.html
+    # Public key and its fingerprint, from the checkout.
+    - cp arch/kineticwe-keyring/kineticwe.gpg public/kineticwe.gpg
+    - sed -i "s|@FPR@|$(cut -d ':' -f1 arch/kineticwe-keyring/kineticwe-trusted | head -1)|g" public/index.html
   publish: public

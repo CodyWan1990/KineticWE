@@ -7,6 +7,9 @@
 # Package names are read from each package's .PKGINFO rather than parsed out
 # of the filename: "kineticwe-*" would also match "kineticwe-greeter-*", and
 # the epoch (e.g. "2:0.0.1-14") makes filename parsing fragile.
+#
+# With GPGKEY set (and GNUPGHOME holding that key, see ci/sign.sh) every kept
+# package must have a valid detached .sig, and the database is signed.
 set -euo pipefail
 
 repo_dir="${1:?usage: repo.sh <repo-dir>}"
@@ -54,7 +57,9 @@ for name in "${!by_name[@]}"; do
     if ((${#files[@]} > keep)); then
         echo "Pruning $(( ${#files[@]} - keep )) old $name build(s):"
         printf '  %s\n' "${files[@]:keep}"
-        rm -f -- "${files[@]:keep}"
+        for old in "${files[@]:keep}"; do
+            rm -f -- "$old" "$old.sig"
+        done
         files=("${files[@]:0:keep}")
     fi
     for ((i = ${#files[@]} - 1; i >= 0; i--)); do
@@ -62,8 +67,19 @@ for name in "${!by_name[@]}"; do
     done
 done
 
-rm -f kineticwe.db kineticwe.db.tar.gz kineticwe.files kineticwe.files.tar.gz
-repo-add kineticwe.db.tar.gz "${kept[@]}"
+sign_args=()
+if [[ -n "${GPGKEY:-}" ]]; then
+    # repo-add --verify only checks an existing database, so verify the
+    # package signatures here.
+    for f in "${kept[@]}"; do
+        gpg --batch --quiet --verify -- "$f.sig" "$f" 2>/dev/null ||
+            { echo "repo.sh: missing or bad signature: $f.sig" >&2; exit 1; }
+    done
+    sign_args=(--sign --key "$GPGKEY")
+fi
+rm -f kineticwe.db kineticwe.db.tar.gz kineticwe.files kineticwe.files.tar.gz \
+    kineticwe.db.sig kineticwe.db.tar.gz.sig kineticwe.files.sig kineticwe.files.tar.gz.sig
+repo-add "${sign_args[@]}" kineticwe.db.tar.gz "${kept[@]}"
 
 echo 'Repo database rebuilt with:'
 tar -tf kineticwe.db.tar.gz | grep '/desc$'

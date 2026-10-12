@@ -85,21 +85,29 @@ systemctl reboot
 
 The fastest way to install KineticWE on Arch-based distros (Arch, CachyOS, EndeavourOS, Manjaro, etc.) is the pre-built binary repo hosted on GitLab Pages — no compiling needed.
 
+Packages are signed with the KineticWE repo key `FD258A99CDC5F61B04A335EEE163D34B273AE987`. Trust it once:
+
+```bash
+sudo pacman-key --recv-keys FD258A99CDC5F61B04A335EEE163D34B273AE987 --keyserver hkps://keys.openpgp.org
+sudo pacman-key --lsign-key FD258A99CDC5F61B04A335EEE163D34B273AE987
+```
+
 Add the repo to `/etc/pacman.conf` (e.g. `sudo nano /etc/pacman.conf`):
 
 ```ini
 [kineticwe]
-SigLevel = Never
 Server = https://theblackdon.gitlab.io/kineticwe/$arch
 ```
 
 and install:
 
 ```bash
-sudo pacman -Sy kineticwe
+sudo pacman -Sy kineticwe-keyring kineticwe
 ```
 
-This also pulls in the `xdg-desktop-portal-kwe` portal backend and the `kineticwe-noctalia` shell.
+This also pulls in the `xdg-desktop-portal-kwe` portal backend and the `kineticwe-noctalia` shell. `kineticwe-keyring` keeps the repo key up to date, so future key changes arrive as normal updates.
+
+Already using the repo with `SigLevel = Never`? Run the two `pacman-key` commands above, install `kineticwe-keyring`, then delete the `SigLevel = Never` line.
 
 Optionally, install the Noctalia greeter (greetd) and run its interactive setup (it asks for `sudo` itself when needed):
 
