@@ -26,7 +26,9 @@ class Node;
 // The compositor reads these keys from the [Windows] group (src/options.cpp
 // via KWinOptionsSettings in kwinoptions_settings.kcfg) and applies them on
 // org.kde.KWin.reconfigure(); this page writes the .kwe file and triggers one
-// reconfigure(), the same contract as the Workspaces/Tiling pages.
+// reconfigure(), the same contract as the Workspaces/Tiling pages. The
+// Clipboard section's [Wayland] EnablePrimarySelection is the exception: the
+// compositor reads it only at startup, so it applies on the next session.
 //
 // Edits are STAGED: controls update an in-memory pending map and nothing
 // touches disk or the compositor until the window's Apply button calls

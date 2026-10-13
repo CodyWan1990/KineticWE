@@ -83,6 +83,8 @@ void KineticDecoration::loadMetrics()
     m_titleFontPointSize = fontSize > 0 ? qBound(5, fontSize, 32) : 0;
     m_buttonSize = button > 0 ? qBound(8, button, 64) : 0;
     m_showTitle = group.readEntry(QStringLiteral("KineticShowTitle"), true);
+    m_titleFontFamily = group.readEntry(QStringLiteral("KineticTitleFontFamily"), QString()).trimmed();
+    m_followShellFont = group.readEntry(QStringLiteral("KineticTitleFollowShellFont"), true);
 }
 
 qreal KineticDecoration::buttonSize() const
@@ -290,6 +292,12 @@ void KineticDecoration::paint(QPainter *painter, const QRectF &repaintArea)
     // Caption.
     const std::shared_ptr<KDecoration3::DecorationSettings> s = settings();
     QFont font = s ? s->font() : painter->font();
+    if (m_followShellFont && !m_titleFontFamily.isEmpty()) {
+        // Follow the shell's typeface; drop the platform font's style name so
+        // it cannot pin a face the new family does not have.
+        font.setFamilies({m_titleFontFamily});
+        font.setStyleName(QString());
+    }
     if (m_titleFontPointSize > 0) {
         // Explicit user choice: use it verbatim.
         font.setPointSizeF(m_titleFontPointSize);

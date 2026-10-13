@@ -92,6 +92,11 @@ private:
     int m_buttonSize = 0;         // logical pixels
     // Whether the window caption text is painted (KineticShowTitle; default on).
     bool m_showTitle = true;
+    // Caption typeface: the shell keeps KineticTitleFontFamily in sync with
+    // its own font; it is used while KineticTitleFollowShellFont is on
+    // (default). Empty or off = the platform title font.
+    QString m_titleFontFamily;
+    bool m_followShellFont = true;
     // Cached button size (device pixels) so a size change can rebuild the
     // button groups; 0 before the first updateBorders().
     qreal m_lastButtonSize = 0.0;
