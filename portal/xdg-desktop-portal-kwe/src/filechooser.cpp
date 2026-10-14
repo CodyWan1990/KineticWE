@@ -11,23 +11,33 @@
 #include "filechooser_debug.h"
 #include "utils.h"
 
+#include <QAbstractItemView>
 #include <QDBusArgument>
 #include <QDBusMetaType>
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileIconProvider>
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QLabel>
+#include <QMimeDatabase>
+#include <QPainter>
 #include <QPushButton>
 #include <QQmlApplicationEngine>
 #include <QStandardPaths>
+#include <QStyleOptionViewItem>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWindow>
 
+#include <KDirModel>
+#include <KDirOperator>
 #include <KFileFilterCombo>
+#include <KFileItem>
+#include <KFileItemDelegate>
 #include <KFileWidget>
+#include <KIconLoader>
 #include <KLocalizedString>
 #include <KSharedConfig>
 #include <KWindowConfig>
@@ -105,6 +115,51 @@ static QString decodeFileName(const QByteArray &name)
     return QFile::decodeName(decodedName);
 }
 
+// The portal runs without the session's Qt platform theme, and QIcon::fromTheme()
+// (what QFileIconProvider and KDirModel use) loads the icon theme's SVGs
+// verbatim. The accent colour is only applied by KIconLoader/KIconEngine, which
+// recolours the ColorScheme-Accent parts (e.g. the Breeze folder body) from
+// QPalette::Accent. Route the file dialogs' icons through KIconLoader so the
+// folders follow the accent like the rest of the desktop.
+class AccentFileIconProvider : public QFileIconProvider
+{
+public:
+    QIcon icon(const QFileInfo &info) const override
+    {
+        const QMimeType mimeType = QMimeDatabase().mimeTypeForFile(info);
+        if (mimeType.isValid()) {
+            return KIconLoader::global()->loadMimeTypeIcon(mimeType.name(), KIconLoader::Small);
+        }
+        return QFileIconProvider::icon(info);
+    }
+};
+
+class AccentFileItemDelegate : public KFileItemDelegate
+{
+public:
+    using KFileItemDelegate::KFileItemDelegate;
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        QStyleOptionViewItem accentOption(option);
+        if (const auto *dirModel = qobject_cast<const KDirModel *>(index.model())) {
+            const KFileItem item = dirModel->itemForIndex(index);
+            const QString mimeType = item.mimetype();
+            if (!mimeType.isEmpty()) {
+                accentOption.icon = KIconLoader::global()->loadMimeTypeIcon(mimeType, KIconLoader::Small);
+            }
+        }
+        KFileItemDelegate::paint(painter, accentOption, index);
+    }
+};
+
+static void installAccentIconDelegate(QAbstractItemView *view)
+{
+    if (view != nullptr) {
+        view->setItemDelegate(new AccentFileItemDelegate(view));
+    }
+}
+
 FileDialog::FileDialog(QDialog *parent, Qt::WindowFlags flags)
     : QDialog(parent, flags)
     , m_fileWidget(new KFileWidget(QUrl(), this))
@@ -125,6 +180,16 @@ FileDialog::FileDialog(QDialog *parent, Qt::WindowFlags flags)
     // reject
     connect(m_fileWidget->cancelButton(), &QAbstractButton::clicked, this, &QDialog::reject);
     connect(this, &QDialog::rejected, m_fileWidget, &KFileWidget::slotCancel);
+
+    // The KFileWidget's views use KDirModel, whose QIcon::fromTheme() icons never
+    // pick up the accent; replace their delegate so folders are drawn through
+    // KIconLoader. viewChanged fires again when the list/icon view is recreated.
+    if (auto *dirOperator = m_fileWidget->dirOperator()) {
+        connect(dirOperator, &KDirOperator::viewChanged, this, [](QAbstractItemView *view) {
+            installAccentIconDelegate(view);
+        });
+        installAccentIconDelegate(dirOperator->view());
+    }
 
     KSharedConfig::Ptr oldConf = KSharedConfig::openConfig();
     oldConf->group(u"FileDialogSize"_s).moveValuesTo(m_configGroup);
@@ -426,6 +491,7 @@ void FileChooserPortal::OpenFile(const QDBusObjectPath &handle,
         // dialog would call org.freedesktop.portal.FileChooser back into this very process,
         // recursing forever and leaking a window plus a wl_shm buffer per iteration.
         dirDialog->setOptions(QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        dirDialog->setIconProvider(new AccentFileIconProvider);
         if (!isKIOFuseAvailable()) {
             dirDialog->setSupportedSchemes(QStringList{QStringLiteral("file")});
         }

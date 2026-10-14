@@ -377,6 +377,8 @@ void TilingController::reconfigure()
     m_emergePresetWindowHeights = parseProportionList(tilingGroup.readEntry(
         "EmergePresetWindowHeights",
         QStringList{QStringLiteral("0.333"), QStringLiteral("0.5"), QStringLiteral("0.667"), QStringLiteral("0.75"), QStringLiteral("1")}));
+    m_emergePeek = tilingGroup.readEntry("EmergePeek", false);
+    m_emergePeekHeight = std::clamp(tilingGroup.readEntry("EmergePeekHeight", 48), 0, 1000);
     applyEmergeSettingsToEngines();
 
     const QString borderModeString = tilingGroup.readEntry("TilingBorderMode", QStringLiteral("None"));
@@ -564,6 +566,8 @@ void TilingController::configureEmergeEngine(EmergeLayoutEngine *engine)
     engine->setEmergePresetColumnWidths(m_emergePresetColumnWidths);
     engine->setEmergePresetWindowHeights(m_emergePresetWindowHeights);
     engine->setEmergeAxis(m_emergeAxis);
+    engine->setEmergePeek(m_emergePeek);
+    engine->setEmergePeekHeightPx(m_emergePeekHeight);
 }
 
 LayoutEngine::LayoutKind TilingController::globalDefaultLayoutKind() const

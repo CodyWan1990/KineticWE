@@ -8,10 +8,17 @@
 
 #include "waylandintegration.h"
 
+#include <KColorScheme>
+#include <KConfigGroup>
+#include <KIconLoader>
 #include <KLocalizedString>
+#include <KSharedConfig>
 #include <KWindowSystem>
 
+#include <QApplication>
+#include <QColor>
 #include <QMessageBox>
+#include <QPalette>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QString>
@@ -66,6 +73,29 @@ QString Utils::applicationName(const QString &appId)
     }
 
     return applicationName;
+}
+
+void Utils::applyKdeApplicationPalette()
+{
+    const KSharedConfigPtr kdeglobals = KSharedConfig::openConfig(QStringLiteral("kdeglobals"));
+    QPalette palette = KColorScheme::createApplicationPalette(kdeglobals);
+
+    // The session's Qt platform theme normally copies [General] AccentColor into
+    // QPalette::Accent. Without it the palette only carries the colour scheme,
+    // and KIconLoader/KIconEngine -- the only thing that recolours Breeze's
+    // ColorScheme-Accent parts such as the folder body -- would fall back to the
+    // icon theme's built-in colour.
+    QColor accent = KConfigGroup(kdeglobals, QStringLiteral("General")).readEntry(QStringLiteral("AccentColor"), QColor());
+    if (!accent.isValid()) {
+        accent = KConfigGroup(kdeglobals, QStringLiteral("Colors:Selection"))
+                     .readEntry(QStringLiteral("BackgroundNormal"), palette.color(QPalette::Highlight));
+    }
+    if (accent.isValid()) {
+        palette.setColor(QPalette::Accent, accent);
+    }
+
+    qApp->setPalette(palette);
+    KIconLoader::global()->setCustomPalette(palette);
 }
 
 void Utils::warnNoStreaming(const WarningContext &context)

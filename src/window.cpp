@@ -2913,6 +2913,13 @@ void Window::pointerEnterEvent(const QPointF &globalPos)
         return;
     }
 
+    // A window shown only in the scrolling (Emerge) layout's bottom peek band
+    // must not take focus on hover; clicking it still focuses it (and scrolls it
+    // into view). See Tile::peeked().
+    if (Tile *t = tile(); t && t->peeked()) {
+        return;
+    }
+
     if (options->isAutoRaise() && !isDesktop() && !isDock() && workspace()->focusChangeEnabled() && globalPos != workspace()->focusMousePosition() && workspace()->topWindowOnDesktop(VirtualDesktopManager::self()->currentDesktop(output()), options->isSeparateScreenFocus() ? output() : nullptr) != this) {
         startAutoRaise();
     }

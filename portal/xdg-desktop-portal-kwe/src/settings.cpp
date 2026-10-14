@@ -18,12 +18,12 @@
 #include <QIcon>
 #include <QPalette>
 
-#include <KColorScheme>
 #include <KConfigGroup>
 #include <KConfigWatcher>
 
 #include "desktopportal.h"
 #include "tabletmodemanager_interface.h"
+#include "utils.h"
 #include "virtualkeyboard_interface.h"
 
 using namespace Qt::Literals::StringLiterals;
@@ -332,9 +332,18 @@ private Q_SLOTS:
             // Re-apply the scheme to the process palette: the portal runs
             // without the session's Qt platform theme (see the main() comment),
             // so nothing else keeps the QApplication palette -- and with it the
-            // Kirigami/QML dialogs -- in sync with kdeglobals.
-            qApp->setPalette(KColorScheme::createApplicationPalette(kdeglobals));
+            // Kirigami/QML dialogs -- in sync with kdeglobals. This also refreshes
+            // the accent colour KIconLoader recolours icons with.
+            Utils::applyKdeApplicationPalette();
             Q_EMIT settingChanged(group(), colorScheme, readFdoColorScheme());
+            Q_EMIT settingChanged(group(), accentColor, readAccentColor());
+        }
+        // The accent colour itself lives in [General] AccentColor rather than in
+        // a [Colors:*] group, so handle it separately. Reparse first for the same
+        // caching reason as above.
+        if (configGroup.name() == u"General"_s && names.contains("AccentColor")) {
+            KSharedConfig::openConfig(u"kdeglobals"_s)->reparseConfiguration();
+            Utils::applyKdeApplicationPalette();
             Q_EMIT settingChanged(group(), accentColor, readAccentColor());
         }
         if (configGroup.name() == u"Icons"_s && names.contains("Theme")) {

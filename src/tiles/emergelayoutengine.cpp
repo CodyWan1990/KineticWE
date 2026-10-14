@@ -38,6 +38,11 @@ constexpr qreal DefaultWeight = 1.0;
 /// expelWindow() so an expelled window's new column matches its neighbours.
 constexpr qreal DefaultColumnExtent = 0.5;
 
+/// At most this many off-view columns show in the bottom peek band. The nearest
+/// ones to the viewport are chosen; any further down the strip stay parked so
+/// the band can never crowd into unreadable slivers.
+constexpr int MaxPeekedColumns = 2;
+
 /// One-pixel tolerance expressed in relative units, matching PlasmaZones'
 /// preset-cycle allowance for fractional-scale rounding.
 constexpr qreal PresetEpsilon = 0.001;
@@ -202,6 +207,8 @@ void EmergeLayoutEngine::parkTile(CustomTile *leaf, qreal mainExtent, qreal cros
     if (!leaf || !m_root) {
         return;
     }
+    // A parked tile is off every output and must never take hover focus.
+    leaf->setPeeked(false);
     const RectF area = workspace()->clientArea(MaximizeArea, m_root->manager()->output());
     if (area.width() <= 0.0 || area.height() <= 0.0) {
         return;
@@ -221,12 +228,90 @@ void EmergeLayoutEngine::parkTile(CustomTile *leaf, qreal mainExtent, qreal cros
     leaf->setRelativeGeometry(RectF(0.0, relY, width / area.width(), height / area.height()));
 }
 
+bool EmergeLayoutEngine::outputHasMonitorBelow() const
+{
+    if (!m_root) {
+        return false;
+    }
+    LogicalOutput *self = m_root->manager()->output();
+    if (!self) {
+        return false;
+    }
+    const RectF own = self->geometryF();
+    const qreal ownBottom = own.y() + own.height();
+    const auto outputs = workspace()->outputs();
+    for (LogicalOutput *output : outputs) {
+        if (!output || output == self) {
+            continue;
+        }
+        const RectF geom = output->geometryF();
+        // A monitor whose top edge is at/under our bottom and which overlaps our
+        // horizontal span would render the part of the peek that hangs below.
+        if (geom.y() + 1.0 >= ownBottom
+            && geom.x() < own.x() + own.width()
+            && geom.x() + geom.width() > own.x()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void EmergeLayoutEngine::peekColumn(int columnIndex, qreal mainPos, qreal mainExtent, qreal peekFrac,
+                                    int unionBottom)
+{
+    if (columnIndex < 0 || columnIndex >= m_columns.size() || peekFrac <= 0.0) {
+        return;
+    }
+    EmergeColumn &col = m_columns[columnIndex];
+    if (col.tiles.isEmpty()) {
+        return;
+    }
+
+    // The column keeps its full cross layout; the whole stack is shifted down so
+    // only its top `peekFrac` sits inside the work area and the rest runs off the
+    // bottom edge. The leaves are off-screen tiles, so the below-output part is
+    // allowed; on a monitor directly below peeking is suppressed entirely.
+    const qreal top = 1.0 - peekFrac;
+    if (col.display == EmergeColumnDisplay::Tabbed) {
+        const int active = qBound(0, col.activeTileIdx, int(col.tiles.size()) - 1);
+        for (int ti = 0; ti < col.tiles.size(); ++ti) {
+            CustomTile *leaf = col.tiles.at(ti).leaf;
+            if (!leaf) {
+                continue;
+            }
+            if (ti == active) {
+                leaf->setPeeked(true);
+                leaf->setRelativeGeometry(makeRect(mainPos, top, mainExtent, 1.0));
+            } else {
+                parkTile(leaf, mainExtent, 1.0, unionBottom);
+            }
+        }
+        return;
+    }
+
+    QList<qreal> heights;
+    resolveCrossExtents(col, heights);
+    qreal cross = top;
+    for (int ti = 0; ti < col.tiles.size(); ++ti) {
+        CustomTile *leaf = col.tiles.at(ti).leaf;
+        const qreal height = heights.value(ti, 1.0);
+        if (leaf) {
+            leaf->setPeeked(true);
+            leaf->setRelativeGeometry(makeRect(mainPos, cross, mainExtent, height));
+        }
+        cross += height;
+    }
+}
+
 void EmergeLayoutEngine::setTileRect(CustomTile *leaf, qreal mainPos, qreal crossPos, qreal mainExtent,
                                         qreal crossExtent, int unionBottom)
 {
     if (!leaf) {
         return;
     }
+
+    // A normally-visible tile is never a peek.
+    leaf->setPeeked(false);
 
     // Fully outside the viewport: park below every output. A rect left at
     // main >= 1 (or entirely below 0) would land on the neighbouring monitor,
@@ -1494,19 +1579,87 @@ void EmergeLayoutEngine::reflow()
     // empty space past the end of the strip.
     const qreal maxViewOffset = qMax(qreal(0), stripExtent() - 1.0);
     const qreal view = qBound(qreal(0), viewOffset(), maxViewOffset);
+
+    // Resolve every column's main-axis placement once, so the off-view columns
+    // are known before anything moves and the peek band can be sized first.
+    struct PlacedColumn
+    {
+        int index;
+        qreal mainPos;
+        qreal extent;
+        bool offView;
+        bool peek = false;
+    };
+    QList<PlacedColumn> placed;
+    QList<int> offViewColumns;
     qreal cursor = -view;
-
-    // Where parked tiles land, computed once per pass.
-    const int unionBottom = unionBottomPx();
-
     for (int ci = 0; ci < m_columns.size(); ++ci) {
-        EmergeColumn &col = m_columns[ci];
+        const EmergeColumn &col = m_columns.at(ci);
         const qreal extent = resolveColumnExtentRel(col);
         if (extent <= 0.0 || col.tiles.isEmpty()) {
             continue;
         }
+        const bool offView = (cursor + extent <= 0.0) || (cursor >= 1.0);
+        placed.append({ci, cursor, extent, offView});
+        if (offView) {
+            offViewColumns.append(int(placed.size()) - 1);
+        }
+        cursor += extent;
+    }
 
-        const qreal mainPos = cursor;
+    // The bottom peek band only exists when it can be seen: enabled, at least
+    // one column fully off-view, and no monitor underneath to bleed onto.
+    qreal peekFrac = 0.0;
+    const qreal crossPx = outputCrossPx();
+    if (m_peekEnabled && !offViewColumns.isEmpty() && m_peekHeightPx > 0 && crossPx > 0.0
+        && !outputHasMonitorBelow()) {
+        peekFrac = qBound(qreal(0.0), m_peekHeightPx / crossPx, qreal(0.4));
+    }
+
+    // Only the nearest MaxPeekedColumns off-view columns peek; the rest stay
+    // parked. Slots are then divided evenly rather than by column width, so a
+    // wide column and a narrow one peek at the same size.
+    int peeked = 0;
+    if (peekFrac > 0.0) {
+        const auto distanceFromViewport = [&placed](int i) {
+            const PlacedColumn &pc = placed.at(i);
+            return (pc.mainPos + pc.extent <= 0.0) ? -(pc.mainPos + pc.extent) : (pc.mainPos - 1.0);
+        };
+        if (offViewColumns.size() > MaxPeekedColumns) {
+            std::sort(offViewColumns.begin(), offViewColumns.end(), [&distanceFromViewport](int a, int b) {
+                return distanceFromViewport(a) < distanceFromViewport(b);
+            });
+            offViewColumns = offViewColumns.mid(0, MaxPeekedColumns);
+        }
+        for (int i : offViewColumns) {
+            placed[i].peek = true;
+        }
+        peeked = int(offViewColumns.size());
+    }
+    const qreal crossScale = 1.0 - peekFrac;
+
+    // Where parked tiles land, computed once per pass.
+    const int unionBottom = unionBottomPx();
+    qreal peekCursor = 0.0;
+
+    for (const PlacedColumn &pc : placed) {
+        EmergeColumn &col = m_columns[pc.index];
+
+        if (pc.offView) {
+            if (pc.peek && peeked > 0) {
+                // Peeked columns share the band evenly, in strip order, so a
+                // column on the left stays left and one on the right stays
+                // right; windowGeometry's half-gaps separate the slots.
+                const qreal slot = 1.0 / qreal(peeked);
+                peekColumn(pc.index, peekCursor, slot, peekFrac, unionBottom);
+                peekCursor += slot;
+            } else {
+                for (const EmergeTile &tile : col.tiles) {
+                    parkTile(tile.leaf, pc.extent, 1.0, unionBottom);
+                }
+            }
+            continue;
+        }
 
         if (col.display == EmergeColumnDisplay::Tabbed) {
             // Only the active tile occupies the column; the rest are parked so
@@ -1518,9 +1671,9 @@ void EmergeLayoutEngine::reflow()
                     continue;
                 }
                 if (ti == active) {
-                    setTileRect(leaf, mainPos, 0.0, extent, 1.0, unionBottom);
+                    setTileRect(leaf, pc.mainPos, 0.0, pc.extent, crossScale, unionBottom);
                 } else {
-                    parkTile(leaf, extent, 1.0, unionBottom);
+                    parkTile(leaf, pc.extent, crossScale, unionBottom);
                 }
             }
         } else {
@@ -1529,13 +1682,11 @@ void EmergeLayoutEngine::reflow()
             qreal cross = 0.0;
             for (int ti = 0; ti < col.tiles.size(); ++ti) {
                 CustomTile *leaf = col.tiles.at(ti).leaf;
-                const qreal height = heights.value(ti, 1.0);
-                setTileRect(leaf, mainPos, cross, extent, height, unionBottom);
+                const qreal height = heights.value(ti, 1.0) * crossScale;
+                setTileRect(leaf, pc.mainPos, cross, pc.extent, height, unionBottom);
                 cross += height;
             }
         }
-
-        cursor += extent;
     }
 
     Q_EMIT layoutChanged();
@@ -1564,6 +1715,25 @@ void EmergeLayoutEngine::setEmergePresetWindowHeights(const QList<qreal> &preset
 void EmergeLayoutEngine::setEmergeAxis(int axis)
 {
     m_axisSetting = qBound(0, axis, 2);
+    reflow();
+}
+
+void EmergeLayoutEngine::setEmergePeek(bool enabled)
+{
+    if (m_peekEnabled == enabled) {
+        return;
+    }
+    m_peekEnabled = enabled;
+    reflow();
+}
+
+void EmergeLayoutEngine::setEmergePeekHeightPx(int heightPx)
+{
+    const int clamped = qBound(0, heightPx, 1000);
+    if (m_peekHeightPx == clamped) {
+        return;
+    }
+    m_peekHeightPx = clamped;
     reflow();
 }
 

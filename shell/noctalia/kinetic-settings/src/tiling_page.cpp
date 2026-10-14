@@ -463,6 +463,28 @@ const std::vector<TilingPage::Field>& TilingPage::fields() {
         .controlWidth = 260.0F,
         .fallback = Value{std::vector<std::string>{"0.333", "0.5", "0.667", "0.75", "1"}},
     });
+    f.push_back(Field{
+        .group = "Tiling",
+        .key = "EmergePeek",
+        .control = ControlKind::Toggle,
+        .title = "Emerge: peek off-screen windows",
+        .subtitle = "Show a sliver of the columns scrolled off the strip in a band at the bottom "
+                    "instead of hiding them; suppressed when a monitor sits directly below",
+        .pageGroup = "Emerge",
+        .fallback = Value{false},
+    });
+    f.push_back(Field{
+        .group = "Tiling",
+        .key = "EmergePeekHeight",
+        .control = ControlKind::Slider,
+        .title = "Emerge: peek band height",
+        .subtitle = "Height of the bottom peek band in pixels",
+        .pageGroup = "Emerge",
+        .maxValue = 1000.0,
+        .integerValue = true,
+        .valueSuffix = " px",
+        .fallback = Value{48},
+    });
     // Window Rules -------------------------------------------------------------
     f.push_back(Field{
         .group = "TilingRules",
