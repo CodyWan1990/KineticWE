@@ -1107,7 +1107,7 @@ KeybindsPage::build(float scale, const Filter& filter, const Callbacks& callback
       .glyph = "plus",
       .fontSize = Style::fontSizeCaption * scale,
       .glyphSize = Style::fontSizeBody * scale,
-      .variant = ButtonVariant::Ghost,
+      .variant = ButtonVariant::Primary,
       .minWidth = Style::controlHeight * scale,
       .minHeight = Style::controlHeight * scale,
       .padding = Style::spaceXs * scale,
