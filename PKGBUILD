@@ -9,7 +9,7 @@
 pkgbase=kineticwe
 pkgname=(kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter)
 pkgver=0.0.1
-pkgrel=16
+pkgrel=17
 # epoch: the 1.x packaging shipped 1:6.7.80-N. KineticWE 2.0 restarted the
 # version at 0.0.1 (matching the COPR spec), which pacman would otherwise see
 # as a downgrade for existing installs.
@@ -136,7 +136,7 @@ makedepends=(
 # and here together on each upstream sync.
 # _commit is ONLY the fallback remote source (a GitLab archive of the
 # kineticwe repo). Release builds pass KWE_LOCAL_TARBALL instead (see below).
-_commit=c368d2965b4392194d79080403d7e502fa9ae1e2
+_commit=d7c1409ea05202de9b0cfe992e08482c57244d6c
 # kinetic-we needs the post-6.7 KGlobalAccelD API and the KDecoration3::Style
 # enum (server-side drop shadows for CSD windows), so both are built from
 # pinned KDE master commits and shipped under private sonames.
