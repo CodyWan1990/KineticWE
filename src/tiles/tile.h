@@ -107,6 +107,15 @@ public:
     bool allowOffscreen() const;
     void setAllowOffscreen(bool allow);
 
+    /**
+     * Whether this tile is currently shown only in the scrolling (Emerge)
+     * layout's bottom peek band. A peeked tile must not take focus on mouse
+     * hover; clicking it still focuses it normally. Off for every other layout
+     * and for tiles that are normally visible.
+     */
+    bool peeked() const;
+    void setPeeked(bool peeked);
+
     qreal padding() const;
     void setPadding(qreal padding);
 
@@ -203,6 +212,7 @@ protected:
     qreal m_gapBetween = 0.0;
     QMarginsF m_gapMargins;
     bool m_allowOffscreen = false;
+    bool m_peeked = false;
 };
 
 } // namespace KWin

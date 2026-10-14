@@ -230,6 +230,16 @@ void Tile::setAllowOffscreen(bool allow)
     m_allowOffscreen = allow;
 }
 
+bool Tile::peeked() const
+{
+    return m_peeked;
+}
+
+void Tile::setPeeked(bool peeked)
+{
+    m_peeked = peeked;
+}
+
 bool Tile::isLayout() const
 {
     // Items with a single child are not allowed, unless the root which is *always* layout

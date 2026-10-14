@@ -123,6 +123,16 @@
       <label>Stacked-tile height presets used by the Emerge layout, as fractions of the work area (0-1).</label>
       <default code="true">QStringList{QStringLiteral("0.333"), QStringLiteral("0.5"), QStringLiteral("0.667"), QStringLiteral("0.75"), QStringLiteral("1")}</default>
     </entry>
+    <entry name="emergePeek" key="EmergePeek" type="Bool">
+      <label>Show a peek band at the bottom for Emerge columns scrolled off the strip instead of hiding them completely. Suppressed automatically when a monitor sits directly below the output.</label>
+      <default>false</default>
+    </entry>
+    <entry name="emergePeekHeight" key="EmergePeekHeight" type="Int">
+      <label>Height in pixels of the Emerge bottom peek band.</label>
+      <default>48</default>
+      <min>0</min>
+      <max>1000</max>
+    </entry>
   </group>
   <group name="TilingRules">
     <entry name="floatingClasses" key="FloatingClass" type="StringList">

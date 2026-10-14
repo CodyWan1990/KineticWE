@@ -24,7 +24,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        15%{?dist}
+Release:        17%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -541,6 +541,18 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Wed Oct 14 2026 LGL <lgl@localhost> - 0.0.1-17
+- Add a configurable Emerge bottom peek band for off-screen columns that prevents hover focus until clicked.
+- Improve portal file chooser icon and accent handling.
+- Use primary styling for the Kinetic Settings custom-keybinding add button.
+
+* Wed Oct 14 2026 LGL <lgl@localhost> - 0.0.1-16
+- Install Noctalia in KineticWE-specific paths with its own desktop identity, icon, and XDG directories.
+- Make upstream Noctalia configuration migration opt-in through migrate-noctalia-config.sh.
+- Fix KineticWE notification metadata and avoid a private kglobalacceld logging-category conflict.
+- Improve the Arch installer and update flow, including migration guidance for older installations.
+- Add signed Arch repository support and the kineticwe-keyring package.
+
 * Thu Oct 1 2026 LGL <lgl@localhost> - 0.0.1-15
 - Fix KineticWE window-switcher thumbnails using KWin's ScreenShot2 interface.
 - Improve cursor-theme propagation for KDE, GTK, XWayland, Steam, and systemd-launched applications.

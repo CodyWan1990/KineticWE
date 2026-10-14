@@ -12,9 +12,9 @@
 #include <QDBusConnectionInterface>
 #include <QIcon>
 #include <QQuickStyle>
+#include <QStandardPaths>
 
 #include <KAboutData>
-#include <KColorScheme>
 #include <KConfigGroup>
 #include <KCrash>
 #include <KLocalizedString>
@@ -23,6 +23,7 @@
 #include "../version.h"
 #include "debug.h"
 #include "desktopportal.h"
+#include "utils.h"
 
 #include <signal.h>
 
@@ -54,8 +55,9 @@ int main(int argc, char *argv[])
     // to Qt's stock light palette, Kirigami's hard-coded Basic theme and
     // KIconLoader's light "breeze" fallback. All are plain local setup -- no
     // portal round-trips -- so the deadlock the unset above avoids cannot come
-    // back.
-    a.setPalette(KColorScheme::createApplicationPalette(KSharedConfig::openConfig(u"kdeglobals"_s)));
+    // back. This also republishes the KDE accent colour, which KIconLoader uses
+    // to recolour the accent parts of icons (e.g. folder bodies).
+    Utils::applyKdeApplicationPalette();
     // Kirigami only loads its palette-driven theme (styles/org.kde.desktop)
     // when the desktop QQuick Controls style is active, which nothing selects
     // on a session that does not run the KDE platform theme.
@@ -70,6 +72,19 @@ int main(int argc, char *argv[])
     if (!iconTheme.isEmpty()) {
         QIcon::setThemeName(iconTheme);
     }
+    // The platform theme also publishes the icon theme *search paths*. With no
+    // theme loaded QIcon only knows its compiled-in ":/icons" resource, so
+    // QIcon::fromTheme() resolves nothing and the widget file dialog's
+    // QFileIconProvider falls back to Qt's stock folder pixmaps instead of the
+    // user's icons (KIconLoader works because it searches by itself). Mirror
+    // the XDG icon dirs QGenericUnixTheme would have supplied.
+    QStringList iconSearchPaths;
+    const QStringList dataLocations = QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
+    for (const QString &dataLocation : dataLocations) {
+        iconSearchPaths << dataLocation + u"/icons"_s;
+    }
+    iconSearchPaths << QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + u"/.icons"_s;
+    QIcon::setThemeSearchPaths(iconSearchPaths);
 
     // Guard against an app closing the reading end when the clipboard portal writes current clipboard contents
     signal(SIGPIPE, SIG_IGN);

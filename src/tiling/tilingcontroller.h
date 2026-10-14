@@ -366,6 +366,8 @@ private:
     int m_emergeAxis = 0; // 0 auto, 1 horizontal, 2 vertical
     QList<qreal> m_emergePresetColumnWidths;
     QList<qreal> m_emergePresetWindowHeights;
+    bool m_emergePeek = false;
+    int m_emergePeekHeight = 48;
     QStringList m_enabledLayouts;
     BorderMode m_borderMode = BorderMode::None;
     qreal m_borderThickness = 2.0;

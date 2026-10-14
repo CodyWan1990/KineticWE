@@ -186,6 +186,14 @@ public:
     /** 0 = auto (from output aspect), 1 = horizontal, 2 = vertical. */
     void setEmergeAxis(int axis);
 
+    /// Bottom peek band. When enabled, columns scrolled fully off the strip
+    /// show a sliver of themselves in a band along the bottom of the work area
+    /// instead of being parked out of sight. Suppressed automatically when
+    /// another output sits directly below (the peek would draw onto it).
+    void setEmergePeek(bool enabled);
+    /// Height of the peek band in pixels (0 disables peeking).
+    void setEmergePeekHeightPx(int heightPx);
+
 private:
     // Strip geometry (all in relative [0,1] units of the client area).
     qreal resolveColumnExtentRel(const EmergeColumn &col) const;
@@ -211,6 +219,13 @@ private:
     /// Move a tile to the region just below the union of all outputs, where no
     /// monitor can draw it (no neighbour bleed on any multi-monitor layout).
     void parkTile(CustomTile *leaf, qreal mainExtent, qreal crossExtent, int unionBottom);
+    /// Lay a fully off-view column into the bottom peek band at @p mainPos with
+    /// a slot @p mainExtent wide. The column keeps its full cross layout but is
+    /// shifted down so only its top @p peekFrac sits inside the work area.
+    void peekColumn(int columnIndex, qreal mainPos, qreal mainExtent, qreal peekFrac, int unionBottom);
+    /// True when another output overlaps this one's horizontal span and starts
+    /// at or below its bottom edge, so a peek would be drawn onto that monitor.
+    bool outputHasMonitorBelow() const;
     /// Bottom edge (global) of the union of every output's geometry.
     int unionBottomPx() const;
     void ensureAxisShortcutRegistered();
@@ -239,6 +254,8 @@ private:
     QList<qreal> m_presetColumnWidths{1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0};
     QList<qreal> m_presetWindowHeights{1.0 / 3.0, 0.5, 2.0 / 3.0, 0.75, 1.0};
     int m_axisSetting = 0; // 0 auto, 1 horizontal, 2 vertical
+    bool m_peekEnabled = false;
+    int m_peekHeightPx = 48;
 
     // Drag-move bookkeeping. The source column/tile indices are captured at
     // drag start (like ColumnsLayoutEngine) so insertWindow() can locate the

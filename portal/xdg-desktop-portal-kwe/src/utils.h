@@ -24,6 +24,11 @@ public:
     static void setParentWindow(QWindow *w, const QString &parent_window);
 
     static QString applicationName(const QString &appId);
+
+    // Builds the QApplication palette from kdeglobals and republishes the KDE
+    // accent colour to QPalette::Accent / KIconLoader. Needed because the portal
+    // runs without the session's Qt platform theme (see xdg-desktop-portal-kwe.cpp).
+    static void applyKdeApplicationPalette();
     struct WarningContext {
         QString title;
         QString genericText;

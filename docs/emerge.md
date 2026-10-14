@@ -587,6 +587,8 @@ Config keys (global; `[Tiling]` group of `kineticwe.kwe`):
 | `EmergeAxis` | int (0 auto / 1 horizontal / 2 vertical) | 0 |
 | `EmergePresetColumnWidths` | StringList | 0.333,0.5,0.667,0.75,1 |
 | `EmergePresetWindowHeights` | StringList | 0.333,0.5,0.667,0.75,1 |
+| `EmergePeek` | Bool | false |
+| `EmergePeekHeight` | int (px of the bottom band) | 48 |
 
 Deferred (Phase C+, needs your go-ahead):
 
@@ -599,6 +601,36 @@ Deferred (Phase C+, needs your go-ahead):
   today; straddlers are clamped by the compositor's own clipping.
 
 ## 12. Revision history
+
+**Revision 20 (this session):**
+- **Peeked windows no longer steal focus on hover.** `Tile` gained a
+  default-off `peeked()` / `setPeeked()` flag (mirroring `allowOffscreen`), set
+  by `EmergeLayoutEngine` on the leaves it lays out in the bottom peek band
+  (`peekColumn()` sets it true; `setTileRect()` and `parkTile()` clear it), so a
+  window that scrolls into view stops being "peeked" on the next reflow.
+  `Window::pointerEnterEvent()` now returns early for a window whose tile is
+  peeked, so `FocusFollowsMouse` / `FocusUnderMouse` do not pull focus (and do
+  not autoraise) when the pointer merely passes over the band. Click-to-focus is
+  a separate path (`Workspace::activateWindow` / `Window::takeFocus`), so a
+  click still focuses the peeked window and the existing focus-follows-view
+  scrolls it into view.
+
+**Revision 19 (this session):**
+- **Bottom peek band for off-view columns.** New `EmergePeek` (Bool, default
+  **false**) and `EmergePeekHeight` (int px, default 48) config keys, pushed to
+  every live engine via `configureEmergeEngine()` and exposed on the Kinetic
+  Settings Emerge page (toggle + slider). When enabled and at least one column is
+  scrolled fully off the strip, `reflow()` carves a band off the bottom of the
+  work area: the visible columns shrink to `1 - peek`, and up to two off-view
+  columns (the nearest to the viewport, `MaxPeekedColumns`) are laid out in the
+  band in strip order, each in an equal-width slot (`peekColumn()`), so a left
+  column stays left and a right column stays right and the existing half-gaps
+  separate the slots. Columns further down the strip stay parked, so the band
+  cannot crowd into unreadable slivers. The peeked column keeps its full
+  cross layout but is shifted down, showing only its top `peek` (no squash). The
+  band is suppressed (falling back to `parkTile()`) when another output sits
+  directly below — `outputHasMonitorBelow()` checks for an output that overlaps
+  the strip's horizontal span and starts at/below its bottom edge.
 
 **Revision 18 (this session):**
 - **Drops now land where released — in every layout, on every output.** A
