@@ -454,7 +454,6 @@ package_kineticwe() {
     optdepends=(
         'qt5ct: Qt5 theming in the KineticWE session'
         'pipewire-pulse: PulseAudio-compatible audio (conflicts with pulseaudio)'
-        'qqc2-desktop-style: desktop style for Qt Quick Controls apps'
     )
     # KineticWE installs beside KWin instead of replacing it: no
     # kwin/kdecoration/kglobalacceld provides, replaces, or conflicts.
