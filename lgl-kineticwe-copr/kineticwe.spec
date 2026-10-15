@@ -176,11 +176,11 @@ Requires:       psmisc
 # KWin uses Qt private API, so it must run against the exact Qt it was built
 # with (Fedora Qt packaging guidelines).
 %{?_qt6:Requires: %{_qt6}%{?_isa} = %{_qt6_version}}
-Recommends:     xdg-user-dirs
+Requires:       xdg-user-dirs
 Recommends:     alacritty
 Recommends:     qt5ct
 Recommends:     qt6ct
-Recommends:     spectacle
+Requires:       spectacle
 Recommends:     kf6-qqc2-desktop-style
 Requires:       adw-gtk3-theme
 # KineticWE installs beside KWin instead of replacing it. There are deliberately
@@ -201,6 +201,9 @@ Summary:        KineticWE portal backend (rebranded xdg-desktop-portal-kde)
 License:        LGPL-2.0-or-later
 # Uses Qt private API (QtGui, QtPrintSupport): exact Qt version required.
 %{?_qt6:Requires: %{_qt6}%{?_isa} = %{_qt6_version}}
+# The portal forces the org.kde.desktop QtQuick Controls style; without it
+# every QML dialog (screen-share chooser, ...) fails to load.
+Requires:       kf6-qqc2-desktop-style
 
 %description -n xdg-desktop-portal-kwe
 The xdg-desktop-portal backend for KineticWE sessions: a fork of KDE's

@@ -18,7 +18,7 @@
 
 let
   inherit (kdePackages)
-    kcoreaddons kconfig ki18n kglobalaccel kio kirigami
+    kcoreaddons kconfig ki18n kglobalaccel kio kirigami qqc2-desktop-style
     knotifications kservice kwidgetsaddons kwindowsystem
     kiconthemes kstatusnotifieritem kcrash kwayland
     extra-cmake-modules
@@ -52,6 +52,7 @@ stdenv.mkDerivation {
     kglobalaccel
     kio
     kirigami
+    qqc2-desktop-style # org.kde.desktop style forced by the portal
     knotifications
     kservice
     kwidgetsaddons

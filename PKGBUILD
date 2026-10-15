@@ -430,6 +430,8 @@ package_kineticwe() {
         'kcmutils'
         'kitemmodels'
         'knighttime'
+        'spectacle'
+        'xdg-user-dirs'
         'libdisplay-info'
         'libxcvt'
         'lcms2'
@@ -450,9 +452,7 @@ package_kineticwe() {
     )
     _kwe_qt_pin
     optdepends=(
-        'xdg-user-dirs: create standard user directories on first login'
         'qt5ct: Qt5 theming in the KineticWE session'
-        'spectacle: screenshot tool'
         'pipewire-pulse: PulseAudio-compatible audio (conflicts with pulseaudio)'
         'qqc2-desktop-style: desktop style for Qt Quick Controls apps'
     )
@@ -532,6 +532,7 @@ package_xdg-desktop-portal-kwe() {
     license=('LGPL-2.0-or-later')
     depends=(
         'kirigami'
+        'qqc2-desktop-style'
         'kitemmodels'
         'ki18n'
         'kpipewire'

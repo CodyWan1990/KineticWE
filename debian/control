@@ -131,7 +131,9 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
          libqt6accessibilityclient6,
          xwayland,
          hwdata,
-         xdg-desktop-portal
+         xdg-desktop-portal,
+         kde-spectacle,
+         xdg-user-dirs
 Description: KineticWE - A tiling KWin Wayland compositor
  KineticWE is a fork of KWin that adds native tiling support for Wayland.
  It is designed to pair with the Noctalia fork shell to form a complete
@@ -151,7 +153,8 @@ Description: KDE Global Shortcuts Daemon (for KineticWE)
 
 Package: xdg-desktop-portal-kwe
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, xdg-desktop-portal
+Depends: ${shlibs:Depends}, ${misc:Depends}, xdg-desktop-portal,
+         qml6-module-org-kde-desktop
 Description: KineticWE portal backend (rebranded xdg-desktop-portal-kde)
  The xdg-desktop-portal backend for KineticWE sessions: a fork of KDE's
  xdg-desktop-portal-kde (v6.7.4) rebranded to export the desktop as KineticWE.
