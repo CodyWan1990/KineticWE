@@ -2,13 +2,15 @@
 #
 # Triggers (plain branch pushes never run a pipeline - see workflow:rules):
 #   * tag push ................... release build, pkgrel exactly as committed
-#   * schedule "abi-watch" ....... (WATCH=1, daily) compares the published
-#                                  kineticwe-abi.txt with current Arch
-#                                  (ci/abi-watch.sh) and, only when Qt /
-#                                  private-API KF6 versions changed or a linked
-#                                  soname is gone, triggers a REBUILD=1 pipeline
-#                                  on the released tag
-#   * trigger REBUILD=1 .......... ABI refresh against current Arch; pkgrel gets
+#   * schedule "abi-watch" ....... (WATCH=1, every 12h, cron "0 */12 * * *",
+#                                  target branch kineticwe-2.0) compares the
+#                                  published kineticwe-abi.txt with the branch
+#                                  and current Arch (ci/abi-watch.sh) and, only
+#                                  when non-doc code changed since the built
+#                                  commit, Qt / private-API KF6 versions changed
+#                                  or a linked soname is gone, triggers one
+#                                  REBUILD=1 pipeline on that branch
+#   * trigger REBUILD=1 .......... rebuild against current Arch; pkgrel gets
 #                                  a .YYYYMMDDHHMM suffix so pacman offers it as
 #                                  an upgrade (e.g. 15 -> 15.202608031200)
 #   * schedule "daily-smoke" ..... (SMOKE=1) installs the published packages on
@@ -20,11 +22,16 @@
 # on the exact qt6-base version they were built with (Qt private API). Users'
 # pacman -Syu holds a Qt update until the matching rebuild is published.
 # Setup (GitLab UI): a pipeline trigger token in the masked CI/CD variable
-# KWE_TRIGGER_TOKEN, a daily schedule with WATCH=1, and Settings -> CI/CD ->
+# KWE_TRIGGER_TOKEN, a 12-hourly schedule with WATCH=1, and Settings -> CI/CD ->
 # Variables -> "Minimum role to use pipeline variables" set to Maintainer
 # (newer projects block pipeline variables, which would reject WATCH/REBUILD).
 # Testing the trigger: run the WATCH=1 schedule with KWE_WATCH_FORCE=1 added.
 # Job URLs use $CI_PAGES_URL, so a fork reads and publishes its own repo.
+# build-package and pages share resource_group arch-repo: each pages deploy
+# replaces the whole repo, so overlapping pipelines run (and publish) one at a
+# time instead of racing. "Oldest first" needs the group's process_mode set
+# once via the API (default is unordered): PUT
+# /projects/:id/resource_groups/arch-repo with process_mode=oldest_first.
 #
 # Signing (ci/sign.sh): packages and the database are signed with the repo's
 # signing subkey from KWE_SIGNING_KEY ("gpg --export-secret-subkeys <primary> |
@@ -72,8 +79,11 @@ abi-watch:
   image: alpine:latest
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $WATCH == "1"
+  variables:
+    GIT_DEPTH: "0"   # full history to diff the branch against the built commit
   script:
-    - apk add --no-cache bash curl jq libarchive-tools
+    - apk add --no-cache bash curl jq libarchive-tools git
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - ci/abi-watch.sh "${CI_PAGES_URL:?Pages not enabled}/x86_64/kineticwe-abi.txt"
 
 build-package:
@@ -82,6 +92,7 @@ build-package:
   # a cold kwin build takes ~2h on a shared runner; the default 1h job
   # timeout kills it (first v6.7.80-16 pipeline died at exactly 60m08s)
   timeout: 3h
+  resource_group: arch-repo
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "schedule" && $REBUILD == "1"
@@ -185,6 +196,7 @@ pages:
   stage: deploy
   image: alpine:latest
   needs: ["build-package"]
+  resource_group: arch-repo
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "schedule" && $REBUILD == "1"
