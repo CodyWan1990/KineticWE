@@ -452,6 +452,19 @@ const std::vector<WindowBehaviorPage::Field>& WindowBehaviorPage::fields() {
         .optionLabels = &maximizeButtonLabels(),
         .fallback = Value{std::string{"Maximize (horizontal only)"}},
     });
+    // Clipboard --------------------------------------------------------------
+    // The compositor only creates the zwp_primary_selection global at startup
+    // (src/wayland_server.cpp), so this takes effect on the next session.
+    f.push_back(Field{
+        .group = "Wayland",
+        .key = "EnablePrimarySelection",
+        .title = "Middle-click paste (primary selection)",
+        .subtitle = "Selecting text copies it to a separate clipboard that a "
+                    "middle click pastes. Takes effect after logging out and "
+                    "back in",
+        .pageGroup = "Clipboard",
+        .fallback = Value{true},
+    });
     return f;
   }();
   return table;

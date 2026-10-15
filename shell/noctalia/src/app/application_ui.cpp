@@ -38,6 +38,7 @@
 #include "i18n/i18n.h"
 #include "i18n/i18n_service.h"
 #include "ipc/ipc_arg_parse.h"
+#include "kinetic-settings/src/title_font_sync.h"
 #include "launcher/app_provider.h"
 #include "launcher/dmenu_provider.h"
 #include "launcher/emoji_provider.h"
@@ -153,6 +154,13 @@ void Application::initUiRenderSurfacesAndSettings() {
   m_kineticSettings.initialize(
       m_wayland, m_renderContext, *m_bus, m_ipcService, m_configService.config().accessibility.uiScale
   );
+  // Keep the window decoration's caption font in step with the shell font.
+  syncTitleFontFamily(m_configService.config().shell.fontFamily, *m_bus);
+  m_configService.addReloadCallback([this]() {
+    if (m_configService.lastChange().shell) {
+      syncTitleFontFamily(m_configService.config().shell.fontFamily, *m_bus);
+    }
+  });
   m_settingsWindow.setOpenDesktopWidgetEditor([this]() {
     if (m_lockscreenWidgetsController.isEditing()) {
       m_lockscreenWidgetsController.exitEdit();

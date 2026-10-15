@@ -123,7 +123,8 @@ bool AppearancePage::applyAll() {
   if (!m_pendingDecoration.has_value() && !m_pendingHideTitleBars.has_value()
       && !m_pendingTitleBarHeight.has_value() && !m_pendingTitleFontSize.has_value()
       && !m_pendingButtonSize.has_value() && !m_pendingButtonsOnLeft.has_value()
-      && !m_pendingButtonsOnRight.has_value() && !m_pendingShowTitle.has_value()) {
+      && !m_pendingButtonsOnRight.has_value() && !m_pendingShowTitle.has_value()
+      && !m_pendingFollowShellFont.has_value()) {
     return true;
   }
   ensureLoaded();
@@ -140,6 +141,7 @@ bool AppearancePage::applyAll() {
   m_pendingButtonsOnLeft.reset();
   m_pendingButtonsOnRight.reset();
   m_pendingShowTitle.reset();
+  m_pendingFollowShellFont.reset();
   m_errorNotice.clear();
   return true;
 }
@@ -154,6 +156,7 @@ std::vector<std::string> AppearancePage::resettableKeyPaths() const {
       buttonsOnLeftKeyPath(),
       buttonsOnRightKeyPath(),
       showTitleKeyPath(),
+      followShellFontKeyPath(),
   };
 }
 
@@ -174,6 +177,8 @@ void AppearancePage::resetKeyPath(std::string_view path) {
     stageButtonsOnRight(std::string(kDefaultButtonsOnRight));
   } else if (path == showTitleKeyPath()) {
     stageShowTitle(true);
+  } else if (path == followShellFontKeyPath()) {
+    stageFollowShellFont(true);
   }
 }
 
@@ -186,6 +191,7 @@ void AppearancePage::resetAll() {
   stageButtonsOnLeft(std::string(kDefaultButtonsOnLeft));
   stageButtonsOnRight(std::string(kDefaultButtonsOnRight));
   stageShowTitle(true);
+  stageFollowShellFont(true);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,6 +398,27 @@ void AppearancePage::stageShowTitle(bool show) {
   }
 }
 
+bool AppearancePage::followShellFontOnDisk() const {
+  return m_decorationsConfig.readBool("org.kde.kdecoration2", "KineticTitleFollowShellFont", true);
+}
+
+bool AppearancePage::effectiveFollowShellFont() const {
+  return m_pendingFollowShellFont.value_or(followShellFontOnDisk());
+}
+
+bool AppearancePage::overriddenFollowShellFont() const {
+  return !effectiveFollowShellFont();
+}
+
+void AppearancePage::stageFollowShellFont(bool follow) {
+  ensureLoaded();
+  if (follow == followShellFontOnDisk()) {
+    m_pendingFollowShellFont.reset();
+  } else {
+    m_pendingFollowShellFont = follow;
+  }
+}
+
 bool AppearancePage::applyTitleBars() {
   // Reload first so edits applied from other pages in the meantime are kept.
   m_decorationsConfig.load();
@@ -453,6 +480,15 @@ bool AppearancePage::applyTitleBars() {
       m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticShowTitle");
     } else {
       m_decorationsConfig.setBool("org.kde.kdecoration2", "KineticShowTitle", false);
+    }
+  }
+  // Caption font follows the shell font by default, so an explicit default
+  // removes the key.
+  if (m_pendingFollowShellFont.has_value()) {
+    if (*m_pendingFollowShellFont) {
+      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticTitleFollowShellFont");
+    } else {
+      m_decorationsConfig.setBool("org.kde.kdecoration2", "KineticTitleFollowShellFont", false);
     }
   }
   if (!m_decorationsConfig.save()) {
@@ -851,14 +887,16 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
   // individual button/label, or the Overridden filter when any part differs from
   // the default.
   const bool buttonsOverridden =
-      overriddenButtonsOnLeft() || overriddenButtonsOnRight() || overriddenShowTitle();
+      overriddenButtonsOnLeft() || overriddenButtonsOnRight() || overriddenShowTitle()
+      || overriddenFollowShellFont();
   const auto matchesButtonOption = [&]() {
     if (!searchActive) {
       return true;
     }
     if (StringUtils::containsInsensitive("Title bar buttons", filter.searchQuery)
         || StringUtils::containsInsensitive("Title bar button", filter.searchQuery)
-        || StringUtils::containsInsensitive("Window title", filter.searchQuery)) {
+        || StringUtils::containsInsensitive("Window title", filter.searchQuery)
+        || StringUtils::containsInsensitive("Use shell font", filter.searchQuery)) {
       return true;
     }
     for (const auto& option : buttonOptions()) {
@@ -1103,6 +1141,39 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
         },
     }));
     card->addChild(std::move(titleRow));
+
+    // Whether the caption uses the shell font (KineticTitleFollowShellFont).
+    auto fontRow = ui::row({
+        .align = FlexAlign::Center,
+        .justify = FlexJustify::SpaceBetween,
+        .gap = Style::spaceXs * scale,
+        .paddingV = 2.0F * scale,
+        .fillWidth = true,
+    });
+    auto fontLabel = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    fontLabel->addChild(ui::label({
+        .text = "Use shell font for title bars",
+        .fontSize = Style::fontSizeCaption * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurface),
+    }));
+    if (overriddenFollowShellFont()) {
+      fontLabel->addChild(makeOverrideBadge(scale));
+      fontLabel->addChild(makeResetButton(
+          followShellFontKeyPath(), armedResetKey == followShellFontKeyPath(), scale, callbacks
+      ));
+    }
+    fontRow->addChild(std::move(fontLabel));
+    fontRow->addChild(ui::toggle({
+        .checked = effectiveFollowShellFont(),
+        .scale = scale,
+        .onChange = [this, callbacks](bool follow) {
+          stageFollowShellFont(follow);
+          if (callbacks.requestRebuild) {
+            callbacks.requestRebuild();
+          }
+        },
+    }));
+    card->addChild(std::move(fontRow));
 
     const auto buildButtonSide = [&](bool left, std::string_view sideLabel) -> std::unique_ptr<Node> {
       const std::string path = left ? buttonsOnLeftKeyPath() : buttonsOnRightKeyPath();
