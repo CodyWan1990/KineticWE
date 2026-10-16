@@ -1,9 +1,10 @@
 #include "kinetic_settings_window.h"
 
+#include "compositors/compositor_platform.h"
 #include "core/input/key_symbols.h"
-#include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "core/log.h"
 #include "i18n/i18n.h"
+#include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "render/render_context.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
@@ -55,9 +56,9 @@ namespace {
 
   constexpr std::string_view kAppId = "dev.kineticwe.Settings";
 
-  void focusWindow(WaylandConnection& wayland, wl_surface* surface) {
+  void focusWindow(CompositorPlatform& platform, WaylandConnection& wayland, wl_surface* surface) {
     wayland.activateSurface(surface);
-    wayland.activateToplevelForAppId(kAppId);
+    platform.activateToplevelForAppId(kAppId);
   }
 
   void removeAllChildren(Flex& flex) {
@@ -73,10 +74,11 @@ KineticSettingsWindow::KineticSettingsWindow() = default;
 KineticSettingsWindow::~KineticSettingsWindow() = default;
 
 void KineticSettingsWindow::initialize(
-    WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, CustomKeybinds& customKeybinds,
-    float uiScale
+    WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
+    CustomKeybinds& customKeybinds, float uiScale
 ) {
   m_wayland = &wayland;
+  m_platform = &platform;
   m_renderContext = &renderContext;
   m_bus = &bus;
   m_customKeybinds = &customKeybinds;
@@ -88,7 +90,7 @@ void KineticSettingsWindow::open() {
     return;
   }
   if (isOpen()) {
-    focusWindow(*m_wayland, m_surface->wlSurface());
+    focusWindow(*m_platform, *m_wayland, m_surface->wlSurface());
     return;
   }
 
@@ -227,7 +229,7 @@ void KineticSettingsWindow::open() {
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
   m_surface->requestLayout();
-  focusWindow(*m_wayland, m_surface->wlSurface());
+  focusWindow(*m_platform, *m_wayland, m_surface->wlSurface());
 }
 
 void KineticSettingsWindow::close() {

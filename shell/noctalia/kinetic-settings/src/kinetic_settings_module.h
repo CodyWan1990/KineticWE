@@ -2,6 +2,7 @@
 
 #include <memory>
 
+class CompositorPlatform;
 class CustomKeybinds;
 class IpcService;
 class KineticSettingsWindow;
@@ -26,8 +27,8 @@ public:
   KineticSettingsModule& operator=(const KineticSettingsModule&) = delete;
 
   void initialize(
-      WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, IpcService& ipcService,
-      float uiScale
+      WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
+      IpcService& ipcService, float uiScale
   );
 
   [[nodiscard]] bool ownsKeyboardSurface(wl_surface* surface) const noexcept;

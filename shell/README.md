@@ -21,8 +21,17 @@ git subtree pull --prefix=shell/noctalia noctalia-upstream main --squash
 
 Notes:
 
-- We never edit files under `shell/noctalia/`. All KineticWE changes are additive
-  (new files, extra modules) or live in `kinetic-settings/`.
+- Prefer additive changes (new files, extra modules, `kinetic-settings/`). We do
+  carry in-place patches to upstream files; these are the usual sources of
+  conflicts on a pull:
+  - rebranding: install paths, app/desktop ID, XDG dirs (`FileUtils::kAppDirName`)
+  - Origami default palette (`src/theme/builtin_palettes.cpp`, `config_types.h`)
+  - keybind recorder / key chords (custom keybinds, function keys)
+  - window switcher + dock on KWin (`KwinThumbnailCapture`, plasma window geometry,
+    switcher close fade)
+  - terminal launch, KDE color scheme export, settings window wiring
+- To see the full patch set: `git diff <last upstream squash commit> HEAD:shell/noctalia`
+  (the squash commits are the ones titled `Squashed 'shell/noctalia/' changes ...`).
 - If you later want to publish Noctalia as its own fork repo (`kineticwe/noctalia`),
   split it back out with `git subtree split --prefix=shell/noctalia -b noctalia-fork`
   — the 2.0 plan anticipated a standalone fork repo, and subtree keeps that option open.

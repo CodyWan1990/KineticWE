@@ -92,7 +92,7 @@ Umbriel can launch Noctalia IPC commands directly from its `[keybinds]` table. A
 "Mod+Space" = "spawn:noctalia msg panel-toggle launcher"
 "Mod+S" = "spawn:noctalia msg panel-toggle control-center"
 "Mod+Comma" = "spawn:noctalia msg settings-toggle"
-"Alt+Tab" = "spawn:noctalia msg window-switcher"
+"Alt+Tab" = "spawn:noctalia msg window-switcher hold"
 "Mod+Shift+A" = "spawn:noctalia msg screenshot-annotate"
 "Mod+Ctrl+A" = "spawn:noctalia msg annotate"
 
@@ -109,9 +109,25 @@ Umbriel can launch Noctalia IPC commands directly from its `[keybinds]` table. A
 
 Noctalia can open its launcher when you start typing in umbriel's overview.
 
+A launcher opened by typing closes automatically when you leave the overview. Launchers opened normally are unaffected.
+
 ```toml
 [shell]
 umbriel_overview_type_to_launch_enabled = true
 ```
 
 You can also enable this from **Settings → Umbriel → Overview**.
+
+## Audio-reactive Effects
+
+Enable **Settings → Umbriel → Audio → Provide Audio to Umbriel** to let Umbriel's
+audio-reactive effects respond to your audio. This is disabled by default. You can also
+enable it in Noctalia's configuration:
+
+```toml
+[shell]
+umbriel_audio_provider_enabled = true
+```
+
+Enable an audio-reactive effect in Umbriel to see a response. No Noctalia visualizer widget
+is required.
