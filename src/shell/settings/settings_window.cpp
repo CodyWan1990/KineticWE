@@ -1,5 +1,6 @@
 #include "shell/settings/settings_window.h"
 
+#include "compositors/compositor_platform.h"
 #include "config/config_service.h"
 #include "config/config_types.h"
 #include "core/deferred_call.h"
@@ -95,10 +96,10 @@ namespace {
     return {"bar", barName, std::string(lane)};
   }
 
-  void focusExistingSettingsWindow(WaylandConnection& wayland, wl_surface* surface) {
+  void focusExistingSettingsWindow(CompositorPlatform& platform, WaylandConnection& wayland, wl_surface* surface) {
     static constexpr std::string_view kSettingsAppId = "dev.noctalia.Noctalia";
     wayland.activateSurface(surface);
-    wayland.activateToplevelForAppId(kSettingsAppId);
+    platform.activateToplevelForAppId(kSettingsAppId);
   }
 
   [[nodiscard]] bool isSettingsSearchTypingKey(const KeyboardEvent& event) {
@@ -400,8 +401,8 @@ void SettingsWindow::open(std::string context) {
 
   if (isOpen()) {
     const auto refocus = [this]() {
-      if (m_wayland != nullptr && m_surface != nullptr) {
-        focusExistingSettingsWindow(*m_wayland, m_surface->wlSurface());
+      if (m_platform != nullptr && m_wayland != nullptr && m_surface != nullptr) {
+        focusExistingSettingsWindow(*m_platform, *m_wayland, m_surface->wlSurface());
       }
     };
     refocus();
@@ -621,6 +622,8 @@ void SettingsWindow::destroyWindow() {
   m_renamingMonitorOverrideMatch.clear();
   m_pendingDeleteMonitorOverrideBarName.clear();
   m_pendingDeleteMonitorOverrideMatch.clear();
+  m_renamingDockMonitorOverride.clear();
+  m_pendingDeleteDockMonitorOverride.clear();
   m_pendingResetPageScope.clear();
   m_pendingResetSettingPaths.clear();
   m_searchQuery.clear();
@@ -877,7 +880,9 @@ void SettingsWindow::refreshPluginListIfNeeded() {
       m_pluginList = std::move(plugins);
       m_pluginListDirty = false;
       if (isOpen() && m_selectedSection == "plugins") {
-        requestContentRebuild();
+        requestContentRebuild(
+            /*refreshRegistry=*/false, /*refreshFilterRow=*/false, /*rebuildEditorSheet=*/m_pluginStoreSheetOpen
+        );
       }
     });
   }).detach();
