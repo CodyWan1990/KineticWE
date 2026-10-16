@@ -616,9 +616,11 @@ void WaylandServer::initScreenLocker()
 
     ScreenLocker::KSldApp::self()->setGreeterEnvironment(kwinApp()->processStartupEnvironment());
 
+#if KWIN_HAVE_KSCREENLOCKER_SUSPEND_API
     connect(ScreenLocker::KSldApp::self(), &ScreenLocker::KSldApp::aboutToLock, this, [this]() {
         new LockScreenPresentationWatcher(this);
     });
+#endif
 
     connect(ScreenLocker::KSldApp::self(), &ScreenLocker::KSldApp::aboutToStartGreeter, this, [this]() {
         if (m_screenLockerClientConnection) {
@@ -645,6 +647,7 @@ void WaylandServer::initScreenLocker()
 
     connect(screenLockerApp, &ScreenLocker::KSldApp::lockStateChanged, this, &WaylandServer::lockStateChanged);
 
+#if KWIN_HAVE_KSCREENLOCKER_SUSPEND_API
     connect(ScreenLocker::KSldApp::self(), &ScreenLocker::KSldApp::inhibitSuspend, this, [this]() {
         if (m_sleepInhibitor) {
             return;
@@ -654,6 +657,7 @@ void WaylandServer::initScreenLocker()
     connect(ScreenLocker::KSldApp::self(), &ScreenLocker::KSldApp::uninhibitSuspend, this, [this]() {
         m_sleepInhibitor.reset();
     });
+#endif
 
     ScreenLocker::KSldApp::self()->initialize();
 
@@ -781,7 +785,11 @@ bool WaylandServer::isScreenLocked() const
     if (!kwinApp()->supportsLockScreen()) {
         return false;
     }
+#if KWIN_HAVE_KSCREENLOCKER_SUSPEND_API
     return ScreenLocker::KSldApp::self()->lockState() == ScreenLocker::KSldApp::Locked || ScreenLocker::KSldApp::self()->lockState() == ScreenLocker::KSldApp::AcquiringLock;
+#else
+    return ScreenLocker::KSldApp::self()->lockState() == ScreenLocker::KSldApp::Locked;
+#endif
 #else
     return false;
 #endif
@@ -860,7 +868,7 @@ void WaylandServer::setRenderBackend(RenderBackend *backend)
     }
 }
 
-#if KWIN_BUILD_SCREENLOCKER
+#if KWIN_HAVE_KSCREENLOCKER_SUSPEND_API
 WaylandServer::LockScreenPresentationWatcher::LockScreenPresentationWatcher(WaylandServer *server)
 {
     connect(ScreenLocker::KSldApp::self(), &ScreenLocker::KSldApp::unlocked, this, [this] {
