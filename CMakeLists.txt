@@ -408,6 +408,19 @@ if (KWIN_BUILD_SCREENLOCKER)
         TYPE REQUIRED
         PURPOSE "For screenlocker integration in kwin_wayland"
     )
+
+    # kscreenlocker 6.8 dropped KSldApp::AcquiringLock, inhibitSuspend/uninhibitSuspend
+    # and lockScreenShown. Detect the old API so we build against both.
+    include(CMakePushCheckState)
+    cmake_push_check_state(RESET)
+    set(CMAKE_REQUIRED_LIBRARIES PW::KScreenLocker Qt6::Core)
+    check_cxx_source_compiles("
+#include <KScreenLocker/KsldApp>
+
+int main() {
+    return ScreenLocker::KSldApp::AcquiringLock;
+}" KWIN_HAVE_KSCREENLOCKER_SUSPEND_API)
+    cmake_pop_check_state()
 endif()
 
 pkg_check_modules(libevdev IMPORTED_TARGET libevdev)
