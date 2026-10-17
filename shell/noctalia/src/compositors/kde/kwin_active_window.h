@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -35,9 +36,11 @@ namespace compositors::kde {
     void setChangeCallback(ChangeCallback callback);
 
     [[nodiscard]] std::optional<ActiveToplevel> current() const;
-    [[nodiscard]] std::vector<std::string> runningAppIds() const;
+    // An empty outputName matches windows on every output.
+    [[nodiscard]] std::vector<std::string> runningAppIds(std::string_view outputName = {}) const;
     [[nodiscard]] std::vector<ToplevelInfo>
-    windowsForApp(const std::string& idLower, const std::string& wmClassLower) const;
+    windowsForApp(const std::string& idLower, const std::string& wmClassLower, std::string_view outputName = {}) const;
+    [[nodiscard]] bool hasTrackedWindows() const noexcept { return !m_trackedWindows.empty(); }
     [[nodiscard]] std::vector<WorkspaceWindow> trackedWorkspaceWindows() const;
     [[nodiscard]] std::optional<std::string> focusedOutputName() const;
     void activateWindow(

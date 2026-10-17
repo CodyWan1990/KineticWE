@@ -272,6 +272,10 @@ syncWindows();
     return false;
   }
 
+  [[nodiscard]] bool windowOnOutput(std::string_view windowOutputName, std::string_view outputName) {
+    return outputName.empty() || (!windowOutputName.empty() && windowOutputName == outputName);
+  }
+
 } // namespace
 
 namespace compositors::kde {
@@ -341,13 +345,14 @@ namespace compositors::kde {
 
   std::optional<ActiveToplevel> KwinActiveWindow::current() const { return m_current; }
 
-  std::vector<std::string> KwinActiveWindow::runningAppIds() const {
+  std::vector<std::string> KwinActiveWindow::runningAppIds(std::string_view outputName) const {
     std::vector<std::string> ids;
     std::unordered_set<std::string> seen;
     ids.reserve(m_trackedWindows.size());
     for (const auto& window : m_trackedWindows) {
       if (window.appId.empty()
           || isNoctaliaShellSurface(window.appId, window.title)
+          || !windowOnOutput(window.outputName, outputName)
           || !seen.insert(window.appId).second) {
         continue;
       }
@@ -356,13 +361,16 @@ namespace compositors::kde {
     return ids;
   }
 
-  std::vector<ToplevelInfo>
-  KwinActiveWindow::windowsForApp(const std::string& idLower, const std::string& wmClassLower) const {
+  std::vector<ToplevelInfo> KwinActiveWindow::windowsForApp(
+      const std::string& idLower, const std::string& wmClassLower, std::string_view outputName
+  ) const {
     std::vector<ToplevelInfo> matched;
     matched.reserve(m_trackedWindows.size());
     std::uint64_t order = 0;
     for (const auto& window : m_trackedWindows) {
-      if (window.appId.empty() || isNoctaliaShellSurface(window.appId, window.title)) {
+      if (window.appId.empty()
+          || isNoctaliaShellSurface(window.appId, window.title)
+          || !windowOnOutput(window.outputName, outputName)) {
         continue;
       }
       std::string appLower = window.appId;

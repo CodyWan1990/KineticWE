@@ -894,12 +894,12 @@ wl_output* CompositorPlatform::activeToplevelOutput() const {
 }
 
 std::vector<std::string> CompositorPlatform::runningAppIds(wl_output* outputFilter) const {
-  if (compositors::isKde() && m_kwinActiveWindow != nullptr && m_kwinActiveWindow->isAvailable()) {
-    const auto ids = m_kwinActiveWindow->runningAppIds();
-    if (!ids.empty()) {
-      (void)outputFilter;
-      return ids;
-    }
+  // An empty result for one output is valid once KWin has reported windows; only fall back before that.
+  if (compositors::isKde()
+      && m_kwinActiveWindow != nullptr
+      && m_kwinActiveWindow->isAvailable()
+      && m_kwinActiveWindow->hasTrackedWindows()) {
+    return m_kwinActiveWindow->runningAppIds(connectorNameForOutput(outputFilter));
   }
   return m_wayland.runningAppIds(outputFilter);
 }
@@ -908,9 +908,9 @@ std::vector<ToplevelInfo> CompositorPlatform::windowsForApp(
     const std::string& idLower, const std::string& wmClassLower, wl_output* outputFilter
 ) const {
   if (compositors::isKde() && m_kwinActiveWindow != nullptr && m_kwinActiveWindow->isAvailable()) {
-    const auto kdeWindows = m_kwinActiveWindow->windowsForApp(idLower, wmClassLower);
+    const std::string outputName = connectorNameForOutput(outputFilter);
+    const auto kdeWindows = m_kwinActiveWindow->windowsForApp(idLower, wmClassLower, outputName);
     if (!kdeWindows.empty()) {
-      (void)outputFilter;
       return kdeWindows;
     }
   }
