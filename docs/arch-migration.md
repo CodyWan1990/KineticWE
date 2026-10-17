@@ -22,7 +22,7 @@ You need this guide if either of these is true:
 - `./install-arch.sh --reset-local` says the dev files came from the old script, or (older versions) "No installation manifest".
 - `ls ~/.local/bin` shows `kinetic-we` or `noctalia-kwe`, but `~/.local/share/kineticwe/arch-native-state/` doesn't exist.
 
-If you only ever used the packages, or only the current `install-arch.sh`, you don't need this. Use `./install-arch.sh --reset-local` instead (see the README).
+If you only ever used the packages, or only the current `install-arch.sh`, you don't need this. Use `./install-arch.sh --reset-local` instead (see [local-arch-dev.md](local-arch-dev.md)).
 
 ## Before you start
 
