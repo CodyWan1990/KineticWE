@@ -1860,7 +1860,7 @@ summary_leftovers() {
     summary_warn "Leftovers from older local builds (they override the packages):"
     local line
     for line in "${MIGRATION_LEFTOVERS[@]}"; do printf '    %s\n' "$line"; done
-    printf '    See docs/arch-migration.md (old build-arch-native.sh installs) or README:\n'
+    printf '    See docs/arch-migration.md (old build-arch-native.sh installs) or docs/local-arch-dev.md:\n'
     printf '    "Migrating from a local (~/.local) build to the packages".\n'
 }
 
