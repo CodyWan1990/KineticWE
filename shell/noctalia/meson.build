@@ -79,6 +79,7 @@ pangoft2_dep        = dependency('pangoft2')
 harfbuzz_dep        = dependency('harfbuzz')
 librsvg_dep         = dependency('librsvg-2.0')
 xkbcommon_dep       = dependency('xkbcommon')
+xkbregistry_dep     = dependency('xkbregistry')
 glib_dep            = dependency('glib-2.0')
 gobject_dep         = dependency('gobject-2.0')
 gio_dep             = dependency('gio-2.0')
@@ -1058,6 +1059,7 @@ _noctalia_sources = files(
   'kinetic-settings/src/keyboard_page.cpp',
   'kinetic-settings/src/pointing_devices_page.cpp',
   'kinetic-settings/src/keybinds_page.cpp',
+  'kinetic-settings/src/layout_catalog.cpp',
   'kinetic-settings/src/window_rules_page.cpp',
   'kinetic-settings/src/window_behavior_page.cpp',
   'kinetic-settings/src/custom_keybinds.cpp',
@@ -1113,6 +1115,7 @@ _noctalia_system_dependencies = [
   harfbuzz_dep,
   librsvg_dep,
   xkbcommon_dep,
+  xkbregistry_dep,
   glib_dep,
   gobject_dep,
   gio_dep,

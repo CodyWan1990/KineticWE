@@ -3,6 +3,7 @@
 #include "kinetic-settings/src/compositor_dbus.h"
 #include "kinetic-settings/src/kineticwe_kwe.h"
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
@@ -21,6 +22,11 @@ class Node;
 // starts or on org.kde.KWin.reconfigure(); this page writes the .kwe file and
 // triggers one reconfigure() so the change applies live, the same contract as
 // the Window Behavior page.
+//
+// The same page also owns the keyboard-layout configuration: the [Layout] group
+// (LayoutList / VariantList / DisplayNames / SwitchMode) read by src/xkb.cpp and
+// src/keyboard_layout.cpp. Layouts are picked from the system catalog
+// (libxkbregistry) and applied through the same reconfigure() call.
 //
 // Edits are STAGED: controls update an in-memory pending map and nothing
 // touches disk or the compositor until the window's Apply button calls
@@ -57,9 +63,21 @@ public:
   void reloadFromDisk() noexcept {
     m_loaded = false;
     m_pending.clear();
+    m_pendingLayouts.reset();
+    m_pendingSwitchMode.reset();
+    m_addingLayout = false;
   }
 
 private:
+  // One configured keyboard layout: a [Layout] LayoutList/VariantList entry.
+  // displayName mirrors KWin's DisplayNames list (localized label used by the
+  // layout OSD and the bar widget); it is derived from the catalog when absent.
+  struct LayoutEntry {
+    std::string layout;
+    std::string variant;
+    std::string displayName;
+    bool operator==(const LayoutEntry&) const = default;
+  };
   // One editable key-repeat setting.
   struct Field {
     std::string_view key;        // .kwe key inside the [Keyboard] group
@@ -99,9 +117,36 @@ private:
       Flex& parent, const Field& field, float scale, std::string_view armedResetKey, const Callbacks& callbacks
   );
 
+  // --- Keyboard layouts ([Layout] group) -------------------------------------
+  [[nodiscard]] std::vector<LayoutEntry> readLayouts() const;
+  // What the UI shows: staged list when present, otherwise the file value.
+  [[nodiscard]] const std::vector<LayoutEntry>& effectiveLayouts() const;
+  [[nodiscard]] const std::string& effectiveSwitchMode() const;
+  // Whether the layouts section matches the active search/override filters.
+  [[nodiscard]] bool layoutsVisible(const Filter& filter) const;
+  void addLayout(LayoutEntry entry);
+  void removeLayout(std::size_t index);
+  void moveLayout(std::size_t from, std::size_t to);
+  void setSwitchMode(std::string mode);
+  // Clears the staged value once it matches the file again (keeps Apply tidy).
+  void normalizeLayoutsPending();
+  void normalizeSwitchModePending();
+  std::unique_ptr<Node> buildLayoutsSection(float scale, const Callbacks& callbacks);
+  std::unique_ptr<Node> buildLayoutRow(
+      const LayoutEntry& entry, std::size_t index, std::size_t count, float scale, const Callbacks& callbacks
+  );
+  std::unique_ptr<Node> buildLayoutAddPicker(float scale, const Callbacks& callbacks);
+
   CompositorDbus m_dbus;
   KineticweKwe m_config;
   bool m_loaded = false;
   // Edits staged by the controls, keyed by "Keyboard.<key>"; flushed by applyAll().
   std::map<std::string, Value> m_pending;
+  // File-backed [Layout] state, plus staged copies (nullopt = not dirty).
+  std::vector<LayoutEntry> m_layouts;
+  std::optional<std::vector<LayoutEntry>> m_pendingLayouts;
+  std::string m_switchMode = "Global";
+  std::optional<std::string> m_pendingSwitchMode;
+  // True while the inline "add layout" search picker is open.
+  bool m_addingLayout = false;
 };

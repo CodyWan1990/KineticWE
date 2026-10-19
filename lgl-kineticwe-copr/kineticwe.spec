@@ -100,6 +100,7 @@ BuildRequires:  wayland-devel
 BuildRequires:  wayland-protocols-devel
 BuildRequires:  libxkbcommon-devel
 BuildRequires:  libxkbcommon-x11-devel
+BuildRequires:  pkgconfig(xkbregistry)
 BuildRequires:  libinput-devel
 BuildRequires:  libdrm-devel
 BuildRequires:  mesa-libgbm-devel

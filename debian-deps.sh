@@ -118,6 +118,7 @@ system_pkgs=(
     wayland-protocols
     libxkbcommon-dev
     libxkbcommon-x11-dev
+    libxkbregistry-dev
     libinput-dev
     libdrm-dev
     libgbm-dev
