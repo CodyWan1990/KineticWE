@@ -35,12 +35,14 @@ fi
 #                        kineticwe-greeter package, --local-dev does not set up
 #                        greetd (your display manager is left alone)
 #   --yes, -y            Skip the confirmation prompt (required when not run
-#                        from a terminal)
+#                        from a terminal; --local-dev always asks, see below)
 #   --binary             Deprecated alias for --local-dev --no-greeter
 #   --install-host-deps  Deprecated alias for --local-dev --no-greeter
 #
 # Every mode except --clean-deps and --help first shows what it will do and
-# asks to continue ([Y/n] for builds; [y/N] for --local-dev and --reset-local).
+# asks to continue ([Y/n] for builds; [y/N] for --reset-local). --local-dev
+# instead shows an unsupported/experimental warning and requires typing "YES"
+# in a terminal, even with --yes.
 #
 # Only one mode may be given.
 #
@@ -1763,9 +1765,9 @@ ui_init() {
     local charmap="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
     if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
         U_B=$'\033[1m' U_DIM=$'\033[2m' U_OK=$'\033[1;32m' U_WARN=$'\033[1;33m'
-        U_CMD=$'\033[1;36m' U_R=$'\033[0m'
+        U_CMD=$'\033[1;36m' U_ERR=$'\033[1;31m' U_R=$'\033[0m'
     else
-        U_B='' U_DIM='' U_OK='' U_WARN='' U_CMD='' U_R=''
+        U_B='' U_DIM='' U_OK='' U_WARN='' U_CMD='' U_ERR='' U_R=''
     fi
     if [[ -t 1 && "${charmap,,}" == *utf-8* || -t 1 && "${charmap,,}" == *utf8* ]]; then
         G_BULLET='•' G_OK='✔' G_WARN='⚠' G_RULE='─' G_H='═' G_V='║' G_TL='╔' G_TR='╗' G_BL='╚' G_BR='╝'
@@ -1876,8 +1878,8 @@ welcome_title() {
 
 # confirm_start <mode> <assume_yes> <do_greeter>
 # Shows what the chosen mode is about to do and asks before continuing.
-# Default answer: Y for builds, N for --local-dev (display manager) and
-# --reset-local (deletes files). Without a terminal, --yes is required.
+# Default answer: Y for builds, N for --reset-local (deletes files). Without a
+# terminal, --yes is required. --local-dev uses confirm_local_dev instead.
 confirm_start() {
     local mode="$1" assume_yes="$2" do_greeter="$3" default=Y
     ui_init
@@ -1925,7 +1927,6 @@ confirm_start() {
             echo "    Adds a \"KineticWE-Dev\" login entry (asks for sudo)."
             echo "    Undo later with: ./install-arch.sh --reset-local"
             if [[ "$do_greeter" == true ]]; then
-                default=N
                 echo
                 summary_box \
                     "This also changes your display manager:" \
@@ -1936,6 +1937,10 @@ confirm_start() {
                     "" \
                     "Uses sudo. Reboot afterwards."
             fi
+            echo
+            # Replaces the Continue? prompt below; --yes does not skip it.
+            confirm_local_dev
+            return 0
             ;;
         reset-local)
             default=N
@@ -1972,6 +1977,45 @@ confirm_start() {
             exit 0
             ;;
     esac
+}
+
+# confirm_local_dev
+# --local-dev is for contributors only: warn in bold red and require typing
+# "YES" (exactly) to continue, or n to exit. Always needs a terminal; --yes
+# does not skip it.
+confirm_local_dev() {
+    local answer
+    summary_rule
+    printf '  %s%s  STOP! TURN BACK NOW!  %s%s\n' "$U_ERR" "$G_WARN" "$G_WARN" "$U_R"
+    summary_rule
+    echo
+    printf '  %s--local-dev is for KineticWE contributors and Don ONLY.%s\n' "$U_ERR" "$U_R"
+    printf '  %sIt builds experimental features and will NOT receive any support%s\n' "$U_ERR" "$U_R"
+    printf '  %sfrom me, the script maintainer.%s\n' "$U_ERR" "$U_R"
+    echo
+    printf '  %sPlease turn back and use the standard install instead:%s\n' "$U_ERR" "$U_R"
+    printf '      %s./install-arch.sh%s            (install the packages)\n' "$U_CMD" "$U_R"
+    printf '      %s./install-arch.sh --update%s   (update them later)\n' "$U_CMD" "$U_R"
+    echo
+    echo "  If you are a contributor (or Don): thank you kindly for helping out!"
+    echo
+
+    if [[ ! -t 0 ]]; then
+        error "--local-dev must be confirmed in a terminal (--yes does not skip this)."
+        exit 1
+    fi
+    while true; do
+        read -r -p "  Type \"YES\" if you understand and want to continue, or n to exit: " answer || answer=n
+        case "$answer" in
+            YES) echo; return 0 ;;
+            n|N|no|No|NO)
+                echo
+                info "Cancelled. Nothing was changed."
+                exit 0
+                ;;
+            *) echo "  Please type YES (in capitals) to continue, or n to exit." ;;
+        esac
+    done
 }
 
 # print_usage pkg | dev [with_greeter]
@@ -2258,7 +2302,8 @@ Modifiers:
                        greetd; your display manager is left alone (e.g. when
                        running next to Plasma). Combines with --update.
   --yes, -y            Skip the confirmation prompt (required when not run
-                       from a terminal).
+                       from a terminal). --local-dev always requires typing
+                       YES in a terminal, even with --yes.
   --binary             Deprecated alias for --local-dev --no-greeter.
   --install-host-deps  Deprecated alias for --local-dev --no-greeter.
   --full               Deprecated alias for --local-dev.
