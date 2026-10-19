@@ -16,10 +16,10 @@
 
 #include <algorithm>
 #include <functional>
-#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 
 namespace {
 
@@ -31,13 +31,6 @@ namespace {
   constexpr float kDecorationTileHeight = 150.0F;
   constexpr float kDecorationPreviewWidth = 168.0F;
   constexpr float kDecorationPreviewHeight = 96.0F;
-
-  // Values the titlebar-metric sliders show when the config key is absent. The
-  // compositor derives the actual default from the title font/grid unit, so
-  // these approximate it; dragging a slider writes an explicit value.
-  constexpr int kDefaultTitleBarHeight = 30; // logical px
-  constexpr int kDefaultTitleFontSize = 9;   // points
-  constexpr int kDefaultButtonSize = 22;     // logical px
 
   // Default title-bar button-code runs (the KDE letters the compositor reads
   // from [org.kde.kdecoration2] ButtonsOnLeft/ButtonsOnRight). An explicit value
@@ -120,11 +113,7 @@ void AppearancePage::ensureLoaded() {
 // ---------------------------------------------------------------------------
 
 bool AppearancePage::applyAll() {
-  if (!m_pendingDecoration.has_value() && !m_pendingHideTitleBars.has_value()
-      && !m_pendingTitleBarHeight.has_value() && !m_pendingTitleFontSize.has_value()
-      && !m_pendingButtonSize.has_value() && !m_pendingButtonsOnLeft.has_value()
-      && !m_pendingButtonsOnRight.has_value() && !m_pendingShowTitle.has_value()
-      && !m_pendingFollowShellFont.has_value()) {
+  if (!hasPending()) {
     return true;
   }
   ensureLoaded();
@@ -133,65 +122,208 @@ bool AppearancePage::applyAll() {
   if (!applyTitleBars()) {
     return false;
   }
+  m_pending.clear();
   m_pendingDecoration.reset();
-  m_pendingHideTitleBars.reset();
-  m_pendingTitleBarHeight.reset();
-  m_pendingTitleFontSize.reset();
-  m_pendingButtonSize.reset();
   m_pendingButtonsOnLeft.reset();
   m_pendingButtonsOnRight.reset();
-  m_pendingShowTitle.reset();
-  m_pendingFollowShellFont.reset();
   m_errorNotice.clear();
   return true;
 }
 
 std::vector<std::string> AppearancePage::resettableKeyPaths() const {
-  return {
-      decorationKeyPath(),
-      titleBarsKeyPath(),
-      titleBarHeightKeyPath(),
-      titleFontSizeKeyPath(),
-      buttonSizeKeyPath(),
-      buttonsOnLeftKeyPath(),
-      buttonsOnRightKeyPath(),
-      showTitleKeyPath(),
-      followShellFontKeyPath(),
-  };
+  std::vector<std::string> paths{decorationKeyPath(), buttonsOnLeftKeyPath(), buttonsOnRightKeyPath()};
+  for (const auto& field : fields()) {
+    paths.push_back(keyPath(field));
+  }
+  return paths;
 }
 
 void AppearancePage::resetKeyPath(std::string_view path) {
   if (path == decorationKeyPath()) {
     stageDecoration(defaultDecoration());
-  } else if (path == titleBarsKeyPath()) {
-    stageHideTitleBars(false);
-  } else if (path == titleBarHeightKeyPath()) {
-    stageTitleBarHeight(kDefaultTitleBarHeight);
-  } else if (path == titleFontSizeKeyPath()) {
-    stageTitleFontSize(kDefaultTitleFontSize);
-  } else if (path == buttonSizeKeyPath()) {
-    stageButtonSize(kDefaultButtonSize);
   } else if (path == buttonsOnLeftKeyPath()) {
     stageButtonsOnLeft(std::string(kDefaultButtonsOnLeft));
   } else if (path == buttonsOnRightKeyPath()) {
     stageButtonsOnRight(std::string(kDefaultButtonsOnRight));
-  } else if (path == showTitleKeyPath()) {
-    stageShowTitle(true);
-  } else if (path == followShellFontKeyPath()) {
-    stageFollowShellFont(true);
+  } else if (const Field* field = findField(path); field != nullptr) {
+    stage(*field, field->fallback);
   }
 }
 
 void AppearancePage::resetAll() {
   stageDecoration(defaultDecoration());
-  stageHideTitleBars(false);
-  stageTitleBarHeight(kDefaultTitleBarHeight);
-  stageTitleFontSize(kDefaultTitleFontSize);
-  stageButtonSize(kDefaultButtonSize);
   stageButtonsOnLeft(std::string(kDefaultButtonsOnLeft));
   stageButtonsOnRight(std::string(kDefaultButtonsOnRight));
-  stageShowTitle(true);
-  stageFollowShellFont(true);
+  for (const auto& field : fields()) {
+    stage(field, field.fallback);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Settings table: the plain toggles and sliders. Each entry's fallback is the
+// compiled-in default (its type is the value type); a value equal to it
+// removes the key on Apply.
+// ---------------------------------------------------------------------------
+
+const std::vector<AppearancePage::Field>& AppearancePage::fields() {
+  static const std::vector<Field> table{
+      // Global default: [Windows] DefaultDecorationPolicy, 0 = None (no title
+      // bar/frame), 1 = ClientPreference (shown). A per-window rule can still
+      // override it. Any non-zero value reads as shown.
+      Field{
+          .group = "Windows",
+          .key = "DefaultDecorationPolicy",
+          .title = "Show title bars",
+          .subtitle = "Show the title bar and frame on every window, unless a per-window "
+                      "rule overrides it for a specific application.",
+          .card = Card::TitleBars,
+          .boolAsInt = true,
+          .fallback = Value{true},
+      },
+      // Kinetic titlebar metrics. The compositor derives the real default from
+      // the title font/grid unit when the key is absent; these fallbacks
+      // approximate it.
+      Field{
+          .group = "org.kde.kdecoration2",
+          .key = "KineticTitleBarHeight",
+          .control = ControlKind::Slider,
+          .title = "Title bar height",
+          .subtitle = "Height of the title bar in logical pixels. It never shrinks below what the "
+                      "buttons need.",
+          .card = Card::Size,
+          .minValue = 18,
+          .maxValue = 72,
+          .valueSuffix = " px",
+          .fallback = Value{30},
+      },
+      Field{
+          .group = "org.kde.kdecoration2",
+          .key = "KineticTitleFontSize",
+          .control = ControlKind::Slider,
+          .title = "Title font size",
+          .subtitle = "Point size of the window title.",
+          .card = Card::Size,
+          .minValue = 6,
+          .maxValue = 20,
+          .valueSuffix = " pt",
+          .fallback = Value{9},
+      },
+      Field{
+          .group = "org.kde.kdecoration2",
+          .key = "KineticButtonSize",
+          .control = ControlKind::Slider,
+          .title = "Button size",
+          .subtitle = "Side length of the minimize, maximize and close buttons in logical pixels.",
+          .card = Card::Size,
+          .minValue = 12,
+          .maxValue = 48,
+          .valueSuffix = " px",
+          .fallback = Value{22},
+      },
+      // Whether the decoration paints the window caption text.
+      Field{
+          .group = "org.kde.kdecoration2",
+          .key = "KineticShowTitle",
+          .title = "Window title",
+          .card = Card::Buttons,
+          .fallback = Value{true},
+      },
+      // Whether captions use the shell font; the family itself is mirrored by
+      // syncTitleFontFamily().
+      Field{
+          .group = "org.kde.kdecoration2",
+          .key = "KineticTitleFollowShellFont",
+          .title = "Use shell font for title bars",
+          .card = Card::Buttons,
+          .fallback = Value{true},
+      },
+  };
+  return table;
+}
+
+std::string AppearancePage::keyPath(const Field& field) {
+  return std::string(field.group) + '.' + std::string(field.key);
+}
+
+const AppearancePage::Field* AppearancePage::findField(std::string_view path) {
+  for (const auto& field : fields()) {
+    if (path == keyPath(field)) {
+      return &field;
+    }
+  }
+  return nullptr;
+}
+
+std::string_view AppearancePage::cardTitle(Card card) {
+  switch (card) {
+  case Card::TitleBars:
+    return "Title bars";
+  case Card::Size:
+    return "Title bar size";
+  case Card::Buttons:
+    return "Title bar buttons";
+  }
+  return {};
+}
+
+AppearancePage::Value AppearancePage::fileBackedValue(const Field& field) const {
+  if (const bool* fallback = std::get_if<bool>(&field.fallback)) {
+    if (field.boolAsInt) {
+      return Value{m_decorationsConfig.readInt(field.group, field.key, *fallback ? 1 : 0) != 0};
+    }
+    return Value{m_decorationsConfig.readBool(field.group, field.key, *fallback)};
+  }
+  return Value{m_decorationsConfig.readInt(field.group, field.key, std::get<int>(field.fallback))};
+}
+
+AppearancePage::Value AppearancePage::effectiveValue(const Field& field) const {
+  if (const auto it = m_pending.find(keyPath(field)); it != m_pending.end()) {
+    return it->second;
+  }
+  return fileBackedValue(field);
+}
+
+bool AppearancePage::overridden(const Field& field) const {
+  return effectiveValue(field) != field.fallback;
+}
+
+bool AppearancePage::matchesFilter(const Field& field, const Filter& filter) const {
+  if (filter.showOverriddenOnly && !overridden(field)) {
+    return false;
+  }
+  const std::string& query = filter.searchQuery;
+  if (query.empty()) {
+    return true;
+  }
+  return StringUtils::containsInsensitive("Title bars", query) || StringUtils::containsInsensitive(field.title, query)
+      || StringUtils::containsInsensitive(field.subtitle, query)
+      || StringUtils::containsInsensitive(cardTitle(field.card), query);
+}
+
+void AppearancePage::stage(const Field& field, const Value& value) {
+  ensureLoaded();
+  const std::string path = keyPath(field);
+  if (value == fileBackedValue(field)) {
+    m_pending.erase(path);
+  } else {
+    m_pending[path] = value;
+  }
+}
+
+void AppearancePage::writeValue(const Field& field, const Value& value) {
+  if (value == field.fallback) {
+    m_decorationsConfig.removeKey(field.group, field.key);
+    return;
+  }
+  if (const bool* b = std::get_if<bool>(&value)) {
+    if (field.boolAsInt) {
+      m_decorationsConfig.setInt(field.group, field.key, *b ? 1 : 0);
+    } else {
+      m_decorationsConfig.setBool(field.group, field.key, *b);
+    }
+    return;
+  }
+  m_decorationsConfig.setInt(field.group, field.key, std::get<int>(value));
 }
 
 // ---------------------------------------------------------------------------
@@ -232,88 +364,6 @@ void AppearancePage::stageDecorationAndRebuild(const DecorationSelection& select
   stageDecoration(selection);
   if (callbacks.requestRebuild) {
     callbacks.requestRebuild();
-  }
-}
-
-bool AppearancePage::titleBarsHiddenOnDisk() const {
-  // DefaultDecorationPolicy: 0 = None (hidden), 1 = ClientPreference (shown).
-  // An absent key reads as shown, which is KWin's default.
-  return m_decorationsConfig.readInt("Windows", "DefaultDecorationPolicy", 1) == 0;
-}
-
-bool AppearancePage::effectiveHideTitleBars() const {
-  return m_pendingHideTitleBars.value_or(titleBarsHiddenOnDisk());
-}
-
-void AppearancePage::stageHideTitleBars(bool hide) {
-  ensureLoaded();
-  if (hide == titleBarsHiddenOnDisk()) {
-    m_pendingHideTitleBars.reset();
-  } else {
-    m_pendingHideTitleBars = hide;
-  }
-}
-
-int AppearancePage::titleBarHeightOnDisk() const {
-  return m_decorationsConfig.readInt("org.kde.kdecoration2", "KineticTitleBarHeight", kDefaultTitleBarHeight);
-}
-
-int AppearancePage::titleFontSizeOnDisk() const {
-  return m_decorationsConfig.readInt("org.kde.kdecoration2", "KineticTitleFontSize", kDefaultTitleFontSize);
-}
-
-int AppearancePage::buttonSizeOnDisk() const {
-  return m_decorationsConfig.readInt("org.kde.kdecoration2", "KineticButtonSize", kDefaultButtonSize);
-}
-
-int AppearancePage::effectiveTitleBarHeight() const {
-  return m_pendingTitleBarHeight.value_or(titleBarHeightOnDisk());
-}
-
-int AppearancePage::effectiveTitleFontSize() const {
-  return m_pendingTitleFontSize.value_or(titleFontSizeOnDisk());
-}
-
-int AppearancePage::effectiveButtonSize() const {
-  return m_pendingButtonSize.value_or(buttonSizeOnDisk());
-}
-
-bool AppearancePage::overriddenTitleBarHeight() const {
-  return effectiveTitleBarHeight() != kDefaultTitleBarHeight;
-}
-
-bool AppearancePage::overriddenTitleFontSize() const {
-  return effectiveTitleFontSize() != kDefaultTitleFontSize;
-}
-
-bool AppearancePage::overriddenButtonSize() const {
-  return effectiveButtonSize() != kDefaultButtonSize;
-}
-
-void AppearancePage::stageTitleBarHeight(int value) {
-  ensureLoaded();
-  if (value == titleBarHeightOnDisk()) {
-    m_pendingTitleBarHeight.reset();
-  } else {
-    m_pendingTitleBarHeight = value;
-  }
-}
-
-void AppearancePage::stageTitleFontSize(int value) {
-  ensureLoaded();
-  if (value == titleFontSizeOnDisk()) {
-    m_pendingTitleFontSize.reset();
-  } else {
-    m_pendingTitleFontSize = value;
-  }
-}
-
-void AppearancePage::stageButtonSize(int value) {
-  ensureLoaded();
-  if (value == buttonSizeOnDisk()) {
-    m_pendingButtonSize.reset();
-  } else {
-    m_pendingButtonSize = value;
   }
 }
 
@@ -377,48 +427,6 @@ void AppearancePage::stageButtonsOnRight(std::string value) {
   }
 }
 
-bool AppearancePage::showTitleOnDisk() const {
-  return m_decorationsConfig.readBool("org.kde.kdecoration2", "KineticShowTitle", true);
-}
-
-bool AppearancePage::effectiveShowTitle() const {
-  return m_pendingShowTitle.value_or(showTitleOnDisk());
-}
-
-bool AppearancePage::overriddenShowTitle() const {
-  return !effectiveShowTitle();
-}
-
-void AppearancePage::stageShowTitle(bool show) {
-  ensureLoaded();
-  if (show == showTitleOnDisk()) {
-    m_pendingShowTitle.reset();
-  } else {
-    m_pendingShowTitle = show;
-  }
-}
-
-bool AppearancePage::followShellFontOnDisk() const {
-  return m_decorationsConfig.readBool("org.kde.kdecoration2", "KineticTitleFollowShellFont", true);
-}
-
-bool AppearancePage::effectiveFollowShellFont() const {
-  return m_pendingFollowShellFont.value_or(followShellFontOnDisk());
-}
-
-bool AppearancePage::overriddenFollowShellFont() const {
-  return !effectiveFollowShellFont();
-}
-
-void AppearancePage::stageFollowShellFont(bool follow) {
-  ensureLoaded();
-  if (follow == followShellFontOnDisk()) {
-    m_pendingFollowShellFont.reset();
-  } else {
-    m_pendingFollowShellFont = follow;
-  }
-}
-
 bool AppearancePage::applyTitleBars() {
   // Reload first so edits applied from other pages in the meantime are kept.
   m_decorationsConfig.load();
@@ -430,32 +438,9 @@ bool AppearancePage::applyTitleBars() {
     m_decorationsConfig.setString("org.kde.kdecoration2", "library", selection.library);
     m_decorationsConfig.setString("org.kde.kdecoration2", "theme", selection.theme);
   }
-  if (m_pendingHideTitleBars.has_value()) {
-    // None (0) hides every title bar/frame; ClientPreference (1) shows the
-    // client's requested decoration.
-    m_decorationsConfig.setInt("Windows", "DefaultDecorationPolicy", *m_pendingHideTitleBars ? 0 : 1);
-  }
-  // Titlebar metrics: an explicit default removes the key so the compositor
-  // falls back to its font/grid-unit-derived value again.
-  if (m_pendingTitleBarHeight.has_value()) {
-    if (*m_pendingTitleBarHeight == kDefaultTitleBarHeight) {
-      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticTitleBarHeight");
-    } else {
-      m_decorationsConfig.setInt("org.kde.kdecoration2", "KineticTitleBarHeight", *m_pendingTitleBarHeight);
-    }
-  }
-  if (m_pendingTitleFontSize.has_value()) {
-    if (*m_pendingTitleFontSize == kDefaultTitleFontSize) {
-      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticTitleFontSize");
-    } else {
-      m_decorationsConfig.setInt("org.kde.kdecoration2", "KineticTitleFontSize", *m_pendingTitleFontSize);
-    }
-  }
-  if (m_pendingButtonSize.has_value()) {
-    if (*m_pendingButtonSize == kDefaultButtonSize) {
-      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticButtonSize");
-    } else {
-      m_decorationsConfig.setInt("org.kde.kdecoration2", "KineticButtonSize", *m_pendingButtonSize);
+  for (const auto& [path, value] : m_pending) {
+    if (const Field* field = findField(path); field != nullptr) {
+      writeValue(*field, value);
     }
   }
   // Title bar buttons: an explicit default removes the key so the compositor
@@ -472,23 +457,6 @@ bool AppearancePage::applyTitleBars() {
       m_decorationsConfig.removeKey("org.kde.kdecoration2", "ButtonsOnRight");
     } else {
       m_decorationsConfig.setString("org.kde.kdecoration2", "ButtonsOnRight", *m_pendingButtonsOnRight);
-    }
-  }
-  // Window caption text: shown by default, so an explicit default removes the key.
-  if (m_pendingShowTitle.has_value()) {
-    if (*m_pendingShowTitle) {
-      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticShowTitle");
-    } else {
-      m_decorationsConfig.setBool("org.kde.kdecoration2", "KineticShowTitle", false);
-    }
-  }
-  // Caption font follows the shell font by default, so an explicit default
-  // removes the key.
-  if (m_pendingFollowShellFont.has_value()) {
-    if (*m_pendingFollowShellFont) {
-      m_decorationsConfig.removeKey("org.kde.kdecoration2", "KineticTitleFollowShellFont");
-    } else {
-      m_decorationsConfig.setBool("org.kde.kdecoration2", "KineticTitleFollowShellFont", false);
     }
   }
   if (!m_decorationsConfig.save()) {
@@ -730,24 +698,21 @@ namespace {
     return tile;
   }
 
-  // One numeric titlebar-metric row: bold title + caption on the left,
-  // [Override][Reset][slider][value] on the right, matching the other pages.
-  struct MetricRow {
-    std::string title;
-    std::string subtitle;
-    int minValue = 0;
-    int maxValue = 100;
-    int value = 0;
-    std::string suffix;
-    std::string keyPath;
-    bool overridden = false;
-    bool armedReset = false;
-    std::function<void(int)> onCommit;
-  };
+} // namespace
 
-  [[nodiscard]] std::unique_ptr<Node> buildMetricRow(
-      const MetricRow& field, float scale, const AppearancePage::Callbacks& callbacks
-  ) {
+// One table row. Full rows (with a subtitle): bold title + caption on the left,
+// [Override][Reset][control] on the right. Compact rows (no subtitle): a
+// caption-size label with the badge/reset beside it, control on the right.
+std::unique_ptr<Node> AppearancePage::buildFieldRow(
+    const Field& field, float scale, std::string_view armedResetKey, const Callbacks& callbacks
+) {
+  const std::string path = keyPath(field);
+  const Value value = effectiveValue(field);
+  const bool isOverridden = overridden(field);
+
+  std::unique_ptr<Node> control;
+  if (field.control == ControlKind::Slider) {
+    const int current = std::get<int>(value);
     Slider* sliderPtr = nullptr;
     Label* valuePtr = nullptr;
     auto slider = ui::slider({
@@ -755,65 +720,100 @@ namespace {
         .minValue = static_cast<double>(field.minValue),
         .maxValue = static_cast<double>(field.maxValue),
         .step = 1.0,
-        .value = static_cast<double>(field.value),
+        .value = static_cast<double>(current),
         .trackHeight = Style::sliderTrackHeight * scale,
         .thumbSize = Style::sliderThumbSize * scale,
         .controlHeight = Style::controlHeight * scale,
         .width = Style::sliderDefaultWidth * scale,
     });
+    const std::string suffix(field.valueSuffix);
     auto valueLabel = ui::label({
         .out = &valuePtr,
-        .text = std::to_string(field.value) + field.suffix,
+        .text = std::to_string(current) + suffix,
         .fontSize = Style::fontSizeCaption * scale,
         .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
         .minWidth = 56.0F * scale,
         .textAlign = TextAlign::End,
     });
-    slider->setOnValueChanged([valuePtr, suffix = field.suffix](double next) {
+    slider->setOnValueChanged([valuePtr, suffix](double next) {
       if (valuePtr != nullptr) {
         valuePtr->setText(std::to_string(static_cast<int>(next)) + suffix);
       }
     });
-    slider->setOnDragEnd([sliderPtr, commit = field.onCommit]() {
-      if (sliderPtr != nullptr && commit) {
-        commit(static_cast<int>(sliderPtr->value()));
+    slider->setOnDragEnd([this, &field, sliderPtr, callbacks]() {
+      if (sliderPtr == nullptr) {
+        return;
+      }
+      stage(field, Value{static_cast<int>(sliderPtr->value())});
+      if (callbacks.requestRebuild) {
+        callbacks.requestRebuild();
       }
     });
+    control = ui::row(
+        {.align = FlexAlign::Center, .gap = Style::spaceSm * scale}, std::move(slider), std::move(valueLabel)
+    );
+  } else {
+    control = ui::toggle({
+        .checked = std::get<bool>(value),
+        .scale = scale,
+        .onChange =
+            [this, &field, callbacks](bool checked) {
+              stage(field, Value{checked});
+              if (callbacks.requestRebuild) {
+                callbacks.requestRebuild();
+              }
+            },
+    });
+  }
 
-    auto titleRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true});
-    titleRow->addChild(makeLabel(
-        field.title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
-    ));
-    titleRow->addChild(ui::spacer());
-
-    auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
-    copy->addChild(std::move(titleRow));
-    copy->addChild(ui::label({
-        .text = field.subtitle,
+  if (field.subtitle.empty()) {
+    auto label = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    label->addChild(ui::label({
+        .text = std::string(field.title),
         .fontSize = Style::fontSizeCaption * scale,
-        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        .maxLines = 4,
+        .color = colorSpecFromRole(ColorRole::OnSurface),
     }));
-
-    auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    if (field.overridden) {
-      actions->addChild(makeOverrideBadge(scale));
-      actions->addChild(makeResetButton(field.keyPath, field.armedReset, scale, callbacks));
+    if (isOverridden) {
+      label->addChild(makeOverrideBadge(scale));
+      label->addChild(makeResetButton(path, armedResetKey == path, scale, callbacks));
     }
-    actions->addChild(std::move(slider));
-    actions->addChild(std::move(valueLabel));
-
     return ui::row(
         {.align = FlexAlign::Center,
          .justify = FlexJustify::SpaceBetween,
          .gap = Style::spaceXs * scale,
          .paddingV = 2.0F * scale,
          .fillWidth = true},
-        std::move(copy), std::move(actions)
+        std::move(label), std::move(control)
     );
   }
 
-} // namespace
+  auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
+  copy->addChild(makeLabel(
+      field.title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+  ));
+  copy->addChild(ui::label({
+      .text = std::string(field.subtitle),
+      .fontSize = Style::fontSizeCaption * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      .maxLines = 4,
+  }));
+
+  auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  if (isOverridden) {
+    actions->addChild(makeOverrideBadge(scale));
+    actions->addChild(makeResetButton(path, armedResetKey == path, scale, callbacks));
+  }
+  actions->addChild(std::move(control));
+
+  return ui::row(
+      {.align = FlexAlign::Center,
+       .justify = FlexJustify::SpaceBetween,
+       .gap = Style::spaceSm * scale,
+       .paddingV = 2.0F * scale,
+       .fillWidth = true},
+      std::move(copy), std::move(actions)
+  );
+}
 
 std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     float scale, const Filter& filter, std::string_view armedResetKey, const Callbacks& callbacks
@@ -853,50 +853,25 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
   const bool searchActive = !filter.searchQuery.empty();
   const bool sectionTitleMatches =
       searchActive && StringUtils::containsInsensitive("Title bars", filter.searchQuery);
-  const bool showToggleRow = !searchActive || sectionTitleMatches
-      || StringUtils::containsInsensitive("Show title bars", filter.searchQuery)
-      || StringUtils::containsInsensitive("Hide title bars", filter.searchQuery)
-      || StringUtils::containsInsensitive("Remove the title bar and frame on every window", filter.searchQuery);
 
-  // The size sliders: each matches independently so a search / the Overridden
-  // filter can narrow down to a single row.
-  const auto matchesAny = [&](std::initializer_list<std::string_view> words) {
-    if (!searchActive) {
-      return true;
+  // Table rows visible under the current filter, per card.
+  std::map<Card, std::vector<const Field*>> visibleRows;
+  for (const auto& field : fields()) {
+    if (matchesFilter(field, filter)) {
+      visibleRows[field.card].push_back(&field);
     }
-    for (const std::string_view word : words) {
-      if (StringUtils::containsInsensitive(word, filter.searchQuery)) {
-        return true;
-      }
-    }
-    return false;
+  }
+  const auto rowsIn = [&](Card card) -> const std::vector<const Field*>& {
+    static const std::vector<const Field*> kNone;
+    const auto it = visibleRows.find(card);
+    return it != visibleRows.end() ? it->second : kNone;
   };
-  const bool heightOverridden = overriddenTitleBarHeight();
-  const bool fontSizeOverridden = overriddenTitleFontSize();
-  const bool buttonSizeOverridden = overriddenButtonSize();
-  const bool heightVisible = (!filter.showOverriddenOnly || heightOverridden)
-      && (sectionTitleMatches || matchesAny({"Title bar height", "Title bar size"}));
-  const bool fontSizeVisible = (!filter.showOverriddenOnly || fontSizeOverridden)
-      && (sectionTitleMatches || matchesAny({"Title font size", "Title bar font", "Title bar size"}));
-  const bool buttonSizeVisible = (!filter.showOverriddenOnly || buttonSizeOverridden)
-      && (sectionTitleMatches || matchesAny({"Button size", "Title bar size"}));
-  const bool showSizeSection = heightVisible || fontSizeVisible || buttonSizeVisible;
 
-  // The Title bar buttons section: two side-by-side columns, each a per-button
-  // toggle row, plus the window-title toggle. It matches the section title, an
-  // individual button/label, or the Overridden filter when any part differs from
-  // the default.
-  const bool buttonsOverridden =
-      overriddenButtonsOnLeft() || overriddenButtonsOnRight() || overriddenShowTitle()
-      || overriddenFollowShellFont();
+  // The Title bar buttons card shows as a whole: its table rows plus the two
+  // letter columns. It matches the section title, a button label, one of its
+  // table rows, or the Overridden filter when any part differs from the default.
   const auto matchesButtonOption = [&]() {
-    if (!searchActive) {
-      return true;
-    }
-    if (StringUtils::containsInsensitive("Title bar buttons", filter.searchQuery)
-        || StringUtils::containsInsensitive("Title bar button", filter.searchQuery)
-        || StringUtils::containsInsensitive("Window title", filter.searchQuery)
-        || StringUtils::containsInsensitive("Use shell font", filter.searchQuery)) {
+    if (!searchActive || StringUtils::containsInsensitive(cardTitle(Card::Buttons), filter.searchQuery)) {
       return true;
     }
     for (const auto& option : buttonOptions()) {
@@ -906,8 +881,9 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     }
     return false;
   };
-  const bool buttonsVisible =
-      (!filter.showOverriddenOnly || buttonsOverridden) && (sectionTitleMatches || matchesButtonOption());
+  const bool lettersVisible = (!filter.showOverriddenOnly || overriddenButtonsOnLeft() || overriddenButtonsOnRight())
+      && (sectionTitleMatches || matchesButtonOption());
+  const bool buttonsVisible = lettersVisible || !rowsIn(Card::Buttons).empty();
 
   const DecorationSelection current = effectiveDecoration();
 
@@ -923,19 +899,14 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     }
     visible.push_back(&tile);
   }
-  if (visible.empty() && !showToggleRow && !showSizeSection && !buttonsVisible) {
+  if (visible.empty() && rowsIn(Card::TitleBars).empty() && rowsIn(Card::Size).empty() && !buttonsVisible) {
     return nullptr;
   }
 
   auto section = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale, .fillWidth = true});
 
-  // Global default: show every title bar and frame unless a per-window rule
-  // overrides it. The stored [Windows] DefaultDecorationPolicy is unchanged
-  // (0 = no decoration / hidden, 1 = client preference / shown); only the
-  // toggle's sense flips so off means no title bar and on means title bars.
-  if (showToggleRow) {
-    const bool showTitleBars = !effectiveHideTitleBars();
-    auto card = ui::column({
+  const auto makeCard = [scale]() {
+    return ui::column({
         .align = FlexAlign::Stretch,
         .gap = Style::spaceSm * scale,
         .padding = Style::spaceMd * scale,
@@ -943,38 +914,18 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
         .radius = Style::scaledRadiusMd(scale),
         .fillWidth = true,
     });
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-        .justify = FlexJustify::SpaceBetween,
-        .gap = Style::spaceSm * scale,
-        .paddingV = 2.0F * scale,
-        .fillWidth = true,
-    });
-    auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
-    copy->addChild(makeLabel(
-        "Show title bars", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
-    ));
-    copy->addChild(ui::label({
-        .text =
-            "Show the title bar and frame on every window, unless a per-window "
-            "rule overrides it for a specific application.",
-        .fontSize = Style::fontSizeCaption * scale,
-        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        .maxLines = 4,
-    }));
-    row->addChild(std::move(copy));
-    row->addChild(ui::toggle({
-        .checked = showTitleBars,
-        .scale = scale,
-        .onChange =
-            [this, callbacks](bool show) {
-              stageHideTitleBars(!show);
-              if (callbacks.requestRebuild) {
-                callbacks.requestRebuild();
-              }
-            },
-    }));
-    card->addChild(std::move(row));
+  };
+  const auto makeCardTitle = [scale](Card card) {
+    return makeLabel(
+        cardTitle(card), Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
+    );
+  };
+
+  if (const auto& rows = rowsIn(Card::TitleBars); !rows.empty()) {
+    auto card = makeCard();
+    for (const Field* field : rows) {
+      card->addChild(buildFieldRow(*field, scale, armedResetKey, callbacks));
+    }
     section->addChild(std::move(card));
   }
 
@@ -1004,176 +955,27 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
     section->addChild(std::move(grid));
   }
 
-  // Kinetic titlebar metrics, written to kineticwe.kwe on Apply. Left as an
-  // explicit value only when the user moves a slider; otherwise the compositor
-  // keeps deriving the size from the title font and grid unit.
-  if (showSizeSection) {
-    auto card = ui::column({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceSm * scale,
-        .padding = Style::spaceMd * scale,
-        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
-        .radius = Style::scaledRadiusMd(scale),
-        .fillWidth = true,
-    });
-    card->addChild(makeLabel(
-        "Title bar size", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
-    ));
-
-    if (heightVisible) {
-      card->addChild(buildMetricRow(
-          MetricRow{
-              .title = "Title bar height",
-              .subtitle = "Height of the title bar in logical pixels. It never shrinks below what the "
-                          "buttons need.",
-              .minValue = 18,
-              .maxValue = 72,
-              .value = effectiveTitleBarHeight(),
-              .suffix = " px",
-              .keyPath = titleBarHeightKeyPath(),
-              .overridden = heightOverridden,
-              .armedReset = armedResetKey == titleBarHeightKeyPath(),
-              .onCommit =
-                  [this, callbacks](int value) {
-                    stageTitleBarHeight(value);
-                    if (callbacks.requestRebuild) {
-                      callbacks.requestRebuild();
-                    }
-                  },
-          },
-          scale, callbacks
-      ));
+  // Kinetic titlebar metrics. Written as an explicit value only when the user
+  // moves a slider; otherwise the compositor keeps deriving the size from the
+  // title font and grid unit.
+  if (const auto& rows = rowsIn(Card::Size); !rows.empty()) {
+    auto card = makeCard();
+    card->addChild(makeCardTitle(Card::Size));
+    for (const Field* field : rows) {
+      card->addChild(buildFieldRow(*field, scale, armedResetKey, callbacks));
     }
-
-    if (fontSizeVisible) {
-      card->addChild(buildMetricRow(
-          MetricRow{
-              .title = "Title font size",
-              .subtitle = "Point size of the window title.",
-              .minValue = 6,
-              .maxValue = 20,
-              .value = effectiveTitleFontSize(),
-              .suffix = " pt",
-              .keyPath = titleFontSizeKeyPath(),
-              .overridden = fontSizeOverridden,
-              .armedReset = armedResetKey == titleFontSizeKeyPath(),
-              .onCommit =
-                  [this, callbacks](int value) {
-                    stageTitleFontSize(value);
-                    if (callbacks.requestRebuild) {
-                      callbacks.requestRebuild();
-                    }
-                  },
-          },
-          scale, callbacks
-      ));
-    }
-
-    if (buttonSizeVisible) {
-      card->addChild(buildMetricRow(
-          MetricRow{
-              .title = "Button size",
-              .subtitle = "Side length of the minimize, maximize and close buttons in logical pixels.",
-              .minValue = 12,
-              .maxValue = 48,
-              .value = effectiveButtonSize(),
-              .suffix = " px",
-              .keyPath = buttonSizeKeyPath(),
-              .overridden = buttonSizeOverridden,
-              .armedReset = armedResetKey == buttonSizeKeyPath(),
-              .onCommit =
-                  [this, callbacks](int value) {
-                    stageButtonSize(value);
-                    if (callbacks.requestRebuild) {
-                      callbacks.requestRebuild();
-                    }
-                  },
-          },
-          scale, callbacks
-      ));
-    }
-
     section->addChild(std::move(card));
   }
 
   if (buttonsVisible) {
-    auto card = ui::column({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceSm * scale,
-        .padding = Style::spaceMd * scale,
-        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
-        .radius = Style::scaledRadiusMd(scale),
-        .fillWidth = true,
-    });
-    card->addChild(makeLabel(
-        "Title bar buttons", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::Secondary), FontWeight::Bold
-    ));
-
-    // Whether the decoration paints the caption text (KineticShowTitle).
-    auto titleRow = ui::row({
-        .align = FlexAlign::Center,
-        .justify = FlexJustify::SpaceBetween,
-        .gap = Style::spaceXs * scale,
-        .paddingV = 2.0F * scale,
-        .fillWidth = true,
-    });
-    auto titleLabel = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    titleLabel->addChild(ui::label({
-        .text = "Window title",
-        .fontSize = Style::fontSizeCaption * scale,
-        .color = colorSpecFromRole(ColorRole::OnSurface),
-    }));
-    if (overriddenShowTitle()) {
-      titleLabel->addChild(makeOverrideBadge(scale));
-      titleLabel->addChild(makeResetButton(
-          showTitleKeyPath(), armedResetKey == showTitleKeyPath(), scale, callbacks
-      ));
+    auto card = makeCard();
+    card->addChild(makeCardTitle(Card::Buttons));
+    // The card shows as a whole, so every table row in it renders.
+    for (const auto& field : fields()) {
+      if (field.card == Card::Buttons) {
+        card->addChild(buildFieldRow(field, scale, armedResetKey, callbacks));
+      }
     }
-    titleRow->addChild(std::move(titleLabel));
-    titleRow->addChild(ui::toggle({
-        .checked = effectiveShowTitle(),
-        .scale = scale,
-        .onChange = [this, callbacks](bool show) {
-          stageShowTitle(show);
-          if (callbacks.requestRebuild) {
-            callbacks.requestRebuild();
-          }
-        },
-    }));
-    card->addChild(std::move(titleRow));
-
-    // Whether the caption uses the shell font (KineticTitleFollowShellFont).
-    auto fontRow = ui::row({
-        .align = FlexAlign::Center,
-        .justify = FlexJustify::SpaceBetween,
-        .gap = Style::spaceXs * scale,
-        .paddingV = 2.0F * scale,
-        .fillWidth = true,
-    });
-    auto fontLabel = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    fontLabel->addChild(ui::label({
-        .text = "Use shell font for title bars",
-        .fontSize = Style::fontSizeCaption * scale,
-        .color = colorSpecFromRole(ColorRole::OnSurface),
-    }));
-    if (overriddenFollowShellFont()) {
-      fontLabel->addChild(makeOverrideBadge(scale));
-      fontLabel->addChild(makeResetButton(
-          followShellFontKeyPath(), armedResetKey == followShellFontKeyPath(), scale, callbacks
-      ));
-    }
-    fontRow->addChild(std::move(fontLabel));
-    fontRow->addChild(ui::toggle({
-        .checked = effectiveFollowShellFont(),
-        .scale = scale,
-        .onChange = [this, callbacks](bool follow) {
-          stageFollowShellFont(follow);
-          if (callbacks.requestRebuild) {
-            callbacks.requestRebuild();
-          }
-        },
-    }));
-    card->addChild(std::move(fontRow));
 
     const auto buildButtonSide = [&](bool left, std::string_view sideLabel) -> std::unique_ptr<Node> {
       const std::string path = left ? buttonsOnLeftKeyPath() : buttonsOnRightKeyPath();
