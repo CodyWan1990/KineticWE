@@ -9,7 +9,7 @@
 pkgbase=kineticwe
 pkgname=(kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter)
 pkgver=0.0.1
-pkgrel=17
+pkgrel=18
 # epoch: the 1.x packaging shipped 1:6.7.80-N. KineticWE 2.0 restarted the
 # version at 0.0.1 (matching the COPR spec), which pacman would otherwise see
 # as a downgrade for existing installs.

@@ -24,7 +24,7 @@
 
 Name:           kineticwe
 Version:        0.0.1
-Release:        17%{?dist}
+Release:        18%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -544,6 +544,12 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Sun Oct 19 2026 LGL <lgl@localhost> - 0.0.1-18
+- Add compatibility with the KScreenLocker 6.8 API used by Fedora Rawhide.
+- Sync the vendored Noctalia shell to 5.3.0 and fix active_monitor_only handling.
+- Update Emerge appearance and tiling behavior.
+- Document the Arch local-development install and update workflow.
+
 * Wed Oct 14 2026 LGL <lgl@localhost> - 0.0.1-17
 - Add a configurable Emerge bottom peek band for off-screen columns that prevents hover focus until clicked.
 - Improve portal file chooser icon and accent handling.
