@@ -1,6 +1,7 @@
 #pragma once
 
 #include "capture/toplevel_thumbnail_source.h"
+#include "shell/switcher/window_switcher_shortcut_state.h"
 #include "shell/switcher/window_switcher_tile.h"
 #include "system/icon_resolver.h"
 #include "wayland/wayland_seat.h"
@@ -20,9 +21,10 @@ class RenderContext;
 class SessionBus;
 class ToplevelThumbnailSource;
 class WaylandConnection;
+struct wl_callback;
 struct wl_output;
 
-// Fullscreen Alt+Tab switcher with selectable preview presentations.
+// Fullscreen keyboard-driven switcher with selectable preview presentations.
 class WindowSwitcher {
 public:
   WindowSwitcher();
@@ -41,6 +43,7 @@ public:
   [[nodiscard]] bool isActive() const noexcept { return m_active; }
   [[nodiscard]] bool onPointerEvent(const PointerEvent& event);
   [[nodiscard]] bool onKeyboardEvent(const KeyboardEvent& event);
+  void onKeyboardModifiers(std::uint32_t modifiers);
 
 private:
   struct Instance;
@@ -70,6 +73,13 @@ private:
   [[nodiscard]] bool mruEnabled() const;
   void recordFocusedWindow();
   void promoteMruKey(const std::string& key);
+  void showFromShortcut(wl_output* output, std::uint32_t modifiers);
+  void showWithDirection(wl_output* output, int direction);
+  void captureShortcutModifiers(std::uint32_t modifiers);
+  void scheduleShortcutModifierReleaseCheck();
+  void completeShortcutModifierReleaseCheck();
+  void cancelShortcutModifierReleaseCheck();
+  static void handleShortcutModifierReleaseSync(void* data, wl_callback* callback, std::uint32_t callbackData);
 
   WaylandConnection* m_wayland = nullptr;
   RenderContext* m_renderContext = nullptr;
@@ -90,5 +100,9 @@ private:
   std::size_t m_selectedIndex = 0;
   wl_output* m_output = nullptr;
   bool m_closing = false;
+  wl_callback* m_shortcutReleaseSync = nullptr;
+  WindowSwitcherShortcutState m_shortcutState;
+  std::uint64_t m_shortcutSessionGeneration = 0;
   bool m_active = false;
+  bool m_shortcutSession = false;
 };

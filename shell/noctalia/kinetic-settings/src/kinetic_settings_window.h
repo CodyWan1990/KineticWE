@@ -31,6 +31,7 @@
 #include <utility>
 
 class Box;
+class CompositorPlatform;
 class CustomKeybinds;
 class Flex;
 class Input;
@@ -60,8 +61,8 @@ public:
   KineticSettingsWindow& operator=(const KineticSettingsWindow&) = delete;
 
   void initialize(
-      WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, CustomKeybinds& customKeybinds,
-      float uiScale
+      WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
+      CustomKeybinds& customKeybinds, float uiScale
   );
 
   void open();
@@ -183,6 +184,7 @@ private:
   [[nodiscard]] float uiScale() const noexcept { return m_uiScale; }
 
   WaylandConnection* m_wayland = nullptr;
+  CompositorPlatform* m_platform = nullptr;
   RenderContext* m_renderContext = nullptr;
   SessionBus* m_bus = nullptr;
   CustomKeybinds* m_customKeybinds = nullptr;

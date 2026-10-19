@@ -23,8 +23,8 @@ KineticSettingsModule::KineticSettingsModule() = default;
 KineticSettingsModule::~KineticSettingsModule() = default;
 
 void KineticSettingsModule::initialize(
-    WaylandConnection& wayland, RenderContext& renderContext, SessionBus& bus, IpcService& ipcService,
-    float uiScale
+    WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
+    IpcService& ipcService, float uiScale
 ) {
   m_bus = &bus;
   // Custom keybind actions must exist in the daemon before the mirror replay
@@ -32,7 +32,7 @@ void KineticSettingsModule::initialize(
   m_customKeybinds = std::make_unique<CustomKeybinds>(bus);
   m_customKeybinds->initialize();
   m_window = std::make_unique<KineticSettingsWindow>();
-  m_window->initialize(wayland, renderContext, bus, *m_customKeybinds, uiScale);
+  m_window->initialize(wayland, platform, renderContext, bus, *m_customKeybinds, uiScale);
   bindIpc(ipcService);
   // The compositor is already up by the time the shell (and this module)
   // initializes, so the persisted keybinds mirror can be replayed now. A
