@@ -1,5 +1,6 @@
 #include "custom_keybinds.h"
 
+#include "config/config_service.h"
 #include "core/log.h"
 #include "core/process/process.h"
 #include "dbus/session_bus.h"
@@ -83,7 +84,7 @@ struct CustomKeybinds::Impl {
   std::unique_ptr<sdbus::IProxy> commandsProxy;
 };
 
-CustomKeybinds::CustomKeybinds(SessionBus& bus) : m_bus(bus) {}
+CustomKeybinds::CustomKeybinds(SessionBus& bus, const ConfigService& config) : m_bus(bus), m_config(config) {}
 
 CustomKeybinds::~CustomKeybinds() = default;
 
@@ -336,7 +337,13 @@ void CustomKeybinds::onTriggered(const std::string& component, const std::string
       kLog.warn("custom keybind trigger: app '{}' no longer exists", it->action);
       return;
     }
-    if (!desktop_entry_launch::launchEntry(*entry)) {
+    // Same app-launch settings as the launcher, dock and taskbar.
+    const auto& shell = m_config.config().shell;
+    const desktop_entry_launch::LaunchOptions options{
+        .runAsSystemdService = shell.launchAppsAsSystemdServices,
+        .customCommand = shell.launchAppsCustomCommand,
+    };
+    if (!desktop_entry_launch::launchEntry(*entry, options)) {
       kLog.warn("custom keybind trigger: failed to launch '{}'", it->action);
     }
     return;

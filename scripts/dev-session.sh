@@ -74,6 +74,11 @@ install_startup_script() {
     install -m 0644 "$SCRIPT_DIR/kineticwe-session.target" \
         "$TEST_PREFIX/share/kineticwe/kineticwe-session.target"
     info "  $TEST_PREFIX/share/kineticwe/kineticwe-session.target"
+    # The shell unit, rendered for this prefix; the launcher syncs it into the
+    # user unit dir.
+    sed -e "s|@INSTALL_PREFIX@|$TEST_PREFIX|g" "$SCRIPT_DIR/kineticwe-shell.service.in" \
+        > "$TEST_PREFIX/share/kineticwe/kineticwe-shell.service"
+    info "  $TEST_PREFIX/share/kineticwe/kineticwe-shell.service"
 }
 
 # ---------------------------------------------------------------------------
@@ -181,7 +186,7 @@ main() {
     echo
     info "To test: log out, pick 'KineticWE-Dev' at the greeter."
     info "Session log: journalctl --user -b -f   (compositor output, SDDM session scope)"
-    info "Shell log:   ~/.local/share/noctalia-kwe.log"
+    info "Shell log:   journalctl --user -u kineticwe-shell -f"
     echo
 }
 

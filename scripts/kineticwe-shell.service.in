@@ -1,0 +1,31 @@
+# KineticWE shell (Noctalia fork, noctalia-kwe) as a systemd user unit.
+#
+# Started by start-kineticwe once the compositor is up and the session
+# environment (WAYLAND_DISPLAY, DISPLAY, ...) has been published to the user
+# manager; stopped with kineticwe-session.target when the session ends. Not a
+# Wants= of the target, so launchers that run their own shell (Nix) are
+# unaffected.
+#
+# Restart=always: Meta+Alt+R restarts the shell with `pkill -x noctalia-kwe`,
+# and SIGTERM counts as a clean exit that Restart=on-failure would not undo.
+#
+# KillMode=process: apps launched from the launcher, dock and taskbar get their
+# own app-*.service units (launch_apps_as_systemd_services), but other shell
+# spawns (custom commands, xdg-open, widget commands) stay in this unit's
+# cgroup. Only noctalia-kwe itself is stopped on restart, so those survive a
+# shell restart or crash, as they did under the old supervised loop.
+#
+# @INSTALL_PREFIX@ is filled in at install time like start-kineticwe.
+
+[Unit]
+Description=KineticWE Shell (Noctalia)
+PartOf=kineticwe-session.target
+After=kineticwe-session.target
+Before=xdg-desktop-autostart.target
+
+[Service]
+Type=simple
+ExecStart=@INSTALL_PREFIX@/bin/noctalia-kwe
+Restart=always
+RestartSec=2
+KillMode=process

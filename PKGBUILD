@@ -487,6 +487,12 @@ package_kineticwe() {
         "$pkgdir/usr/lib/systemd/user/kineticwe-workspace.target"
     install -Dm644 "$srcdir/$_sourcebase/scripts/kineticwe-session.target" \
         "$pkgdir/usr/lib/systemd/user/kineticwe-session.target"
+    # The shell runs as a user unit, started by the launcher.
+    sed -e 's|@INSTALL_PREFIX@|/usr|g' \
+        "$srcdir/$_sourcebase/scripts/kineticwe-shell.service.in" \
+        > "$srcdir/kineticwe-shell.service"
+    install -Dm644 "$srcdir/kineticwe-shell.service" \
+        "$pkgdir/usr/lib/systemd/user/kineticwe-shell.service"
 
     # Drop development files: runtime only, like the spec.
     rm -rf "$pkgdir/usr/include/KGlobalAccelD"

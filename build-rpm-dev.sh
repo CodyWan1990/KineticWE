@@ -685,6 +685,11 @@ install_startup_script() {
     install -m 0644 "$SCRIPT_DIR/scripts/kineticwe-session.target" \
         "$TEST_PREFIX/share/kineticwe/kineticwe-session.target"
     info "  $TEST_PREFIX/share/kineticwe/kineticwe-session.target"
+    # The shell unit, rendered for this prefix; the launcher syncs it into the
+    # user unit dir.
+    sed -e "s|@INSTALL_PREFIX@|$TEST_PREFIX|g" "$SCRIPT_DIR/scripts/kineticwe-shell.service.in" \
+        > "$TEST_PREFIX/share/kineticwe/kineticwe-shell.service"
+    info "  $TEST_PREFIX/share/kineticwe/kineticwe-shell.service"
 }
 
 # ---------------------------------------------------------------------------

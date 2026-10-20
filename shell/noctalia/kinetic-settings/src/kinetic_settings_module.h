@@ -3,6 +3,7 @@
 #include <memory>
 
 class CompositorPlatform;
+class ConfigService;
 class CustomKeybinds;
 class IpcService;
 class KineticSettingsWindow;
@@ -28,7 +29,7 @@ public:
 
   void initialize(
       WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
-      IpcService& ipcService, float uiScale
+      IpcService& ipcService, const ConfigService& config, float uiScale
   );
 
   [[nodiscard]] bool ownsKeyboardSurface(wl_surface* surface) const noexcept;

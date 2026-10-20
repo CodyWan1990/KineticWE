@@ -436,6 +436,11 @@ install -Dpm 0644 %{SOURCE3} %{buildroot}%{_datadir}/wayland-sessions/kineticwe.
 install -Dpm 0644 %{SOURCE4} %{buildroot}%{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 install -Dpm 0644 %{_builddir}/%{name}-%{version}/scripts/kineticwe-workspace.target %{buildroot}%{_userunitdir}/kineticwe-workspace.target
 install -Dpm 0644 %{_builddir}/%{name}-%{version}/scripts/kineticwe-session.target %{buildroot}%{_userunitdir}/kineticwe-session.target
+# The shell runs as a user unit, started by the launcher.
+install -d %{buildroot}%{_userunitdir}
+sed -e 's|@INSTALL_PREFIX@|%{_prefix}|g' \
+    %{_builddir}/%{name}-%{version}/scripts/kineticwe-shell.service.in \
+    > %{buildroot}%{_userunitdir}/kineticwe-shell.service
 
 # Drop development files. This COPR package intentionally ships runtime only.
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD
@@ -487,6 +492,7 @@ echo
 %{_bindir}/start-kineticwe
 %{_userunitdir}/kineticwe-workspace.target
 %{_userunitdir}/kineticwe-session.target
+%{_userunitdir}/kineticwe-shell.service
 %{_libdir}/libkineticwe-globalacceld.so.*
 %{_libdir}/libkineticwe-decoration.so.*
 %{_libdir}/libkineticwe-decoration-private.so.*

@@ -1130,8 +1130,9 @@ else
     KWIN_PID=$!
 fi
 
-# If this script dies (logout, Ctrl-C, logind teardown), take the compositor down.
-trap 'kill "$KWIN_PID" 2>/dev/null || true' EXIT
+# If this script dies (logout, Ctrl-C, logind teardown), take the compositor
+# down, and the shell unit with the session target (a no-op before step 6b).
+trap 'kill "$KWIN_PID" 2>/dev/null || true; systemctl --user stop kineticwe-session.target 2>/dev/null || true' EXIT
 
 WAYLAND_SOCK=""
 for _ in $(seq 1 20); do
@@ -1185,6 +1186,7 @@ fi
 systemctl --user import-environment \
     WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
     XDG_SESSION_TYPE XDG_DATA_DIRS \
+    KWE_CONFIG_HOME KWE_REAL_CONFIG_HOME KWE_REAL_CACHE_HOME \
     QT_QPA_PLATFORMTHEME "${_kwe_prefix_env_vars[@]}" PATH \
     2>/dev/null || true
 unset _kwe_prefix_env_vars
@@ -1197,13 +1199,24 @@ fi
 #     so it can only be started by a dependency). The portal frontend unit
 #     has Requisite=graphical-session.target and fails to start without it.
 # ---------------------------------------------------------------------------
+_kwe_user_units="${XDG_DATA_HOME:-$HOME/.local/share}/systemd/user"
 if ! systemctl --user cat kineticwe-session.target >/dev/null 2>&1; then
     # Dev/raw-checkout fallback: install the unit into the user unit dir.
-    mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/systemd/user"
+    mkdir -p "$_kwe_user_units"
     install -m 0644 "$INSTALL_PREFIX/share/kineticwe/kineticwe-session.target" \
-        "${XDG_DATA_HOME:-$HOME/.local/share}/systemd/user/" 2>/dev/null \
+        "$_kwe_user_units/" 2>/dev/null \
         || true
 fi
+# Prefix (dev) installs stage the shell unit, rendered for their prefix, next to
+# the target. Keep the user unit dir's copy in sync with it, so a rebuilt prefix
+# never runs a stale unit. Packaged installs ship it in the system unit dir.
+_kwe_shell_unit="$INSTALL_PREFIX/share/kineticwe/kineticwe-shell.service"
+if [[ "$INSTALL_PREFIX" != /usr && -f "$_kwe_shell_unit" ]] &&
+    ! cmp -s "$_kwe_shell_unit" "$_kwe_user_units/kineticwe-shell.service"; then
+    mkdir -p "$_kwe_user_units"
+    install -m 0644 "$_kwe_shell_unit" "$_kwe_user_units/" 2>/dev/null || true
+fi
+unset _kwe_user_units _kwe_shell_unit
 systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user start kineticwe-session.target 2>/dev/null || true
 
@@ -1239,24 +1252,37 @@ systemctl --user start --no-block xdg-desktop-portal.service 2>/dev/null || true
 # upowerd process is started by the session launcher.
 
 # ---------------------------------------------------------------------------
-# 7. Start the shell (Noctalia fork, noctalia-kwe) — supervised, in the background
+# 7. Start the shell (Noctalia fork, noctalia-kwe) as kineticwe-shell.service:
+#    systemd restarts it (including Meta+Alt+R's pkill), logs it to the journal
+#    (journalctl --user -u kineticwe-shell) and stops it with the session
+#    target. restart, not start: a unit left running by a session that died
+#    uncleanly would still point at the old WAYLAND_DISPLAY.
+#    Fallback when the unit is not installed: supervise it from here, as before.
 # ---------------------------------------------------------------------------
-(
-    while true; do
-        noctalia-kwe >>"$HOME/.local/share/noctalia-kwe.log" 2>&1
-        echo "noctalia-kwe exited (code $?), restarting in 2s..." >&2
-        sleep 2
-    done
-) &
-SHELL_PID=$!
+SHELL_PID=""
+if ! systemctl --user restart kineticwe-shell.service 2>/dev/null; then
+    echo "kineticwe: kineticwe-shell.service unavailable; supervising noctalia-kwe from the launcher" >&2
+    (
+        while true; do
+            noctalia-kwe >>"$HOME/.local/share/noctalia-kwe.log" 2>&1
+            echo "noctalia-kwe exited (code $?), restarting in 2s..." >&2
+            sleep 2
+        done
+    ) &
+    SHELL_PID=$!
+fi
 
 # ---------------------------------------------------------------------------
 # 8. Wait on the compositor; its exit ends the session
 # ---------------------------------------------------------------------------
 wait "$KWIN_PID" || true
 
-# Compositor exited — take the session down. (No plasma-workspace.target to stop
-# in 2.0; just stop the supervised shell and let the greeter return.)
-kill "$SHELL_PID" 2>/dev/null || true
-pkill -x noctalia-kwe 2>/dev/null || true
+# Compositor exited — take the session down. Stopping the session target stops
+# the shell unit (PartOf=) and lets graphical-session.target, which nothing else
+# holds, go down with it; then the greeter returns.
+systemctl --user stop kineticwe-session.target 2>/dev/null || true
+if [[ -n "$SHELL_PID" ]]; then
+    kill "$SHELL_PID" 2>/dev/null || true
+    pkill -x noctalia-kwe 2>/dev/null || true
+fi
 trap - EXIT
