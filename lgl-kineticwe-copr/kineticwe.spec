@@ -426,8 +426,8 @@ sed -i \
     -e 's/hardcodes greeter:greeter/hardcodes greetd:greetd/' \
     %{buildroot}%{_tmpfilesdir}/noctalia-greeter.conf
 
-# Install the packaging-local session launcher. This intentionally overrides
-# the copy in the source archive so packaging fixes do not modify upstream.
+# Install the session launcher. SOURCE10 is scripts/start-kineticwe.sh, the one
+# canonical copy, staged into SOURCES by build-rpms.sh.
 sed -e 's|@INSTALL_PREFIX@|%{_prefix}|g' \
     %{SOURCE10} \
     > %{buildroot}%{_bindir}/start-kineticwe

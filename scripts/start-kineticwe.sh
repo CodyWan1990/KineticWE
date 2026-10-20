@@ -109,7 +109,7 @@ done
 if [[ "${KWE_SCOPED_ENV:-0}" == 1 ]]; then
     export KWE_QT_PLUGIN_PATH="$(IFS=:; echo "${_qt_plugin_paths[*]}")"
 else
-    export QT_PLUGIN_PATH="$(IFS=:; echo "${_qt_plugin_paths[*]}")"
+    export QT_PLUGIN_PATH="$(IFS=:; echo "${_qt_plugin_paths[*]}")${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
 fi
 
 # QML import roots. ECM installs KWin's private QML modules
@@ -129,8 +129,8 @@ done
 if [[ "${KWE_SCOPED_ENV:-0}" == 1 ]]; then
     export KWE_QML_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")"
 else
-    export QML_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")"
-    export QML2_IMPORT_PATH="$QML_IMPORT_PATH"
+    export QML_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+    export QML2_IMPORT_PATH="$(IFS=:; echo "${_qml_import_paths[*]}")${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
 fi
 unset _qt_plugin_paths _qml_import_paths _KWE_LIBDIRS _d
 export XDG_DATA_DIRS="$INSTALL_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
@@ -216,12 +216,12 @@ fi
 # by the shell's theme templates whenever the palette changes (the Qt
 # color-scheme template).
 for _qttool in qt5ct qt6ct; do
-    _qtconf="${HOME}/.config/${_qttool}/${_qttool}.conf"
+    _qtconf="${KWE_REAL_CONFIG_HOME}/${_qttool}/${_qttool}.conf"
     if [[ ! -e "$_qtconf" ]]; then
         mkdir -p "$(dirname "$_qtconf")"
         cat > "$_qtconf" << EOF
 [Appearance]
-color_scheme_path=${HOME}/.config/${_qttool}/colors/noctalia.conf
+color_scheme_path=${KWE_REAL_CONFIG_HOME}/${_qttool}/colors/noctalia.conf
 custom_palette=true
 icon_theme=Breeze-Round-Chameleon Dark Icons
 standard_dialogs=xdgdesktopportal
@@ -944,7 +944,7 @@ fi
 #     is atomic and skipped when nothing differs.
 # ---------------------------------------------------------------------------
 python3 - "$KWE_CONFIG_HOME/appearance.kwe" "$KWE_REAL_CONFIG_HOME/kdeglobals" \
-    "$HOME/.config/qt5ct/qt5ct.conf" "$HOME/.config/qt6ct/qt6ct.conf" <<'PY' || \
+    "$KWE_REAL_CONFIG_HOME/qt5ct/qt5ct.conf" "$KWE_REAL_CONFIG_HOME/qt6ct/qt6ct.conf" <<'PY' || \
     echo "kineticwe: qt5ct/qt6ct appearance sync failed (continuing)" >&2
 import os
 import stat

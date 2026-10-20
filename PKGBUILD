@@ -472,10 +472,10 @@ package_kineticwe() {
     mv "$pkgdir/usr/share/qlogging-categories6/kglobalacceld.categories" \
        "$pkgdir/usr/share/qlogging-categories6/kineticwe-globalacceld.categories"
 
-    # Session launcher: the packaging-local copy the spec ships (SOURCE10),
-    # which intentionally overrides scripts/start-kineticwe.sh.
+    # Session launcher: the one canonical copy, shared with the spec and the
+    # dev install paths.
     sed -e 's|@INSTALL_PREFIX@|/usr|g' \
-        "$srcdir/$_sourcebase/lgl-kineticwe-copr/start-kineticwe.sh" \
+        "$srcdir/$_sourcebase/scripts/start-kineticwe.sh" \
         > "$srcdir/start-kineticwe"
     install -Dm755 "$srcdir/start-kineticwe" "$pkgdir/usr/bin/start-kineticwe"
     install -Dm644 "$srcdir/$_sourcebase/lgl-kineticwe-copr/SOURCES/kineticwe.desktop" \

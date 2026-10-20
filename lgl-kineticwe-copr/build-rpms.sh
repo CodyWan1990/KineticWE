@@ -201,7 +201,8 @@ build_srpm() {
     download_archive "${RPM_DIR}/noctalia-greeter-${greeter_ref}.tar.gz" \
         "https://gitlab.com/theblackdon/noctalia-greeter-kwe/-/archive/${greeter_ref}/noctalia-greeter-${greeter_ref}.tar.gz"
     cp "${OUTPUT_DIR}/kineticwe-setup-greeter.sh" "${RPM_DIR}/"
-    cp "${OUTPUT_DIR}/start-kineticwe.sh" "${RPM_DIR}/"
+    # Source10: the canonical session launcher from the source tree.
+    cp "${OUTPUT_DIR}/../scripts/start-kineticwe.sh" "${RPM_DIR}/start-kineticwe.sh"
 
     # Build SRPM inside distrobox
     distrobox enter "$DISTROBOX_NAME" -- bash -lc "
