@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+class ConfigService;
 class SessionBus;
 
 // User-created global-shortcut actions, shown by the keybinds page as two
@@ -31,7 +32,7 @@ public:
     std::string command;
   };
 
-  explicit CustomKeybinds(SessionBus& bus);
+  CustomKeybinds(SessionBus& bus, const ConfigService& config);
   ~CustomKeybinds();
 
   CustomKeybinds(const CustomKeybinds&) = delete;
@@ -66,6 +67,7 @@ private:
   void onTriggered(const std::string& component, const std::string& action);
 
   SessionBus& m_bus;
+  const ConfigService& m_config;
   std::vector<Definition> m_definitions;
   struct Impl;
   std::unique_ptr<Impl> m_impl;

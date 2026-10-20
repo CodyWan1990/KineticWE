@@ -171,6 +171,8 @@ Requires:       hwdata
 Requires:       xdg-desktop-portal
 Requires:       xdg-desktop-portal-kwe = %{version}-%{release}
 Requires:       bash
+# The session's config setup helper (lib/kineticwe/kineticwe-config-setup).
+Requires:       python3
 Requires:       systemd
 Requires:       procps-ng
 Requires:       psmisc
@@ -426,16 +428,22 @@ sed -i \
     -e 's/hardcodes greeter:greeter/hardcodes greetd:greetd/' \
     %{buildroot}%{_tmpfilesdir}/noctalia-greeter.conf
 
-# Install the packaging-local session launcher. This intentionally overrides
-# the copy in the source archive so packaging fixes do not modify upstream.
+# Install the session launcher. SOURCE10 is scripts/start-kineticwe.sh, the one
+# canonical copy, staged into SOURCES by build-rpms.sh.
 sed -e 's|@INSTALL_PREFIX@|%{_prefix}|g' \
     %{SOURCE10} \
     > %{buildroot}%{_bindir}/start-kineticwe
 chmod 0755 %{buildroot}%{_bindir}/start-kineticwe
+install -Dpm 0755 %{_builddir}/%{name}-%{version}/scripts/kineticwe-config-setup %{buildroot}%{_prefix}/lib/kineticwe/kineticwe-config-setup
 install -Dpm 0644 %{SOURCE3} %{buildroot}%{_datadir}/wayland-sessions/kineticwe.desktop
 install -Dpm 0644 %{SOURCE4} %{buildroot}%{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 install -Dpm 0644 %{_builddir}/%{name}-%{version}/scripts/kineticwe-workspace.target %{buildroot}%{_userunitdir}/kineticwe-workspace.target
 install -Dpm 0644 %{_builddir}/%{name}-%{version}/scripts/kineticwe-session.target %{buildroot}%{_userunitdir}/kineticwe-session.target
+# The shell runs as a user unit, started by the launcher.
+install -d %{buildroot}%{_userunitdir}
+sed -e 's|@INSTALL_PREFIX@|%{_prefix}|g' \
+    %{_builddir}/%{name}-%{version}/scripts/kineticwe-shell.service.in \
+    > %{buildroot}%{_userunitdir}/kineticwe-shell.service
 
 # Drop development files. This COPR package intentionally ships runtime only.
 rm -rf %{buildroot}%{_includedir}/KGlobalAccelD
@@ -485,8 +493,10 @@ echo
 %{_bindir}/kineticwe_windowprop
 %{_bindir}/kinetic-we_wayland_wrapper
 %{_bindir}/start-kineticwe
+%{_prefix}/lib/kineticwe/
 %{_userunitdir}/kineticwe-workspace.target
 %{_userunitdir}/kineticwe-session.target
+%{_userunitdir}/kineticwe-shell.service
 %{_libdir}/libkineticwe-globalacceld.so.*
 %{_libdir}/libkineticwe-decoration.so.*
 %{_libdir}/libkineticwe-decoration-private.so.*

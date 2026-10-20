@@ -74,7 +74,8 @@ DESKTOPEOF
     cat > "$out/bin/start-kineticwe" << 'SCRIPTEOF'
 #!/usr/bin/env bash
 # KineticWE — session launcher (Nix-built).
-# Mirrors scripts/start-kineticwe.sh / the COPR RPM launcher.
+# Mirrors scripts/start-kineticwe.sh (the canonical launcher PKGBUILD and the
+# COPR spec ship).
 set -e
 
 KINETIC_WE="${kineticWe}/bin/kinetic-we"

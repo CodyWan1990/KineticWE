@@ -1299,7 +1299,8 @@ struct ShellConfig {
   bool showLocation = true;
   bool appIconColorize = false;
   std::optional<ColorSpec> appIconColor;
-  bool launchAppsAsSystemdServices = false;
+  // KineticWE: on by default; the session runs the shell as kineticwe-shell.service.
+  bool launchAppsAsSystemdServices = true;
   std::string launchAppsCustomCommand;
   /// When false, disables Wayland clipboard integration (history panel, data-control binding, Input paste/copy hooks).
   bool clipboardEnabled = true;

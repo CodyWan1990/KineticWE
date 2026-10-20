@@ -208,7 +208,7 @@ int applyToDaemon(
   int applied = 0;
   // Entries whose component is not registered with the daemon at all (e.g. a
   // user-added Applications/Custom Commands action whose definitions were
-  // dropped by the session script — see _KWE_KEEP in start-kineticwe.sh).
+  // dropped by the session's config setup — see KEEP in scripts/kineticwe-config-setup).
   // setActionShortcuts() would fail with a D-Bus exception and produce one
   // noisy "kglobalaccel setShortcutKeys failed" line per entry. Group them
   // into a single aggregated warning so the regression is easy to grep for
@@ -271,7 +271,7 @@ int applyToDaemon(
     kLog.warn(
         "keybinds import skipped {} entries from {} component(s) not registered with the daemon: {}. "
         "Custom keybinds definitions (custom-keybinds.kwe) may have been pruned — "
-        "check that scripts/start-kineticwe.sh's _KWE_KEEP includes custom-keybinds.kwe.",
+        "check that KEEP in scripts/kineticwe-config-setup includes custom-keybinds.kwe.",
         total,
         missingByComponent.size(),
         detail

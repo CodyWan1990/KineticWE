@@ -153,7 +153,7 @@ void Application::initUiRenderSurfacesAndSettings() {
   m_settingsWindow.setIpcService(&m_ipcService);
   m_settingsWindow.setAsyncTextureCache(&m_asyncTextureCache);
   m_kineticSettings.initialize(
-      m_wayland, m_compositorPlatform, m_renderContext, *m_bus, m_ipcService,
+      m_wayland, m_compositorPlatform, m_renderContext, *m_bus, m_ipcService, m_configService,
       m_configService.config().accessibility.uiScale
   );
   // Keep the window decoration's caption font in step with the shell font.

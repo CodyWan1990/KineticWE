@@ -472,12 +472,14 @@ package_kineticwe() {
     mv "$pkgdir/usr/share/qlogging-categories6/kglobalacceld.categories" \
        "$pkgdir/usr/share/qlogging-categories6/kineticwe-globalacceld.categories"
 
-    # Session launcher: the packaging-local copy the spec ships (SOURCE10),
-    # which intentionally overrides scripts/start-kineticwe.sh.
+    # Session launcher: the one canonical copy, shared with the spec and the
+    # dev install paths.
     sed -e 's|@INSTALL_PREFIX@|/usr|g' \
-        "$srcdir/$_sourcebase/lgl-kineticwe-copr/start-kineticwe.sh" \
+        "$srcdir/$_sourcebase/scripts/start-kineticwe.sh" \
         > "$srcdir/start-kineticwe"
     install -Dm755 "$srcdir/start-kineticwe" "$pkgdir/usr/bin/start-kineticwe"
+    install -Dm755 "$srcdir/$_sourcebase/scripts/kineticwe-config-setup" \
+        "$pkgdir/usr/lib/kineticwe/kineticwe-config-setup"
     install -Dm644 "$srcdir/$_sourcebase/lgl-kineticwe-copr/SOURCES/kineticwe.desktop" \
         "$pkgdir/usr/share/wayland-sessions/kineticwe.desktop"
     # KineticWE embeds kglobalacceld in-process; keep the standalone daemon off.
@@ -487,6 +489,12 @@ package_kineticwe() {
         "$pkgdir/usr/lib/systemd/user/kineticwe-workspace.target"
     install -Dm644 "$srcdir/$_sourcebase/scripts/kineticwe-session.target" \
         "$pkgdir/usr/lib/systemd/user/kineticwe-session.target"
+    # The shell runs as a user unit, started by the launcher.
+    sed -e 's|@INSTALL_PREFIX@|/usr|g' \
+        "$srcdir/$_sourcebase/scripts/kineticwe-shell.service.in" \
+        > "$srcdir/kineticwe-shell.service"
+    install -Dm644 "$srcdir/kineticwe-shell.service" \
+        "$pkgdir/usr/lib/systemd/user/kineticwe-shell.service"
 
     # Drop development files: runtime only, like the spec.
     rm -rf "$pkgdir/usr/include/KGlobalAccelD"

@@ -7,6 +7,7 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 #include "noctaliasettings.h"
+#include "main.h"
 
 #include <KGlobalAccel>
 #include <KLocalizedString>
@@ -30,6 +31,17 @@ const QString s_mediaUiComponent = QStringLiteral("media-ui");
 const QString s_mediaUiDisplay = QStringLiteral("Media & UI");
 const QString s_brightnessComponent = QStringLiteral("brightness");
 const QString s_brightnessDisplay = QStringLiteral("Brightness");
+
+// Start with the session environment rather than the compositor's own, whose
+// XDG_CONFIG_HOME / XDG_CACHE_HOME point at the kineticwe roots.
+void startSessionProcess(const QString &program, const QStringList &arguments)
+{
+    QProcess process;
+    process.setProgram(program);
+    process.setArguments(arguments);
+    process.setProcessEnvironment(kwinApp()->processStartupEnvironment());
+    process.startDetached();
+}
 } // namespace
 
 NoctaliaSettings::NoctaliaSettings(QObject *parent)
@@ -316,7 +328,7 @@ void NoctaliaSettings::registerShortcut(const QString &component, const QString 
     KGlobalAccel::setGlobalShortcut(action, shortcuts);
 
     connect(action, &QAction::triggered, this, [args]() {
-        QProcess::startDetached(QStringLiteral("noctalia-kwe"), args);
+        startSessionProcess(QStringLiteral("noctalia-kwe"), args);
     });
 
     m_actions.append(action);
@@ -342,7 +354,7 @@ void NoctaliaSettings::registerProcessAction(const QString &component, const QSt
         }
         const QString program = command.first();
         const QStringList arguments = command.mid(1);
-        QProcess::startDetached(program, arguments);
+        startSessionProcess(program, arguments);
     });
 
     m_actions.append(action);

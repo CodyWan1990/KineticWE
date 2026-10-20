@@ -959,6 +959,8 @@ install_startup_script() {
     render_prefix_template "$SCRIPT_DIR/scripts/start-kineticwe.sh" > "$stage$TEST_PREFIX/bin/start-kineticwe"
     chmod +x "$stage$TEST_PREFIX/bin/start-kineticwe"
     install -m 0644 "$SCRIPT_DIR/scripts/kineticwe-session.target" "$stage$TEST_PREFIX/share/kineticwe/kineticwe-session.target"
+    render_prefix_template "$SCRIPT_DIR/scripts/kineticwe-shell.service.in" > "$stage$TEST_PREFIX/share/kineticwe/kineticwe-shell.service"
+    install -Dm755 "$SCRIPT_DIR/scripts/kineticwe-config-setup" "$stage$TEST_PREFIX/lib/kineticwe/kineticwe-config-setup"
     promote_stage launcher "$stage"
     remove_temp "$stage"
 }
@@ -1719,13 +1721,16 @@ check_migration_leftovers() {
         leftover "  Fix: follow docs/arch-migration.md (removes these and the rest of the old install)."
     fi
 
-    # d. User systemd unit overriding the packaged session target.
-    local user_target="$data_home/systemd/user/kineticwe-session.target"
-    if [[ -e "$user_target" || -L "$user_target" ]] && [[ -e /usr/lib/systemd/user/kineticwe-session.target ]]; then
-        found=1
-        leftover "User unit overrides the packaged kineticwe-session.target: $user_target"
-        leftover "  Fix: rm -f '$user_target' && systemctl --user daemon-reload"
-    fi
+    # d. User systemd units overriding the packaged session target / shell unit.
+    local unit user_unit
+    for unit in kineticwe-session.target kineticwe-shell.service; do
+        user_unit="$data_home/systemd/user/$unit"
+        if [[ -e "$user_unit" || -L "$user_unit" ]] && [[ -e "/usr/lib/systemd/user/$unit" ]]; then
+            found=1
+            leftover "User unit overrides the packaged $unit: $user_unit"
+            leftover "  Fix: rm -f '$user_unit' && systemctl --user daemon-reload"
+        fi
+    done
 
     if [[ "$greeter_pkg" == true ]]; then
         # e. Source-built greeter in /usr/local shadowing the package.

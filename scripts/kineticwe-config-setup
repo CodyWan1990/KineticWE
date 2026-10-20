@@ -1,0 +1,1047 @@
+#!/usr/bin/env python3
+# KineticWE config root setup — run by start-kineticwe before the compositor
+# starts, once per login.
+#
+# The compositor's settings live in their own config root ($KWE_CONFIG_HOME,
+# ~/.config/kineticwe: kineticwe.kwe, rules.kwe, kglobalaccelrc, ...); the
+# shared files user apps also read (kdeglobals, qt5ct/qt6ct) stay in the real
+# config home ($KWE_REAL_CONFIG_HOME). This helper migrates legacy files into
+# the root, seeds defaults, prunes stray entries out of the root and keeps the
+# shared files in step. Each step is idempotent and non-fatal: a failing step
+# is logged and the rest still run.
+#
+# Safety:
+#   * Nothing is deleted. The prune moves stray entries to
+#     $XDG_STATE_HOME/kineticwe/pruned/<timestamp>/, and every existing file a
+#     step is about to change or remove is first copied to
+#     $XDG_STATE_HOME/kineticwe/backups/<timestamp>/ (path relative to $HOME).
+#     The newest 5 of each are kept.
+#   * Every action and failure is logged to stderr and to
+#     $XDG_STATE_HOME/kineticwe/config-setup.log.
+#   * --dry-run prints what would happen and writes nothing at all.
+
+import argparse
+import datetime
+import os
+import re
+import shutil
+import stat
+import sys
+import tempfile
+import time
+
+HOME = os.environ.get("HOME") or os.path.expanduser("~")
+STATE_DIR = os.path.join(os.environ.get("XDG_STATE_HOME") or os.path.join(HOME, ".local", "state"), "kineticwe")
+LOG_PATH = os.path.join(STATE_DIR, "config-setup.log")
+LOG_KEEP_LINES = 1000
+KEEP_RUNS = 5
+RUN_STAMP = time.strftime("%Y%m%d-%H%M%S")
+
+DRY_RUN = False
+_backed_up = set()
+
+# Compositor-owned entries of the config root; step 4d moves everything else
+# out of the root.
+#
+# Note: keybinds.kwe AND custom-keybinds.kwe are both compositor-owned —
+# keybinds.kwe is the portable keybinds mirror (chords) and custom-keybinds.kwe
+# is the kinetic-settings register of the user-added Applications / Custom
+# Commands actions (component + action + exec). If custom-keybinds.kwe is
+# dropped here, the shell loses the user's Application / Custom Command
+# keybinds on every login because the custom-action registration step in
+# CustomKeybinds::initialize() finds no definitions to register. Keep both
+# files in lockstep.
+#
+# kdeglobals is kept only as the step 4g symlink to the shared real-config file.
+# decoration.colors is written by the shell's kineticwe theme template and read
+# by the compositor's titlebar decoration (kineticpalette.cpp).
+KEEP = (
+    "kineticwe.kwe",
+    "rules.kwe",
+    "keybinds.kwe",
+    "custom-keybinds.kwe",
+    "appearance.kwe",
+    "kinetic-settings.kwe",
+    "kglobalaccelrc",
+    "kglobalshortcutsrc",
+    "kineticweoutputconfig.json",
+    "kactivitymanagerdrc",
+    "session",
+    "kdeglobals",
+    "decoration.colors",
+)
+
+
+# ---------------------------------------------------------------------------
+# Logging, backups and the mutating primitives (all honour --dry-run)
+# ---------------------------------------------------------------------------
+
+
+def log(message):
+    if DRY_RUN:
+        message = "[dry-run] " + message
+    print("kineticwe-config-setup: " + message, file=sys.stderr)
+    if DRY_RUN:
+        return
+    try:
+        os.makedirs(STATE_DIR, exist_ok=True)
+        stamp = datetime.datetime.now().isoformat(timespec="seconds")
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(f"{stamp} {message}\n")
+    except OSError:
+        pass
+
+
+def trim_log():
+    if DRY_RUN:
+        return
+    try:
+        with open(LOG_PATH, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return
+    if len(lines) <= LOG_KEEP_LINES:
+        return
+    try:
+        with open(LOG_PATH, "w", encoding="utf-8") as f:
+            f.writelines(lines[-LOG_KEEP_LINES:])
+    except OSError:
+        pass
+
+
+def _rotate(parent):
+    # Keep the newest KEEP_RUNS timestamp dirs (names sort chronologically).
+    try:
+        runs = sorted(e for e in os.listdir(parent) if os.path.isdir(os.path.join(parent, e)))
+    except OSError:
+        return
+    for old in runs[:-KEEP_RUNS]:
+        shutil.rmtree(os.path.join(parent, old), ignore_errors=True)
+
+
+def _relative_to_home(path):
+    path = os.path.abspath(path)
+    home = os.path.abspath(HOME)
+    if path == home or path.startswith(home + os.sep):
+        return os.path.relpath(path, home)
+    return path.lstrip(os.sep)
+
+
+def backup(path):
+    """Copy an existing file into this run's backup dir before it changes."""
+    if not os.path.isfile(path) or path in _backed_up:
+        return
+    _backed_up.add(path)
+    root = os.path.join(STATE_DIR, "backups")
+    dest = os.path.join(root, RUN_STAMP, _relative_to_home(path))
+    if DRY_RUN:
+        log(f"would back up {path} -> {dest}")
+        return
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copy2(path, dest)
+    log(f"backed up {path} -> {dest}")
+    _rotate(root)
+
+
+def atomic_write(path, contents, what, prefix, suffix=".tmp", keep_mode=False, make_parent=False):
+    """tmp + os.replace, as the original inline helpers did.
+
+    keep_mode copies an existing file's permission bits onto the new file;
+    without it (or for a new file) the file gets mkstemp's 0600, as before.
+    """
+    if DRY_RUN:
+        log(f"would write {path}: {what}")
+        return
+    parent = os.path.dirname(path) or "."
+    if make_parent:
+        os.makedirs(parent, exist_ok=True)
+    backup(path)
+    mode = None
+    if keep_mode and os.path.exists(path):
+        mode = stat.S_IMODE(os.stat(path).st_mode)
+    fd, tmp = tempfile.mkstemp(dir=parent, prefix=prefix, suffix=suffix)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(contents)
+        if mode is not None:
+            os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    log(f"wrote {path}: {what}")
+
+
+def copy_file(src, dst):
+    if DRY_RUN:
+        log(f"would copy {src} -> {dst}")
+        return
+    backup(dst)
+    shutil.copy(src, dst)
+    log(f"copied {src} -> {dst}")
+
+
+def append_bytes(src, dst):
+    if DRY_RUN:
+        log(f"would append {src} to {dst}")
+        return
+    backup(dst)
+    with open(src, "rb") as f:
+        data = f.read()
+    with open(dst, "ab") as f:
+        f.write(data)
+    log(f"appended {src} to {dst}")
+
+
+def append_text(dst, text, what):
+    if DRY_RUN:
+        log(f"would append {what} to {dst}")
+        return
+    backup(dst)
+    with open(dst, "a", encoding="utf-8", errors="surrogateescape") as f:
+        f.write(text)
+    log(f"appended {what} to {dst}")
+
+
+def remove_file(path):
+    if not (os.path.exists(path) or os.path.islink(path)):
+        return
+    if DRY_RUN:
+        log(f"would remove {path}")
+        return
+    backup(path)
+    os.unlink(path)
+    log(f"removed {path}")
+
+
+def rename(src, dst):
+    if DRY_RUN:
+        log(f"would rename {src} -> {dst}")
+        return
+    backup(src)
+    os.rename(src, dst)
+    log(f"renamed {src} -> {dst}")
+
+
+# ---------------------------------------------------------------------------
+# 4b. First-run config seeding: 2.0 relocated all compositor settings into the
+#     config root (kineticwe.kwe + rules.kwe — Part 6 of the plan). On first
+#     run after the 2.0 upgrade, move the legacy KDE rc files over so existing
+#     settings keep applying.
+# ---------------------------------------------------------------------------
+def step_legacy_rc(config_root):
+    legacy_home = os.path.join(HOME, ".config")
+    if os.path.exists(os.path.join(config_root, "kineticwe.kwe")):
+        return
+    if os.path.exists(os.path.join(legacy_home, "kwinrc")):
+        copy_file(os.path.join(legacy_home, "kwinrc"), os.path.join(config_root, "kineticwe.kwe"))
+    if os.path.exists(os.path.join(legacy_home, "kwinrulesrc")):
+        copy_file(os.path.join(legacy_home, "kwinrulesrc"), os.path.join(config_root, "rules.kwe"))
+    # 2.0 merged the small kwin-read rc files into kineticwe.kwe; append their
+    # settings (KConfig merges duplicate group sections).
+    for legacy in ("kaccessrc", "kcminputrc", "kxkbrc", "klaunchrc", "plasmarc"):
+        src = os.path.join(legacy_home, legacy)
+        if os.path.exists(src):
+            append_bytes(src, os.path.join(config_root, "kineticwe.kwe"))
+
+
+# Seed minimal qt5ct/qt6ct configs pointing at the Noctalia color scheme, so Qt
+# apps (which load these via QT_QPA_PLATFORMTHEME=qt6ct) are themed out of the
+# box. Only created when absent so a user's existing config (fonts, interface
+# tweaks) is never clobbered. The color scheme files themselves are regenerated
+# by the shell's theme templates whenever the palette changes (the Qt
+# color-scheme template).
+def step_qtct_seed(real_config):
+    for tool in ("qt5ct", "qt6ct"):
+        conf = os.path.join(real_config, tool, f"{tool}.conf")
+        if os.path.exists(conf):
+            continue
+        contents = (
+            "[Appearance]\n"
+            f"color_scheme_path={real_config}/{tool}/colors/noctalia.conf\n"
+            "custom_palette=true\n"
+            "icon_theme=Breeze-Round-Chameleon Dark Icons\n"
+            "standard_dialogs=xdgdesktopportal\n"
+            "style=Breeze\n"
+        )
+        if DRY_RUN:
+            log(f"would seed {conf}")
+            continue
+        os.makedirs(os.path.dirname(conf), exist_ok=True)
+        with open(conf, "w", encoding="utf-8") as f:
+            f.write(contents)
+        log(f"seeded {conf}")
+
+
+# ---------------------------------------------------------------------------
+# 4c. One-time migration: earlier 2.0 builds resolved KWIN_CONFIG against the
+#     unredirected ~/.config, leaving compositor runtime state in FLAT
+#     ~/.config/kineticwe.kwe + rules.kwe that the redirected compositor would
+#     no longer see. Fold those files into the new root (appending only groups
+#     the canonical file lacks), then retire the flat leftovers. Idempotent:
+#     the flat files are gone after the first run.
+# ---------------------------------------------------------------------------
+def _missing_groups(canonical, legacy):
+    # Port of:  awk 'FNR == NR { if ($0 ~ /^\[/) have[$0] = 1; next }
+    #                /^\[/     { keep = !($0 in have); if (keep) print; next }
+    #                          { if (keep) print }' canonical legacy
+    # including awk's quirk that FNR == NR also holds for the second file when
+    # the first one is empty (then the legacy headers fill `have` and nothing
+    # is printed).
+    def records(path):
+        # awk records: split on "\n" only; a trailing newline ends the last one.
+        with open(path, "r", encoding="utf-8", errors="surrogateescape") as f:
+            text = f.read()
+        lines = text.split("\n")
+        if text.endswith("\n"):
+            lines.pop()
+        return lines if text else []
+
+    canonical_lines = records(canonical)
+    legacy_lines = records(legacy)
+    if not canonical_lines:
+        return ""
+    have = {line for line in canonical_lines if line.startswith("[")}
+    out, keep = [], False
+    for line in legacy_lines:
+        if line.startswith("["):
+            keep = line not in have
+        if keep:
+            out.append(line + "\n")
+    return "".join(out)
+
+
+def step_flat_leftovers(config_root):
+    legacy_home = os.path.join(HOME, ".config")
+    flat_kwe = os.path.join(legacy_home, "kineticwe.kwe")
+    root_kwe = os.path.join(config_root, "kineticwe.kwe")
+    if os.path.exists(flat_kwe):
+        if not os.path.exists(root_kwe):
+            copy_file(flat_kwe, root_kwe)
+        else:
+            append_text(root_kwe, "\n" + _missing_groups(root_kwe, flat_kwe), f"missing groups of {flat_kwe}")
+        remove_file(flat_kwe)
+    flat_rules = os.path.join(legacy_home, "rules.kwe")
+    if os.path.exists(flat_rules) and not os.path.exists(os.path.join(config_root, "rules.kwe")):
+        copy_file(flat_rules, os.path.join(config_root, "rules.kwe"))
+    remove_file(flat_rules)
+    for shared in ("kglobalaccelrc", "kineticweoutputconfig.json"):
+        src = os.path.join(legacy_home, shared)
+        dst = os.path.join(config_root, shared)
+        if os.path.exists(src) and not os.path.exists(dst):
+            copy_file(src, dst)
+    # 2.0 renamed the output config (kwinoutputconfig.json ->
+    # kineticweoutputconfig.json). Carry over the in-root 2.0 file, or the
+    # legacy flat ~/.config file, so the user's monitor layout survives the
+    # upgrade.
+    output = os.path.join(config_root, "kineticweoutputconfig.json")
+    if not os.path.exists(output):
+        if os.path.exists(os.path.join(config_root, "kwinoutputconfig.json")):
+            rename(os.path.join(config_root, "kwinoutputconfig.json"), output)
+        elif os.path.exists(os.path.join(legacy_home, "kwinoutputconfig.json")):
+            copy_file(os.path.join(legacy_home, "kwinoutputconfig.json"), output)
+
+
+# ---------------------------------------------------------------------------
+# 4d. Prune stale user-app state from the config root. Earlier 2.0 builds
+#     redirected XDG_CONFIG_HOME for the whole session, so user applications
+#     (yazi, zed, fish, kitty, ...) wrote their configs inside the root. With
+#     the compositor-only redirect those entries are dead weight — apps now
+#     read the real config home, so the copies would silently drift. Keep only
+#     compositor-owned files (KEEP); move the rest to
+#     $XDG_STATE_HOME/kineticwe/pruned/<timestamp>/. The real configs are
+#     untouched. Idempotent.
+# ---------------------------------------------------------------------------
+def step_prune(config_root):
+    pruned_root = os.path.join(STATE_DIR, "pruned")
+    dest_dir = os.path.join(pruned_root, RUN_STAMP)
+    moved = False
+    for name in sorted(os.listdir(config_root)):
+        # Same set as the old `* .[!.]*` glob + [[ -e ]] test: no "..x" names,
+        # and dangling symlinks are left alone.
+        entry = os.path.join(config_root, name)
+        # kdeglobals is only kept as step 4g's symlink; a real file left by the
+        # old session-wide redirect is a stale copy and goes, so 4g relinks.
+        if name == "kdeglobals" and not os.path.islink(entry):
+            pass
+        elif name.startswith("..") or name in KEEP:
+            continue
+        if not os.path.exists(entry):
+            continue
+        if DRY_RUN:
+            log(f"would move stale entry {entry} -> {dest_dir}/")
+            continue
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.move(entry, os.path.join(dest_dir, name))
+        log(f"moved stale entry {entry} -> {dest_dir}/")
+        moved = True
+    if moved:
+        _rotate(pruned_root)
+
+
+# ---------------------------------------------------------------------------
+# 4d.5. One-shot migration: clear ALL of Spectacle's global-shortcut defaults
+#     (_launch, the screenshot actions and the Start/Stop * Recording actions)
+#     in the live kglobalaccelrc so none collide with KineticWE's own binds or
+#     the user's plans. The KineticWE Default Binds.kksrc clears them in fresh
+#     installs, but on an existing install the defaults were already written
+#     by Spectacle before the .kwe override could land. This migration runs
+#     once per version, marks the file with a `[Migration]
+#     SpectacleRecordingUnbound=` sentinel, and never touches user-set values
+#     after that.
+#
+#     One-time disruption: any custom keybind the user has previously set on a
+#     Spectacle action is cleared the first time this runs. That's intentional
+#     per the user request ("unbind by default"); post-migration, the user can
+#     rebind any Spectacle action in Kinetic Settings -> Keybinds -> Spectacle,
+#     and subsequent startups leave the rebind alone (sentinel suppresses
+#     re-clearing). No-op when the file already has the sentinel at the
+#     current version.
+# ---------------------------------------------------------------------------
+SPECTACLE_MIGRATION_VERSION = "kineticwe-2.1"
+SPECTACLE = "[org.kde.spectacle.desktop][Global Shortcuts]"
+# Every action id from /usr/share/kglobalaccel/org.kde.spectacle.desktop
+# (`Actions=` list plus the app-launch action `_launch`).
+SPECTACLE_ACTIONS = (
+    "_launch",
+    "FullScreenScreenShot",
+    "CurrentMonitorScreenShot",
+    "ActiveWindowScreenShot",
+    "RectangularRegionScreenShot",
+    "WindowUnderCursorScreenShot",
+    "OpenWithoutScreenshot",
+    "RecordRegion",
+    "RecordScreen",
+    "RecordWindow",
+)
+MIGRATION_GROUP = "[Migration]"
+SENTINEL_KEY = "SpectacleRecordingUnbound"
+
+
+def _have_spectacle():
+    for d in os.environ.get("PATH", "").split(":"):
+        if not d:
+            continue
+        candidate = os.path.join(d, "spectacle")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return True
+    return False
+
+
+def _strip_existing_sentinels(lines):
+    out, skip = [], False
+    for line in lines:
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            skip = s == MIGRATION_GROUP
+            if not skip:
+                out.append(line)
+            continue
+        if not skip:
+            out.append(line)
+    return out
+
+
+def _read_sentinels(lines):
+    out, group = set(), None
+    for line in lines:
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            group = s
+            continue
+        if group == MIGRATION_GROUP and s.startswith(SENTINEL_KEY + "="):
+            out.add(s.split("=", 1)[1].strip())
+    return out
+
+
+def step_spectacle(config_root):
+    path = os.path.join(config_root, "kglobalaccelrc")
+    version = SPECTACLE_MIGRATION_VERSION
+
+    lines = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+
+    if version in _read_sentinels(lines):
+        return  # already migrated at this version
+
+    # Drop every existing [Migration] group so the file does not accumulate
+    # sentinels across version bumps; re-add a single canonical one at end.
+    lines = _strip_existing_sentinels(lines)
+
+    # Force every Spectacle action to empty inside the Spectacle group.
+    # Only create the group if Spectacle is actually installed (so users
+    # without Spectacle don't end up with a stray empty group in their
+    # kglobalaccelrc).
+    group, saw_spectacle, actions_seen, out = None, False, set(), []
+    for line in lines:
+        s = line.strip()
+        if s.startswith("[") and s.endswith("]"):
+            if group == SPECTACLE:
+                for action in SPECTACLE_ACTIONS:
+                    if action not in actions_seen:
+                        out.append(f"{action}=")
+                        actions_seen.add(action)
+            group = s
+            if group == SPECTACLE:
+                saw_spectacle = True
+            out.append(line)
+        elif group == SPECTACLE and s and "=" in s and not s.startswith("#"):
+            key = s.split("=", 1)[0].strip()
+            if key in SPECTACLE_ACTIONS:
+                out.append(f"{key}=")
+                actions_seen.add(key)
+            else:
+                out.append(line)
+        else:
+            out.append(line)
+    if group == SPECTACLE:
+        for action in SPECTACLE_ACTIONS:
+            if action not in actions_seen:
+                out.append(f"{action}=")
+                actions_seen.add(action)
+
+    if not saw_spectacle and _have_spectacle():
+        if out and out[-1].strip() != "":
+            out.append("")
+        out.append(SPECTACLE)
+        for action in SPECTACLE_ACTIONS:
+            out.append(f"{action}=")
+
+    out.append("")
+    out.append(MIGRATION_GROUP)
+    out.append(f"{SENTINEL_KEY}={version}")
+
+    atomic_write(path, "\n".join(out) + "\n", f"Spectacle shortcuts cleared ({version})", prefix=".kglobalaccelrc.")
+
+
+# ---------------------------------------------------------------------------
+# 4d.6. One-shot migration: rename the KGlobalAccel components to KineticWE
+#     identity (Phase 4). The compositor's own shortcut component moved from
+#     "kwin" to "kineticwe", and the keyboard-layout component from
+#     "KDE Keyboard Layout Switcher" to "KineticWE Keyboard Layout Switcher".
+#     The shortcuts live in kglobalshortcutsrc / kglobalaccelrc, keyed by that
+#     component name, so an existing user's binds would be lost unless the
+#     groups are carried over. Kinetic Settings mirrors the compositor's binds
+#     into keybinds.kwe, so that file is migrated too. Idempotent: after the
+#     rename the old groups no longer exist.
+# ---------------------------------------------------------------------------
+# Component unique-name renames. Group headers may be "[name]" or
+# "[name][Global Shortcuts]".
+RENAMES = {
+    "kwin": "kineticwe",
+    "KDE Keyboard Layout Switcher": "KineticWE Keyboard Layout Switcher",
+}
+HEADER = re.compile(r"^\[([^\]]+)\](.*)$")
+
+
+def _split_groups(text):
+    out = []
+    for line in text.splitlines(keepends=True):
+        if HEADER.match(line.rstrip("\n")):
+            out.append([line.rstrip("\n"), []])
+        elif out:
+            out[-1][1].append(line)
+        else:
+            out.append([None, [line]])
+    return out
+
+
+def _key_of(line):
+    return line.split("=", 1)[0].strip() if "=" in line else None
+
+
+def _rename_components(path):
+    if not os.path.isfile(path):
+        return
+    with open(path, "r", encoding="utf-8") as f:
+        original = f.read()
+    groups = _split_groups(original)
+    by_header = {}
+    for group in groups:
+        if group[0] is not None:
+            by_header.setdefault(group[0], group)
+    changed = False
+    out = []
+    for group in groups:
+        if group[0] is None:
+            out.append("".join(group[1]))
+            continue
+        match = HEADER.match(group[0])
+        new_name = RENAMES.get(match.group(1))
+        if new_name is None:
+            out.append(group[0] + "\n" + "".join(group[1]))
+            continue
+        new_header = "[" + new_name + "]" + match.group(2)
+        target = by_header.get(new_header)
+        if target is not None and target is not group:
+            # Merge into the group that is already present, keeping its values.
+            existing = {_key_of(line) for line in target[1]}
+            for line in group[1]:
+                if _key_of(line) not in existing:
+                    target[1].append(line)
+            changed = True
+            continue  # drop the old group
+        group[0] = new_header
+        out.append(new_header + "\n" + "".join(group[1]))
+        changed = True
+    if not changed:
+        return
+    atomic_write(path, "".join(out), "renamed shortcut components", prefix="tmp", suffix="")
+
+
+def step_component_rename(config_root):
+    for name in ("kglobalshortcutsrc", "kglobalaccelrc", "keybinds.kwe"):
+        _rename_components(os.path.join(config_root, name))
+
+
+# ---------------------------------------------------------------------------
+# 4e. Default color scheme: Breeze Dark.
+#     The Breeze window decoration (and KDE apps) take their colors from the
+#     shared kdeglobals color scheme. When no scheme is configured the
+#     decoration falls back to KColorScheme's built-in default, which is
+#     Breeze *Light*. Until the Kinetic Settings decorations/theming section
+#     lands, make the out-of-the-box default Breeze Dark for both new and
+#     existing users.
+#
+#     Gate: only apply when no color scheme is configured yet (no [Colors:*]
+#     groups and no non-empty ColorScheme= entry). This seeds new users and
+#     migrates existing users who are still on the bare light default, while
+#     never overwriting a scheme the user (or the Noctalia theme service)
+#     chose. The gate makes the step idempotent.
+#
+#     The merge mirrors Noctalia's mergeKdeColorScheme (same group/key rules),
+#     preserving every non-color setting already in the user's kdeglobals.
+# ---------------------------------------------------------------------------
+COLOR_PREFIX = "Colors:"
+
+# Name[xx] translation keys bloat kdeglobals; Plasma only writes the plain
+# Name= when applying a scheme, so skip them.
+_NAME_TRANSLATION = re.compile(r"^Name\[.*\]$")
+
+
+def _is_comment_or_blank(line):
+    stripped = line.strip()
+    return stripped == "" or stripped.startswith("#") or stripped.startswith(";")
+
+
+def _parse(path):
+    doc = {
+        "prefix": [],
+        "sections": [],  # list of {name, header, lines, keys, key_index}
+        "section_index": {},  # name -> index into sections
+    }
+    current = None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        return doc
+    for raw in lines:
+        line = raw[:-1] if raw.endswith("\r") else raw
+        stripped = line.strip()
+        if _is_comment_or_blank(stripped):
+            (current["lines"] if current else doc["prefix"]).append(line)
+            continue
+        if stripped.startswith("[") and stripped.endswith("]"):
+            name = stripped[1:-1]
+            section = {"name": name, "header": line, "lines": [], "keys": [], "key_index": {}}
+            doc["section_index"][name] = len(doc["sections"])
+            doc["sections"].append(section)
+            current = section
+            continue
+        equals = stripped.find("=")
+        if current is None or equals == -1:
+            continue
+        key = stripped[:equals].strip()
+        value = stripped[equals + 1 :].strip()
+        if key == "" or key in current["key_index"]:
+            continue
+        line_index = len(current["lines"])
+        current["lines"].append(line)
+        current["key_index"][key] = len(current["keys"])
+        current["keys"].append({"name": key, "value": value, "line_index": line_index})
+    return doc
+
+
+def _append_key(section, key):
+    insert_at = len(section["lines"])
+    while insert_at > 0 and _is_comment_or_blank(section["lines"][insert_at - 1]):
+        insert_at -= 1
+    section["lines"].insert(insert_at, key["name"] + "=" + key["value"])
+
+
+def _merge(destination, source):
+    for source_section in source["sections"]:
+        name = source_section["name"]
+        index = destination["section_index"].get(name)
+        if index is None:
+            new_section = {"name": name, "header": "[" + name + "]", "lines": [], "keys": [], "key_index": {}}
+            for key in source_section["keys"]:
+                if _NAME_TRANSLATION.match(key["name"]):
+                    continue
+                _append_key(new_section, key)
+            destination["section_index"][name] = len(destination["sections"])
+            destination["sections"].append(new_section)
+            continue
+        destination_section = destination["sections"][index]
+        for source_key in source_section["keys"]:
+            if _NAME_TRANSLATION.match(source_key["name"]):
+                continue
+            destination_key_index = destination_section["key_index"].get(source_key["name"])
+            if destination_key_index is None:
+                _append_key(destination_section, source_key)
+            else:
+                destination_key = destination_section["keys"][destination_key_index]
+                destination_section["lines"][destination_key["line_index"]] = (
+                    source_key["name"] + "=" + source_key["value"]
+                )
+
+
+def _serialize(doc):
+    out = []
+    for line in doc["prefix"]:
+        out.append(line)
+    for i, section in enumerate(doc["sections"]):
+        if i > 0 and out and (not out[-1].strip() == ""):
+            out.append("")
+        out.append(section["header"])
+        for line in section["lines"]:
+            out.append(line)
+    return "\n".join(out) + "\n"
+
+
+def _has_scheme(doc):
+    for section in doc["sections"]:
+        if section["name"].startswith(COLOR_PREFIX):
+            return True
+        if section["name"] in ("General", "KDE"):
+            for key in section["keys"]:
+                if key["name"] == "ColorScheme" and key["value"] != "":
+                    return True
+    return False
+
+
+def _find_breeze_dark(prefix):
+    # Same search order as the old launcher loop:
+    #   "$HOME/.local/share" ${XDG_DATA_DIRS//:/ } "$INSTALL_PREFIX/share"
+    #   /usr/local/share /usr/share
+    dirs = [os.path.join(HOME, ".local", "share")]
+    dirs += os.environ.get("XDG_DATA_DIRS", "").replace(":", " ").split()
+    dirs += [os.path.join(prefix, "share"), "/usr/local/share", "/usr/share"]
+    for d in dirs:
+        if not d:
+            continue
+        candidate = os.path.join(d, "color-schemes", "BreezeDark.colors")
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def step_breeze_dark(real_config, prefix):
+    scheme_path = _find_breeze_dark(prefix)
+    if scheme_path is None:
+        return
+    globals_path = os.path.join(real_config, "kdeglobals")
+
+    globals_doc = _parse(globals_path)
+    if _has_scheme(globals_doc):
+        return  # a scheme is already configured; do not touch it
+
+    scheme_doc = _parse(scheme_path)
+    if not scheme_doc["sections"]:
+        raise RuntimeError("no sections in " + scheme_path)
+
+    _merge(globals_doc, scheme_doc)
+    atomic_write(
+        globals_path,
+        _serialize(globals_doc),
+        f"seeded the Breeze Dark color scheme from {scheme_path}",
+        prefix=".kdeglobals.",
+        keep_mode=True,
+        make_parent=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 4f. Default desktop-content seeding.
+#     A fresh install from TTY has no KDE desktop packages, so even after
+#     installing the Breeze packages the session would come up with no cursor
+#     theme, no icon theme and no terminal default (and nothing to launch with
+#     a shortcut). Seed those — plus a Meta+T -> Alacritty shortcut — only when
+#     they are unset, so a user's existing choices (icons, cursor, terminal,
+#     keybinds) are never clobbered. Idempotent.
+#
+#     The compositor config keys ([Mouse] cursorTheme/cursorSize) are the ones
+#     KWin and the launch-time cursor actually read; kdeglobals carries the
+#     shared Qt/KDE settings (icon theme, cursor, default terminal);
+#     appearance.kwe is the portable mirror the Kinetic Settings Icons and
+#     Cursors pages drive; and the custom-command definition + chord are what
+#     the shell registers/replays at start so Meta+T fires Alacritty.
+# ---------------------------------------------------------------------------
+def _ensure(path, header, key, value):
+    # Ensure `key=value` exists inside the `[header]` section of a KConfig-style
+    # file, preserving every other line. Creates the file/section if missing;
+    # leaves the file untouched when the key is already present.
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            lines = [l[:-1] if l.endswith("\r") else l for l in f.read().splitlines()]
+    else:
+        lines = []
+    sections, preamble, cur = [], [], None
+    for line in lines:
+        if line.startswith("[") and line.endswith("]"):
+            cur = [line, []]
+            sections.append(cur)
+        else:
+            (cur[1] if cur is not None else preamble).append(line)
+    keyline = key + "=" + value
+    target = next((s for s in sections if s[0] == header), None)
+    if target is not None:
+        for line in target[1]:
+            if line.split("=", 1)[0].strip() == key:
+                return  # already present; leave untouched
+        target[1].insert(0, keyline)
+    else:
+        sections.append([header, [keyline]])
+    out = list(preamble)
+    for i, (h, body) in enumerate(sections):
+        if i > 0 and out and out[-1].strip() != "":
+            out.append("")
+        out.append(h)
+        out.extend(body)
+    atomic_write(path, "\n".join(out) + "\n", f"seeded {header} {keyline}", prefix=".kwe-seed.", keep_mode=True, make_parent=True)
+
+
+def step_seed_defaults(config_root, real_config):
+    cfg = lambda name: os.path.join(config_root, name)  # noqa: E731
+    # Only seed the default Meta+T -> Alacritty shortcut on the first run (when
+    # the user has no custom keybinds yet). Once custom-keybinds.kwe exists the
+    # user has interacted with custom keybinds, so re-seeding the shortcut on
+    # every login would resurrect a bind they deliberately unbound or
+    # reassigned.
+    seed_keybinds = not os.path.exists(cfg("custom-keybinds.kwe"))
+
+    # Portable Appearance settings (drive the Kinetic Settings pages).
+    _ensure(cfg("appearance.kwe"), "[Appearance]", "IconTheme", "Breeze-Round-Chameleon Dark Icons")
+    _ensure(cfg("appearance.kwe"), "[Appearance]", "CursorTheme", "breeze_cursors")
+    _ensure(cfg("appearance.kwe"), "[Appearance]", "CursorSize", "24")
+
+    # What the compositor actually reads for the pointer cursor.
+    _ensure(cfg("kineticwe.kwe"), "[Mouse]", "cursorTheme", "breeze_cursors")
+    _ensure(cfg("kineticwe.kwe"), "[Mouse]", "cursorSize", "24")
+
+    # On NVIDIA proprietary drivers, the KWin blur effect is extremely
+    # CPU-heavy on the compositor while a blurred window is on screen, which
+    # makes the whole desktop slow. Disable blur by default there; users can
+    # re-enable it later in Kinetic Settings.
+    if os.path.exists("/proc/driver/nvidia/version"):
+        _ensure(cfg("kineticwe.kwe"), "[Plugins]", "blurEnabled", "false")
+
+    # Shared Qt/KDE settings so apps see icons and the cursor and can open a
+    # terminal.
+    kde = os.path.join(real_config, "kdeglobals")
+    _ensure(kde, "[Icons]", "Theme", "Breeze-Round-Chameleon Dark Icons")
+    _ensure(kde, "[KDE]", "cursorTheme", "breeze_cursors")
+    _ensure(kde, "[KDE]", "cursorSize", "24")
+    _ensure(kde, "[General]", "TerminalApplication", "alacritty")
+
+    # Meta+T -> Alacritty, so a fresh user has a terminal to start from. The
+    # action is registered with the daemon (custom-keybinds.kwe) and its chord
+    # is replayed (keybinds.kwe) at session start by the shell. First-run only
+    # so a user's later changes to this bind are never undone.
+    if seed_keybinds:
+        _ensure(cfg("custom-keybinds.kwe"), "[custom-commands]", "cmd-1", "Terminal")
+        _ensure(cfg("custom-keybinds.kwe"), "[custom-commands:exec]", "cmd-1", "alacritty")
+        _ensure(cfg("keybinds.kwe"), "[custom-commands][Global Shortcuts]", "cmd-1", "Meta+T")
+
+
+# ---------------------------------------------------------------------------
+# 4g. The compositor redirects XDG_CONFIG_HOME to the kineticwe root, so its
+#     QML theme stack (Kirigami/Plasma.Theme -> KColorScheme -> "kdeglobals")
+#     resolves kdeglobals inside the root — where none exists — and falls back
+#     to Breeze Light for the Overview/Grid View and other QML effects. The
+#     C++ side already opens the shared file by path (kineticweKdeGlobalsPath),
+#     but QML uses the standard config location. Symlink the shared kdeglobals
+#     into the root so both agree on the single source of truth. A symlink is
+#     not a mirror: atomic renames of the real file stay visible through it.
+#     Only link when the real file exists: on a minimal host that has no seeded
+#     color scheme yet (no BreezeDark.colors, so step 4e is a no-op) a dangling
+#     symlink is worse than leaving the root without a kdeglobals at all.
+# ---------------------------------------------------------------------------
+def step_kdeglobals_link(config_root, real_config):
+    real = os.path.join(real_config, "kdeglobals")
+    link = os.path.join(config_root, "kdeglobals")
+    if os.path.exists(real) and not os.path.exists(link) and not os.path.islink(link):
+        if DRY_RUN:
+            log(f"would symlink {link} -> {real}")
+            return
+        os.symlink(real, link)
+        log(f"symlinked {link} -> {real}")
+
+
+# ---------------------------------------------------------------------------
+# 4h. Keep the qt5ct/qt6ct tool configs in step with the session's icon theme.
+#     Those configs are seeded once (first run only), so a user who picks
+#     another icon theme in Kinetic Settings -> Icons would still get the seeded
+#     one in non-KDE Qt apps: they read the platform-theme config, not
+#     kdeglobals. Patch the two keys that must follow the session:
+#       * [Appearance] icon_theme       <- appearance.kwe [Appearance] IconTheme
+#                                          (fallback: kdeglobals [Icons] Theme=)
+#       * [Appearance] standard_dialogs <- xdgdesktopportal, but only where the
+#                                          legacy gtk3/gtk2 value is still set
+#                                          (the session ships its own portal)
+#     Only existing configs are touched, only those keys change, and the write
+#     is atomic and skipped when nothing differs.
+# ---------------------------------------------------------------------------
+APPEARANCE = "Appearance"
+LEGACY_DIALOGS = ("gtk3", "gtk2")
+
+
+def _read_key(path, section, key):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return ""
+    current = None
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1]
+            continue
+        if current != section or "=" not in line:
+            continue
+        name, value = line.split("=", 1)
+        if name.strip() == key:
+            return value.strip()
+    return ""
+
+
+def _patch_appearance(path, updates, replace_only=None):
+    """Set `updates` in the file's [Appearance] section.
+
+    Keys listed in `replace_only` are only rewritten while they still hold one
+    of the listed (legacy) values, so a deliberate user choice survives.
+    """
+    if not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+
+    out = []
+    changed = False
+    seen = set()
+    in_section = False
+
+    def flush_missing():
+        nonlocal changed
+        # Keep the section's trailing blank lines where they are
+        trailing = []
+        while out and out[-1].strip() == "":
+            trailing.append(out.pop())
+        for name, value in updates.items():
+            if name not in seen:
+                out.append(f"{name}={value}")
+                seen.add(name)
+                changed = True
+        out.extend(reversed(trailing))
+
+    for raw in lines:
+        stripped = raw.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if in_section:
+                flush_missing()
+            in_section = stripped[1:-1] == APPEARANCE
+            out.append(raw)
+            continue
+        if in_section and "=" in stripped and not stripped.startswith(("#", ";")):
+            name, value = stripped.split("=", 1)
+            name, value = name.strip(), value.strip()
+            if name in updates:
+                seen.add(name)
+                allowed = (replace_only or {}).get(name)
+                if (allowed is None or value in allowed) and value != updates[name]:
+                    out.append(f"{name}={updates[name]}")
+                    changed = True
+                    continue
+        out.append(raw)
+    if in_section:
+        flush_missing()
+    if not changed:
+        return
+
+    atomic_write(
+        path,
+        "\n".join(out) + "\n",
+        f"synced [Appearance] {', '.join(sorted(updates))}",
+        prefix="." + os.path.basename(path) + ".",
+        keep_mode=True,
+    )
+
+
+def step_qtct_sync(config_root, real_config):
+    appearance = os.path.join(config_root, "appearance.kwe")
+    kdeglobals = os.path.join(real_config, "kdeglobals")
+    icon_theme = _read_key(appearance, APPEARANCE, "IconTheme") or _read_key(kdeglobals, "Icons", "Theme")
+    updates = {"standard_dialogs": "xdgdesktopportal"}
+    if icon_theme:
+        updates["icon_theme"] = icon_theme
+    for tool in ("qt5ct", "qt6ct"):
+        path = os.path.join(real_config, tool, f"{tool}.conf")
+        _patch_appearance(path, updates, replace_only={"standard_dialogs": LEGACY_DIALOGS})
+
+
+# ---------------------------------------------------------------------------
+
+
+def main():
+    global DRY_RUN
+    parser = argparse.ArgumentParser(description="KineticWE config root setup (run by start-kineticwe).")
+    parser.add_argument("--config-root", required=True, help="the compositor config root (KWE_CONFIG_HOME)")
+    parser.add_argument("--real-config", required=True, help="the real config home (KWE_REAL_CONFIG_HOME)")
+    parser.add_argument("--prefix", required=True, help="the install prefix (for BreezeDark.colors)")
+    parser.add_argument("--dry-run", action="store_true", help="print what would change; write nothing")
+    args = parser.parse_args()
+    DRY_RUN = args.dry_run
+
+    config_root, real_config, prefix = args.config_root, args.real_config, args.prefix
+    trim_log()
+    log(f"start (config root {config_root}, real config {real_config})")
+    if not os.path.isdir(config_root):
+        if DRY_RUN:
+            log(f"would create {config_root}")
+        else:
+            os.makedirs(config_root, exist_ok=True)
+
+    steps = (
+        ("4b legacy rc files", lambda: step_legacy_rc(config_root)),
+        ("4b qt5ct/qt6ct seed", lambda: step_qtct_seed(real_config)),
+        ("4c flat leftovers", lambda: step_flat_leftovers(config_root)),
+        ("4d prune", lambda: step_prune(config_root)),
+        ("4d.5 Spectacle shortcuts", lambda: step_spectacle(config_root)),
+        ("4d.6 component rename", lambda: step_component_rename(config_root)),
+        ("4e Breeze Dark", lambda: step_breeze_dark(real_config, prefix)),
+        ("4f default seeding", lambda: step_seed_defaults(config_root, real_config)),
+        ("4g kdeglobals symlink", lambda: step_kdeglobals_link(config_root, real_config)),
+        ("4h qt5ct/qt6ct sync", lambda: step_qtct_sync(config_root, real_config)),
+    )
+    failed = 0
+    for name, run in steps:
+        try:
+            run()
+        except Exception as error:  # every step is non-fatal
+            failed += 1
+            log(f"step {name} failed: {error!r}")
+    log(f"done ({failed} step(s) failed)" if failed else "done")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

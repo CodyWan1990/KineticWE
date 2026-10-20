@@ -24,12 +24,12 @@ KineticSettingsModule::~KineticSettingsModule() = default;
 
 void KineticSettingsModule::initialize(
     WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
-    IpcService& ipcService, float uiScale
+    IpcService& ipcService, const ConfigService& config, float uiScale
 ) {
   m_bus = &bus;
   // Custom keybind actions must exist in the daemon before the mirror replay
   // (importKeybinds) tries to re-apply their chords.
-  m_customKeybinds = std::make_unique<CustomKeybinds>(bus);
+  m_customKeybinds = std::make_unique<CustomKeybinds>(bus, config);
   m_customKeybinds->initialize();
   m_window = std::make_unique<KineticSettingsWindow>();
   m_window->initialize(wayland, platform, renderContext, bus, *m_customKeybinds, uiScale);
