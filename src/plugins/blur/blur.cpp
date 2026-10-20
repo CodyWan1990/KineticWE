@@ -60,11 +60,22 @@ namespace KWin
 static const QByteArray s_blurAtomName = QByteArrayLiteral("_KDE_NET_WM_BLUR_BEHIND_REGION");
 
 // The Noctalia shell owns the bar, panels, dock, notifications, wallpaper,
-// switcher, and its own windows (Kinetic Settings). ForceBlurAll must not blur
-// them; a surface that *requests* blur (e.g. the shell's compositor_blur
-// option) is still honoured through the normal request path below.
+// switcher, and its settings windows. The settings windows are real app
+// windows and must blur like any other application, but the shell chrome must
+// never blur -- not even when it requests blur itself through the normal
+// surface request path below.
+static bool isNoctaliaSettingsWindow(const Window *window)
+{
+    const QString desktopFileName = window->desktopFileName();
+    return desktopFileName == QLatin1String("dev.kineticwe.Settings")
+        || desktopFileName == QLatin1String("dev.kineticwe.Noctalia");
+}
+
 static bool isNoctaliaShellWindow(const Window *window)
 {
+    if (isNoctaliaSettingsWindow(window)) {
+        return false;
+    }
     if (window->resourceName().contains(QLatin1StringView("noctalia"), Qt::CaseInsensitive)
         || window->resourceClass().contains(QLatin1StringView("noctalia"), Qt::CaseInsensitive)) {
         return true;
@@ -306,10 +317,14 @@ void BlurEffect::updateBlurRegion(EffectWindow *w)
     std::optional<RegionF> frame;
 
     bool forceBlur = BlurConfig::forceBlurAll();
+    bool isShellWindow = false;
     if (Window *window = w->window()) {
         forceBlur = window->rules()->checkBlur(forceBlur);
+        isShellWindow = isNoctaliaShellWindow(window);
         // "Blur all windows" (and a Force rule) must never opt the shell in.
-        if (forceBlur && isNoctaliaShellWindow(window)) {
+        // The settings windows are excluded from isNoctaliaShellWindow, so
+        // they still blur like regular applications.
+        if (forceBlur && isShellWindow) {
             forceBlur = false;
         }
     }
@@ -360,6 +375,12 @@ void BlurEffect::updateBlurRegion(EffectWindow *w)
         if (w->decorationHasAlpha() && decorationSupportsBlurBehind(w)) {
             frame = decorationBlurRegion(w);
         }
+    }
+
+    if (isShellWindow) {
+        // The shell chrome must not opt itself in through a surface request.
+        content.reset();
+        frame.reset();
     }
 
     if (content.has_value() || frame.has_value()) {
