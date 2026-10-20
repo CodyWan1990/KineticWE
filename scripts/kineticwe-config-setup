@@ -819,6 +819,12 @@ def _ensure(path, header, key, value):
 
 def step_seed_defaults(config_root, real_config):
     cfg = lambda name: os.path.join(config_root, name)  # noqa: E731
+    # The NVIDIA blur default below is a first-run policy, not a login routine.
+    # Capture whether the compositor config already exists before the cursor
+    # seeds create it: Kinetic Settings removes [Plugins] blurEnabled when blur
+    # is set back to its default (on), so re-running the seed every login would
+    # switch blur off again for NVIDIA users who deliberately enabled it.
+    fresh_compositor_config = not os.path.exists(cfg("kineticwe.kwe"))
     # Only seed the default Meta+T -> Alacritty shortcut on the first run (when
     # the user has no custom keybinds yet). Once custom-keybinds.kwe exists the
     # user has interacted with custom keybinds, so re-seeding the shortcut on
@@ -837,9 +843,10 @@ def step_seed_defaults(config_root, real_config):
 
     # On NVIDIA proprietary drivers, the KWin blur effect is extremely
     # CPU-heavy on the compositor while a blurred window is on screen, which
-    # makes the whole desktop slow. Disable blur by default there; users can
-    # re-enable it later in Kinetic Settings.
-    if os.path.exists("/proc/driver/nvidia/version"):
+    # makes the whole desktop slow. Disable it by default on a fresh config
+    # root; users can re-enable it later in Kinetic Settings, and that choice
+    # now survives subsequent logins.
+    if fresh_compositor_config and os.path.exists("/proc/driver/nvidia/version"):
         _ensure(cfg("kineticwe.kwe"), "[Plugins]", "blurEnabled", "false")
 
     # Shared Qt/KDE settings so apps see icons and the cursor and can open a
