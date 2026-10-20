@@ -321,6 +321,7 @@ const std::vector<WindowRulesPage::RuleField>& WindowRulesPage::ruleFields() {
       {"decorationpolicy", "decorationpolicyrule", RuleValueKind::TitleBar, RulePolicyKind::SetRule, "Appearance & Fixes", "Title bar"},
       {"opacityactive", "opacityactiverule", RuleValueKind::Percentage, RulePolicyKind::ForceRule, "Appearance & Fixes", "Active opacity"},
       {"opacityinactive", "opacityinactiverule", RuleValueKind::Percentage, RulePolicyKind::ForceRule, "Appearance & Fixes", "Inactive opacity"},
+      {"blur", "blurrule", RuleValueKind::Bool, RulePolicyKind::ForceRule, "Appearance & Fixes", "Blur behind window"},
   };
   return kFields;
 }

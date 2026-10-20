@@ -386,6 +386,15 @@
       <default code="true">Rules::UnusedForceRule</default>
     </entry>
 
+    <entry name="blur" type="Bool">
+      <label>Blur</label>
+      <default>false</default>
+    </entry>
+    <entry name="blurrule" type="Int">
+      <label>Blur rule type</label>
+      <default code="true">Rules::UnusedForceRule</default>
+    </entry>
+
     <entry name="closeable" type="Bool">
       <label>Closeable</label>
       <default>false</default>

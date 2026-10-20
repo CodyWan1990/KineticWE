@@ -14,6 +14,7 @@
 #include "core/renderviewport.h"
 #include "effect/effecthandler.h"
 #include "opengl/glplatform.h"
+#include "rules.h"
 #include "scene/backgroundeffectitem.h"
 #include "scene/decorationitem.h"
 #include "scene/scene.h"
@@ -24,6 +25,7 @@
 #include "wayland/surface.h"
 #include "wayland_server.h"
 #include "window.h"
+#include "workspace.h"
 
 #if KWIN_BUILD_X11
 #include "utils/xcbutils.h"
@@ -56,6 +58,19 @@ namespace KWin
 {
 
 static const QByteArray s_blurAtomName = QByteArrayLiteral("_KDE_NET_WM_BLUR_BEHIND_REGION");
+
+// The Noctalia shell owns the bar, panels, dock, notifications, wallpaper,
+// switcher, and its own windows (Kinetic Settings). ForceBlurAll must not blur
+// them; a surface that *requests* blur (e.g. the shell's compositor_blur
+// option) is still honoured through the normal request path below.
+static bool isNoctaliaShellWindow(const Window *window)
+{
+    if (window->resourceName().contains(QLatin1StringView("noctalia"), Qt::CaseInsensitive)
+        || window->resourceClass().contains(QLatin1StringView("noctalia"), Qt::CaseInsensitive)) {
+        return true;
+    }
+    return window->desktopFileName().startsWith(QLatin1StringView("dev.kineticwe."));
+}
 
 static QMatrix4x4 colorTransformMatrix(qreal saturation, qreal contrast)
 {
@@ -168,6 +183,21 @@ BlurEffect::BlurEffect()
     connect(effects, &EffectsHandler::windowAdded, this, &BlurEffect::slotWindowAdded);
     connect(effects, &EffectsHandler::windowDeleted, this, &BlurEffect::slotWindowDeleted);
     connect(effects, &EffectsHandler::viewRemoved, this, &BlurEffect::slotViewRemoved);
+    // Window rules are re-evaluated right after Workspace::configChanged is
+    // emitted, so defer re-reading the per-window blur rules to the event loop.
+    // Otherwise an edited blur rule would only reach already-open windows on the
+    // next effect reconfigure.
+    connect(
+        Workspace::self(), &Workspace::configChanged, this,
+        [this]() {
+            const auto windows = effects->stackingOrder();
+            for (EffectWindow *w : windows) {
+                updateBlurRegion(w);
+            }
+            effects->addRepaintFull();
+        },
+        Qt::QueuedConnection
+    );
 #if KWIN_BUILD_X11
     connect(effects, &EffectsHandler::propertyNotify, this, &BlurEffect::slotPropertyNotify);
     connect(effects, &EffectsHandler::xcbConnectionChanged, this, [this]() {
@@ -261,6 +291,11 @@ void BlurEffect::reconfigure(ReconfigureFlags flags)
         data.blurItem->setPixelsToExpandRepaintsBelowOpaqueRegions(m_expandSize);
     }
 
+    const auto windows = effects->stackingOrder();
+    for (EffectWindow *w : windows) {
+        updateBlurRegion(w);
+    }
+
     // Update all windows for the blur to take effect
     effects->addRepaintFull();
 }
@@ -270,45 +305,61 @@ void BlurEffect::updateBlurRegion(EffectWindow *w)
     std::optional<RegionF> content;
     std::optional<RegionF> frame;
 
+    bool forceBlur = BlurConfig::forceBlurAll();
+    if (Window *window = w->window()) {
+        forceBlur = window->rules()->checkBlur(forceBlur);
+        // "Blur all windows" (and a Force rule) must never opt the shell in.
+        if (forceBlur && isNoctaliaShellWindow(window)) {
+            forceBlur = false;
+        }
+    }
+
+    if (forceBlur) {
+        content = RegionF();
+        if (w->decoration()) {
+            frame = RegionF(w->decoration()->rect()) - w->contentsRect();
+        }
+    } else {
 #if KWIN_BUILD_X11
-    if (net_wm_blur_region != XCB_ATOM_NONE) {
-        if (const auto x11Window = qobject_cast<X11Window *>(w->window())) {
-            Xcb::Property wmBlurRegionProperty(false, x11Window->window(), net_wm_blur_region, XCB_ATOM_CARDINAL, 0, 32768);
-            if (const auto cardinals = wmBlurRegionProperty.array<uint32_t>()) {
-                if (cardinals->size() == 0 || cardinals->size() == 1) {
-                    // It means blur background behind whole window.
-                    content = RegionF();
-                } else if (cardinals->size() % 4 == 0) {
-                    RegionF region;
-                    for (uint i = 0; i < cardinals->size();) {
-                        const int x = (*cardinals)[i++];
-                        const int y = (*cardinals)[i++];
-                        const int w = (*cardinals)[i++];
-                        const int h = (*cardinals)[i++];
-                        region += Xcb::fromXNative(Rect(x, y, w, h));
+        if (net_wm_blur_region != XCB_ATOM_NONE) {
+            if (const auto x11Window = qobject_cast<X11Window *>(w->window())) {
+                Xcb::Property wmBlurRegionProperty(false, x11Window->window(), net_wm_blur_region, XCB_ATOM_CARDINAL, 0, 32768);
+                if (const auto cardinals = wmBlurRegionProperty.array<uint32_t>()) {
+                    if (cardinals->size() == 0 || cardinals->size() == 1) {
+                        // It means blur background behind whole window.
+                        content = RegionF();
+                    } else if (cardinals->size() % 4 == 0) {
+                        RegionF region;
+                        for (uint i = 0; i < cardinals->size();) {
+                            const int x = (*cardinals)[i++];
+                            const int y = (*cardinals)[i++];
+                            const int w = (*cardinals)[i++];
+                            const int h = (*cardinals)[i++];
+                            region += Xcb::fromXNative(Rect(x, y, w, h));
+                        }
+                        content = region;
                     }
-                    content = region;
                 }
             }
         }
-    }
 #endif
 
-    if (SurfaceInterface *surface = w->surface()) {
-        if (!surface->blurRegion().isEmpty()) {
-            content = surface->blurRegion();
+        if (SurfaceInterface *surface = w->surface()) {
+            if (!surface->blurRegion().isEmpty()) {
+                content = surface->blurRegion();
+            }
         }
-    }
 
-    if (auto internal = w->internalWindow()) {
-        const auto property = internal->property("kwin_blur");
-        if (property.isValid()) {
-            content = property.value<RegionF>();
+        if (auto internal = w->internalWindow()) {
+            const auto property = internal->property("kwin_blur");
+            if (property.isValid()) {
+                content = property.value<RegionF>();
+            }
         }
-    }
 
-    if (w->decorationHasAlpha() && decorationSupportsBlurBehind(w)) {
-        frame = decorationBlurRegion(w);
+        if (w->decorationHasAlpha() && decorationSupportsBlurBehind(w)) {
+            frame = decorationBlurRegion(w);
+        }
     }
 
     if (content.has_value() || frame.has_value()) {

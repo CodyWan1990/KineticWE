@@ -197,6 +197,9 @@ void KineticSettingsWindow::open() {
   if (m_desktopEffectsPage == nullptr) {
     m_desktopEffectsPage = std::make_unique<DesktopEffectsPage>(*m_bus);
   }
+  if (m_blurPage == nullptr) {
+    m_blurPage = std::make_unique<BlurPage>(*m_bus);
+  }
   if (m_animationsPage == nullptr) {
     m_animationsPage = std::make_unique<AnimationsPage>(*m_bus);
   }
@@ -221,6 +224,7 @@ void KineticSettingsWindow::open() {
   m_iconsPage->reloadFromDisk();
   m_cursorsPage->reloadFromDisk();
   m_desktopEffectsPage->reloadFromDisk();
+  m_blurPage->reloadFromDisk();
   m_animationsPage->reloadFromDisk();
   m_defaultAppsPage->reloadFromDisk();
   m_accessibilityPage->reloadFromDisk();
@@ -694,6 +698,35 @@ DesktopEffectsPage::Callbacks KineticSettingsWindow::desktopEffectsPageCallbacks
   };
 }
 
+BlurPage::Filter KineticSettingsWindow::blurFilter() const {
+  return BlurPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+BlurPage::Callbacks KineticSettingsWindow::blurPageCallbacks() {
+  return BlurPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_blurPage != nullptr) {
+              m_blurPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 AnimationsPage::Filter KineticSettingsWindow::animationsFilter() const {
   return AnimationsPage::Filter{
       .searchQuery = m_searchQuery,
@@ -853,6 +886,9 @@ void KineticSettingsWindow::applyActivePage() {
   case ActivePage::DesktopEffects:
     applied = m_desktopEffectsPage != nullptr && m_desktopEffectsPage->applyAll();
     break;
+  case ActivePage::Blur:
+    applied = m_blurPage != nullptr && m_blurPage->applyAll();
+    break;
   case ActivePage::Tiling:
     applied = m_tilingPage != nullptr && m_tilingPage->applyAll();
     break;
@@ -929,6 +965,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_desktopEffectsPage->resetAll();
     }
     break;
+  case ActivePage::Blur:
+    if (m_blurPage != nullptr) {
+      m_blurPage->resetAll();
+    }
+    break;
   case ActivePage::Tiling:
     if (m_tilingPage != nullptr) {
       m_tilingPage->resetAll();
@@ -1001,6 +1042,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_animationsPage != nullptr && m_animationsPage->hasPending();
   case ActivePage::DesktopEffects:
     return m_desktopEffectsPage != nullptr && m_desktopEffectsPage->hasPending();
+  case ActivePage::Blur:
+    return m_blurPage != nullptr && m_blurPage->hasPending();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && m_tilingPage->hasPending();
   case ActivePage::WindowRules:
@@ -1041,6 +1084,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_animationsPage != nullptr && !m_animationsPage->resettableKeyPaths().empty();
   case ActivePage::DesktopEffects:
     return m_desktopEffectsPage != nullptr && !m_desktopEffectsPage->resettableKeyPaths().empty();
+  case ActivePage::Blur:
+    return m_blurPage != nullptr && !m_blurPage->resettableKeyPaths().empty();
   case ActivePage::Tiling:
     return m_tilingPage != nullptr && !m_tilingPage->resettableKeyPaths().empty();
   case ActivePage::WindowRules:
@@ -1075,8 +1120,8 @@ bool KineticSettingsWindow::anyPageHasPending() const {
       || pending(m_mousePage) || pending(m_touchpadPage) || pending(m_windowRulesPage)
       || pending(m_windowBehaviorPage) || pending(m_displayPage) || pending(m_appearancePage)
       || pending(m_iconsPage) || pending(m_cursorsPage) || pending(m_desktopEffectsPage)
-      || pending(m_animationsPage) || pending(m_defaultAppsPage) || pending(m_accessibilityPage)
-      || pending(m_autostartPage);
+      || pending(m_blurPage) || pending(m_animationsPage) || pending(m_defaultAppsPage)
+      || pending(m_accessibilityPage) || pending(m_autostartPage);
 }
 
 void KineticSettingsWindow::applyAllPages() {
@@ -1098,6 +1143,7 @@ void KineticSettingsWindow::applyAllPages() {
   applyPending(m_iconsPage);
   applyPending(m_cursorsPage);
   applyPending(m_desktopEffectsPage);
+  applyPending(m_blurPage);
   applyPending(m_animationsPage);
   applyPending(m_defaultAppsPage);
   applyPending(m_accessibilityPage);
@@ -1324,6 +1370,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     addSubNav(ActivePage::AppearanceCursors, "mouse-2", "Cursors");
     addSubNav(ActivePage::Animations, "movie", "Animations");
     addSubNav(ActivePage::DesktopEffects, "sparkles", "Desktop Effects");
+    addSubNav(ActivePage::Blur, "sparkles", "Blur");
   }
 
   addCategory("Input & Output", m_inputOutputExpanded, [this]() {
@@ -1377,7 +1424,9 @@ std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
   case ActivePage::Animations:
     return "appearance animations animation speed effects";
   case ActivePage::DesktopEffects:
-    return "appearance desktop effects blur wobbly";
+    return "appearance desktop effects wobbly";
+  case ActivePage::Blur:
+    return "appearance blur blur all windows translucency transparency background opacity";
   case ActivePage::Keyboard:
     return "input output keyboard input devices key repeat num lock";
   case ActivePage::Mouse:
@@ -1451,6 +1500,11 @@ std::unique_ptr<Node> KineticSettingsWindow::buildPageNodeWithQuery(ActivePage p
       return m_desktopEffectsPage->build(
           uiScale(), desktopEffectsFilter(), m_armedResetKeyPath, desktopEffectsPageCallbacks()
       );
+    }
+    break;
+  case ActivePage::Blur:
+    if (m_blurPage != nullptr) {
+      return m_blurPage->build(uiScale(), blurFilter(), m_armedResetKeyPath, blurPageCallbacks());
     }
     break;
   case ActivePage::Tiling:
@@ -1578,11 +1632,11 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
   // return nullptr when nothing in them matches the query.
   static constexpr ActivePage kSearchPageOrder[] = {
       ActivePage::AppearanceTitleBars, ActivePage::AppearanceIcons,   ActivePage::AppearanceCursors,
-      ActivePage::Animations,            ActivePage::DesktopEffects,    ActivePage::Keyboard,
-      ActivePage::Mouse,                 ActivePage::Touchpad,          ActivePage::Keybinds,
-      ActivePage::Displays,              ActivePage::WindowBehavior,    ActivePage::Workspaces,
-      ActivePage::Tiling,                ActivePage::WindowRules,       ActivePage::DefaultApps,
-      ActivePage::Accessibility,         ActivePage::Autostart,
+      ActivePage::Animations,            ActivePage::DesktopEffects,    ActivePage::Blur,
+      ActivePage::Keyboard,              ActivePage::Mouse,             ActivePage::Touchpad,
+      ActivePage::Keybinds,              ActivePage::Displays,          ActivePage::WindowBehavior,
+      ActivePage::Workspaces,            ActivePage::Tiling,            ActivePage::WindowRules,
+      ActivePage::DefaultApps,           ActivePage::Accessibility,     ActivePage::Autostart,
   };
 
   // Title Bars (window decoration previews), Icons and Cursors rescan the

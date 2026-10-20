@@ -75,6 +75,7 @@ public:
     bool checkAdaptiveSync(bool adaptivesync) const;
     bool checkTearing(bool requestsTearing) const;
     bool checkExcludeFromCapture(bool exclude, bool init = false) const;
+    KWIN_EXPORT bool checkBlur(bool blur) const;
 
 private:
     MaximizeMode checkMaximizeVert(MaximizeMode mode, bool init) const;
@@ -180,6 +181,7 @@ public:
     bool applyFSP(FocusStealingPreventionLevel &fsp) const;
     bool applyFPP(FocusStealingPreventionLevel &fpp) const;
     bool applyAcceptFocus(bool &focus) const;
+    bool applyBlur(bool &blur) const;
     bool applyCloseable(bool &closeable) const;
     bool applyStrictGeometry(bool &strict) const;
     bool applyShortcut(QString &shortcut, bool init) const;
@@ -283,6 +285,8 @@ private:
     ForceRule fpplevelrule;
     bool acceptfocus;
     ForceRule acceptfocusrule;
+    bool blur;
+    ForceRule blurrule;
     bool closeable;
     ForceRule closeablerule;
     QString shortcut;

@@ -14,5 +14,10 @@
         <entry name="Saturation" type="Int">
             <default>150</default>
         </entry>
+        <!-- Force blur behind every window, even if the window did not request it.
+             Per-window "blur" window rules override this setting. -->
+        <entry name="ForceBlurAll" type="Bool">
+            <default>false</default>
+        </entry>
     </group>
 </kcfg>

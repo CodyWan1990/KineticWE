@@ -71,6 +71,7 @@ Rules::Rules()
     , fsplevelrule(UnusedForceRule)
     , fpplevelrule(UnusedForceRule)
     , acceptfocusrule(UnusedForceRule)
+    , blurrule(UnusedForceRule)
     , closeablerule(UnusedForceRule)
     , shortcutrule(UnusedSetRule)
     , disableglobalshortcutsrule(UnusedForceRule)
@@ -156,6 +157,7 @@ void Rules::readFromSettings(const RuleSettings *settings)
     READ_FORCE_RULE(fsplevel, FocusStealingPreventionLevel);
     READ_FORCE_RULE(fpplevel, FocusStealingPreventionLevel);
     READ_FORCE_RULE(acceptfocus, );
+    READ_FORCE_RULE(blur, );
     READ_FORCE_RULE(closeable, );
     READ_SET_RULE(shortcut);
     READ_FORCE_RULE(disableglobalshortcuts, );
@@ -249,6 +251,7 @@ void Rules::write(RuleSettings *settings) const
     WRITE_FORCE_RULE(fsplevel, Fsplevel, focusStealingLevelToInt);
     WRITE_FORCE_RULE(fpplevel, Fpplevel, focusStealingLevelToInt);
     WRITE_FORCE_RULE(acceptfocus, Acceptfocus, );
+    WRITE_FORCE_RULE(blur, Blur, );
     WRITE_FORCE_RULE(closeable, Closeable, );
     WRITE_SET_RULE(shortcut, Shortcut, );
     WRITE_FORCE_RULE(disableglobalshortcuts, Disableglobalshortcuts, );
@@ -289,6 +292,7 @@ bool Rules::isEmpty() const
         && fsplevelrule == UnusedForceRule
         && fpplevelrule == UnusedForceRule
         && acceptfocusrule == UnusedForceRule
+        && blurrule == UnusedForceRule
         && closeablerule == UnusedForceRule
         && shortcutrule == UnusedSetRule
         && disableglobalshortcutsrule == UnusedForceRule
@@ -738,6 +742,7 @@ APPLY_FORCE_RULE(decocolor, DecoColor, QString)
 APPLY_FORCE_RULE(fsplevel, FSP, FocusStealingPreventionLevel)
 APPLY_FORCE_RULE(fpplevel, FPP, FocusStealingPreventionLevel)
 APPLY_FORCE_RULE(acceptfocus, AcceptFocus, bool)
+APPLY_FORCE_RULE(blur, Blur, bool)
 APPLY_FORCE_RULE(closeable, Closeable, bool)
 APPLY_RULE(shortcut, Shortcut, QString)
 APPLY_FORCE_RULE(disableglobalshortcuts, DisableGlobalShortcuts, bool)
@@ -793,6 +798,7 @@ bool Rules::discardUsed(bool withdrawn)
     DISCARD_USED_FORCE_RULE(fsplevel);
     DISCARD_USED_FORCE_RULE(fpplevel);
     DISCARD_USED_FORCE_RULE(acceptfocus);
+    DISCARD_USED_FORCE_RULE(blur);
     DISCARD_USED_FORCE_RULE(closeable);
     DISCARD_USED_SET_RULE(shortcut);
     DISCARD_USED_FORCE_RULE(disableglobalshortcuts);
@@ -937,6 +943,7 @@ CHECK_FORCE_RULE(DecoColor, QString)
 CHECK_FORCE_RULE(FSP, FocusStealingPreventionLevel)
 CHECK_FORCE_RULE(FPP, FocusStealingPreventionLevel)
 CHECK_FORCE_RULE(AcceptFocus, bool)
+CHECK_FORCE_RULE(Blur, bool)
 CHECK_FORCE_RULE(Closeable, bool)
 CHECK_RULE(Shortcut, QString)
 CHECK_FORCE_RULE(DisableGlobalShortcuts, bool)

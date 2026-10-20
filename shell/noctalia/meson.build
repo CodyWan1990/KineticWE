@@ -1036,6 +1036,7 @@ _noctalia_sources = files(
   'src/ipc/cli.cpp',
   'kinetic-settings/src/kineticwe_kwe.cpp',
   'kinetic-settings/src/accessibility_page.cpp',
+  'kinetic-settings/src/blur_page.cpp',
   'kinetic-settings/src/autostart.cpp',
   'kinetic-settings/src/autostart_page.cpp',
   'kinetic-settings/src/compositor_dbus.cpp',

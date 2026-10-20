@@ -44,7 +44,11 @@ namespace {
         // the Touch Points debug visualiser, and the moving/resizing
         // Translucency effect. They stay available to the compositor, just not
         // configurable here.
-        "thumbnailaside", "touchpoints", "translucency"};
+        "thumbnailaside", "touchpoints", "translucency",
+        // Blur now has its own dedicated page (Appearance > Blur), which owns
+        // the single enable toggle plus its parameters; keep it off the generic
+        // Desktop Effects list so there is exactly one toggle.
+        "blur"};
     return kExcluded;
   }
 
