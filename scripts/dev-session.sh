@@ -66,6 +66,9 @@ install_startup_script() {
         > "$TEST_PREFIX/bin/start-kineticwe"
     chmod +x "$TEST_PREFIX/bin/start-kineticwe"
     info "  $TEST_PREFIX/bin/start-kineticwe"
+    # The launcher's config setup helper (migrations, seeding, prune).
+    install -Dm755 "$SCRIPT_DIR/kineticwe-config-setup" "$TEST_PREFIX/lib/kineticwe/kineticwe-config-setup"
+    info "  $TEST_PREFIX/lib/kineticwe/kineticwe-config-setup"
 
     # The 2.0 session target (pulls graphical-session.target up for the
     # portal frontend). The launcher installs it into the user unit dir on

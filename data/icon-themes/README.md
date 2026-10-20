@@ -17,7 +17,7 @@ The theme inherits `breeze,hicolor`, so the `kineticwe` package keeps its
 `Requires: breeze-icons`. The compositor's CMake (`data/CMakeLists.txt`)
 extracts the archive into the build tree and installs it to
 `$datadir/icons/Breeze-Round-Chameleon Dark Icons/`, where it is picked up by
-Qt/KDE/GTK apps. The session (`scripts/start-kineticwe.sh`) seeds it as the
+Qt/KDE/GTK apps. The session's config setup (`scripts/kineticwe-config-setup`) seeds it as the
 default icon theme for `kdeglobals`, `appearance.kwe` and the qt5ct/qt6ct
 configs.
 

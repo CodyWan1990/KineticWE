@@ -171,6 +171,8 @@ Requires:       hwdata
 Requires:       xdg-desktop-portal
 Requires:       xdg-desktop-portal-kwe = %{version}-%{release}
 Requires:       bash
+# The session's config setup helper (lib/kineticwe/kineticwe-config-setup).
+Requires:       python3
 Requires:       systemd
 Requires:       procps-ng
 Requires:       psmisc
@@ -432,6 +434,7 @@ sed -e 's|@INSTALL_PREFIX@|%{_prefix}|g' \
     %{SOURCE10} \
     > %{buildroot}%{_bindir}/start-kineticwe
 chmod 0755 %{buildroot}%{_bindir}/start-kineticwe
+install -Dpm 0755 %{_builddir}/%{name}-%{version}/scripts/kineticwe-config-setup %{buildroot}%{_prefix}/lib/kineticwe/kineticwe-config-setup
 install -Dpm 0644 %{SOURCE3} %{buildroot}%{_datadir}/wayland-sessions/kineticwe.desktop
 install -Dpm 0644 %{SOURCE4} %{buildroot}%{_sysconfdir}/systemd/user/plasma-kglobalaccel.service.d/kineticwe-mask.conf
 install -Dpm 0644 %{_builddir}/%{name}-%{version}/scripts/kineticwe-workspace.target %{buildroot}%{_userunitdir}/kineticwe-workspace.target
@@ -490,6 +493,7 @@ echo
 %{_bindir}/kineticwe_windowprop
 %{_bindir}/kinetic-we_wayland_wrapper
 %{_bindir}/start-kineticwe
+%{_prefix}/lib/kineticwe/
 %{_userunitdir}/kineticwe-workspace.target
 %{_userunitdir}/kineticwe-session.target
 %{_userunitdir}/kineticwe-shell.service

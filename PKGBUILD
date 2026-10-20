@@ -478,6 +478,8 @@ package_kineticwe() {
         "$srcdir/$_sourcebase/scripts/start-kineticwe.sh" \
         > "$srcdir/start-kineticwe"
     install -Dm755 "$srcdir/start-kineticwe" "$pkgdir/usr/bin/start-kineticwe"
+    install -Dm755 "$srcdir/$_sourcebase/scripts/kineticwe-config-setup" \
+        "$pkgdir/usr/lib/kineticwe/kineticwe-config-setup"
     install -Dm644 "$srcdir/$_sourcebase/lgl-kineticwe-copr/SOURCES/kineticwe.desktop" \
         "$pkgdir/usr/share/wayland-sessions/kineticwe.desktop"
     # KineticWE embeds kglobalacceld in-process; keep the standalone daemon off.

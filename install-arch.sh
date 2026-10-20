@@ -960,6 +960,7 @@ install_startup_script() {
     chmod +x "$stage$TEST_PREFIX/bin/start-kineticwe"
     install -m 0644 "$SCRIPT_DIR/scripts/kineticwe-session.target" "$stage$TEST_PREFIX/share/kineticwe/kineticwe-session.target"
     render_prefix_template "$SCRIPT_DIR/scripts/kineticwe-shell.service.in" > "$stage$TEST_PREFIX/share/kineticwe/kineticwe-shell.service"
+    install -Dm755 "$SCRIPT_DIR/scripts/kineticwe-config-setup" "$stage$TEST_PREFIX/lib/kineticwe/kineticwe-config-setup"
     promote_stage launcher "$stage"
     remove_temp "$stage"
 }
