@@ -17,8 +17,9 @@ class Renderer;
 // (XDG icon theme directories), shows a preview resolved from each theme, and
 // lets the user pick the theme to apply. Persists to appearance.kwe
 // ([Appearance] IconTheme) and, on Apply, writes the choice to kdeglobals
-// ([Icons] Theme) and gsettings (org.gnome.desktop.interface icon-theme) so
-// Qt/KDE and GTK apps pick it up.
+// ([Icons] Theme), the GTK settings.ini files (gtk-icon-theme-name) and
+// gsettings (org.gnome.desktop.interface icon-theme) so Qt/KDE and GTK apps
+// pick it up.
 //
 // Like the other pages, edits are STAGED: selecting a tile updates an
 // in-memory pending map and nothing touches disk until the window's Apply
@@ -52,9 +53,10 @@ public:
   void resetAll();
 
   [[nodiscard]] bool hasPending() const noexcept { return !m_pending.empty(); }
-  // Writes every staged edit to appearance.kwe and, when a theme was selected,
-  // applies it to kdeglobals + the qt5ct/qt6ct icon_theme + gsettings +
-  // KGlobalSettings notification.
+  // Writes every staged edit to appearance.kwe and applies the effective theme
+  // to kdeglobals + the GTK settings.ini files + gsettings + the qt5ct/qt6ct
+  // icon_theme + KGlobalSettings notification (even with nothing staged, so
+  // Apply can repair drifted targets).
   bool applyAll();
 
   void reloadFromDisk() noexcept {

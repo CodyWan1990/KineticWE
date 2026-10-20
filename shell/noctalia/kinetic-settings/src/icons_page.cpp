@@ -193,7 +193,20 @@ bool IconsPage::applyTheme(std::string_view theme, std::string* error) {
     kLog.warn("kinetic-settings: failed to notify Qt apps of icon change: {}", notifyError);
   }
 
-  // 3. GTK apps (and the shell's icon resolver, which reads gsettings): set the
+  // 3. GTK 3/4 read gtk-icon-theme-name from their settings.ini, which takes
+  // precedence over the gsettings/dconf value below. Write it so GTK apps
+  // follow the selection even when dconf says otherwise (a fresh profile, or a
+  // file seeded by another desktop/tool). Best effort — a read-only or
+  // hand-written file must not fail the whole Apply.
+  for (const std::string_view tool : {"gtk-3.0", "gtk-4.0"}) {
+    const std::filesystem::path config = realConfigHome() / std::string(tool) / "settings.ini";
+    std::string iniError;
+    if (!kinetic_settings::setKey(config, "Settings", "gtk-icon-theme-name", theme, true, &iniError)) {
+      kLog.warn("kinetic-settings: failed to sync the {} icon theme: {}", tool, iniError);
+    }
+  }
+
+  // 4. GTK apps (and the shell's icon resolver, which reads gsettings): set the
   // icon-theme key directly.
   if (process::commandExists("gsettings")) {
     (void)process::runAsync(
@@ -205,7 +218,7 @@ bool IconsPage::applyTheme(std::string_view theme, std::string* error) {
     );
   }
 
-  // 4. qt5ct/qt6ct: non-KDE Qt apps read the icon theme from the platform-theme
+  // 5. qt5ct/qt6ct: non-KDE Qt apps read the icon theme from the platform-theme
   // config, not kdeglobals, so keep [Appearance] icon_theme in step with the
   // choice. Best effort — the KDE/GTK paths above already applied, and a
   // read-only or hand-written tool config must not fail the whole Apply.
@@ -222,26 +235,26 @@ bool IconsPage::applyTheme(std::string_view theme, std::string* error) {
 
 bool IconsPage::applyAll() {
   ensureLoaded();
-  if (m_pending.empty()) {
-    return true;
-  }
-  for (const auto& [path, value] : m_pending) {
-    if (path == keyPath()) {
-      if (value.empty()) {
-        m_config.removeKey("Appearance", "IconTheme");
-      } else {
-        m_config.setString("Appearance", "IconTheme", value);
+  if (!m_pending.empty()) {
+    for (const auto& [path, value] : m_pending) {
+      if (path == keyPath()) {
+        if (value.empty()) {
+          m_config.removeKey("Appearance", "IconTheme");
+        } else {
+          m_config.setString("Appearance", "IconTheme", value);
+        }
       }
     }
-  }
-  if (!m_config.save()) {
-    m_errorNotice = "Failed to write appearance.kwe. Your changes were kept; try Apply again.";
-    kLog.warn("kinetic-settings: failed to write {}", m_config.path().string());
-    return false;
+    if (!m_config.save()) {
+      m_errorNotice = "Failed to write appearance.kwe. Your changes were kept; try Apply again.";
+      kLog.warn("kinetic-settings: failed to write {}", m_config.path().string());
+      return false;
+    }
   }
 
-  // Apply the effective selection system-wide (even when it equals the default,
-  // so a freshly chosen system theme is pushed out too).
+  // Apply the effective selection system-wide (even when nothing was staged or
+  // it equals the default) so pressing Apply also repairs targets that drifted,
+  // e.g. a gsettings value reset back to Adwaita.
   const Value current = effectiveValue();
   if (!current.empty()) {
     std::string error;

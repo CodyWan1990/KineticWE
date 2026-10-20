@@ -159,23 +159,44 @@ namespace {
   constexpr int kMinIconFiles = 10;
 
   // Whether a theme directory contains icon content (vs only cursor content).
+  // Icon themes come in two layouts:
+  //   * size-first (Breeze, Adwaita): <size>/<context>/<file>, e.g. 48x48/apps/
+  //   * context-first (Gruvbox Plus, Suru-based): <context>/<size>/<file>,
+  //     e.g. apps/16/ or places/scalable/
+  // Both must be recognized, or valid themes are filtered out of the Icons page.
   bool hasIconContent(const fs::path& themeDir) {
     std::error_code ec;
     int totalFiles = 0;
+    const auto countSizeDir = [&](const fs::path& dir) {
+      totalFiles += countIconFiles(dir, kMinIconFiles);
+      return totalFiles >= kMinIconFiles;
+    };
     for (const auto& entry : fs::directory_iterator(themeDir, ec)) {
       if (!entry.is_directory(ec)) {
         continue;
       }
       const std::string name = entry.path().filename().string();
-      if (name == "cursors" || name == "cursors_scalable") {
+      if (name == "cursors" || name == "cursors_scalable" || name.starts_with('.')) {
         continue;
       }
-      if (!isIconSizeDir(name)) {
+      if (isIconSizeDir(name)) {
+        if (countSizeDir(entry.path())) {
+          return true;
+        }
         continue;
       }
-      totalFiles += countIconFiles(entry.path(), kMinIconFiles);
-      if (totalFiles >= kMinIconFiles) {
-        return true;
+      // Context-first layout: probe the context's size subdirectories. Names
+      // that do not look like a context simply contribute nothing.
+      for (const auto& contextEntry : fs::directory_iterator(entry.path(), ec)) {
+        if (!contextEntry.is_directory(ec)) {
+          continue;
+        }
+        if (!isIconSizeDir(contextEntry.path().filename().string())) {
+          continue;
+        }
+        if (countSizeDir(contextEntry.path())) {
+          return true;
+        }
       }
     }
     return false;

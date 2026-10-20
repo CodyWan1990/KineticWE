@@ -8,8 +8,9 @@
 // icon theme directories) for the KineticWE settings Icons/Cursors pages.
 // Both icon and cursor themes live under the same XDG icon roots; they are
 // distinguished by their content: an icon theme exposes size subdirectories
-// (scalable/, NNxNN/...), a cursor theme exposes a cursors/ (or
-// cursors_scalable/) subdirectory.
+// (scalable/, NNxNN/...) — either directly or one level down inside context
+// dirs (context-first layouts like apps/16/) — while a cursor theme exposes a
+// cursors/ (or cursors_scalable/) subdirectory.
 //
 // Self-contained: only uses the C++ standard library and the XDG environment,
 // so it works identically in the compositor- and shell-side processes.
