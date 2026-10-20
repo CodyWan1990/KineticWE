@@ -28,6 +28,7 @@
 #include "core/output.h"
 #include "cursor.h"
 #include "input.h"
+#include "main.h"
 #include "options.h"
 #include "pointer_input.h"
 #include "scripting/scripting.h"
@@ -784,7 +785,13 @@ void Workspace::slotLowerWindowOpacity()
 
 void Workspace::slotExecuteCommand(const QString &command)
 {
-    QProcess::startDetached(QStringLiteral("/bin/sh"), {QStringLiteral("-c"), command});
+    // Session environment, not the compositor's own (its XDG_CONFIG_HOME /
+    // XDG_CACHE_HOME point at the kineticwe roots).
+    QProcess process;
+    process.setProgram(QStringLiteral("/bin/sh"));
+    process.setArguments({QStringLiteral("-c"), command});
+    process.setProcessEnvironment(kwinApp()->processStartupEnvironment());
+    process.startDetached();
 }
 
 void Workspace::closeActivePopup()

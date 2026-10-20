@@ -61,14 +61,36 @@ fi
 # ---------------------------------------------------------------------------
 KWE_CONFIG_HOME="$HOME/.config/kineticwe"
 export KWE_CONFIG_HOME
-# Defensive: if the launcher inherited a stale XDG_CONFIG_HOME pointing at the
-# kineticwe root (e.g. exported in a shell profile during earlier testing),
-# treat the real config home as ~/.config, not the root.
+# The compositor's private KSycoca cache root (see step 5).
+KWE_CACHE_HOME="$HOME/.cache/kineticwe"
+# Defensive: if the launcher inherited a stale XDG_CONFIG_HOME / XDG_CACHE_HOME
+# pointing at the kineticwe roots (e.g. exported in a shell profile during
+# earlier testing, or left in the systemd user manager by an earlier 2.0 build
+# that redirected the whole session), drop it so the shell and user apps get
+# the real homes. KWE_REAL_* carry the real homes to the compositor, which
+# hands them back to the processes it starts.
 if [[ "${XDG_CONFIG_HOME:-}" == "$KWE_CONFIG_HOME" ]]; then
-    export KWE_REAL_CONFIG_HOME="$HOME/.config"
-else
-    export KWE_REAL_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+    unset XDG_CONFIG_HOME
 fi
+if [[ "${XDG_CACHE_HOME:-}" == "$KWE_CACHE_HOME" ]]; then
+    unset XDG_CACHE_HOME
+fi
+export KWE_REAL_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export KWE_REAL_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+# Only clear values that point at the kineticwe roots, so a user's own
+# XDG_CONFIG_HOME / XDG_CACHE_HOME in the user manager survives.
+_kwe_stale=()
+while IFS='=' read -r _name _value; do
+    if [[ "$_name" == XDG_CONFIG_HOME && "$_value" == "$KWE_CONFIG_HOME" ]] ||
+        [[ "$_name" == XDG_CACHE_HOME && "$_value" == "$KWE_CACHE_HOME" ]]; then
+        _kwe_stale+=("$_name")
+    fi
+done < <(systemctl --user show-environment 2>/dev/null || true)
+if ((${#_kwe_stale[@]})); then
+    echo "kineticwe: clearing stale ${_kwe_stale[*]} from the systemd user manager" >&2
+    systemctl --user unset-environment "${_kwe_stale[@]}" 2>/dev/null || true
+fi
+unset _kwe_stale _name _value
 mkdir -p "$KWE_CONFIG_HOME"
 
 # ---------------------------------------------------------------------------
@@ -905,8 +927,13 @@ PY
 #     kbuildsycoca6, which KineticWE 2.0 dropped; a one-shot rebuild at login
 #     is cheap and re-syncs the cache with newly installed applications.
 #     --noincremental forces a full rebuild so a brand-new app is always seen.
+#     The compositor keeps its own cache under KWE_CACHE_HOME (step 5), so that
+#     one is rebuilt with the compositor's XDG homes; the regular ~/.cache one
+#     is still rebuilt for the shell and KDE apps, as no kded keeps it fresh.
 # ---------------------------------------------------------------------------
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
+    XDG_CONFIG_HOME="$KWE_CONFIG_HOME" XDG_CACHE_HOME="$KWE_CACHE_HOME" \
+        kbuildsycoca6 --noincremental 2>/dev/null || true
     kbuildsycoca6 --noincremental 2>/dev/null || true
 fi
 
@@ -1096,10 +1123,10 @@ _before_wayland="$(ls -1 "$RUNTIME_DIR" 2>/dev/null | grep '^wayland-' || true)"
 _before_x11="$(ls -1 /tmp/.X11-unix 2>/dev/null | grep '^X[0-9]' || true)"
 
 if [[ -n "$_KWE_DRM_LOG" ]]; then
-    QT_LOGGING_RULES="kwin_wayland_drm=true" XDG_CONFIG_HOME="$KWE_CONFIG_HOME" XDG_CACHE_HOME="$HOME/.cache/kineticwe" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen 2>>"$_KWE_DRM_LOG" &
+    QT_LOGGING_RULES="kwin_wayland_drm=true" XDG_CONFIG_HOME="$KWE_CONFIG_HOME" XDG_CACHE_HOME="$KWE_CACHE_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen 2>>"$_KWE_DRM_LOG" &
     KWIN_PID=$!
 else
-    XDG_CONFIG_HOME="$KWE_CONFIG_HOME" XDG_CACHE_HOME="$HOME/.cache/kineticwe" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen &
+    XDG_CONFIG_HOME="$KWE_CONFIG_HOME" XDG_CACHE_HOME="$KWE_CACHE_HOME" "$INSTALL_PREFIX/bin/kinetic-we" --xwayland --no-lockscreen &
     KWIN_PID=$!
 fi
 

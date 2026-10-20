@@ -295,6 +295,24 @@ int main(int argc, char *argv[])
 
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
 
+    // KineticWE: start-kineticwe.sh points XDG_CONFIG_HOME / XDG_CACHE_HOME at
+    // the compositor's private roots for this process only. Children (input
+    // method, helpers, apps) must get the user's real homes back, carried in
+    // KWE_REAL_CONFIG_HOME / KWE_REAL_CACHE_HOME.
+    if (environment.contains(QStringLiteral("KWE_CONFIG_HOME"))) {
+        const std::pair<QString, QString> homes[] = {
+            {QStringLiteral("XDG_CONFIG_HOME"), QStringLiteral("KWE_REAL_CONFIG_HOME")},
+            {QStringLiteral("XDG_CACHE_HOME"), QStringLiteral("KWE_REAL_CACHE_HOME")},
+        };
+        for (const auto &[xdgName, realName] : homes) {
+            environment.remove(xdgName);
+            const QString real = environment.value(realName);
+            if (!real.isEmpty()) {
+                environment.insert(xdgName, real);
+            }
+        }
+    }
+
     // enforce our internal qpa plugin, unfortunately command line switch has precedence
     setenv("QT_QPA_PLATFORM", "wayland-org.kde.kwin.qpa", true);
 
