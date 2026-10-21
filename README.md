@@ -36,48 +36,34 @@ If you want to support this project, you can donate here: [Ko-fi — theblackdon
 
 ## Installing KineticWE
 
-### COPR (Fedora) — Recommended - Use Fedora Linux for the best and tested experience 
+### Fedora (COPR) — Recommended
 
 The recommended way to install KineticWE on Fedora is via [COPR](https://copr.fedorainfracloud.org/).
-COPR provides pre-built RPMs so you don't need to compile from source.
-
-Enable the required COPR repositories, then install:
+COPR provides pre-built RPMs, so you don't need to compile from source.
 
 ```bash
-sudo dnf copr enable lionheartp/Hyprland
-sudo dnf copr enable theblackdon/kineticwe
-sudo dnf install kineticwe noctalia-git
+sudo dnf copr enable linuxgamerlife/lgl-experimental
+sudo dnf install kineticwe
 ```
 
-After installation, select **KineticWE** from your display manager's session menu
-or run `start-kineticwe` from a TTY.
+`kineticwe` pulls in the Noctalia shell (`kineticwe-noctalia`), the KineticWE
+portal backend (`xdg-desktop-portal-kwe`), and the Wayland session entry.
+KineticWE 2.0 installs alongside Fedora's stock KWin packages rather than
+replacing them.
 
-The `kineticwe` package provides and obsoletes Fedora's stock `kwin`, `kwin-common`,
-`kwin-libs`, `kglobalacceld`, and `kdecoration` packages — it replaces the stock
-compositor rather than installing alongside it.
+After installation, log out and select **KineticWE** from your display manager's
+session menu, or run `start-kineticwe` from a TTY.
 
-> **Note:** The first time you install, reboot before logging in to a KineticWE session. On subsequent logins Noctalia will load automatically.
->
 > **Tip:** Press **Meta+Space** to open the app drawer.
 
-### Bazzite / Universal Blue (rpm-ostree)
-
-> **Prerequisite:** The kineticwe COPR package requires **Qt ≥ 6.11**.
-> Your base image must include Qt 6.11 or newer — update your system first:
-> `sudo bootc upgrade && systemctl reboot`
-
-On rpm-ostree based systems (Bazzite, Bluefin, Aurora, Silverblue, Kinoite),
-`kineticwe` replaces the system's stock `kwin`, `kwin-common`, `kwin-libs`,
-`kglobalacceld`, and `kdecoration`. These base packages must be removed from
-the immutable image first via `override remove`:
+Optionally, install the Noctalia greeter (greetd) and run its interactive setup:
 
 ```bash
-sudo dnf copr enable lionheartp/Hyprland
-sudo dnf copr enable theblackdon/kineticwe
-sudo rpm-ostree override remove kwin kwin-common kwin-libs kglobalacceld kdecoration \
-    --install kineticwe --install noctalia-git
-systemctl reboot
+sudo dnf install kineticwe-greeter
+kineticwe-setup-greeter
 ```
+
+Then reboot.
 
 ### Arch Linux
 
@@ -163,146 +149,3 @@ Enabling `greetd.service` on its own is not enough: Arch's default greetd config
 #### Migrating from a local (`~/.local`) build to the packages
 
 Used `./install-arch.sh --local-dev` before? See [docs/local-arch-dev.md](docs/local-arch-dev.md#migrating-from-a-local-local-build-to-the-packages) to remove the dev install after switching to the packages.
-
-### NixOS / Nix
-
-> **⚠ Work in progress:** The Nix flake is experimental — it is not fully tested or complete. **Use at your own risk**; things may be broken or change without notice.
-
-A [Nix flake](https://nixos.wiki/wiki/Flakes) provides a reproducible build of kinetic-we, the full KineticWE session (kinetic-we + noctalia), and Home Manager / NixOS modules. Like the AUR and COPR packages, it builds `kdecoration` and `kglobalacceld` from pinned KDE master commits (kinetic-we needs `KDecoration3::Style`, which only exists in kdecoration master) and bundles the runtime library in the kinetic-we closure.
-
-**Add to your flake.nix inputs:**
-```nix
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-    kineticwe = {
-      url = "gitlab:theblackdon/kineticwe";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
-}
-```
-
-**NixOS module (recommended — registers the Wayland session with SDDM/greetd):**
-```nix
-{
-  imports = [ inputs.kineticwe.nixosModules.default ];
-  programs.kineticwe.enable = true;
-}
-```
-
-**Home Manager module** (puts `start-kineticwe` on PATH and installs the session desktop entry; use the NixOS module so the greeter lists the session):
-```nix
-{
-  imports = [ inputs.kineticwe.homeModules.default ];
-  nixpkgs.overlays = [ inputs.kineticwe.overlays.default ];
-  programs.kineticwe.enable = true;
-}
-```
-
-Both modules share a single option surface: `programs.kineticwe.enable` installs everything (kinetic-we + session + decorations), with optional `programs.kineticwe.package` and `programs.kineticwe.autostart`.
-
-> **Note:** On the first build, Nix may error with a hash mismatch for the pinned `kdecoration` or `kglobalacceld` sources. Copy the expected hash from the error into `nix/kdecoration-git.nix` / `nix/kglobalacceld-git.nix` and rebuild.
-
-### Debian / Ubuntu (distrobox build)
-
-> **Prerequisite:** KineticWE requires **Qt ≥ 6.10** and **KF6 ≥ 6.27**. Debian **sid** already ships these (Qt6 6.10, KF6 6.26–6.28). On older suites (e.g. trixie with Qt6 6.8) enable Debian **experimental** inside the container for the needed packages.
-
-On Debian/Ubuntu-based systems, use `build-deb-dev.sh` to build KineticWE from source inside a **`debian:sid` distrobox** — the host stays clean and the result installs to `~/.local` for immediate TTY testing:
-
-```bash
-git clone https://gitlab.com/theblackdon/kineticwe
-cd kineticwe
-
-# Prerequisites (once):
-sudo apt install distrobox podman
-
-# Quick cmake build (recommended for dev):
-./build-deb-dev.sh --quick
-
-# Or produce .deb packages:
-./build-deb-dev.sh --deb
-
-# Test from a TTY:
-start-kineticwe
-```
-
-The first run creates the `kineticwe-deb-build` container (from `debian:sid`), installs every build dependency via `debian-deps.sh`, then builds `kglobalacceld` and `kdecoration` from pinned KDE master commits before compiling `kinetic-we`, the `xdg-desktop-portal-kwe` portal backend, and the `noctalia-kwe` shell.
-
-Useful flags: `--no-session` (skip the login-screen entry), `--no-extract` (build `.debs` only), `--reset-local` (remove dev files from `~/.local`). Override the image/container via `DEBIAN_IMAGE` / `DISTROBOX_NAME`.
-
----
-
-## Troubleshooting
-
-### Power management not working (brightness, idle/DPMS, suspend, power profiles)
-
-Power management is provided by the Noctalia process inside the KineticWE
-session. It handles idle actions, lock-before-suspend, DPMS, brightness, and
-session power actions without starting KDE's PowerDevil daemon. UPower and
-`power-profiles-daemon` are optional freedesktop services used for battery and
-power-profile information.
-
-Check the Noctalia log for power-service initialization:
-
-```bash
-grep -E 'idle|lockscreen|logind|brightness|power profiles|upower' ~/.local/share/noctalia.log
-```
-
-The idle/DPMS settings live in `~/.config/noctalia/config.toml` under
-`[lockscreen]`, `[idle]`, and `[idle.behavior.<name>]`. You can test the
-compositor output path directly with:
-
-```bash
-noctalia-kwe msg dpms-off
-noctalia-kwe msg dpms-on
-```
-
----
-
-## KWin is not...
-
- * a standalone Wayland compositor (c.f. labwc, sway) and does not provide any functionality belonging to a Desktop Shell.
- * a replacement for window managers designed for use with a specific Desktop Shell (e.g. GNOME Shell)
- * a minimalistic window manager
- * designed for use with network transparency, though it is possible (with e.g. waypipe).
-
-# Contributing to KWin
-
-Please refer to the [contributing document](CONTRIBUTING.md) for everything you need to know to get started contributing to KWin.
-
-# Contacting KWin development team
-
- * IRC: #kde-kwin on irc.libera.chat
- * Matrix: [#kwin:kde.org](https://go.kde.org/matrix/#/#kwin:kde.org)
-
-# Support
-## Application Developer
-If you are an application developer having questions regarding windowing systems (either X11 or Wayland) please do not hesitate to contact us.
-
-## End user
-Please contact the support channels of your Linux distribution for user support. The KWin development team does not provide end user support.
-
-# Reporting bugs
-
-Please use [KDE's bugtracker](https://bugs.kde.org) and report for [product KWin](https://bugs.kde.org/enter_bug.cgi?product=kwin). For **KineticWE-specific** issues, please open an issue on this repository instead.
-
-## Guidelines for new features
-
-A new Feature can only be added to KWin if:
-
- * it does not violate the primary missions as stated at the start of this document
- * it does not introduce instabilities
- * it is maintained, that is bugs are fixed in a timely manner (second next minor release) if it is not a corner case.
- * it works together with all existing features
- * it supports both single and multi screen
- * it adds a significant advantage
- * it is feature complete, that is supports at least all useful features from competitive implementations
- * it is not a special case for a small user group
- * it does not increase code complexity significantly
- * it does not affect KWin's license (GPLv2+)
-
-All new added features are under probation, that is if any of the non-functional requirements as listed above do not hold true in the next two feature releases, the added feature will be removed again.
-
-The same non functional requirements hold true for any kind of plugins (effects, scripts, etc.). It is suggested to use scripted plugins and distribute them separately.
