@@ -134,7 +134,13 @@ setup_distrobox() {
     "
 
     local buildreqs
-    buildreqs=$(grep '^BuildRequires:' "$SPEC_FILE" | sed 's/BuildRequires:\s*//' | tr '\n' ' ')
+    # Quote pkgconfig(...) tokens: they are valid RPM spec dependencies but the
+    # parentheses are shell metacharacters when the list is interpolated into
+    # the unquoted `bash -c` command below.
+    buildreqs=$(grep '^BuildRequires:' "$SPEC_FILE" \
+        | sed 's/BuildRequires:\s*//' \
+        | sed "s/pkgconfig([^)]*)/'&'/g" \
+        | tr '\n' ' ')
 
     step "Installing build dependencies..."
     distrobox enter "$DISTROBOX_NAME" -- bash -c "

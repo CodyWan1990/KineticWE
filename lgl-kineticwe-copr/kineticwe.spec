@@ -23,8 +23,8 @@
 # ===========================================================================
 
 Name:           kineticwe
-Version:        0.0.1
-Release:        19%{?dist}
+Version:        0.1.0
+Release:        1%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
 License:        GPL-2.0-or-later AND LGPL-2.0-or-later AND MIT AND BSD-3-Clause AND CC0-1.0
@@ -555,6 +555,15 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Tue Oct 21 2026 LGL <lgl@localhost> - 0.1.0-1
+- Bump to 0.1.0.
+- Refactor the session launcher: one canonical start-kineticwe.sh, config/cache
+  redirect kept out of child processes, shell runs as kineticwe-shell.service,
+  config setup moved into kineticwe-config-setup.
+- Add blur support; seed the NVIDIA blur default only on a fresh config root.
+- Fix GTK apps not picking up icon theme changes.
+- Fix Meta+Shift+Scroll in Emerge.
+
 * Sun Oct 19 2026 LGL <lgl@localhost> - 0.0.1-19
 - Add Kinetic Settings support for configuring keyboard layouts and layout switching.
 - Add the xkbregistry build requirement needed by the keyboard-layout catalog.
