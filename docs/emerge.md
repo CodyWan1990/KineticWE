@@ -708,7 +708,21 @@ Deferred (Phase C+, needs your go-ahead):
 - **Swap verb**: `moveWindow(window, delta)` swaps the window `delta` positions
   away in strip order (same column = tile swap; different column = column swap),
   making the `Meta+Shift+Arrow` swap binds work.
-- **Shift+Meta+scroll** pans the strip (avoids the VDM's `Meta+scroll`).
+- **Shift+Meta+scroll** panned the strip (avoids the VDM's `Meta+scroll`);
+  replaced by focus stepping in Revision 15.
+
+**Revision 15 (this session):**
+- **Shift+Meta+scroll now steps column focus.** It used to pan the viewport by
+  one column width plus a fixed 5% offset while leaving `m_activeColumnIdx`
+  untouched, so the strip stopped mid-column (windows clipped at the viewport
+  edge, outer gaps applied to the cut edges) and the focused window could sit
+  off-screen. Wheel input now delegates to
+  `TilingController::focusLeft/Right` (or `focusUp/Down` for a vertical strip),
+  i.e. the same path as `Meta+Left/Right`, resolved against the active output's
+  Emerge engine. That keeps the target column pinned to the viewport edge, moves
+  keyboard focus, targets the visible strip even when another engine registered
+  the axis shortcut first, and avoids a reflow-before-activation race with
+  FocusFollowsMouse.
 
 **Revision 14 (this session):**
 - **Main-axis mouse resize is now a divider.** New `interactiveResizeEnded()`
@@ -836,5 +850,5 @@ Deferred (Phase C+, needs your go-ahead):
   the two enum keys by choice name *or* int, so both UIs round-trip.
 - Known limitation: a vertical stack of more than ~6 tiles can hit the tile
   system's relative minimum size (0.15), like the other stacking layouts.
-- Known limitation: Shift+Meta+scroll pans in fixed increments; a smooth kinetic
-  pan is a future enhancement.
+- Known limitation: Shift+Meta+scroll steps one column per notch; a smooth
+  kinetic pan is not implemented.

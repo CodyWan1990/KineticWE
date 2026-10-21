@@ -10,6 +10,7 @@
 #include "customtile.h"
 #include "core/output.h"
 #include "tilemanager.h"
+#include "tiling/tilingcontroller.h"
 #include "window.h"
 #include "workspace.h"
 
@@ -997,49 +998,61 @@ void EmergeLayoutEngine::normalizeWidthsToFill()
 
 void EmergeLayoutEngine::ensureAxisShortcutRegistered()
 {
-    if (m_panAction) {
+    if (m_wheelForwardAction) {
         return;
     }
-    // Pan forward (Shift+Meta+ScrollDown).
-    m_panAction = new QAction(this);
-    connect(m_panAction.data(), &QAction::triggered, this, [this]() {
-        if (m_columns.isEmpty()) {
-            return;
-        }
-        int idx = m_activeColumnIdx;
-        if (idx < 0 || idx >= m_columns.size()) {
-            idx = 0;
-        }
-        const qreal extent = resolveColumnExtentRel(m_columns.at(idx));
-        qreal offset = viewOffset();
-        offset += (extent > 0.0) ? (extent + 0.05) : 0.5;
-        const qreal maxViewOffset = qMax(qreal(0), stripExtent() - 1.0);
-        offset = qMin(offset, maxViewOffset);
-        m_viewAnchor = columnStripPos(idx) - offset;
-        reflow();
+    // Shift+Meta+scroll steps focus through the strip. Delegate to the
+    // controller's keyboard focus path so the wheel and Meta+Left/Right share
+    // one implementation and always target the active output/desktop, not
+    // whichever engine happened to register this action first. The keyboard
+    // path also activates before reflowing, which matters with
+    // FocusFollowsMouse (see stepWheelFocus()).
+    m_wheelForwardAction = new QAction(this);
+    connect(m_wheelForwardAction.data(), &QAction::triggered, this, [this]() {
+        stepWheelFocus(1);
     });
-    auto *panBack = new QAction(this);
-    connect(panBack, &QAction::triggered, this, [this]() {
-        if (m_columns.isEmpty()) {
-            return;
-        }
-        int idx = m_activeColumnIdx;
-        if (idx < 0 || idx >= m_columns.size()) {
-            idx = 0;
-        }
-        const qreal extent = resolveColumnExtentRel(m_columns.at(idx));
-        qreal offset = viewOffset();
-        offset -= (extent > 0.0) ? (extent + 0.05) : 0.5;
-        offset = qMax(offset, qreal(0));
-        m_viewAnchor = columnStripPos(idx) - offset;
-        reflow();
+    auto *wheelBackAction = new QAction(this);
+    connect(wheelBackAction, &QAction::triggered, this, [this]() {
+        stepWheelFocus(-1);
     });
     // Shift+Meta+scroll — avoids conflict with the VirtualDesktopManager's
     // Meta+scroll desktop-switch shortcuts.
     input()->registerAxisShortcut(Qt::MetaModifier | Qt::ShiftModifier,
-                                  PointerAxisDown, m_panAction.data());
+                                  PointerAxisDown, m_wheelForwardAction.data());
     input()->registerAxisShortcut(Qt::MetaModifier | Qt::ShiftModifier,
-                                  PointerAxisUp, panBack);
+                                  PointerAxisUp, wheelBackAction);
+}
+
+void EmergeLayoutEngine::stepWheelFocus(int delta)
+{
+    // This action may belong to an engine on another output or desktop (every
+    // Emerge engine registers the same axis shortcut), so resolve the active
+    // strip at trigger time instead of acting on this instance.
+    TilingController *controller = workspace()->tilingController();
+    EmergeLayoutEngine *engine = controller ? controller->activeEmergeLayoutEngine() : nullptr;
+    if (!engine) {
+        return;
+    }
+
+    // Reuse the keyboard paths: they start from the actually focused window
+    // and activate the target before the strip reflows. Reflowing first would
+    // move windows under the stationary pointer and make FocusFollowsMouse
+    // schedule a delayed focus for whatever landed under the cursor, undoing
+    // the move.
+    const bool forward = delta > 0;
+    if (engine->axis() == Qt::Horizontal) {
+        if (forward) {
+            controller->focusRight();
+        } else {
+            controller->focusLeft();
+        }
+    } else {
+        if (forward) {
+            controller->focusDown();
+        } else {
+            controller->focusUp();
+        }
+    }
 }
 
 void EmergeLayoutEngine::cancelMoveWindow(Window *window)

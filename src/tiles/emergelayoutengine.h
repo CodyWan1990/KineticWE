@@ -152,6 +152,12 @@ public:
     void setViewportOffset(qreal offset) override;
     qreal viewportOffset() const override;
 
+    /// Orientation the strip currently runs along, as resolved by the last reflow.
+    Qt::Orientation axis() const
+    {
+        return m_axis;
+    }
+
     void focusColumnLeft() override;
     void focusColumnRight() override;
     void moveColumnLeft() override;
@@ -206,6 +212,7 @@ private:
     qreal focusAnchorFor(int targetIdx, int prevIdx, qreal oldViewOffset) const;
     void setActiveColumn(int newIndex);
     void focusAdjacentColumn(int delta);
+    void stepWheelFocus(int delta);
 
     RectF makeRect(qreal mainPos, qreal crossPos, qreal mainExtent, qreal crossExtent) const;
     Qt::Orientation effectiveAxis() const;
@@ -229,7 +236,7 @@ private:
     /// Bottom edge (global) of the union of every output's geometry.
     int unionBottomPx() const;
     void ensureAxisShortcutRegistered();
-    QPointer<QAction> m_panAction;
+    QPointer<QAction> m_wheelForwardAction;
 
     int columnOfWindow(Window *window) const;
     int tileIndexOfWindow(Window *window) const;
