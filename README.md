@@ -65,6 +65,19 @@ kineticwe-setup-greeter
 
 Then reboot.
 
+### [UNINSTALL KineticV1 INSTRUCTIONS]
+1. login to a KDE or KineticWE session
+2. `systemctl set-default multi-user.target` (TTY after reboot)
+3. `reboot`
+4. login
+5. `sudo dnf copr remove theblackdon/kineticwe`
+6. `sudo dnf copr remove lionheartp/Hyprland`
+7. `sudo rpm -e --nodeps kineticwe plasma-desktop plasma-workspace kwin kwin-libs kwin-common`
+8. `sudo dnf upgrade --refresh`
+9. `sudo dnf group install kde-desktop`
+10. `systemctl set-default graphical.target`
+11. `reboot` 
+
 ### Arch Linux
 
 #### Binary repo (recommended)
