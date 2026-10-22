@@ -8,8 +8,36 @@
 
 pkgbase=kineticwe
 pkgname=(kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter)
-pkgver=0.0.1
-pkgrel=19
+# KWE_BUILD (optional): comma-separated subset of the names above, e.g.
+# KWE_BUILD=kineticwe-noctalia,kineticwe-greeter. CI sets it to rebuild only
+# the packages a code or ABI change affects; build() skips the phases of the
+# others. Unset or empty builds all packages (install-arch.sh, local builds).
+if [[ -n "${KWE_BUILD:-}" ]]; then
+    _kwe_sel=()
+    IFS=, read -ra _kwe_req <<< "$KWE_BUILD"
+    for _kwe_p in "${_kwe_req[@]}"; do
+        [[ -n "$_kwe_p" ]] || continue
+        if [[ " ${pkgname[*]} " != *" $_kwe_p "* ]]; then
+            printf '==> ERROR: KWE_BUILD: unknown package "%s" (valid: %s)\n' \
+                "$_kwe_p" "${pkgname[*]}" >&2
+            return 1
+        fi
+    done
+    # Filter in canonical order, whatever order KWE_BUILD lists them in.
+    for _kwe_p in "${pkgname[@]}"; do
+        if [[ ",$KWE_BUILD," == *",$_kwe_p,"* ]]; then
+            _kwe_sel+=("$_kwe_p")
+        fi
+    done
+    if (( ${#_kwe_sel[@]} == 0 )); then
+        printf '==> ERROR: KWE_BUILD="%s" selects no packages\n' "$KWE_BUILD" >&2
+        return 1
+    fi
+    pkgname=("${_kwe_sel[@]}")
+    unset _kwe_sel _kwe_req _kwe_p
+fi
+pkgver=0.1.0
+pkgrel=1
 # epoch: the 1.x packaging shipped 1:6.7.80-N. KineticWE 2.0 restarted the
 # version at 0.0.1 (matching the COPR spec), which pacman would otherwise see
 # as a downgrade for existing installs.
@@ -180,12 +208,18 @@ _kwe_normalize() {
     fi
 }
 
+# True if <pkgname> is being built (see KWE_BUILD near pkgname above).
+_kwe_want() {
+    [[ " ${pkgname[*]} " == *" $1 "* ]]
+}
+
 # CI release builds (KWE_ABI_PIN=1) pin the exact upstream qt6-base version,
 # like Fedora's %{_qt6_version} Requires: kineticwe and the portal use Qt
 # private API, which has no compatibility guarantee between Qt releases. pkgrel
 # is left out so an Arch rebuild of the same Qt still satisfies it. Local
 # builds (install-arch.sh) stay unpinned so a Qt update never blocks pacman
-# before the user can rebuild.
+# before the user can rebuild. CI partial rebuilds also set KWE_BUILD (see
+# pkgname).
 _kwe_qt_pin() {
     [[ "${KWE_ABI_PIN:-}" == 1 ]] || return 0
     local qtver
@@ -276,86 +310,94 @@ KWE_KGA
 build() {
     cd "$srcdir"
 
-    # --- Phase 1: kglobalacceld (pinned KDE master commit) ---
-    echo "==> Building kglobalacceld..."
-    cmake -S kglobalacceld -B kga-build -GNinja \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_SKIP_RPATH=ON \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DBUILD_TESTING=OFF \
-        -Wno-dev
-    cmake --build kga-build
+    if _kwe_want kineticwe; then
+        # --- Phase 1: kglobalacceld (pinned KDE master commit) ---
+        echo "==> Building kglobalacceld..."
+        cmake -S kglobalacceld -B kga-build -GNinja \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_SKIP_RPATH=ON \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF \
+            -Wno-dev
+        cmake --build kga-build
 
-    # Stage it so kinetic-we's CMake finds it
-    mkdir -p "$srcdir/kga-staging"
-    DESTDIR="$srcdir/kga-staging" cmake --install kga-build --prefix /usr
+        # Stage it so kinetic-we's CMake finds it
+        mkdir -p "$srcdir/kga-staging"
+        DESTDIR="$srcdir/kga-staging" cmake --install kga-build --prefix /usr
 
-    # --- Phase 2: kdecoration (pinned KDE master commit) ---
-    # kinetic-we uses KDecoration3::Style, which the released kdecoration in
-    # the repos does not have. Build it and stage it next to kglobalacceld.
-    echo "==> Building kdecoration..."
-    cmake -S kdecoration -B kdeco-build -GNinja \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_SKIP_RPATH=ON \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DBUILD_TESTING=OFF \
-        -Wno-dev
-    cmake --build kdeco-build
-    DESTDIR="$srcdir/kga-staging" cmake --install kdeco-build --prefix /usr
+        # --- Phase 2: kdecoration (pinned KDE master commit) ---
+        # kinetic-we uses KDecoration3::Style, which the released kdecoration in
+        # the repos does not have. Build it and stage it next to kglobalacceld.
+        echo "==> Building kdecoration..."
+        cmake -S kdecoration -B kdeco-build -GNinja \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_SKIP_RPATH=ON \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF \
+            -Wno-dev
+        cmake --build kdeco-build
+        DESTDIR="$srcdir/kga-staging" cmake --install kdeco-build --prefix /usr
 
-    # --- Phase 3: fixed kconfig_compiler (build-time tool only) ---
-    echo "==> Building kconfig_compiler..."
-    cmake -S kconfig -B kconfig-build -GNinja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_TESTING=OFF \
-        -Wno-dev
-    cmake --build kconfig-build --target kconfig_compiler
+        # --- Phase 3: fixed kconfig_compiler (build-time tool only) ---
+        echo "==> Building kconfig_compiler..."
+        cmake -S kconfig -B kconfig-build -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -Wno-dev
+        cmake --build kconfig-build --target kconfig_compiler
 
-    # --- Phase 4: kinetic-we compositor ---
-    echo "==> Building kinetic-we..."
-    # CMAKE_INSTALL_MESSAGE=NEVER (here and for the portal): the per-file
-    # "-- Installing:" lines of the icon themes alone push the CI job log past
-    # GitLab's 4 MB limit, hiding everything after package().
-    cmake -S "$_sourcebase" -B kwin-build -GNinja \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_PREFIX_PATH="$srcdir/kga-staging/usr" \
-        -DCMAKE_SKIP_RPATH=ON \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DBUILD_TESTING=OFF \
-        -DKWIN_KCONFIG_COMPILER="$srcdir/kconfig-build/bin/kconfig_compiler_kf6" \
-        -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
-        -DKWIN_BUILD_KCMS=OFF \
-        -DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=ON \
-        -DCMAKE_INSTALL_MESSAGE=NEVER \
-        -Wno-dev
-    cmake --build kwin-build
+        # --- Phase 4: kinetic-we compositor ---
+        echo "==> Building kinetic-we..."
+        # CMAKE_INSTALL_MESSAGE=NEVER (here and for the portal): the per-file
+        # "-- Installing:" lines of the icon themes alone push the CI job log past
+        # GitLab's 4 MB limit, hiding everything after package().
+        cmake -S "$_sourcebase" -B kwin-build -GNinja \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_PREFIX_PATH="$srcdir/kga-staging/usr" \
+            -DCMAKE_SKIP_RPATH=ON \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF \
+            -DKWIN_KCONFIG_COMPILER="$srcdir/kconfig-build/bin/kconfig_compiler_kf6" \
+            -DKWIN_BUILD_GLOBALSHORTCUTS=ON \
+            -DKWIN_BUILD_KCMS=OFF \
+            -DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=ON \
+            -DCMAKE_INSTALL_MESSAGE=NEVER \
+            -Wno-dev
+        cmake --build kwin-build
+    fi
 
-    # --- Phase 5: portal backend (rebranded xdg-desktop-portal-kde) ---
-    # KDE_INSTALL_LIBEXECDIR is left at its default, like the spec.
-    echo "==> Building xdg-desktop-portal-kwe..."
-    cmake -S "$_sourcebase/portal/xdg-desktop-portal-kwe" -B portal-build -GNinja \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_SKIP_RPATH=ON \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DBUILD_TESTING=OFF \
-        -DCMAKE_INSTALL_MESSAGE=NEVER \
-        -Wno-dev
-    cmake --build portal-build
+    if _kwe_want xdg-desktop-portal-kwe; then
+        # --- Phase 5: portal backend (rebranded xdg-desktop-portal-kde) ---
+        # KDE_INSTALL_LIBEXECDIR is left at its default, like the spec.
+        echo "==> Building xdg-desktop-portal-kwe..."
+        cmake -S "$_sourcebase/portal/xdg-desktop-portal-kwe" -B portal-build -GNinja \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_SKIP_RPATH=ON \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_INSTALL_MESSAGE=NEVER \
+            -Wno-dev
+        cmake --build portal-build
+    fi
 
-    # --- Phase 6: Noctalia fork shell (noctalia-kwe) ---
-    echo "==> Building kineticwe-noctalia..."
-    arch-meson "$_sourcebase/shell/noctalia" shell-build \
-        -Dtests=disabled
-    meson compile -C shell-build
+    if _kwe_want kineticwe-noctalia; then
+        # --- Phase 6: Noctalia fork shell (noctalia-kwe) ---
+        echo "==> Building kineticwe-noctalia..."
+        arch-meson "$_sourcebase/shell/noctalia" shell-build \
+            -Dtests=disabled
+        meson compile -C shell-build
+    fi
 
-    # --- Phase 7: Noctalia greeter (kineticwe-greeter) ---
-    # -Dcpp_args/-Dc_args replace the environment flags in meson, so makepkg's
-    # CFLAGS/CXXFLAGS are passed through explicitly alongside -fPIE.
-    echo "==> Building kineticwe-greeter..."
-    arch-meson noctalia-greeter greeter-build \
-        -Dcpp_args="${CXXFLAGS:-} -fPIE" \
-        -Dc_args="${CFLAGS:-} -fPIE"
-    meson compile -C greeter-build
+    if _kwe_want kineticwe-greeter; then
+        # --- Phase 7: Noctalia greeter (kineticwe-greeter) ---
+        # -Dcpp_args/-Dc_args replace the environment flags in meson, so makepkg's
+        # CFLAGS/CXXFLAGS are passed through explicitly alongside -fPIE.
+        echo "==> Building kineticwe-greeter..."
+        arch-meson noctalia-greeter greeter-build \
+            -Dcpp_args="${CXXFLAGS:-} -fPIE" \
+            -Dc_args="${CFLAGS:-} -fPIE"
+        meson compile -C greeter-build
+    fi
 }
 
 package_kineticwe() {

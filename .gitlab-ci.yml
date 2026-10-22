@@ -9,14 +9,27 @@
 #                                  when non-doc code changed since the built
 #                                  commit, Qt / private-API KF6 versions changed
 #                                  or a linked soname is gone, triggers one
-#                                  REBUILD=1 pipeline on that branch
+#                                  REBUILD=1 pipeline on that branch, with
+#                                  KWE_BUILD naming the affected packages
 #   * trigger REBUILD=1 .......... rebuild against current Arch; pkgrel gets
 #                                  a .YYYYMMDDHHMM suffix so pacman offers it as
 #                                  an upgrade (e.g. 15 -> 15.202608031200)
 #   * schedule "daily-smoke" ..... (SMOKE=1) installs the published packages on
 #                                  a fully updated Arch container and checks
 #                                  every library resolves; a failure emails you
-#   * manual "Run pipeline" ...... on-demand rebuild
+#   * manual "Run pipeline" ...... on-demand rebuild; add the variable
+#                                  KWE_BUILD to rebuild only some packages
+#
+# Partial rebuilds: KWE_BUILD is a comma-separated subset of the four split
+# packages (e.g. "kineticwe-noctalia,kineticwe-greeter"); unset/empty builds
+# all four, and tag pushes (without REBUILD=1) always build all four. The
+# PKGBUILD only builds/packages the listed ones. Because each pages deploy
+# replaces the whole repo, every package NOT rebuilt is carried over from the
+# currently published repo (ci/fetch-published.sh, with its .sig). Race guard:
+# if the Qt / KF6 versions the published build was made against
+# (kineticwe-abi.txt "version" lines) differ from this container's, kineticwe
+# and xdg-desktop-portal-kwe are added to the set. kineticwe-keyring is always
+# rebuilt (cheap, arch=any).
 #
 # CI builds set KWE_ABI_PIN=1, so kineticwe and xdg-desktop-portal-kwe depend
 # on the exact qt6-base version they were built with (Qt private API). Users'
@@ -144,6 +157,44 @@ build-package:
         fi
       done
       pacman -S --noconfirm --needed "${todo[@]}"
+    # Build set (see top): validate KWE_BUILD, then the race guard. This runs
+    # after the system upgrade and dependency install, so pacman -Q reports the
+    # versions this build will actually compile against. The published
+    # manifest's "version <pkg> <ver>" lines carry the upstream version
+    # (pkgrel dropped); compare against the same.
+    - |
+      all="kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter"
+      if [ -n "$CI_COMMIT_TAG" ] && [ "$REBUILD" != 1 ]; then
+        KWE_BUILD=""   # release build: everything
+      fi
+      want=" "
+      for p in $(tr ',' ' ' <<<"${KWE_BUILD:-}"); do
+        case " $all " in
+          *" $p "*) want+="$p " ;;
+          *) echo "KWE_BUILD: unknown package '$p' (valid: $all)"; exit 1 ;;
+        esac
+      done
+      [ "$want" != " " ] || want=" $all "
+      if curl -sfL "${CI_PAGES_URL:?Pages not enabled}/x86_64/kineticwe-abi.txt" -o /tmp/published-abi.txt; then
+        while read -r kind pkg ver _; do
+          [ "$kind" = version ] || continue
+          cur=$(pacman -Q "$pkg" 2>/dev/null | awk '{print $2}')
+          cur="${cur%-*}"
+          if [ "$cur" != "$ver" ]; then
+            echo "Race guard: $pkg is ${cur:-not installed} here, published build used $ver"
+            want+="kineticwe xdg-desktop-portal-kwe "
+          fi
+        done < /tmp/published-abi.txt
+      else
+        echo "No published kineticwe-abi.txt; building every package"
+        want=" $all "
+      fi
+      # canonical order, no duplicates
+      KWE_BUILD=""
+      for p in $all; do
+        case "$want" in *" $p "*) KWE_BUILD+="${KWE_BUILD:+,}$p" ;; esac
+      done
+      echo "Building: $KWE_BUILD (+ kineticwe-keyring)"
     # makepkg refuses to run as root; runuser is in util-linux (base).
     - useradd -m builder
     # Build this exact CI checkout (not the PKGBUILD's pinned _commit): the
@@ -155,20 +206,33 @@ build-package:
       git archive --format=tar.gz --prefix="kineticwe-$pkgver/" -o /home/builder/kineticwe-src.tar.gz HEAD
     - cp PKGBUILD kineticwe.install kineticwe-greeter.install /home/builder/ && chown -R builder:builder /home/builder
     # KWE_ABI_PIN=1: pin the exact qt6-base version (see PKGBUILD _kwe_qt_pin).
-    - runuser -u builder -- env KWE_ABI_PIN=1 KWE_LOCAL_TARBALL=/home/builder/kineticwe-src.tar.gz bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
+    # KWE_BUILD: only build/package the split packages in the build set.
+    - runuser -u builder -- env KWE_ABI_PIN=1 KWE_BUILD="$KWE_BUILD" KWE_LOCAL_TARBALL=/home/builder/kineticwe-src.tar.gz bash -c 'cd /home/builder && makepkg -f --nodeps --noconfirm'
     # Repo keyring package (arch=any, no dependencies).
     - cp -r arch/kineticwe-keyring /home/builder/keyring && chown -R builder:builder /home/builder/keyring
     - runuser -u builder -- bash -c 'cd /home/builder/keyring && makepkg -f --nodeps --noconfirm'
     - mkdir -p public/x86_64
-    # every split package (!debug above keeps -debug packages out)
+    # the rebuilt split packages (!debug above keeps -debug packages out)
     - cp /home/builder/*.pkg.tar.zst /home/builder/keyring/*.pkg.tar.zst public/x86_64/
-    # Sign every package (unsigned without KWE_SIGNING_KEY, see top); repo.sh
-    # then checks each signature and signs the database.
+    # Sign the rebuilt packages (unsigned without KWE_SIGNING_KEY, see top);
+    # carried-over packages keep their published .sig. repo.sh then checks
+    # each signature and signs the database.
     - export GNUPGHOME="$(mktemp -d)"
     - KWE_SIGN_FPR=$(ci/sign.sh arch/kineticwe-keyring public/x86_64/*.pkg.tar.zst)
+    # Carry over the packages not in the build set from the published repo,
+    # or the pages deploy (which replaces the whole repo) would drop them.
+    - |
+      carry=()
+      for p in kineticwe xdg-desktop-portal-kwe kineticwe-noctalia kineticwe-greeter; do
+        case ",$KWE_BUILD," in *",$p,"*) ;; *) carry+=("$p") ;; esac
+      done
+      if [ ${#carry[@]} -gt 0 ]; then
+        ci/fetch-published.sh "$CI_PAGES_URL/x86_64" public/x86_64 "${carry[@]}"
+      fi
     - GPGKEY="$KWE_SIGN_FPR" ci/repo.sh public/x86_64
-    # Qt / KF6 versions and linked sonames of this build, read by abi-watch.
-    - ci/abi-manifest.sh /home/builder/*.pkg.tar.zst > public/x86_64/kineticwe-abi.txt
+    # Qt / KF6 versions and linked sonames of every package in the repo
+    # (rebuilt and carried over), read by abi-watch and the race guard.
+    - ci/abi-manifest.sh public/x86_64/*.pkg.tar.zst > public/x86_64/kineticwe-abi.txt
     - cat public/x86_64/kineticwe-abi.txt
   artifacts:
     paths:
