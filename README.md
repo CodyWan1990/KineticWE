@@ -42,7 +42,7 @@ The recommended way to install KineticWE on Fedora is via [COPR](https://copr.fe
 COPR provides pre-built RPMs, so you don't need to compile from source.
 
 ```bash
-sudo dnf copr enable linuxgamerlife/lgl-experimental
+sudo dnf copr enable theblackdon/kwee
 sudo dnf install kineticwe
 ```
 
