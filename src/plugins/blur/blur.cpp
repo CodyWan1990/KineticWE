@@ -377,12 +377,6 @@ void BlurEffect::updateBlurRegion(EffectWindow *w)
         }
     }
 
-    if (isShellWindow) {
-        // The shell chrome must not opt itself in through a surface request.
-        content.reset();
-        frame.reset();
-    }
-
     if (content.has_value() || frame.has_value()) {
         BlurEffectData &data = m_windows[w];
         data.content = content;
