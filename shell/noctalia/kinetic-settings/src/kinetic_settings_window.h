@@ -13,6 +13,7 @@
 #include "kinetic-settings/src/keyboard_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
 #include "kinetic-settings/src/pointing_devices_page.h"
+#include "kinetic-settings/src/shadows_page.h"
 #include "kinetic-settings/src/tiling_page.h"
 #include "kinetic-settings/src/window_behavior_page.h"
 #include "kinetic-settings/src/window_rules_page.h"
@@ -87,6 +88,7 @@ private:
     AppearanceTitleBars,
     AppearanceIcons,
     AppearanceCursors,
+    AppearanceShadows,
     Animations,
     DesktopEffects,
     Blur,
@@ -165,6 +167,8 @@ private:
   [[nodiscard]] DesktopEffectsPage::Callbacks desktopEffectsPageCallbacks();
   [[nodiscard]] BlurPage::Filter blurFilter() const;
   [[nodiscard]] BlurPage::Callbacks blurPageCallbacks();
+  [[nodiscard]] ShadowsPage::Filter shadowsFilter() const;
+  [[nodiscard]] ShadowsPage::Callbacks shadowsPageCallbacks();
   [[nodiscard]] AnimationsPage::Filter animationsFilter() const;
   [[nodiscard]] AnimationsPage::Callbacks animationsPageCallbacks();
   [[nodiscard]] DefaultAppsPage::Filter defaultAppsFilter() const;
@@ -211,6 +215,7 @@ private:
   std::unique_ptr<CursorsPage> m_cursorsPage;
   std::unique_ptr<DesktopEffectsPage> m_desktopEffectsPage;
   std::unique_ptr<BlurPage> m_blurPage;
+  std::unique_ptr<ShadowsPage> m_shadowsPage;
   std::unique_ptr<AnimationsPage> m_animationsPage;
   std::unique_ptr<DefaultAppsPage> m_defaultAppsPage;
   std::unique_ptr<AccessibilityPage> m_accessibilityPage;

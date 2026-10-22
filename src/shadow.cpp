@@ -45,6 +45,9 @@ std::unique_ptr<Shadow> Shadow::createShadow(Window *window)
 {
     auto shadow = createShadowFromDecoration(window);
     if (!shadow) {
+        shadow = createShadowFromTiling(window);
+    }
+    if (!shadow) {
         shadow = createShadowFromWayland(window);
     }
 #if KWIN_BUILD_X11
@@ -85,6 +88,18 @@ std::unique_ptr<Shadow> Shadow::createShadowFromDecoration(Window *window)
     }
     auto shadow = std::make_unique<Shadow>(window);
     if (!shadow->init(window->decoration())) {
+        return nullptr;
+    }
+    return shadow;
+}
+
+std::unique_ptr<Shadow> Shadow::createShadowFromTiling(Window *window)
+{
+    if (!window->tilingState().shadow) {
+        return nullptr;
+    }
+    auto shadow = std::make_unique<Shadow>(window);
+    if (!shadow->init(window->tilingState().shadow)) {
         return nullptr;
     }
     return shadow;
@@ -188,13 +203,18 @@ bool Shadow::init(const QList<uint32_t> &data)
 
 bool Shadow::init(KDecoration3::Decoration *decoration)
 {
+    return init(decoration->shadow());
+}
+
+bool Shadow::init(const std::shared_ptr<KDecoration3::DecorationShadow> &decorationShadow)
+{
     if (m_decorationShadow) {
         // disconnect previous connections
         disconnect(m_decorationShadow.get(), &KDecoration3::DecorationShadow::innerShadowRectChanged, m_window, &Window::updateShadow);
         disconnect(m_decorationShadow.get(), &KDecoration3::DecorationShadow::shadowChanged, m_window, &Window::updateShadow);
         disconnect(m_decorationShadow.get(), &KDecoration3::DecorationShadow::paddingChanged, m_window, &Window::updateShadow);
     }
-    m_decorationShadow = decoration->shadow();
+    m_decorationShadow = decorationShadow;
     if (!m_decorationShadow) {
         return false;
     }
@@ -285,8 +305,21 @@ bool Shadow::updateShadow()
                     return true;
                 }
             }
+            if (const auto &tilingShadow = m_window->tilingState().shadow) {
+                if (init(tilingShadow)) {
+                    return true;
+                }
+            }
         }
-        return false;
+        // Neither the decoration nor tiling provides a shadow anymore; drop
+        // it and fall through so a client-provided shadow can take over.
+        init(std::shared_ptr<KDecoration3::DecorationShadow>());
+    }
+
+    if (const auto &tilingShadow = m_window->tilingState().shadow) {
+        if (init(tilingShadow)) {
+            return true;
+        }
     }
 
     if (m_window && m_window->surface()) {

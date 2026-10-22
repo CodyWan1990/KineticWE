@@ -128,11 +128,13 @@ public Q_SLOTS:
 private:
     static std::unique_ptr<Shadow> createShadowFromX11(Window *window);
     static std::unique_ptr<Shadow> createShadowFromDecoration(Window *window);
+    static std::unique_ptr<Shadow> createShadowFromTiling(Window *window);
     static std::unique_ptr<Shadow> createShadowFromWayland(Window *window);
     static std::unique_ptr<Shadow> createShadowFromInternalWindow(Window *window);
     static QList<uint32_t> readX11ShadowProperty(xcb_window_t id);
     bool init(const QList<uint32_t> &data);
     bool init(KDecoration3::Decoration *decoration);
+    bool init(const std::shared_ptr<KDecoration3::DecorationShadow> &decorationShadow);
     bool init(const QPointer<ShadowInterface> &shadow);
     bool init(const QWindow *window);
     Window *m_window;

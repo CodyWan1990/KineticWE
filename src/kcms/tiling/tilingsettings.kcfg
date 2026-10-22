@@ -94,6 +94,44 @@
       <min>0</min>
       <max>50</max>
     </entry>
+    <entry name="tilingShadowMode" key="TilingShadowMode" type="Enum">
+      <label>Shadow display mode for windows</label>
+      <choices>
+        <choice name="None"/>
+        <choice name="AllTiled"/>
+        <choice name="ActiveOnly"/>
+        <choice name="AllWindows"/>
+      </choices>
+      <default>None</default>
+    </entry>
+    <entry name="tilingShadowSize" key="TilingShadowSize" type="Int">
+      <label>Blur radius of the tiling shadow (in pixels)</label>
+      <default>16</default>
+      <min>0</min>
+      <max>64</max>
+    </entry>
+    <entry name="tilingShadowColor" key="TilingShadowColor" type="Color">
+      <label>Color of the shadow drawn around tiled windows</label>
+      <default code="true">QColor(0, 0, 0, 120)</default>
+    </entry>
+    <entry name="tilingShadowOffsetX" key="TilingShadowOffsetX" type="Int">
+      <label>Horizontal offset of the tiling shadow (in pixels, negative shifts left)</label>
+      <default>0</default>
+      <min>-32</min>
+      <max>32</max>
+    </entry>
+    <entry name="tilingShadowOpacity" key="TilingShadowOpacity" type="Int">
+      <label>Opacity of the tiling shadow (percent, multiplies the color's alpha)</label>
+      <default>100</default>
+      <min>0</min>
+      <max>100</max>
+    </entry>
+    <entry name="tilingShadowOffsetY" key="TilingShadowOffsetY" type="Int">
+      <label>Vertical offset of the tiling shadow (in pixels)</label>
+      <default>4</default>
+      <min>0</min>
+      <max>32</max>
+    </entry>
     <entry name="resizeStep" key="ResizeStep" type="Double">
       <label>How much each Grow/Shrink shortcut press changes a tiled window's share of its column, or the column divider in a master/stack layout. Expressed in weight units (0.01 - 1.0). The KDE standard 0.05 means a single press moves the divider by 5% of the screen width, or grows a leaf's share by ~5% of its column.</label>
       <default>0.05</default>

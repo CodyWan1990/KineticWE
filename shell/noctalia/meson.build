@@ -1048,6 +1048,7 @@ _noctalia_sources = files(
   'kinetic-settings/src/animations_page.cpp',
   'kinetic-settings/src/kinetic_settings_window.cpp',
   'kinetic-settings/src/appearance_page.cpp',
+  'kinetic-settings/src/shadows_page.cpp',
   'kinetic-settings/src/icons_page.cpp',
   'kinetic-settings/src/ini_config.cpp',
   'kinetic-settings/src/cursors_page.cpp',

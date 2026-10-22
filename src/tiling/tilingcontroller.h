@@ -21,6 +21,8 @@
 #include <QPointer>
 #include <QTimer>
 
+#include <memory>
+
 class KConfigGroup;
 
 namespace KWin
@@ -386,6 +388,18 @@ private:
 
     QColor resolveColor(ColorSource source, const QColor &custom) const;
     void applyCornerRadius(Window *window);
+
+    // Drop shadow drawn under tiled windows. One DecorationShadow is shared
+    // by every window and rebuilt only when its parameters change.
+    BorderMode m_shadowMode = BorderMode::None;
+    int m_shadowSize = 16;
+    QColor m_shadowColor = QColor(0, 0, 0, 120);
+    int m_shadowOffsetX = 0;
+    int m_shadowOffsetY = 4;
+    int m_shadowOpacity = 100; // percent, multiplies the color's own alpha
+    std::shared_ptr<KDecoration3::DecorationShadow> m_shadow;
+    QString m_shadowKey;
+    std::shared_ptr<KDecoration3::DecorationShadow> currentShadow();
 
     void readNoctaliaColors();
     void readSystemAccent();

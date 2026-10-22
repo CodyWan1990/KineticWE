@@ -29,19 +29,24 @@
 
 #include <KColorScheme>
 #include <KConfigGroup>
+#include <KDecoration3/DecorationShadow>
 #include <KSharedConfig>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QPainter>
 #include <QPalette>
 #include <QStandardPaths>
 #include <QVariant>
 #include <QtGlobal>
 
+#include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <utility>
+#include <vector>
 
 namespace KWin
 {
@@ -393,6 +398,22 @@ void TilingController::reconfigure()
     }
     m_borderThickness = tilingGroup.readEntry("TilingBorderThickness", 2.0);
     m_cornerRadius = tilingGroup.readEntry("TilingCornerRadius", 0);
+
+    const QString shadowModeString = tilingGroup.readEntry("TilingShadowMode", QStringLiteral("None"));
+    if (shadowModeString == QLatin1String("AllTiled")) {
+        m_shadowMode = BorderMode::AllTiled;
+    } else if (shadowModeString == QLatin1String("ActiveOnly")) {
+        m_shadowMode = BorderMode::ActiveOnly;
+    } else if (shadowModeString == QLatin1String("AllWindows")) {
+        m_shadowMode = BorderMode::AllWindows;
+    } else {
+        m_shadowMode = BorderMode::None;
+    }
+    m_shadowSize = std::clamp(tilingGroup.readEntry("TilingShadowSize", 16), 0, 64);
+    m_shadowColor = tilingGroup.readEntry("TilingShadowColor", QColor(0, 0, 0, 120));
+    m_shadowOffsetX = std::clamp(tilingGroup.readEntry("TilingShadowOffsetX", 0), -32, 32);
+    m_shadowOffsetY = std::clamp(tilingGroup.readEntry("TilingShadowOffsetY", 4), 0, 32);
+    m_shadowOpacity = std::clamp(tilingGroup.readEntry("TilingShadowOpacity", 100), 0, 100);
 
     const QString activeSourceString = tilingGroup.readEntry("TilingBorderColorSourceActive", QStringLiteral("SystemAccent"));
     if (activeSourceString == QLatin1String("Custom")) {
@@ -903,6 +924,23 @@ void TilingController::updateBorders()
             || layer == OverlayLayer
             || layer == PopupLayer
             || (window->skipTaskbar() && window->skipPager());
+        bool shouldShowShadow = false;
+        if (m_shadowMode != BorderMode::None && !isSystemSurface && !isMaximizedOrFullscreen) {
+            switch (m_shadowMode) {
+            case BorderMode::AllTiled:
+                shouldShowShadow = isTiled;
+                break;
+            case BorderMode::ActiveOnly:
+                shouldShowShadow = (window == activeWindow);
+                break;
+            case BorderMode::AllWindows:
+                shouldShowShadow = true;
+                break;
+            case BorderMode::None:
+                break;
+            }
+        }
+
         bool shouldShow = false;
         if (m_borderMode != BorderMode::None) {
             if (allWindows || isTiled || (activeOnly && window == activeWindow)) {
@@ -940,7 +978,133 @@ void TilingController::updateBorders()
             state.borderColor = borderColor;
             Q_EMIT window->tilingBorderChanged();
         }
+
+        const std::shared_ptr<KDecoration3::DecorationShadow> shadow = shouldShowShadow ? currentShadow() : nullptr;
+        if (state.shadow != shadow) {
+            state.shadow = shadow;
+            window->updateShadow();
+        }
     }
+}
+
+// Blurs the alpha channel of a premultiplied ARGB32 image in place with three
+// box-blur passes per axis, which approximates a gaussian blur.
+static void blurAlpha(QImage &image, int radius)
+{
+    if (radius <= 0) {
+        return;
+    }
+    const int width = image.width();
+    const int height = image.height();
+    std::vector<int> alpha(size_t(width) * height);
+    for (int y = 0; y < height; ++y) {
+        const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+        for (int x = 0; x < width; ++x) {
+            alpha[size_t(y) * width + x] = qAlpha(line[x]);
+        }
+    }
+
+    std::vector<int> scratch(std::max(width, height));
+    const int window = 2 * radius + 1;
+    auto boxBlur = [&](int count, int stride, int base) {
+        int sum = 0;
+        for (int i = -radius; i <= radius; ++i) {
+            sum += alpha[base + std::clamp(i, 0, count - 1) * stride];
+        }
+        for (int i = 0; i < count; ++i) {
+            scratch[i] = sum / window;
+            sum += alpha[base + std::min(i + radius + 1, count - 1) * stride];
+            sum -= alpha[base + std::max(i - radius, 0) * stride];
+        }
+        for (int i = 0; i < count; ++i) {
+            alpha[base + i * stride] = scratch[i];
+        }
+    };
+    for (int pass = 0; pass < 3; ++pass) {
+        for (int y = 0; y < height; ++y) {
+            boxBlur(width, 1, y * width);
+        }
+        for (int x = 0; x < width; ++x) {
+            boxBlur(height, width, x);
+        }
+    }
+
+    for (int y = 0; y < height; ++y) {
+        QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < width; ++x) {
+            const int a = alpha[size_t(y) * width + x];
+            line[x] = qRgba(a, a, a, a);
+        }
+    }
+}
+
+std::shared_ptr<KDecoration3::DecorationShadow> TilingController::currentShadow()
+{
+    QColor tint = m_shadowColor;
+    tint.setAlphaF(tint.alphaF() * m_shadowOpacity / 100.0);
+    if (m_shadowSize <= 0 || tint.alpha() == 0) {
+        return nullptr;
+    }
+
+    const QString key = QStringLiteral("%1/%2/%3/%4/%5")
+                            .arg(m_shadowSize)
+                            .arg(tint.name(QColor::HexArgb))
+                            .arg(m_shadowOffsetX)
+                            .arg(m_shadowOffsetY)
+                            .arg(m_cornerRadius);
+    if (m_shadow && m_shadowKey == key) {
+        return m_shadow;
+    }
+
+    // Three box passes of radius r spread an edge over ~3r on either side.
+    const int blurRadius = std::max(1, m_shadowSize / 2);
+    const int blurExtent = 3 * blurRadius;
+
+    // The image holds a window-shaped box with the shadow around it. The box
+    // must be large enough that the blur cannot reach across it, otherwise
+    // the falloff eats into the shadow and it renders almost transparent.
+    // Like Breeze, only the centre pixel is stretched: the four corner tiles
+    // reach into the window area, which the cut-out below keeps clear.
+    const int radius = std::max(m_cornerRadius, 0);
+    const int boxSize = 2 * radius + 2 * blurExtent + 1;
+    const int margin = blurExtent + std::max(std::abs(m_shadowOffsetX), m_shadowOffsetY);
+    const int imageSize = boxSize + 2 * margin;
+    const QRectF boxRect(margin, margin, boxSize, boxSize);
+
+    QImage image(imageSize, imageSize, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+
+    {
+        QPainter painter(&image);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Qt::white);
+        painter.drawRoundedRect(boxRect.translated(m_shadowOffsetX, m_shadowOffsetY), radius, radius);
+    }
+
+    blurAlpha(image, blurRadius);
+
+    {
+        QPainter painter(&image);
+        painter.setRenderHint(QPainter::Antialiasing);
+        // Tint the blurred mask with the configured color.
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        painter.fillRect(image.rect(), tint);
+        // Punch out the area under the window so translucent windows do not
+        // show their own shadow through them.
+        painter.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Qt::black);
+        painter.drawRoundedRect(boxRect, radius, radius);
+    }
+
+    auto shadow = std::make_shared<KDecoration3::DecorationShadow>();
+    shadow->setPadding(QMarginsF(margin, margin, margin, margin));
+    shadow->setInnerShadowRect(QRectF(imageSize / 2, imageSize / 2, 1, 1));
+    shadow->setShadow(image);
+    m_shadow = shadow;
+    m_shadowKey = key;
+    return m_shadow;
 }
 
 QColor TilingController::resolveColor(ColorSource source, const QColor &custom) const
