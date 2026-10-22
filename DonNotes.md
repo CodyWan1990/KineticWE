@@ -2,6 +2,7 @@
 ## Add
 fonts
 Make it so window rules can pin an app to all desktops 
+add hot corner settings in kinetic settings. 
 
 
 # Need attention

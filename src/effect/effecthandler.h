@@ -214,6 +214,7 @@ public:
      */
     void stopMouseInterception(Effect *effect);
     bool isMouseInterception() const;
+    bool isMouseInterceptionAt(const QPointF &pos) const;
 
     void grabbedKeyboardEvent(QKeyEvent *e);
     bool hasKeyboardGrab() const;

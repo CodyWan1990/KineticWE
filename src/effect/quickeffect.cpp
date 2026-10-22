@@ -9,6 +9,7 @@
 #include "effect/effecthandler.h"
 #include "input_event.h"
 #include "virtualdesktops.h"
+#include "workspace.h"
 
 #include "logging_p.h"
 
@@ -81,6 +82,7 @@ public:
     QPointer<QuickSceneView> mouseImplicitGrab;
     bool running = false;
     bool viewCachingEnabled = false;
+    bool autoSizeRootItem = true;
 };
 
 bool QuickSceneEffectPrivate::isItemOnScreen(QQuickItem *item, LogicalOutput *screen) const
@@ -98,9 +100,14 @@ QuickSceneView::QuickSceneView(QuickSceneEffect *effect, LogicalOutput *screen)
     , m_effect(effect)
     , m_screen(screen)
 {
-    setGeometry(screen->geometry());
-    connect(screen, &LogicalOutput::geometryChanged, this, [this, screen]() {
-        setGeometry(screen->geometry());
+    setGeometry(m_effect->viewGeometry(m_screen));
+    setWorkAreaGeometry(m_effect->viewInputGeometry(m_screen));
+    connect(screen, &LogicalOutput::geometryChanged, this, [this]() {
+        setGeometry(m_effect->viewGeometry(m_screen));
+        setWorkAreaGeometry(m_effect->viewInputGeometry(m_screen));
+    });
+    connect(this, &OffscreenQuickView::geometryChanged, this, [this] {
+        Q_EMIT viewGeometryChanged();
     });
     connect(VirtualDesktopManager::self(), &VirtualDesktopManager::currentChanged, this, [this](VirtualDesktop *, VirtualDesktop *newDesktop, LogicalOutput *screen) {
         if (m_screen != screen) {
@@ -129,12 +136,14 @@ void QuickSceneView::setRootItem(QQuickItem *item)
     m_rootItem.reset(item);
     m_rootItem->setParentItem(contentItem());
 
-    auto updateSize = [this]() {
-        m_rootItem->setSize(contentItem()->size());
-    };
-    updateSize();
-    connect(contentItem(), &QQuickItem::widthChanged, m_rootItem.get(), updateSize);
-    connect(contentItem(), &QQuickItem::heightChanged, m_rootItem.get(), updateSize);
+    if (m_effect->autoSizeRootItem()) {
+        auto updateSize = [this]() {
+            m_rootItem->setSize(contentItem()->size());
+        };
+        updateSize();
+        connect(contentItem(), &QQuickItem::widthChanged, m_rootItem.get(), updateSize);
+        connect(contentItem(), &QQuickItem::heightChanged, m_rootItem.get(), updateSize);
+    }
 }
 
 QuickSceneEffect *QuickSceneView::effect() const
@@ -176,6 +185,26 @@ VirtualDesktop *QuickSceneView::currentDesktop() const
 void QuickSceneView::setCurrentDesktop(VirtualDesktop *desktop)
 {
     VirtualDesktopManager::self()->setCurrent(desktop, m_screen);
+}
+
+QRect QuickSceneView::viewGeometry() const
+{
+    const Rect geometry = OffscreenQuickView::geometry();
+    return QRect(geometry.x(), geometry.y(), geometry.width(), geometry.height());
+}
+
+QRect QuickSceneView::workAreaGeometry() const
+{
+    return m_workAreaGeometry;
+}
+
+void QuickSceneView::setWorkAreaGeometry(const QRect &geometry)
+{
+    if (m_workAreaGeometry == geometry) {
+        return;
+    }
+    m_workAreaGeometry = geometry;
+    Q_EMIT workAreaGeometryChanged();
 }
 
 QuickSceneView *QuickSceneView::findView(QQuickItem *item)
@@ -341,8 +370,8 @@ QuickSceneView *QuickSceneEffect::viewForScreen(LogicalOutput *screen) const
 
 QuickSceneView *QuickSceneEffect::viewAt(const QPoint &pos) const
 {
-    const auto it = std::find_if(d->views.begin(), d->views.end(), [pos](const auto &view) {
-        return view.second->geometry().contains(pos);
+    const auto it = std::find_if(d->views.begin(), d->views.end(), [pos, this](const auto &view) {
+        return view.second->geometry().contains(pos) && acceptsInputAt(view.second->screen(), pos);
     });
     return it == d->views.end() ? nullptr : it->second.get();
 }
@@ -432,6 +461,46 @@ void QuickSceneEffect::setViewCachingEnabled(bool enabled)
     d->viewCachingEnabled = enabled;
 }
 
+Rect QuickSceneEffect::viewGeometry(LogicalOutput *screen) const
+{
+    return screen->geometry();
+}
+
+Rect QuickSceneEffect::viewInputGeometry(LogicalOutput *screen) const
+{
+    return viewGeometry(screen);
+}
+
+bool QuickSceneEffect::acceptsInputAt(LogicalOutput *screen, const QPoint &pos) const
+{
+    return viewInputGeometry(screen).contains(pos);
+}
+
+bool QuickSceneEffect::acceptsInputAt(const QPointF &pos) const
+{
+    LogicalOutput *screen = workspace()->outputAt(pos);
+    return screen && acceptsInputAt(screen, pos.toPoint());
+}
+
+void QuickSceneEffect::updateViewGeometries()
+{
+    for (const auto &[screen, view] : d->views) {
+        view->setGeometry(viewGeometry(screen));
+        const Rect inputGeometry = viewInputGeometry(screen);
+        view->setWorkAreaGeometry(QRect(inputGeometry.x(), inputGeometry.y(), inputGeometry.width(), inputGeometry.height()));
+    }
+}
+
+bool QuickSceneEffect::autoSizeRootItem() const
+{
+    return d->autoSizeRootItem;
+}
+
+void QuickSceneEffect::setAutoSizeRootItem(bool enabled)
+{
+    d->autoSizeRootItem = enabled;
+}
+
 void QuickSceneEffect::prePaintScreen(ScreenPrePaintData &data)
 {
     data.mask |= PAINT_SCREEN_TRANSFORMED;
@@ -476,8 +545,9 @@ void QuickSceneEffect::handleScreenRemoved(LogicalOutput *screen)
 void QuickSceneEffect::addScreen(LogicalOutput *screen)
 {
     auto properties = initialProperties(screen);
-    properties["width"] = screen->geometry().width();
-    properties["height"] = screen->geometry().height();
+    const Rect geometry = viewGeometry(screen);
+    properties["width"] = geometry.width();
+    properties["height"] = geometry.height();
 
     auto incubator = new QuickSceneViewIncubator(this, screen, [this, screen](QuickSceneViewIncubator *incubator) {
         if (incubator->isReady()) {

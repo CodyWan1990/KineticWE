@@ -7,6 +7,11 @@
 #include "overvieweffect.h"
 #include "effect/effecthandler.h"
 #include "overviewconfig.h"
+#include "scene/item.h"
+#include "scene/windowitem.h"
+#include "scene/workspacescene.h"
+#include "window.h"
+#include "workspace.h"
 
 #include <KGlobalAccel>
 #include <KLocalizedString>
@@ -15,6 +20,8 @@
 #include <QDebug>
 #include <QQuickItem>
 #include <QTimer>
+
+#include <limits>
 
 using namespace std::chrono_literals;
 
@@ -30,8 +37,9 @@ OverviewEffect::OverviewEffect()
     , m_border(new EffectTogglableTouchBorder(m_overviewState))
     , m_gridBorder(new EffectTogglableTouchBorder(m_gridState))
     , m_shutdownTimer(new QTimer(this))
-    , m_manager(new KRunner::RunnerManager(this))
 {
+    setAutoSizeRootItem(false);
+
     auto gesture = new EffectTogglableGesture(m_overviewState);
     gesture->addTouchpadSwipeGesture(SwipeDirection::Up, 4);
     gesture->addTouchscreenSwipeGesture(SwipeDirection::Up, 3);
@@ -50,7 +58,6 @@ OverviewEffect::OverviewEffect()
 
     connect(m_overviewState, &EffectTogglableState::statusChanged, this, [this](EffectTogglableState::Status status) {
         if (status == EffectTogglableState::Status::Activating || status == EffectTogglableState::Status::Active) {
-            setSearchText(QString());
             setRunning(true);
             m_gridState->stop();
         }
@@ -83,7 +90,6 @@ OverviewEffect::OverviewEffect()
 
     connect(m_gridState, &EffectTogglableState::statusChanged, this, [this](EffectTogglableState::Status status) {
         if (status == EffectTogglableState::Status::Activating || status == EffectTogglableState::Status::Active) {
-            setSearchText(QString());
             setRunning(true);
             m_overviewState->stop();
         }
@@ -104,6 +110,9 @@ OverviewEffect::OverviewEffect()
 
     connect(m_gridState, &EffectTogglableState::inProgressChanged, this, &OverviewEffect::gridGestureInProgressChanged);
     connect(m_gridState, &EffectTogglableState::partialActivationFactorChanged, this, &OverviewEffect::gridPartialActivationFactorChanged);
+
+    connect(this, &QuickSceneEffect::activated, this, &OverviewEffect::raiseAboveLayers);
+    connect(this, &QuickSceneEffect::deactivated, this, &OverviewEffect::restoreAboveLayers);
 
     connect(effects, &EffectsHandler::desktopChanging, this, [this](VirtualDesktop *old, QPointF desktopOffset, EffectWindow *, LogicalOutput *output) {
         m_screenDesktopOffsets.insertOrAssign(output, desktopOffset);
@@ -182,7 +191,6 @@ void OverviewEffect::reconfigure(ReconfigureFlags)
 {
     OverviewConfig::self()->read();
     setAnimationDuration(animationTime(300ms).count());
-    setFilterWindows(OverviewConfig::filterWindows());
 
     for (const ElectricBorder &border : std::as_const(m_borderActivate)) {
         effects->unreserveElectricBorder(border, this);
@@ -223,17 +231,100 @@ void OverviewEffect::setAnimationDuration(int duration)
     }
 }
 
-bool OverviewEffect::filterWindows() const
+Rect OverviewEffect::viewInputGeometry(LogicalOutput *screen) const
 {
-    return m_filterWindows;
+    return effects->clientArea(MaximizeArea, screen).toRect();
 }
 
-void OverviewEffect::setFilterWindows(bool filterWindows)
+bool OverviewEffect::acceptsInputAt(LogicalOutput *screen, const QPoint &pos) const
 {
-    if (m_filterWindows != filterWindows) {
-        m_filterWindows = filterWindows;
-        Q_EMIT filterWindowsChanged();
+    if (!viewInputGeometry(screen).contains(pos)) {
+        return false;
     }
+    for (Window *window : workspace()->windows()) {
+        if (window->layer() >= AboveLayer && window->frameGeometry().contains(QPointF(pos))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void OverviewEffect::raiseWindow(Window *window)
+{
+    if (!window || window->layer() < AboveLayer) {
+        return;
+    }
+    WindowItem *item = window->windowItem();
+    if (!item || item->parentItem() == effects->scene()->overlayItem()) {
+        return;
+    }
+    if (m_raisedWindows.contains(window)) {
+        return;
+    }
+
+    const bool wasElevated = item->isElevated();
+    m_raisedWindows.insert(window, RaisedWindow{
+        .oldParent = item->parentItem(),
+        .wasElevated = wasElevated,
+    });
+
+    connect(window, &QObject::destroyed, this, [this, window] {
+        m_raisedWindows.remove(window);
+    });
+
+    item->setParentItem(effects->scene()->overlayItem());
+    if (!wasElevated) {
+        item->elevate();
+    }
+}
+
+void OverviewEffect::raiseAboveLayers()
+{
+    if (m_overviewRaised) {
+        return;
+    }
+    m_overviewRaised = true;
+
+    m_oldCursorZ = effects->scene()->cursorItem()->z();
+    effects->scene()->cursorItem()->setZ(std::numeric_limits<int>::max());
+
+    const QList<Window *> windows = workspace()->windows();
+    for (Window *window : windows) {
+        raiseWindow(window);
+    }
+
+    m_windowAddedConnection = connect(workspace(), &Workspace::windowAdded, this, [this](Window *window) {
+        raiseWindow(window);
+    });
+}
+
+void OverviewEffect::restoreAboveLayers()
+{
+    if (!m_overviewRaised) {
+        return;
+    }
+    m_overviewRaised = false;
+
+    disconnect(m_windowAddedConnection);
+
+    const QList<Window *> windows = m_raisedWindows.keys();
+    for (Window *window : windows) {
+        const auto it = m_raisedWindows.constFind(window);
+        if (it == m_raisedWindows.constEnd()) {
+            continue;
+        }
+        WindowItem *item = window->windowItem();
+        if (!item) {
+            continue;
+        }
+        item->setParentItem(it->oldParent);
+        if (!it->wasElevated) {
+            item->deelevate();
+        }
+    }
+    m_raisedWindows.clear();
+
+    effects->scene()->cursorItem()->setZ(m_oldCursorZ);
 }
 
 qreal OverviewEffect::overviewPartialActivationFactor() const
@@ -276,11 +367,6 @@ bool OverviewEffect::ignoreMinimized() const
     return OverviewConfig::ignoreMinimized();
 }
 
-bool OverviewEffect::organizedGrid() const
-{
-    return OverviewConfig::organizedGrid();
-}
-
 int OverviewEffect::requestedEffectChainPosition() const
 {
     return 70;
@@ -304,6 +390,7 @@ void OverviewEffect::activate()
         return;
     }
 
+    updateViewGeometries();
     m_overviewState->activate();
     m_shutdownTimer->stop();
 }
@@ -341,14 +428,6 @@ void OverviewEffect::reverseCycle()
         m_transitionState->deactivate();
     } else if (m_gridState->status() == EffectTogglableState::Status::Inactive) {
         m_gridState->activate();
-    }
-}
-
-void OverviewEffect::setSearchText(const QString &text)
-{
-    if (text != m_searchText) {
-        m_searchText = text;
-        Q_EMIT searchTextChanged();
     }
 }
 

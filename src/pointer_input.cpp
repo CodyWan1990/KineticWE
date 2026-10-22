@@ -1240,7 +1240,7 @@ void CursorImage::reevaluteSource()
         setSource(m_windowSelectionCursor.get());
         return;
     }
-    if (effects && effects->isMouseInterception()) {
+    if (effects && effects->isMouseInterceptionAt(m_pointer->pos())) {
         setSource(m_effectsCursor.get());
         return;
     }

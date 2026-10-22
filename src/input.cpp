@@ -3480,7 +3480,7 @@ Window *InputRedirection::findToplevel(const QPointF &pos)
     const bool isScreenLocked = waylandServer() && waylandServer()->isScreenLocked();
     if (!isScreenLocked) {
         // if an effect overrides the cursor we don't have a window to focus
-        if (effects && effects->isMouseInterception()) {
+        if (effects && effects->isMouseInterceptionAt(pos)) {
             return nullptr;
         }
     }

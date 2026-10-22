@@ -65,6 +65,10 @@ ExpoCell {
 
     property bool isReady: width !== 0 && height !== 0
 
+    function saveDND() {
+        thumbSource.saveDND();
+    }
+
     function restoreDND(oldGlobalRect: rect) {
         thumbSource.restoreDND(oldGlobalRect);
     }

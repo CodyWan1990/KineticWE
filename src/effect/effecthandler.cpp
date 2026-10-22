@@ -533,6 +533,16 @@ bool EffectsHandler::isMouseInterception() const
     return m_grabbedMouseEffects.count() > 0;
 }
 
+bool EffectsHandler::isMouseInterceptionAt(const QPointF &pos) const
+{
+    for (Effect *effect : m_grabbedMouseEffects) {
+        if (effect->acceptsInputAt(pos)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool EffectsHandler::pointerMotion(PointerMotionEvent *event)
 {
     if (m_grabbedMouseEffects.isEmpty()) {
@@ -541,7 +551,7 @@ bool EffectsHandler::pointerMotion(PointerMotionEvent *event)
     for (Effect *effect : std::as_const(m_grabbedMouseEffects)) {
         effect->pointerMotion(event);
     }
-    return true;
+    return isMouseInterceptionAt(event->position);
 }
 
 bool EffectsHandler::pointerButton(PointerButtonEvent *event)
@@ -552,7 +562,7 @@ bool EffectsHandler::pointerButton(PointerButtonEvent *event)
     for (Effect *effect : std::as_const(m_grabbedMouseEffects)) {
         effect->pointerButton(event);
     }
-    return true;
+    return isMouseInterceptionAt(event->position);
 }
 
 bool EffectsHandler::pointerAxis(PointerAxisEvent *event)
@@ -563,7 +573,7 @@ bool EffectsHandler::pointerAxis(PointerAxisEvent *event)
     for (Effect *effect : std::as_const(m_grabbedMouseEffects)) {
         effect->pointerAxis(event);
     }
-    return true;
+    return isMouseInterceptionAt(event->position);
 }
 
 bool EffectsHandler::touchDown(qint32 id, const QPointF &pos, std::chrono::microseconds time)

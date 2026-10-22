@@ -108,7 +108,7 @@ class OutputFrame;
 
 #define KWIN_EFFECT_API_MAKE_VERSION(major, minor) ((major) << 8 | (minor))
 #define KWIN_EFFECT_API_VERSION_MAJOR 0
-#define KWIN_EFFECT_API_VERSION_MINOR 237
+#define KWIN_EFFECT_API_VERSION_MINOR 238
 #define KWIN_EFFECT_API_VERSION KWIN_EFFECT_API_MAKE_VERSION( \
     KWIN_EFFECT_API_VERSION_MAJOR, KWIN_EFFECT_API_VERSION_MINOR)
 
@@ -864,6 +864,14 @@ public:
      * \since 6.7
      */
     virtual void pointerAxis(PointerAxisEvent *event);
+
+    /*!
+     * Returns whether this effect accepts pointer input at \a pos.
+     *
+     * The default implementation returns \c true, preserving the behavior of
+     * effects that grab the mouse globally.
+     */
+    virtual bool acceptsInputAt(const QPointF &pos) const;
 
     /*!
      * A touch point was pressed.

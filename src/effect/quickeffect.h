@@ -11,6 +11,7 @@
 #include "effect/offscreenquickview.h"
 
 #include <QQmlComponent>
+#include <QRect>
 
 namespace KWin
 {
@@ -76,6 +77,16 @@ class KWIN_EXPORT QuickSceneView : public OffscreenQuickView
      */
     Q_PROPERTY(VirtualDesktop *currentDesktop READ currentDesktop WRITE setCurrentDesktop NOTIFY currentDesktopChanged)
 
+    /*!
+     * \property KWin::QuickSceneView::viewGeometry
+     */
+    Q_PROPERTY(QRect viewGeometry READ viewGeometry NOTIFY viewGeometryChanged)
+
+    /*!
+     * \property KWin::QuickSceneView::workAreaGeometry
+     */
+    Q_PROPERTY(QRect workAreaGeometry READ workAreaGeometry NOTIFY workAreaGeometryChanged)
+
 public:
     /*!
      * Constructs a scene view for the given \a effect and \a screen.
@@ -91,6 +102,10 @@ public:
 
     VirtualDesktop *currentDesktop() const;
     void setCurrentDesktop(VirtualDesktop *desktop);
+
+    QRect viewGeometry() const;
+    QRect workAreaGeometry() const;
+    void setWorkAreaGeometry(const QRect &geometry);
 
     /*!
      * \internal
@@ -127,11 +142,14 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void currentDesktopChanged(VirtualDesktop *newDesktop);
+    void viewGeometryChanged();
+    void workAreaGeometryChanged();
 
 private:
     QuickSceneEffect *m_effect;
     LogicalOutput *m_screen;
     std::unique_ptr<QQuickItem> m_rootItem;
+    QRect m_workAreaGeometry;
     bool m_dirty = false;
 };
 
@@ -270,6 +288,52 @@ public:
      * Enables or disables view caching.
      */
     void setViewCachingEnabled(bool enabled);
+
+    /*!
+     * Returns the geometry that the scene view for the given \a screen should cover.
+     *
+     * The default implementation returns the full geometry of the screen.
+     */
+    virtual Rect viewGeometry(LogicalOutput *screen) const;
+
+    /*!
+     * Returns the geometry in which the scene view for the given \a screen accepts
+     * input.
+     *
+     * The default implementation returns viewGeometry().
+     */
+    virtual Rect viewInputGeometry(LogicalOutput *screen) const;
+
+    /*!
+     * Returns \c true if the scene view for the given \a screen should receive
+     * input at \a pos in the global screen coordinates; otherwise returns \c false.
+     *
+     * The default implementation checks whether \a pos is inside viewInputGeometry().
+     */
+    virtual bool acceptsInputAt(LogicalOutput *screen, const QPoint &pos) const;
+
+    /*!
+     * Returns \c true if this effect accepts pointer input at \a pos in the
+     * global screen coordinates; otherwise returns \c false.
+     */
+    bool acceptsInputAt(const QPointF &pos) const override;
+
+    /*!
+     * Updates the geometry of all existing views using viewGeometry().
+     */
+    void updateViewGeometries();
+
+    /*!
+     * Returns \c true if the root QML item is automatically resized to match the
+     * view; otherwise returns \c false.
+     */
+    bool autoSizeRootItem() const;
+
+    /*!
+     * Sets whether the root QML item should be automatically resized to match the
+     * view to \a enabled.
+     */
+    void setAutoSizeRootItem(bool enabled);
 
     QQmlComponent *delegate() const;
     void setDelegate(QQmlComponent *delegate);

@@ -341,8 +341,14 @@ binary_build() {
               && ! -d '${TEST_PREFIX}/lib/cmake/KGlobalAccelD' ]]; then
             echo '[STEP] Building kglobalacceld first...'
             KGA_BUILD=\$(mktemp -d /tmp/kga-build.XXXXXX)
-            curl -fsSL https://invent.kde.org/plasma/kglobalacceld/-/archive/${SPEC_KGA_REF}/kglobalacceld-${SPEC_KGA_REF}.tar.gz \
-                | tar xz -C \"\$KGA_BUILD\" --strip-components=1
+            # invent.kde.org intermittently returns 502 for archive downloads;
+            # fall back to the KDE GitHub mirror for the same pinned commit.
+            if ! curl -fsSL https://invent.kde.org/plasma/kglobalacceld/-/archive/${SPEC_KGA_REF}/kglobalacceld-${SPEC_KGA_REF}.tar.gz \
+                | tar xz -C \"\$KGA_BUILD\" --strip-components=1; then
+                echo '[STEP] invent.kde.org unavailable; using GitHub mirror for kglobalacceld...'
+                curl -fsSL https://codeload.github.com/KDE/kglobalacceld/tar.gz/${SPEC_KGA_REF} \
+                    | tar xz -C \"\$KGA_BUILD\" --strip-components=1
+            fi
             cd \"\$KGA_BUILD\"
             echo 'set_target_properties(KGlobalAccelD PROPERTIES OUTPUT_NAME kineticwe-globalacceld)' >> CMakeLists.txt
             cmake -B build -S . \\
@@ -364,8 +370,12 @@ binary_build() {
               && ! -d '${TEST_PREFIX}/lib/cmake/KDecoration3' ]]; then
             echo '[STEP] Building kdecoration (pinned master for KDecoration3::Style)...'
             KDECO_BUILD=\$(mktemp -d /tmp/kdeco-build.XXXXXX)
-            curl -fsSL https://invent.kde.org/plasma/kdecoration/-/archive/${SPEC_KDECO_REF}/kdecoration-${SPEC_KDECO_REF}.tar.gz \
-                | tar xz -C \"\$KDECO_BUILD\" --strip-components=1
+            if ! curl -fsSL https://invent.kde.org/plasma/kdecoration/-/archive/${SPEC_KDECO_REF}/kdecoration-${SPEC_KDECO_REF}.tar.gz \
+                | tar xz -C \"\$KDECO_BUILD\" --strip-components=1; then
+                echo '[STEP] invent.kde.org unavailable; using GitHub mirror for kdecoration...'
+                curl -fsSL https://codeload.github.com/KDE/kdecoration/tar.gz/${SPEC_KDECO_REF} \
+                    | tar xz -C \"\$KDECO_BUILD\" --strip-components=1
+            fi
             echo 'set_target_properties(kdecorations3 PROPERTIES OUTPUT_NAME kineticwe-decoration)' >> "\$KDECO_BUILD/CMakeLists.txt"
             echo 'set_target_properties(kdecorations3private PROPERTIES OUTPUT_NAME kineticwe-decoration-private)' >> "\$KDECO_BUILD/CMakeLists.txt"
             cmake -B \"\$KDECO_BUILD/build\" -S \"\$KDECO_BUILD\" \\
@@ -392,8 +402,12 @@ binary_build() {
             # enum-class setter fix. KConfig master now requires ECM 6.29.0,
             # newer than the container's ECM 6.28.0 — hence no master clone.
             mkdir -p \"\$KCFG_FIX/src\"
-            curl -fsSL https://invent.kde.org/frameworks/kconfig/-/archive/${SPEC_KCONFIG_REF}/kconfig-${SPEC_KCONFIG_REF}.tar.gz \
-                | tar xz -C \"\$KCFG_FIX/src\" --strip-components=1
+            if ! curl -fsSL https://invent.kde.org/frameworks/kconfig/-/archive/${SPEC_KCONFIG_REF}/kconfig-${SPEC_KCONFIG_REF}.tar.gz \
+                | tar xz -C \"\$KCFG_FIX/src\" --strip-components=1; then
+                echo '[STEP] invent.kde.org unavailable; using GitHub mirror for kconfig...'
+                curl -fsSL https://codeload.github.com/KDE/kconfig/tar.gz/${SPEC_KCONFIG_REF} \
+                    | tar xz -C \"\$KCFG_FIX/src\" --strip-components=1
+            fi
             cmake -B "\$KCFG_FIX/build" -S "\$KCFG_FIX/src" \\
                 -DCMAKE_BUILD_TYPE=Release \\
                 -DBUILD_TESTING=OFF

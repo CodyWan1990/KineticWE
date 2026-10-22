@@ -747,7 +747,9 @@ void WorkspacesPage::buildWorkspacesSection(Flex& parent, float scale, const Cal
   ));
   rowsCopy->addChild(
       makeLabel(
-          "How the workspaces are arranged in the switcher", Style::fontSizeCaption * scale,
+          "Workspace layout for the slide animation and desktop-change OSD; "
+          "Grid View always uses a single vertical strip",
+          Style::fontSizeCaption * scale,
           colorSpecFromRole(ColorRole::OnSurfaceVariant)
       )
   );

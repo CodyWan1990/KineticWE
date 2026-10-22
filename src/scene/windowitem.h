@@ -62,6 +62,10 @@ public:
 
     void elevate();
     void deelevate();
+    bool isElevated() const
+    {
+        return m_elevation.has_value();
+    }
 
 protected:
     explicit WindowItem(Window *window, Item *parent = nullptr);

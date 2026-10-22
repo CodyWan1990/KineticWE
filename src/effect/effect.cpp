@@ -456,6 +456,11 @@ int Effect::requestedEffectChainPosition() const
     return 0;
 }
 
+bool Effect::acceptsInputAt(const QPointF &pos) const
+{
+    return true;
+}
+
 void Effect::pointerMotion(PointerMotionEvent *event)
 {
 }
