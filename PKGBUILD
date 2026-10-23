@@ -405,8 +405,8 @@ package_kineticwe() {
     license=('GPL-2.0-or-later' 'LGPL-2.0-or-later' 'MIT' 'BSD-3-Clause' 'CC0-1.0')
     install=kineticwe.install
     depends=(
-        "kineticwe-noctalia=$epoch:$pkgver-$pkgrel"
-        "xdg-desktop-portal-kwe=$epoch:$pkgver-$pkgrel"
+        "kineticwe-noctalia=$epoch:$pkgver"
+        "xdg-desktop-portal-kwe=$epoch:$pkgver"
         'milou'
         # The window decoration is the first-party org.kineticwe.decoration
         # plugin; neither breeze nor the distro kdecoration is required.
@@ -665,7 +665,7 @@ package_kineticwe-greeter() {
     license=('MIT')
     install=kineticwe-greeter.install
     depends=(
-        "kineticwe=$epoch:$pkgver-$pkgrel"
+        "kineticwe=$epoch:$pkgver"
         'greetd'
         'wlroots0.20'
         'wayland'
