@@ -493,6 +493,12 @@ package_kineticwe() {
         'xcb-util-wm'
     )
     _kwe_qt_pin
+    # CI repo builds (KWE_REPO_BUILD=1) pull in the repo keyring so key
+    # rotations/revocations reach every binary-repo user; local builds
+    # (install-arch.sh) don't build it and must not require it.
+    if [[ "${KWE_REPO_BUILD:-}" == 1 ]]; then
+        depends+=('kineticwe-keyring')
+    fi
     optdepends=(
         'qt5ct: Qt5 theming in the KineticWE session'
         'pipewire-pulse: PulseAudio-compatible audio (conflicts with pulseaudio)'
