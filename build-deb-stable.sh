@@ -34,9 +34,13 @@
 #   stops and asks for an update (the default mode is tuned for Debian 13, not
 #   for a lagging sid snapshot).
 #
+#   Pass --greeter (sid only) to also build the Noctalia login greeter from
+#   source. Trixie does not package wlroots-0.20, which the greeter needs, so
+#   the option is ignored there.
+#
 # This script NEVER uses sudo. Anything that needs root (apt packages, the
-# login-screen session entry, the portal's .portal file) is printed for you to
-# run yourself.
+# login-screen session entry, the portal's .portal file, the greetd setup for
+# the greeter) is printed for you to run yourself.
 #
 # Usage:
 #   ./build-deb-stable.sh                 # Full trixie build (first run: 1-3 hours)
@@ -45,11 +49,14 @@
 #   ./build-deb-stable.sh --quick         # Incremental kinetic-we + portal + Noctalia rebuild
 #   ./build-deb-stable.sh --no-session    # Skip the session-entry hint
 #   ./build-deb-stable.sh --reset-local   # Delete KWE_PREFIX and the build dirs
+#   ./build-deb-stable.sh --sid --greeter # Also build the Noctalia login greeter (sid only)
 #
 # Environment variables:
 #   KWE_PREFIX   - Install prefix (default: $HOME/.local/kineticwe)
 #   QT_VERSION   - Qt release fetched by aqtinstall (trixie only, default: 6.11.3)
 #   JOBS         - Parallel build jobs (default: nproc)
+#   NOCTALIA_GREETER_REPO - Git URL of the greeter fork (default: KineticWE fork)
+#   NOCTALIA_GREETER_REF  - Branch/tag/commit to build (default: noctalia_greeter_ref from the spec)
 #
 # Switching flavors reuses the same prefix; run --reset-local first, or the
 # sid build would pick up the trixie Qt/KF6 stack from the prefix.
@@ -96,6 +103,17 @@ HIGHWAY_TAG="1.3.0"
 # master, so use the exact commits the COPR package is built with.
 SPEC_KGA_REF=$(sed -n 's/.*%global kglobalacceld_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
 SPEC_KDECORATION_REF=$(sed -n 's/.*%global kdecoration_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
+SPEC_GREETER_REF=$(sed -n 's/.*%global noctalia_greeter_ref \([0-9a-f]\{40\}\).*/\1/p' "$SPEC_FILE" | head -1)
+
+# Noctalia login greeter (built only with --greeter, sid only). The greeter is
+# not vendored here: fetch the KineticWE fork at the pinned COPR revision, or
+# point NOCTALIA_GREETER_REPO/REF at another checkout.
+NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO:-https://gitlab.com/theblackdon/noctalia-greeter-kwe}"
+NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO%/}"
+NOCTALIA_GREETER_REF="${NOCTALIA_GREETER_REF:-$SPEC_GREETER_REF}"
+# Greeter build dep: the compositor part needs wlroots-0.20, which sid packages
+# as libwlroots-0.20-dev (trixie only has 0.18).
+GREETER_BUILD_PACKAGES=(libwlroots-0.20-dev)
 
 # Login-screen session entry. /usr/local/share/wayland-sessions is searched by
 # SDDM and GDM; installing there needs root, so we only stage it and print the
@@ -225,6 +243,9 @@ set_flavor() {
     BUILD_DIR="${SCRIPT_DIR}/build-deb-sid"
     DEB_PACKAGES=("${DEB_PACKAGES_COMMON[@]}" "${DEB_PACKAGES_SID[@]}")
     DEB_RUNTIME_PACKAGES=(qt6ct kde-spectacle tesseract-ocr-eng)
+    if [[ "$GREETER" == "yes" ]]; then
+        DEB_PACKAGES+=("${GREETER_BUILD_PACKAGES[@]}")
+    fi
 
     # A prefix built by the trixie flavor contains its own Qt/KF6; the sid build
     # would link against those instead of the distro's. Refuse early (except for
@@ -310,6 +331,11 @@ check_host() {
     fi
     if [[ -z "$SPEC_KGA_REF" || -z "$SPEC_KDECORATION_REF" ]]; then
         error "Could not read kglobalacceld_ref/kdecoration_ref from $SPEC_FILE"
+        exit 1
+    fi
+    if [[ "$GREETER" == "yes" && -z "$NOCTALIA_GREETER_REF" ]]; then
+        error "Could not resolve the greeter revision: set NOCTALIA_GREETER_REF"
+        error "or add noctalia_greeter_ref to $SPEC_FILE."
         exit 1
     fi
 
@@ -679,7 +705,59 @@ build_noctalia() {
 }
 
 # ---------------------------------------------------------------------------
-# 6. Session wiring
+# 6. Noctalia greeter (sid only, opt-in via --greeter)
+# ---------------------------------------------------------------------------
+build_noctalia_greeter() {
+    local src="$KWE_PREFIX/build/noctalia-greeter-src"
+    local build="$KWE_PREFIX/build/noctalia-greeter"
+    prefix_env
+
+    if [[ -z "$NOCTALIA_GREETER_REF" ]]; then
+        error "No greeter revision: set NOCTALIA_GREETER_REF or add noctalia_greeter_ref to $SPEC_FILE."
+        exit 1
+    fi
+
+    # The greeter is not vendored: cache the source per ref so --quick reuses
+    # it, and re-download (plus clean build) only when the ref changes.
+    if [[ ! -f "$src/meson.build" || "$(cat "$src/.kwe-ref" 2>/dev/null || true)" != "$NOCTALIA_GREETER_REF" ]]; then
+        step "Fetching noctalia-greeter ${NOCTALIA_GREETER_REF}..."
+        rm -rf "$src" "$build"
+        mkdir -p "$src" "$KWE_PREFIX/build"
+        local archive
+        archive=$(mktemp "$KWE_PREFIX/build/noctalia-greeter.XXXXXX")
+        curl --fail --location --proto '=https' \
+            "$NOCTALIA_GREETER_REPO/-/archive/$NOCTALIA_GREETER_REF/noctalia-greeter-kwe-$NOCTALIA_GREETER_REF.tar.gz" \
+            -o "$archive"
+        tar xzf "$archive" -C "$src" --strip-components=1
+        rm -f "$archive"
+        if [[ ! -f "$src/meson.build" ]]; then
+            error "Incomplete noctalia-greeter source for $NOCTALIA_GREETER_REF."
+            exit 1
+        fi
+        printf '%s\n' "$NOCTALIA_GREETER_REF" > "$src/.kwe-ref"
+    fi
+
+    if [[ ! -f "$build/build.ninja" ]]; then
+        step "Configuring noctalia-greeter..."
+        rm -rf "$build"
+        meson setup "$build" "$src" \
+            --prefix="$KWE_PREFIX" \
+            --buildtype=release
+    fi
+
+    step "Building noctalia-greeter..."
+    meson compile -C "$build" -j "$JOBS"
+    meson install -C "$build" --quiet
+
+    if [[ ! -x "$KWE_PREFIX/bin/noctalia-greeter-session" ]]; then
+        error "noctalia-greeter-session was not installed in $KWE_PREFIX/bin."
+        exit 1
+    fi
+    info "  $KWE_PREFIX/bin/noctalia-greeter-session"
+}
+
+# ---------------------------------------------------------------------------
+# 7. Session wiring
 # ---------------------------------------------------------------------------
 install_startup_script() {
     step "Installing dev startup script..."
@@ -837,6 +915,72 @@ stage_session_entry() {
     fi
 }
 
+# greetd runs the greeter as its config `user`; Debian's greetd package uses
+# "_greetd". Read the value greetd would use, then fall back to whichever
+# conventional greeter account exists.
+resolve_greeter_user() {
+    local cfg="/etc/greetd/config.toml"
+    local user=""
+    if [[ -f "$cfg" ]]; then
+        user=$(awk '
+            /^\[default_session\]/  { in_block=1; next }
+            /^\[/                   { in_block=0 }
+            in_block && /^[[:space:]]*user[[:space:]]*=/ {
+                sub(/^[[:space:]]*user[[:space:]]*=[[:space:]]*"/, "")
+                sub(/".*$/, "")
+                print; exit
+            }
+        ' "$cfg" 2>/dev/null || true)
+    fi
+    if [[ -z "$user" ]]; then
+        local candidate
+        for candidate in _greetd greetd greeter; do
+            if id "$candidate" &>/dev/null; then
+                user="$candidate"
+                break
+            fi
+        done
+    fi
+    printf '%s\n' "$user"
+}
+
+# greetd setup needs root, so print the commands (same policy as the session
+# entry and portal hints). The greeter's own setup helper patches PAM, creates
+# /var/lib/noctalia-greeter and installs greeter.toml; it then prints the
+# greetd config block and the service command.
+stage_greeter_setup() {
+    step "Staging Noctalia greeter login setup..."
+    local session_bin="$KWE_PREFIX/bin/noctalia-greeter-session"
+    local apply_appearance="$KWE_PREFIX/bin/noctalia-greeter-apply-appearance"
+    local setup_script="$KWE_PREFIX/share/noctalia-greeter/setup_greeter_system.sh"
+    local policy="$KWE_PREFIX/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy"
+    local policy_target="/usr/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy"
+    local greeter_user
+    greeter_user=$(resolve_greeter_user)
+
+    if [[ ! -x "$setup_script" ]]; then
+        warn "  $setup_script not found; skipping the greetd setup hint."
+        return
+    fi
+
+    warn "The greeter runs from $KWE_PREFIX, so greetd needs root setup. Run once:"
+    echo
+    if ! command -v greetd >/dev/null; then
+        echo "  sudo apt install greetd"
+    fi
+    if [[ -f "$policy" ]]; then
+        # polkit only reads /usr/share/polkit-1/actions; the prefix policy's
+        # Exec path still points at this prefix.
+        echo "  sudo install -Dm0644 \"$policy\" \"$policy_target\""
+    fi
+    printf '  sudo env%s NOCTALIA_GREETER_SESSION_BIN="%s" NOCTALIA_GREETER_APPLY_APPEARANCE="%s" "%s"\n' \
+        "${greeter_user:+ GREETER_USER=$greeter_user}" \
+        "$session_bin" "$apply_appearance" "$setup_script"
+    echo
+    info "  The greeter lists system session entries: install the 'KineticWE-Dev'"
+    info "  entry above. The setup script then prints the greetd config and service command."
+}
+
 # ---------------------------------------------------------------------------
 # Reset
 # ---------------------------------------------------------------------------
@@ -867,6 +1011,11 @@ reset_local() {
         warn "Remove the login-screen entry yourself:"
         echo "  sudo rm -f $SESSION_DIR/$SESSION_DESKTOP"
     fi
+    local greeter_policy="/usr/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy"
+    if [[ -f "$greeter_policy" ]] && grep -Fq -- "$KWE_PREFIX" "$greeter_policy" 2>/dev/null; then
+        warn "Remove the greeter polkit action yourself:"
+        echo "  sudo rm -f $greeter_policy"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -874,6 +1023,7 @@ reset_local() {
 # ---------------------------------------------------------------------------
 MODE="full"
 SESSION="yes"
+GREETER="no"
 while (( $# )); do
     case "$1" in
         --sid)         FLAVOR="sid" ;;
@@ -881,11 +1031,19 @@ while (( $# )); do
         --quick)       MODE="quick" ;;
         --reset-local) MODE="reset" ;;
         --no-session)  SESSION="no" ;;
+        --greeter)     GREETER="yes" ;;
         -h|--help)     usage; exit 0 ;;
         *) error "Unknown option: $1"; usage; exit 1 ;;
     esac
     shift
 done
+
+# The greeter's compositor needs wlroots-0.20, which trixie does not package.
+# Ignore the flag there rather than failing an otherwise valid trixie build.
+if [[ "$GREETER" == "yes" && "$FLAVOR" != "sid" ]]; then
+    warn "--greeter needs Debian sid (wlroots-0.20 is not packaged in trixie); skipping the greeter."
+    GREETER="no"
+fi
 
 set_flavor
 
@@ -928,6 +1086,7 @@ case "$MODE" in
         build_kinetic_we yes
         build_portal yes
         build_noctalia yes
+        [[ "$GREETER" == "yes" ]] && build_noctalia_greeter
         ;;
     deps)
         build_dependencies
@@ -946,6 +1105,7 @@ case "$MODE" in
         build_kinetic_we no
         build_portal no
         build_noctalia no
+        [[ "$GREETER" == "yes" ]] && build_noctalia_greeter
         ;;
 esac
 
@@ -955,5 +1115,6 @@ wire_portal
 # sid uses the distro's Spectacle (kde-spectacle 6.7); nothing to rewire.
 [[ "$FLAVOR" == trixie ]] && wire_spectacle
 [[ "$SESSION" == "yes" ]] && stage_session_entry
+[[ "$GREETER" == "yes" ]] && stage_greeter_setup
 
 info "Done. Start from a TTY with: $KWE_PREFIX/bin/start-kineticwe"
