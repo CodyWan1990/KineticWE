@@ -550,7 +550,6 @@ bool Dock::onPointerEvent(const PointerEvent& event) {
             inst->hideOpacity = v;
             const auto& cfg = inst->config;
             shell::dock::syncDockSlideLayerTransform(*inst, cfg);
-            shell::dock::applyDockCompositorBlur(*inst, cfg);
           },
           [inst = m_hoveredInstance]() { inst->hideAnimId = 0; }
       );

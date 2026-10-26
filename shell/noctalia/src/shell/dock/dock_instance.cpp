@@ -183,37 +183,6 @@ namespace shell::dock {
     );
   }
 
-  void applyDockCompositorBlur(DockInstance& instance, const DockConfig& cfg) {
-    if (instance.surface == nullptr) {
-      return;
-    }
-    // Compositor blur is independent of scene opacity — clear it while auto-hide
-    // has faded the dock out so a transparent buffer does not leave a blur halo.
-    constexpr float kBlurVisibleOpacity = 0.02F;
-    if (dockUsesAnyAutoHide(cfg) && instance.hideOpacity < kBlurVisibleOpacity) {
-      instance.surface->clearBlurRegion();
-      return;
-    }
-    if (instance.panel == nullptr) {
-      return;
-    }
-    const auto concave = dockConcaveShape(cfg);
-    float absX = 0.0F;
-    float absY = 0.0F;
-    Node::absolutePosition(instance.panel, absX, absY);
-
-    const float insetL = concave.logicalInset.left;
-    const float insetT = concave.logicalInset.top;
-    const float insetR = concave.logicalInset.right;
-    const float insetB = concave.logicalInset.bottom;
-    const int px = static_cast<int>(std::lround(absX + insetL));
-    const int py = static_cast<int>(std::lround(absY + insetT));
-    const int pw = static_cast<int>(std::lround(instance.panel->width() - insetL - insetR));
-    const int ph = static_cast<int>(std::lround(instance.panel->height() - insetT - insetB));
-    auto blurStrips = Surface::tessellateShape(px, py, pw, ph, concave.corners, concave.logicalInset, concave.radii);
-    instance.surface->setBlurRegion(blurStrips);
-  }
-
   void buildScene(DockInstance& instance, DockInstanceDependencies deps, const DockInstanceCallbacks& callbacks) {
     uiAssertNotRendering("shell::dock::buildScene");
     if (instance.surface == nullptr) {
@@ -406,8 +375,6 @@ namespace shell::dock {
     syncDockSlideLayerTransform(instance, cfg);
     syncDockAutoHideInputRegion(instance, cfg, panelGeometry);
 
-    applyDockCompositorBlur(instance, cfg);
-
     // Palette reactivity.
     instance.paletteConn = paletteChanged().connect([inst = &instance] {
       applyPanelPalette(*inst, inst->config);
@@ -468,7 +435,6 @@ namespace shell::dock {
         [&inst](float v) {
           inst.hideOpacity = v;
           syncDockSlideLayerTransform(inst, inst.config);
-          applyDockCompositorBlur(inst, inst.config);
         },
         [&inst]() { inst.hideAnimId = 0; }
     );
@@ -490,7 +456,6 @@ namespace shell::dock {
         [&inst](float v) {
           inst.hideOpacity = v;
           syncDockSlideLayerTransform(inst, inst.config);
-          applyDockCompositorBlur(inst, inst.config);
         },
         [&inst]() { inst.hideAnimId = 0; }
     );
