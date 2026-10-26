@@ -1,38 +1,58 @@
 #!/bin/bash
 # =============================================================================
-# KineticWE - Debian 13 (trixie) Dev Build Script
+# KineticWE - Debian Dev Build Script (trixie + sid)
 # =============================================================================
-# Builds KineticWE from local source on Debian stable and installs it into an
-# isolated user prefix. Debian 13 ships Qt 6.8 / KF6 6.13 / Plasma 6.3, which
-# are too old for this compositor (needs Qt >= 6.10, KF6 >= 6.27, Plasma libs
-# >= 6.6.90, wayland >= 1.24, libdrm >= 2.4.127), so the newer stack is built
-# into the prefix as well:
+# Builds KineticWE from local source on Debian and installs it into an isolated
+# user prefix. Two flavors:
 #
-#   1. Qt            - official qt.io binaries via aqtinstall
-#   2. KDE stack     - KF6 frameworks + Plasma libs + wayland/libdrm/libei via
-#                      kde-builder (exact kwin dependency set, pinned tags)
-#   3. kinetic-we    - this checkout
-#   4. Portal        - portal/xdg-desktop-portal-kwe
-#   5. Noctalia      - shell/noctalia (noctalia-kwe, incl. Kinetic Settings),
-#                      against Debian's own packages
-#   6. Session       - start-kineticwe + KineticWE-Dev session entry
+# Debian 13 (trixie), default:
+#   Debian 13 ships Qt 6.8 / KF6 6.13 / Plasma 6.3, which are too old for this
+#   compositor (needs Qt >= 6.10, KF6 >= 6.27, Plasma libs >= 6.6.90,
+#   wayland >= 1.24, libdrm >= 2.4.127), so the newer stack is built into the
+#   prefix as well:
+#
+#     1. Qt            - official qt.io binaries via aqtinstall
+#     2. KDE stack     - KF6 frameworks + Plasma libs + wayland/libdrm/libei via
+#                        kde-builder (exact kwin dependency set, pinned tags)
+#     3. kinetic-we    - this checkout
+#     4. Portal        - portal/xdg-desktop-portal-kwe
+#     5. Noctalia      - shell/noctalia (noctalia-kwe, incl. Kinetic Settings),
+#                        against Debian's own packages
+#     6. Session       - start-kineticwe + KineticWE-Dev session entry
+#
+# Debian sid (--sid), including sid-based distros such as PikaOS:
+#   sid already ships Qt 6.11 / KF6 6.30 / Plasma 6.7, so only the two KDE
+#   pieces the distro does not have yet are built from source into the prefix,
+#   pinned to the same commits as the COPR package:
+#
+#     - kdecoration    - KDecoration3::Style (server-side drop shadows for CSD)
+#     - kglobalacceld  - post-6.7 KGlobalAccelD input API
+#
+#   Everything else (Qt, KF6, Plasma, Spectacle, wayland, libdrm, libei) comes
+#   from the distro, which makes a --sid build much faster. The distro versions
+#   are checked first; if sid is older than what kinetic-we needs the script
+#   stops and asks for an update (the default mode is tuned for Debian 13, not
+#   for a lagging sid snapshot).
 #
 # This script NEVER uses sudo. Anything that needs root (apt packages, the
 # login-screen session entry, the portal's .portal file) is printed for you to
-# run yourself. (build-deb-dev.sh is upstream's separate Debian sid distrobox
-# build.)
+# run yourself.
 #
 # Usage:
-#   ./build-deb-stable.sh                 # Full build (first run: 1-3 hours)
-#   ./build-deb-stable.sh --deps-only     # Only Qt + KDE stack
+#   ./build-deb-stable.sh                 # Full trixie build (first run: 1-3 hours)
+#   ./build-deb-stable.sh --sid           # Full sid build (uses the distro's Qt/KF6/Plasma)
+#   ./build-deb-stable.sh --deps-only     # Only the trixie Qt + KDE stack / the sid pins
 #   ./build-deb-stable.sh --quick         # Incremental kinetic-we + portal + Noctalia rebuild
 #   ./build-deb-stable.sh --no-session    # Skip the session-entry hint
-#   ./build-deb-stable.sh --reset-local   # Delete KWE_PREFIX and build-deb/
+#   ./build-deb-stable.sh --reset-local   # Delete KWE_PREFIX and the build dirs
 #
 # Environment variables:
 #   KWE_PREFIX   - Install prefix (default: $HOME/.local/kineticwe)
-#   QT_VERSION   - Qt release fetched by aqtinstall (default: 6.11.3)
+#   QT_VERSION   - Qt release fetched by aqtinstall (trixie only, default: 6.11.3)
 #   JOBS         - Parallel build jobs (default: nproc)
+#
+# Switching flavors reuses the same prefix; run --reset-local first, or the
+# sid build would pick up the trixie Qt/KF6 stack from the prefix.
 # =============================================================================
 
 set -euo pipefail
@@ -42,15 +62,19 @@ QT_VERSION="${QT_VERSION:-6.11.3}"
 JOBS="${JOBS:-$(nproc)}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_FILE="${SCRIPT_DIR}/lgl-kineticwe-copr/kineticwe.spec"
+# Flavor-dependent (set_flavor): trixie uses build-deb/, sid build-deb-sid/ so
+# a stale cache from the other flavor is never picked up.
 BUILD_DIR="${SCRIPT_DIR}/build-deb"
+FLAVOR="trixie"
 
 QT_DIR="${KWE_PREFIX}/qt/${QT_VERSION}/gcc_64"
 TOOLS_DIR="${KWE_PREFIX}/tools"
 KDE_BUILDER_RC="${KWE_PREFIX}/kde-builder.yaml"
-# Debian's CMake never searches <prefix>/lib64 for packages (its platform file
-# turns FIND_LIBRARY_USE_LIB64_PATHS off), so lib64/cmake is listed as its own
-# prefix: find_package() also matches <prefix>/<Name>*/<Name>Config.cmake.
-CMAKE_SEARCH_PATH="${QT_DIR};${KWE_PREFIX};${KWE_PREFIX}/lib64/cmake"
+# Set by set_flavor(): trixie adds the prefix Qt, sid uses the distro's Qt.
+# (Debian's CMake never searches <prefix>/lib64 for packages - its platform
+# file turns FIND_LIBRARY_USE_LIB64_PATHS off - so lib64/cmake is listed as its
+# own prefix: find_package() also matches <prefix>/<Name>*/<Name>Config.cmake.)
+CMAKE_SEARCH_PATH=""
 
 # Pinned versions. Frameworks/Plasma use release tags; kdecoration and
 # kglobalacceld come from the spec (single source of truth, see below).
@@ -79,9 +103,11 @@ SPEC_KDECORATION_REF=$(sed -n 's/.*%global kdecoration_ref \([0-9a-f]\{40\}\).*/
 SESSION_DIR="/usr/local/share/wayland-sessions"
 SESSION_DESKTOP="kineticwe-dev.desktop"
 
-# Debian packages needed to build the whole stack (KDE deps, kinetic-we,
-# Noctalia) and to run kde-builder / aqtinstall.
-DEB_PACKAGES=(
+# Packages every flavor needs: toolchain, X11/Wayland/hardware libs, Noctalia's
+# build deps, and everything the portal links against. The trixie flavor builds
+# KF6/Plasma/kinetic-we against its own stack; the sid flavor gets those from
+# the distro, see DEB_PACKAGES_SID.
+DEB_PACKAGES_COMMON=(
     # toolchain + build tools
     build-essential cmake ninja-build meson pkgconf git curl gettext gperf
     bison flex itstool xsltproc
@@ -113,25 +139,62 @@ DEB_PACKAGES=(
     # kpipewire
     libpipewire-0.3-dev libavcodec-dev libavformat-dev libavfilter-dev
     libswscale-dev libva-dev
-    # Noctalia (shell/noctalia/meson.build)
+    # Noctalia (shell/noctalia/meson.build). No md4c-html here: Noctalia only
+    # uses md4c, and the html dev package is named differently per suite.
     libwayland-dev libwayland-bin wayland-protocols libsdbus-c++-dev
     libcairo2-dev libpango1.0-dev libharfbuzz-dev librsvg2-dev libglib2.0-dev
     libsecret-1-dev libsodium-dev libwireplumber-0.5-dev libqalculate-dev
-    libxml2-dev libmd4c-dev libmd4c-html0-dev nlohmann-json3-dev
+    libxml2-dev libmd4c-dev nlohmann-json3-dev
     libtomlplusplus-dev libical-dev libjemalloc-dev libwebp-dev libjxl-dev
     libsndfile1-dev libstb-dev
-    # portal: qt.io's Qt was built with CUPS, so Qt::PrintSupportPrivate's
-    # CMake config links Cups::Cups
+    # portal: the distro Qt (sid) and qt.io's Qt (trixie) are built with CUPS,
+    # so Qt::PrintSupportPrivate links Cups::Cups
     libcups2-dev
-    # Spectacle 6.7 (OCR needs OpenCV + Tesseract; prison uses Debian's ZXing
-    # and needs libdmtx)
+)
+
+# Debian 13: the KDE stack is built from source, and Debian's Spectacle 6.3
+# cannot talk to KWin >= 6.5, so Spectacle 6.7 and its OCR deps are needed too.
+DEB_PACKAGES_TRIXIE=(
+    libmd4c-html0-dev   # renamed to libmd4c-html-dev in sid
     libopencv-dev libtesseract-dev libzxing-dev libdmtx-dev
+)
+
+# Debian sid: Qt/KF6/Plasma come from the distro, so install the dev packages
+# the KDE stack build used to provide. kdecoration and kglobalacceld are still
+# built from source (build_kde_pins) but only need generic Qt6/KF6 devel plus
+# ECM.
+DEB_PACKAGES_SID=(
+    libmd4c-html-dev
+    extra-cmake-modules
+    # Qt 6 (kinetic-we needs Qt6GuiPrivate; the portal Qt6PrintSupportPrivate)
+    qt6-base-dev qt6-base-private-dev qt6-declarative-dev
+    qt6-declarative-private-dev qt6-svg-dev qt6-wayland-dev
+    qt6-wayland-private-dev qt6-5compat-dev qt6-tools-dev
+    # KF6
+    libkf6auth-dev libkf6colorscheme-dev libkf6config-dev
+    libkf6coreaddons-dev libkf6crash-dev libkf6dbusaddons-dev
+    libkf6globalaccel-dev libkf6guiaddons-dev libkf6i18n-dev
+    libkf6iconthemes-dev libkf6idletime-dev libkf6kio-dev
+    libkf6notifications-dev libkf6package-dev libkf6runner-dev
+    libkf6service-dev libkf6statusnotifieritem-dev libkf6svg-dev
+    libkf6widgetsaddons-dev libkf6windowsystem-dev
+    # kglobalacceld master links KF6::JobWidgets
+    libkf6jobwidgets-dev
+    libkirigami-dev
+    # Plasma 6.7 libs (CMake configs + QML runtime modules)
+    kwayland-dev kscreenlocker-dev knighttime-dev
+    libplasma-dev libplasmaactivities-dev
+    # libeis-dev for Libeis-1.0 (input capture); it pulls libei-dev.
+    libei-dev libeis-dev
+    # Optional feature the trixie kde-builder stack enables: zoom effect
+    # accessibility support (CMake skips it cleanly if absent).
+    libqaccessibilityclient-qt6-dev
 )
 
 # Runtime-only packages the session uses from Debian (not built here): the
 # start script sets QT_QPA_PLATFORMTHEME=qt6ct; Spectacle's OCR needs a
-# Tesseract language. Missing ones are only warned.
-DEB_RUNTIME_PACKAGES=(qt6ct tesseract-ocr-eng)
+# Tesseract language. Missing ones are only warned. Set by set_flavor().
+DEB_RUNTIME_PACKAGES=()
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -148,15 +211,92 @@ usage() {
     sed -n '/^# Usage:/,/^# =====/p' "$0" | sed -e 's/^# \{0,1\}//' -e '/^=====/d'
 }
 
+# Compose the flavor-dependent settings once the flags are parsed.
+set_flavor() {
+    if [[ "$FLAVOR" == trixie ]]; then
+        CMAKE_SEARCH_PATH="${QT_DIR};${KWE_PREFIX};${KWE_PREFIX}/lib64/cmake"
+        BUILD_DIR="${SCRIPT_DIR}/build-deb"
+        DEB_PACKAGES=("${DEB_PACKAGES_COMMON[@]}" "${DEB_PACKAGES_TRIXIE[@]}")
+        DEB_RUNTIME_PACKAGES=(qt6ct tesseract-ocr-eng)
+        return
+    fi
+
+    CMAKE_SEARCH_PATH="${KWE_PREFIX};${KWE_PREFIX}/lib64/cmake"
+    BUILD_DIR="${SCRIPT_DIR}/build-deb-sid"
+    DEB_PACKAGES=("${DEB_PACKAGES_COMMON[@]}" "${DEB_PACKAGES_SID[@]}")
+    DEB_RUNTIME_PACKAGES=(qt6ct kde-spectacle tesseract-ocr-eng)
+
+    # A prefix built by the trixie flavor contains its own Qt/KF6; the sid build
+    # would link against those instead of the distro's. Refuse early (except for
+    # --reset-local, whose whole job is to get rid of that prefix).
+    if [[ "$MODE" != "reset" ]] \
+        && [[ -x "$QT_DIR/bin/qmake" || -d "$KWE_PREFIX/lib64/cmake/KF6CoreAddons" ]]; then
+        error "$KWE_PREFIX already contains the trixie Qt/KF6 stack."
+        error "Run '$0 --reset-local' first, or use a different KWE_PREFIX."
+        exit 1
+    fi
+}
+
 # Environment for everything built against the prefix (kinetic-we, Noctalia).
 prefix_env() {
-    export PATH="$KWE_PREFIX/bin:$QT_DIR/bin:$PATH"
+    if [[ "$FLAVOR" == trixie ]]; then
+        export PATH="$KWE_PREFIX/bin:$QT_DIR/bin:$PATH"
+    else
+        export PATH="$KWE_PREFIX/bin:$PATH"
+    fi
     export PKG_CONFIG_PATH="$KWE_PREFIX/lib64/pkgconfig:$KWE_PREFIX/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-    export CMAKE_PREFIX_PATH="$QT_DIR:$KWE_PREFIX:$KWE_PREFIX/lib64/cmake"
+    export CMAKE_PREFIX_PATH="$CMAKE_SEARCH_PATH"
     export CMAKE_LIBRARY_PATH="$KWE_PREFIX/lib64"
     export XDG_DATA_DIRS="$KWE_PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
     export QML_IMPORT_PATH="$KWE_PREFIX/lib64/qml"
     export QML2_IMPORT_PATH="$KWE_PREFIX/lib64/qml"
+}
+
+# Minimum distro versions for --sid. Mirrors the find_package/pkg-config
+# requirements: Qt 6.10, KF6 6.30 (kconfig_compiler's enum-class kcfg fix),
+# Plasma 6.6.90, wayland 1.24, wayland-protocols 1.48,
+# plasma-wayland-protocols 1.21, libinput 1.28, libdrm 2.4.127, libei 1.4,
+# libdisplay-info 0.2, pipewire 1.0.9.
+# Epochs are stripped before comparing: Debian's KDE packages use a "4:" epoch,
+# which would otherwise make an old 6.3 look newer than 6.6.90.
+SID_MIN_VERSIONS=(
+    "qt6-base-dev 6.10.0"
+    "libkf6config-dev 6.30.0"
+    "libplasma-dev 6.6.90"
+    "kwayland-dev 6.6.90"
+    "knighttime-dev 6.6.90"
+    "kscreenlocker-dev 6.6.90"
+    "libwayland-dev 1.24"
+    "wayland-protocols 1.48"
+    "plasma-wayland-protocols 1.21"
+    "libinput-dev 1.28"
+    "libdrm-dev 2.4.127"
+    "libei-dev 1.4"
+    "libeis-dev 1.4"
+    "libdisplay-info-dev 0.2.0"
+    "libpipewire-0.3-dev 1.0.9"
+)
+
+check_sid_versions() {
+    local entry pkg want ver
+    local too_old=()
+    for entry in "${SID_MIN_VERSIONS[@]}"; do
+        pkg="${entry%% *}"
+        want="${entry##* }"
+        ver=$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null) || continue
+        dpkg --compare-versions "${ver#*:}" ge "$want" \
+            || too_old+=("$pkg $ver (need >= $want)")
+    done
+    if (( ${#too_old[@]} )); then
+        error "This system's KDE/Qt stack is too old for kinetic-we:"
+        printf '  %s\n' "${too_old[@]}"
+        echo
+        error "Update the system (sid-based distros such as PikaOS sync with sid"
+        error "periodically) and re-run. The full-stack mode without --sid is"
+        error "tuned for Debian 13, so it is not a fallback on sid."
+        exit 1
+    fi
+    info "  Distro Qt/KF6/Plasma stack is new enough for --sid."
 }
 
 # ---------------------------------------------------------------------------
@@ -174,8 +314,11 @@ check_host() {
     fi
 
     # Mesa from trixie-backports: libgbm-dev must match the installed libgbm1.
+    # sid has no backports; libgbm-dev comes from the same suite as libgbm1.
     local gbm_bpo="no"
-    [[ "$(dpkg-query -W -f='${Version}' libgbm1 2>/dev/null)" == *bpo* ]] && gbm_bpo="yes"
+    if [[ "$FLAVOR" == trixie ]]; then
+        [[ "$(dpkg-query -W -f='${Version}' libgbm1 2>/dev/null)" == *bpo* ]] && gbm_bpo="yes"
+    fi
 
     local missing=() pkg
     for pkg in "${DEB_PACKAGES[@]}"; do
@@ -203,6 +346,10 @@ check_host() {
         fi
     done
     info "  All required Debian packages are installed."
+
+    if [[ "$FLAVOR" == sid ]]; then
+        check_sid_versions
+    fi
 
     local runtime_missing=()
     for pkg in "${DEB_RUNTIME_PACKAGES[@]}"; do
@@ -404,6 +551,56 @@ build_spectacle() {
 }
 
 # ---------------------------------------------------------------------------
+# 2b. sid: kdecoration + kglobalacceld from the spec's pinned commits
+# ---------------------------------------------------------------------------
+# Debian sid already ships Qt 6.11 / KF6 6.30 / Plasma 6.7, but not the two
+# post-6.7 KDE pieces kinetic-we needs, so build exactly those into the prefix.
+# kdecoration master adds KDecoration3::Style; kglobalacceld master adds the
+# keyEvent()/pointerPressed()/axisTriggered()/resetModifierOnlyState() input
+# API the embedded daemon integration uses.
+build_pinned_kde_repo() {
+    local name="$1" ref="$2"
+    local src="$KWE_PREFIX/src/$name"
+    local build="$KWE_PREFIX/build/$name"
+    local stamp="$build/.kwe-commit"
+
+    if [[ ! -d "$src/.git" ]]; then
+        step "Fetching $name..."
+        git clone --quiet "https://invent.kde.org/plasma/$name.git" "$src"
+    fi
+    git -C "$src" fetch --quiet origin
+    if [[ "$(git -C "$src" rev-parse HEAD 2>/dev/null)" != "$ref" ]]; then
+        step "Checking out $name $ref..."
+        git -C "$src" checkout --quiet --force "$ref"
+    fi
+
+    # Reconfigure from scratch when the pin changes so no stale objects survive.
+    if [[ "$(cat "$stamp" 2>/dev/null)" != "$ref" ]]; then
+        step "Configuring $name..."
+        rm -rf "$build"
+        cmake -B "$build" -S "$src" -G Ninja \
+            -DCMAKE_INSTALL_PREFIX="$KWE_PREFIX" \
+            -DCMAKE_PREFIX_PATH="$CMAKE_SEARCH_PATH" \
+            -DCMAKE_LIBRARY_PATH="$KWE_PREFIX/lib64" \
+            -DCMAKE_INSTALL_LIBDIR=lib64 \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DBUILD_TESTING=OFF
+    fi
+
+    step "Building $name..."
+    cmake --build "$build" --parallel "$JOBS"
+    cmake --install "$build"
+    echo "$ref" > "$stamp"
+}
+
+build_kde_pins() {
+    prefix_env
+    step "Building kdecoration and kglobalacceld (sid pins)..."
+    build_pinned_kde_repo kdecoration "$SPEC_KDECORATION_REF"
+    build_pinned_kde_repo kglobalacceld "$SPEC_KGA_REF"
+}
+
+# ---------------------------------------------------------------------------
 # 3. kinetic-we
 # ---------------------------------------------------------------------------
 build_kinetic_we() {
@@ -487,10 +684,14 @@ build_noctalia() {
 install_startup_script() {
     step "Installing dev startup script..."
     mkdir -p "$KWE_PREFIX/bin"
-    # KWE_SCOPED_ENV=1: keep the prefix's Qt 6.11/KF6 paths out of the session
-    # so Debian's own (Qt 6.8) KDE apps keep working; see start-kineticwe.sh.
+    # KWE_SCOPED_ENV=1 (trixie): keep the prefix's Qt 6.11/KF6 paths out of the
+    # session so Debian's own (Qt 6.8) KDE apps keep working. sid uses the
+    # distro's Qt/KF6, so the session must see prefix/lib64 for kdecoration,
+    # kglobalacceld and kinetic-we's own libraries -> 0.
+    local scoped="1"
+    [[ "$FLAVOR" == sid ]] && scoped="0"
     sed -e "s|@INSTALL_PREFIX@|$KWE_PREFIX|g" \
-        -e '1a export KWE_SCOPED_ENV="${KWE_SCOPED_ENV:-1}"' \
+        -e "1a export KWE_SCOPED_ENV=\"\${KWE_SCOPED_ENV:-$scoped}\"" \
         "$SCRIPT_DIR/scripts/start-kineticwe.sh" \
         > "$KWE_PREFIX/bin/start-kineticwe"
     chmod +x "$KWE_PREFIX/bin/start-kineticwe"
@@ -646,12 +847,12 @@ reset_local() {
             exit 1 ;;
     esac
 
-    warn "This deletes $KWE_PREFIX and $BUILD_DIR"
+    warn "This deletes $KWE_PREFIX and the build dirs (build-deb, build-deb-sid)"
     read -r -p "Continue? [y/N] " reply
     [[ "$reply" =~ ^[Yy]$ ]] || { info "Aborted."; exit 0; }
 
-    rm -rf "$KWE_PREFIX" "$BUILD_DIR"
-    info "Removed $KWE_PREFIX and $BUILD_DIR"
+    rm -rf "$KWE_PREFIX" "${SCRIPT_DIR}/build-deb" "${SCRIPT_DIR}/build-deb-sid"
+    info "Removed $KWE_PREFIX and the build dirs"
 
     # User-level files pointing into the prefix (the D-Bus overrides would
     # otherwise break Plasma's Spectacle / portal activation).
@@ -675,6 +876,7 @@ MODE="full"
 SESSION="yes"
 while (( $# )); do
     case "$1" in
+        --sid)         FLAVOR="sid" ;;
         --deps-only)   MODE="deps" ;;
         --quick)       MODE="quick" ;;
         --reset-local) MODE="reset" ;;
@@ -684,6 +886,8 @@ while (( $# )); do
     esac
     shift
 done
+
+set_flavor
 
 if [[ "$MODE" == "reset" ]]; then
     reset_local
@@ -705,24 +909,38 @@ unset PKG_CONFIG_PATH LD_LIBRARY_PATH CMAKE_PREFIX_PATH CMAKE_LIBRARY_PATH \
 check_host
 mkdir -p "$KWE_PREFIX" "$TOOLS_DIR"
 
-case "$MODE" in
-    full)
+# trixie builds the whole newer stack into the prefix; sid only needs the two
+# KDE pins on top of the distro's Qt/KF6/Plasma (and no Spectacle: sid's 6.7
+# already works with KWin >= 6.5).
+build_dependencies() {
+    if [[ "$FLAVOR" == trixie ]]; then
         install_qt
         build_kde_stack
         build_spectacle
+    else
+        build_kde_pins
+    fi
+}
+
+case "$MODE" in
+    full)
+        build_dependencies
         build_kinetic_we yes
         build_portal yes
         build_noctalia yes
         ;;
     deps)
-        install_qt
-        build_kde_stack
-        build_spectacle
+        build_dependencies
         exit 0
         ;;
     quick)
-        if [[ ! -x "$QT_DIR/bin/qmake" ]]; then
-            error "No Qt in $QT_DIR - run a full build first."
+        if [[ "$FLAVOR" == trixie ]]; then
+            if [[ ! -x "$QT_DIR/bin/qmake" ]]; then
+                error "No Qt in $QT_DIR - run a full build first."
+                exit 1
+            fi
+        elif [[ ! -d "$KWE_PREFIX/lib64/cmake/KDecoration3" ]]; then
+            error "kdecoration is not installed in $KWE_PREFIX - run a full --sid build first."
             exit 1
         fi
         build_kinetic_we no
@@ -734,7 +952,8 @@ esac
 install_startup_script
 install_kwe_run
 wire_portal
-wire_spectacle
+# sid uses the distro's Spectacle (kde-spectacle 6.7); nothing to rewire.
+[[ "$FLAVOR" == trixie ]] && wire_spectacle
 [[ "$SESSION" == "yes" ]] && stage_session_entry
 
 info "Done. Start from a TTY with: $KWE_PREFIX/bin/start-kineticwe"

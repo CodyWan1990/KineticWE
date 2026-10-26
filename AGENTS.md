@@ -11,14 +11,15 @@ The user builds and tests locally on their own machine. An agent's job ends at
 "code is written and statically verified." Under no circumstances run anything
 that compiles, links, packages, installs, or launches binaries.
 
-Always tell me the exact build command to run after changes: `./build-rpm-dev.sh --kwin-only` for kwin-only, `./build-rpm-dev.sh --noct-only` for noctalia-only, or `./build-rpm-dev.sh --binary` / `--full` for the full build. On Arch: `./install-arch.sh --update` (rebuilds + pacman -U all packages, only if something changed), `./install-arch.sh` (all packages), or `./install-arch.sh --local-dev --update` for dev builds into ~/.local (drop `--update` to rebuild everything; add `--no-greeter` to skip the greeter in either mode).
+Always tell me the exact build command to run after changes: `./build-rpm-dev.sh --kwin-only` for kwin-only, `./build-rpm-dev.sh --noct-only` for noctalia-only, or `./build-rpm-dev.sh --binary` / `--full` for the full build. On Debian 13: `./build-deb-stable.sh`; on Debian sid / PikaOS: `./build-deb-stable.sh --sid` (add `--quick` for an incremental rebuild). On Arch: `./install-arch.sh --update` (rebuilds + pacman -U all packages, only if something changed), `./install-arch.sh` (all packages), or `./install-arch.sh --local-dev --update` for dev builds into ~/.local (drop `--update` to rebuild everything; add `--no-greeter` to skip the greeter in either mode).
 
 ### Forbidden — never run, in any form
 
 - **Build tools:** `cmake --build`, `ninja`, `make`, `meson compile`,
   `cargo build`, `npm run build` / `yarn build` / `pnpm build`, `nix build`,
   `makepkg`, `dpkg-buildpackage`, `debuild`, `rpmbuild`, `mock`, `copr-cli build`.
-- **Distrobox builds:** never run `build-deb-dev.sh`, `build-rpm-dev.sh`,
+- **Distrobox / build helpers:** never run `build-deb-stable.sh`,
+  `build-rpm-dev.sh`,
   `build-kinetic-noctalia.sh` (superseded by `build-rpm-dev.sh --noct-only`),
   `install-build-deps.sh`, `debian-deps.sh`, and
   never `distrobox enter` (or `podman`/`docker exec`) into a container to build.
