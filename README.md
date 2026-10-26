@@ -56,6 +56,10 @@ session menu, or run `start-kineticwe` from a TTY.
 
 > **Tip:** Press **Meta+Space** to open the app drawer.
 
+Working on KineticWE itself? [docs/nix-dev-install.md](docs/nix-dev-install.md)
+describes a development install that builds your checkout through the repo's
+Nix flake and installs it with dcli.
+
 Optionally, install the Noctalia greeter (greetd) and run its interactive setup:
 
 ```bash
