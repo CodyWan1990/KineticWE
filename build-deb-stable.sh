@@ -209,9 +209,29 @@ DEB_PACKAGES_SID=(
     libqaccessibilityclient-qt6-dev
 )
 
-# Runtime-only packages the session uses from Debian (not built here): the
-# start script sets QT_QPA_PLATFORMTHEME=qt6ct; Spectacle's OCR needs a
-# Tesseract language. Missing ones are only warned. Set by set_flavor().
+# Runtime-only packages the session uses from Debian (not built here):
+#   qt6ct                 - the platform theme plugin behind
+#                           QT_QPA_PLATFORMTHEME=qt6ct; without it no Qt app
+#                           reads the Noctalia palette at all
+#   breeze                - the Qt6 Breeze widget style (kde-style-breeze) that
+#                           the seeded qt5ct/qt6ct configs select, plus cursor
+#                           theme and Breeze color schemes
+#   breeze-icon-theme     - the vendored icon theme declares
+#                           Inherits=breeze,hicolor; without Breeze installed
+#                           the inheritance chain dead-ends at hicolor and KDE
+#                           apps show missing icons
+#   xdg-desktop-portal    - the portal frontend the kwe backend registers
+#                           with; also what qt6ct's
+#                           standard_dialogs=xdgdesktopportal talks to
+#   gtk-update-icon-cache - builds the icon-theme.cache for the vendored
+#                           theme; no distro trigger runs for an unmanaged
+#                           prefix, so KDE apps otherwise stat-walk ~9k files
+#                           on every start
+#   kde-spectacle         - the distro screenshot tool (sid's 6.7 build matches
+#                           KWin 6.7; the trixie flavor builds its own instead)
+#   tesseract-ocr-eng     - Spectacle's OCR language data
+# Missing ones are only warned (this script never calls sudo). Set by
+# set_flavor().
 DEB_RUNTIME_PACKAGES=()
 
 RED='\033[0;31m'
@@ -242,7 +262,14 @@ set_flavor() {
     CMAKE_SEARCH_PATH="${KWE_PREFIX};${KWE_PREFIX}/lib64/cmake"
     BUILD_DIR="${SCRIPT_DIR}/build-deb-sid"
     DEB_PACKAGES=("${DEB_PACKAGES_COMMON[@]}" "${DEB_PACKAGES_SID[@]}")
-    DEB_RUNTIME_PACKAGES=(qt6ct kde-spectacle tesseract-ocr-eng)
+    DEB_RUNTIME_PACKAGES=(
+        qt6ct
+        kde-spectacle
+        breeze breeze-icon-theme
+        xdg-desktop-portal
+        gtk-update-icon-cache
+        tesseract-ocr-eng
+    )
     if [[ "$GREETER" == "yes" ]]; then
         DEB_PACKAGES+=("${GREETER_BUILD_PACKAGES[@]}")
     fi
