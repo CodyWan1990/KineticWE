@@ -67,6 +67,33 @@ set -euo pipefail
 KWE_PREFIX="${KWE_PREFIX:-$HOME/.local/kineticwe}"
 QT_VERSION="${QT_VERSION:-6.11.3}"
 JOBS="${JOBS:-$(nproc)}"
+# Native architecture, used to qualify every dpkg-query below. A Multi-Arch:
+# same package installed for more than one architecture (PikaOS enables i386 for
+# Steam and Proton) makes an unqualified query print one line per architecture,
+# so "${Status}" becomes "install ok installedinstall ok installed" and never
+# equals "install ok installed". "${Version}" is mangled the same way.
+DPKG_ARCH="$(dpkg --print-architecture)"
+
+# dpkg-query needs both forms handled:
+#   * Multi-Arch: same packages installed for several architectures print one
+#     line per architecture for an unqualified query ("install ok installedinstall
+#     ok installed"), which never equals a single status;
+#   * arch: all packages (meson, hwdata, docbook-*) do not answer the
+#     architecture-qualified query at all.
+# Try the native-arch query first, then fall back to the unqualified one.
+pkg_installed() {
+    dpkg-query -W -f='${Status}\n' "$1:${DPKG_ARCH}" 2>/dev/null \
+        | grep -qx 'install ok installed' && return 0
+    dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null \
+        | grep -qx 'install ok installed'
+}
+
+pkg_version() {
+    local v
+    v=$(dpkg-query -W -f='${Version}\n' "$1:${DPKG_ARCH}" 2>/dev/null | head -1)
+    [[ -n "$v" ]] || v=$(dpkg-query -W -f='${Version}\n' "$1" 2>/dev/null | head -1)
+    printf '%s' "$v"
+}
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC_FILE="${SCRIPT_DIR}/lgl-kineticwe-copr/kineticwe.spec"
 # Flavor-dependent (set_flavor): trixie uses build-deb/, sid build-deb-sid/ so
@@ -230,6 +257,15 @@ DEB_PACKAGES_SID=(
 #   kde-spectacle         - the distro screenshot tool (sid's 6.7 build matches
 #                           KWin 6.7; the trixie flavor builds its own instead)
 #   tesseract-ocr-eng     - Spectacle's OCR language data
+#   qml6-module-org-kde-* - QML modules the portal dialogs import; without
+#   pipewire, wireplumber   org.kde.pipewire the ScreenCast picker cannot load,
+#   rtkit                   PipeWire needs a session manager to hand out
+#                           capture nodes, and rtkit provides the realtime
+#                           scheduling xdg-desktop-portal looks for
+#   pipewire-audio,       - PipeWire audio routing, Qt6 SVG image plugins, the
+#   qt6-svg-plugins,        Adwaita GTK3 theme and the Noto fonts (core, CJK,
+#   adw-gtk3-theme,         colour emoji) the session and its apps expect
+#   fonts-noto-*
 # Missing ones are only warned (this script never calls sudo). Set by
 # set_flavor().
 DEB_RUNTIME_PACKAGES=()
@@ -269,6 +305,35 @@ set_flavor() {
         xdg-desktop-portal
         gtk-update-icon-cache
         tesseract-ocr-eng
+        # ScreenCast / RemoteDesktop / Screenshot portal. The backend's QML
+        # imports org.kde.pipewire (stream preview) plus the Kirigami stack,
+        # and PipeWire only hands out capture nodes when a session manager is
+        # running. Missing any of these leaves the portal up but the screen
+        # picker dialog dead.
+        qml6-module-org-kde-pipewire
+        qml6-module-org-kde-kirigami
+        qml6-module-org-kde-ki18n
+        qml6-module-org-kde-kitemmodels
+        qml6-module-org-kde-kcmutils
+        qml6-module-org-kde-iconthemes
+        qml6-module-org-kde-kquickcontrols
+        qml6-module-org-kde-desktop
+        qml6-module-qt5compat-graphicaleffects
+        qml6-module-qt-labs-platform
+        qml6-module-qtquick-controls
+        pipewire wireplumber
+        # xdg-desktop-portal logs "Failed to load RealtimeKit property" on every
+        # start without it; PipeWire capture wants realtime scheduling.
+        rtkit
+        # Desktop runtime extras: PipeWire's audio routing, Qt6's SVG image
+        # plugins (SVG icons render blank without them), the Adwaita-for-GTK3
+        # theme the GTK apps are themed with (Debian calls this package
+        # adw-gtk3; PikaOS/Fedora call it adw-gtk3-theme), and the Noto fonts
+        # (core, CJK, colour emoji) the shell and browsers expect.
+        pipewire-audio
+        qt6-svg-plugins
+        adw-gtk3-theme
+        fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
     )
     if [[ "$GREETER" == "yes" ]]; then
         DEB_PACKAGES+=("${GREETER_BUILD_PACKAGES[@]}")
@@ -331,7 +396,8 @@ check_sid_versions() {
     for entry in "${SID_MIN_VERSIONS[@]}"; do
         pkg="${entry%% *}"
         want="${entry##* }"
-        ver=$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null) || continue
+        ver=$(pkg_version "$pkg")
+        [[ -n "$ver" ]] || continue
         dpkg --compare-versions "${ver#*:}" ge "$want" \
             || too_old+=("$pkg $ver (need >= $want)")
     done
@@ -370,12 +436,12 @@ check_host() {
     # sid has no backports; libgbm-dev comes from the same suite as libgbm1.
     local gbm_bpo="no"
     if [[ "$FLAVOR" == trixie ]]; then
-        [[ "$(dpkg-query -W -f='${Version}' libgbm1 2>/dev/null)" == *bpo* ]] && gbm_bpo="yes"
+        [[ "$(pkg_version libgbm1)" == *bpo* ]] && gbm_bpo="yes"
     fi
 
     local missing=() pkg
     for pkg in "${DEB_PACKAGES[@]}"; do
-        if [[ "$(dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null)" != "install ok installed" ]]; then
+        if ! pkg_installed "$pkg"; then
             [[ "$pkg" == libgbm-dev && "$gbm_bpo" == yes ]] && pkg="libgbm-dev/trixie-backports"
             missing+=("$pkg")
         fi
@@ -406,7 +472,7 @@ check_host() {
 
     local runtime_missing=()
     for pkg in "${DEB_RUNTIME_PACKAGES[@]}"; do
-        if [[ "$(dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null)" != "install ok installed" ]]; then
+        if ! pkg_installed "$pkg"; then
             runtime_missing+=("$pkg")
         fi
     done
@@ -901,15 +967,62 @@ EOF
     info "  $dbus_dir/$service"
     info "  $conf_dir/kineticwe-portals.conf"
 
+    # Smoke-test the backend before D-Bus ever touches it. A binary built in a
+    # different prefix (or by the other flavor) links against a Qt this host
+    # does not have; the only symptoms are "exited with status 1" in the
+    # journal and a portal that silently exports no ScreenCast interface.
+    # ldd -r reports the versioned-symbol mismatch behind that.
+    local ldd_err=""
+    if [[ -x "$exec_path" ]]; then
+        local ldd_libdir="$KWE_PREFIX/lib64"
+        [[ "$FLAVOR" == trixie ]] && ldd_libdir="$ldd_libdir:$QT_DIR/lib"
+        ldd_err=$(LD_LIBRARY_PATH="$ldd_libdir" ldd -r "$exec_path" 2>&1 \
+            | grep -E 'undefined symbol|not found' | head -3 || true)
+    else
+        warn "  Portal backend missing: $exec_path"
+    fi
+
+    if [[ -n "$ldd_err" ]]; then
+        error "  Portal backend cannot be loaded by the dynamic linker:"
+        printf '%s\n' "$ldd_err" | sed 's/^/    /'
+        error "  Screen sharing/remote desktop will not work until the portal"
+        error "  is rebuilt for this prefix (full build, or --reset-local first)."
+    fi
+
     local portal_src="$KWE_PREFIX/share/xdg-desktop-portal/portals/kwe.portal"
     local portal_dst="/usr/share/xdg-desktop-portal/portals/kwe.portal"
+    local portal_stale="no"
     if [[ -f "$portal_dst" ]] && cmp -s "$portal_src" "$portal_dst"; then
         info "  $portal_dst (already up to date)"
     else
+        portal_stale="yes"
         warn "For screenshots/screen sharing via the portal, run once yourself:"
         echo
         echo "  sudo install -m0644 $portal_src $portal_dst"
         echo
+    fi
+
+    if [[ -z "$ldd_err" && -x "$exec_path" ]]; then
+        # The frontend creates its backend proxies once at startup and keeps the
+        # failed ones, so rewriting the service file alone does nothing for an
+        # already-running session. Restart last, once the wiring is in place;
+        # the frontend also re-reads the .portal files at startup.
+        if systemctl --user is-active --quiet xdg-desktop-portal.service 2>/dev/null; then
+            if systemctl --user try-restart xdg-desktop-portal.service 2>/dev/null; then
+                info "  Restarted xdg-desktop-portal.service"
+                if [[ "$portal_stale" == yes ]]; then
+                    warn "  Restart it again after the sudo install above."
+                fi
+            else
+                warn "  Could not restart the portal; run it yourself:"
+                echo "    systemctl --user restart xdg-desktop-portal.service"
+            fi
+        fi
+        info "  Verify ScreenCast with:"
+        echo "    gdbus call --session -d org.freedesktop.portal.Desktop \\"
+        echo "      -o /org/freedesktop/portal/desktop \\"
+        echo "      -m org.freedesktop.DBus.Properties.Get \\"
+        echo "      org.freedesktop.portal.ScreenCast version"
     fi
 }
 
