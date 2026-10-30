@@ -35,15 +35,19 @@
 #   for a lagging sid snapshot).
 #
 #   Pass --greeter (sid only) to also build the Noctalia login greeter from
-#   source. Trixie does not package wlroots-0.20, which the greeter needs, so
-#   the option is ignored there.
+#   source and make it your login screen: greetd is installed, /etc/greetd/
+#   config.toml is written (backup kept), and greetd becomes the display
+#   manager, replacing the current one. One confirmation prompt at the end;
+#   --no-setup-greeter only prints the root steps instead. Trixie does not
+#   package wlroots-0.20, which the greeter needs, so the option is ignored
+#   there.
 #
 # Missing Debian packages are installed for you: check_host lists them, asks
 # once on the TTY, and runs 'sudo apt-get install -y' (sudo still prompts for
 # its password). Pass --no-install-deps to only print the apt command instead,
 # which is also what happens when stdin is not a TTY. The remaining root steps
-# (the login-screen session entry, the portal's .portal file, the greetd setup
-# for the greeter) are printed for you to run yourself.
+# (the login-screen session entry outside --greeter, the portal's .portal file)
+# are printed for you to run yourself.
 #
 # Usage:
 #   ./build-deb-stable.sh                 # Full trixie build (first run: 1-3 hours)
@@ -54,7 +58,8 @@
 #   ./build-deb-stable.sh --no-session    # Skip the session-entry hint
 #   ./build-deb-stable.sh --no-install-deps  # Only print missing apt packages
 #   ./build-deb-stable.sh --reset-local   # Delete KWE_PREFIX and the build dirs
-#   ./build-deb-stable.sh --sid --greeter # Also build the Noctalia login greeter (sid only)
+#   ./build-deb-stable.sh --sid --greeter # Build + configure the login greeter (sid only)
+#   ./build-deb-stable.sh --sid --greeter --no-setup-greeter  # Only print the setup steps
 #
 # Environment variables:
 #   KWE_PREFIX   - Install prefix (default: $HOME/.local/kineticwe)
@@ -155,13 +160,14 @@ SPEC_GREETER_REF=$(sed -n 's/.*%global noctalia_greeter_ref \([0-9a-f]\{40\}\).*
 NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO:-https://gitlab.com/theblackdon/noctalia-greeter-kwe}"
 NOCTALIA_GREETER_REPO="${NOCTALIA_GREETER_REPO%/}"
 NOCTALIA_GREETER_REF="${NOCTALIA_GREETER_REF:-$SPEC_GREETER_REF}"
-# Greeter build dep: the compositor part needs wlroots-0.20, which sid packages
-# as libwlroots-0.20-dev (trixie only has 0.18).
-GREETER_BUILD_PACKAGES=(libwlroots-0.20-dev)
+# Greeter packages: the compositor part needs wlroots-0.20, which sid packages
+# as libwlroots-0.20-dev (trixie only has 0.18); greetd is the display manager
+# the setup below configures. Both go through check_host's apt prompt.
+GREETER_PACKAGES=(libwlroots-0.20-dev greetd)
 
 # Login-screen session entry. /usr/local/share/wayland-sessions is searched by
-# SDDM and GDM; installing there needs root, so we only stage it and print the
-# command.
+# SDDM, GDM and the Noctalia greeter; installing there needs root, so it is
+# only staged and printed unless the --greeter automatic setup installs it.
 SESSION_DIR="/usr/local/share/wayland-sessions"
 SESSION_DESKTOP="kineticwe-dev.desktop"
 
@@ -354,7 +360,7 @@ set_flavor() {
         fonts-noto-core fonts-noto-cjk fonts-noto-color-emoji
     )
     if [[ "$GREETER" == "yes" ]]; then
-        DEB_PACKAGES+=("${GREETER_BUILD_PACKAGES[@]}")
+        DEB_PACKAGES+=("${GREETER_PACKAGES[@]}")
     fi
 
     # A prefix built by the trixie flavor contains its own Qt/KF6; the sid build
@@ -1348,8 +1354,10 @@ EOF
 }
 
 # Display managers only scan system session dirs, so the entry is staged in
-# the prefix and the (root) install command is printed instead of run.
+# the prefix. auto=yes (the --greeter automatic setup) installs it with sudo;
+# otherwise the (root) install command is printed instead of run.
 stage_session_entry() {
+    local auto="${1:-no}"
     step "Staging 'KineticWE-Dev' login-screen session entry..."
     local staged="$KWE_PREFIX/share/wayland-sessions/$SESSION_DESKTOP"
     local target="$SESSION_DIR/$SESSION_DESKTOP"
@@ -1360,6 +1368,14 @@ stage_session_entry() {
 
     if [[ -f "$target" ]] && cmp -s "$staged" "$target"; then
         info "  $target (already up to date)"
+    elif [[ "$auto" == "yes" ]]; then
+        step "Installing 'KineticWE-Dev' login-screen session entry..."
+        if sudo install -Dm0644 "$staged" "$target"; then
+            info "  $target"
+        else
+            warn "Could not install $target. Install it yourself:"
+            echo "  sudo install -Dm0644 $staged $target"
+        fi
     else
         warn "To show 'KineticWE-Dev' on the login screen, run once yourself:"
         echo
@@ -1405,10 +1421,10 @@ resolve_greeter_user() {
     printf '%s\n' "$user"
 }
 
-# greetd setup needs root, so print the commands (same policy as the session
-# entry and portal hints). The greeter's own setup helper patches PAM, creates
-# /var/lib/noctalia-greeter and installs greeter.toml; it then prints the
-# greetd config block and the service command.
+# Print the root steps when the automatic setup is skipped (--no-setup-greeter
+# or a non-interactive run). The greeter's own setup helper patches PAM,
+# creates /var/lib/noctalia-greeter and installs greeter.toml; it then prints
+# the greetd config block. The display-manager switch is always manual here.
 stage_greeter_setup() {
     step "Staging Noctalia greeter login setup..."
     local session_bin="$KWE_PREFIX/bin/noctalia-greeter-session"
@@ -1416,8 +1432,10 @@ stage_greeter_setup() {
     local setup_script="$KWE_PREFIX/share/noctalia-greeter/setup_greeter_system.sh"
     local policy="$KWE_PREFIX/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy"
     local policy_target="/usr/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy"
-    local greeter_user
+    local tmpfiles="$KWE_PREFIX/lib/tmpfiles.d/noctalia-greeter.conf"
+    local greeter_user current_dm
     greeter_user=$(resolve_greeter_user)
+    current_dm=$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null || true)
 
     if [[ ! -x "$setup_script" ]]; then
         warn "  $setup_script not found; skipping the greetd setup hint."
@@ -1434,12 +1452,272 @@ stage_greeter_setup() {
         # Exec path still points at this prefix.
         echo "  sudo install -Dm0644 \"$policy\" \"$policy_target\""
     fi
+    if [[ -f "$tmpfiles" ]]; then
+        echo "  sudo install -Dm0644 \"$tmpfiles\" /etc/tmpfiles.d/noctalia-greeter.conf"
+    fi
     printf '  sudo env%s NOCTALIA_GREETER_SESSION_BIN="%s" NOCTALIA_GREETER_APPLY_APPEARANCE="%s" "%s"\n' \
         "${greeter_user:+ GREETER_USER=$greeter_user}" \
         "$session_bin" "$apply_appearance" "$setup_script"
     echo
-    info "  The greeter lists system session entries: install the 'KineticWE-Dev'"
-    info "  entry above. The setup script then prints the greetd config and service command."
+    echo "Then make greetd the display manager:"
+    echo "  sudo systemctl set-default graphical.target"
+    if [[ "$current_dm" != */greetd.service ]]; then
+        if [[ -n "$current_dm" && "$current_dm" != /dev/null ]]; then
+            echo "  sudo systemctl disable $(basename "$current_dm")"
+        fi
+        echo "  sudo systemctl enable greetd.service"
+        echo "  sudo ln -sfn /usr/lib/systemd/system/greetd.service \\"
+        echo "    /etc/systemd/system/display-manager.service"
+    fi
+    echo
+    info "  The setup script prints the /etc/greetd/config.toml block to paste;"
+    info "  save the old file first, then reboot. Make sure the 'KineticWE-Dev'"
+    info "  session entry above is installed, or the greeter has nothing to offer."
+}
+
+# Decide once, at the end of the build, whether the greeter setup is applied.
+# Sets GREETER_AUTO; the actual root work happens in apply_greeter_setup().
+# Asking here (not before the build) keeps a long build from blocking on a
+# prompt, and a declined/non-TTY run falls back to the printed steps.
+ask_greeter_setup() {
+    GREETER_AUTO="no"
+    [[ "$SETUP_GREETER" == "yes" ]] || return 0
+
+    if [[ ! -t 0 || ! -t 1 ]]; then
+        warn "No TTY: printing the greeter setup commands instead."
+        return 0
+    fi
+    if ! command -v sudo >/dev/null; then
+        warn "sudo not found: printing the greeter setup commands instead."
+        return 0
+    fi
+
+    warn "The greeter needs root setup: greetd, /etc/greetd/config.toml (backup"
+    warn "kept), and greetd as the display manager, replacing the current one."
+    local reply=""
+    if read -r -p "Apply the greeter setup now? [Y/n] " reply \
+        && [[ "$reply" =~ ^([Yy]|)$ ]]; then
+        GREETER_AUTO="yes"
+    else
+        info "Skipping the automatic greeter setup."
+    fi
+}
+
+# write_greetd_config <session-bin> <greeter-user>: point [default_session] at
+# the prefix wrapper, preserving every other key and section. A .bak copy of
+# the previous file is kept; an already-correct file is left untouched.
+write_greetd_config() {
+    local session_bin="$1" greeter_user="$2"
+    local cfg="/etc/greetd/config.toml" tmp base
+    tmp=$(mktemp) || { warn "Could not create a temporary file."; return 1; }
+    base="$tmp.base"
+
+    if [[ -f "$cfg" ]]; then
+        if ! cp -- "$cfg" "$base" 2>/dev/null; then
+            warn "Cannot read $cfg; leaving it untouched."
+            rm -f "$tmp" "$base"
+            return 1
+        fi
+    else
+        cat > "$base" <<EOF
+[terminal]
+vt = 1
+
+[default_session]
+command = "$session_bin"
+user = "$greeter_user"
+EOF
+    fi
+
+    if grep -q '^\[default_session\]' "$base"; then
+        # Same merge as build-rpm-dev.sh: replace command/user inside the
+        # block, leave comments and other keys alone, and add a missing key
+        # rather than leaving an unusable [default_session] behind.
+        awk -v session="$session_bin" -v guser="$greeter_user" '
+            function close_block() {
+                if (!seen_cmd) print "command = \"" session "\""
+                if (!seen_user) print "user = \"" guser "\""
+                in_block = 0
+            }
+            /^\[default_session\]/ {
+                in_block = 1; seen_cmd = 0; seen_user = 0; print; next
+            }
+            /^\[/ { if (in_block) close_block() }
+            in_block && /^[[:space:]]*command[[:space:]]*=/ {
+                print "command = \"" session "\""; seen_cmd = 1; next
+            }
+            in_block && /^[[:space:]]*user[[:space:]]*=/ {
+                print "user = \"" guser "\""; seen_user = 1; next
+            }
+            { print }
+            END { if (in_block) close_block() }
+        ' "$base" > "$tmp"
+    else
+        cat -- "$base" > "$tmp"
+        printf '\n[default_session]\ncommand = "%s"\nuser = "%s"\n' \
+            "$session_bin" "$greeter_user" >> "$tmp"
+    fi
+
+    if [[ -f "$cfg" ]] && cmp -s "$tmp" "$cfg"; then
+        info "  $cfg (already up to date)"
+    else
+        if [[ -f "$cfg" ]] && ! sudo cp -a -- "$cfg" "$cfg.bak"; then
+            warn "Could not back up $cfg; not changing it."
+            rm -f "$tmp" "$base"
+            return 1
+        fi
+        if sudo install -Dm0644 "$tmp" "$cfg"; then
+            info "  $cfg"
+        else
+            warn "Could not write $cfg; run the greeter setup manually."
+            rm -f "$tmp" "$base"
+            return 1
+        fi
+    fi
+    rm -f "$tmp" "$base"
+}
+
+# Apply the greeter's root setup. Every step is idempotent and guarded, so a
+# failure warns instead of discarding the already-built prefix.
+apply_greeter_setup() {
+    step "Configuring the Noctalia greeter (greetd)..."
+    local session_bin="$KWE_PREFIX/bin/noctalia-greeter-session"
+    local apply_bin="$KWE_PREFIX/bin/noctalia-greeter-apply-appearance"
+    local setup_script="$KWE_PREFIX/share/noctalia-greeter/setup_greeter_system.sh"
+    local policy="$KWE_PREFIX/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy"
+    local policy_target="/usr/share/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy"
+    local tmpfiles_target="/etc/tmpfiles.d/noctalia-greeter.conf"
+    local dm_link="/etc/systemd/system/display-manager.service"
+    local greeter_user="" nologin grp current_dm unit dm tmpfiles
+
+    if ! command -v greetd >/dev/null; then
+        warn "  greetd is missing; printing the setup steps instead."
+        stage_greeter_setup
+        return
+    fi
+    if [[ ! -x "$session_bin" || ! -x "$apply_bin" || ! -x "$setup_script" ]]; then
+        warn "  Greeter binaries/scripts are missing in $KWE_PREFIX; skipping."
+        stage_greeter_setup
+        return
+    fi
+
+    greeter_user=$(resolve_greeter_user)
+    [[ -n "$greeter_user" ]] || greeter_user="_greetd"
+    info "  Greeter user: $greeter_user"
+
+    if ! id "$greeter_user" >/dev/null 2>&1; then
+        nologin=/usr/sbin/nologin
+        [[ -x "$nologin" ]] || nologin=/bin/false
+        step "Creating the greeter user '$greeter_user'..."
+        sudo useradd -r -s "$nologin" -d /var/lib/noctalia-greeter "$greeter_user" \
+            || warn "  Could not create '$greeter_user'; the greeter may not start."
+    fi
+
+    for grp in video input; do
+        getent group "$grp" >/dev/null 2>&1 || continue
+        [[ " $(id -Gn "$greeter_user" 2>/dev/null || true) " == *" $grp "* ]] && continue
+        sudo usermod -a -G "$grp" "$greeter_user" \
+            || warn "  Could not add '$greeter_user' to '$grp'."
+    done
+
+    if [[ -f "$policy" ]]; then
+        if [[ -f "$policy_target" ]] && cmp -s "$policy" "$policy_target"; then
+            info "  $policy_target (already up to date)"
+        elif sudo install -Dm0644 "$policy" "$policy_target"; then
+            info "  $policy_target"
+        else
+            warn "  Could not install $policy_target."
+        fi
+    fi
+
+    # tmpfiles recreates and chowns the state dir on boot. Generate the line
+    # for the resolved user instead of copying the prefix's hardcoded _greetd
+    # file; /etc/tmpfiles.d is the admin-scanned location.
+    tmpfiles=$(mktemp) || tmpfiles=""
+    if [[ -n "$tmpfiles" ]]; then
+        printf 'd /var/lib/noctalia-greeter 0750 %s %s -\n' \
+            "$greeter_user" "$greeter_user" > "$tmpfiles"
+        if [[ -f "$tmpfiles_target" ]] && cmp -s "$tmpfiles" "$tmpfiles_target"; then
+            info "  $tmpfiles_target (already up to date)"
+        elif sudo install -Dm0644 "$tmpfiles" "$tmpfiles_target"; then
+            info "  $tmpfiles_target"
+        else
+            warn "  Could not install $tmpfiles_target."
+        fi
+        rm -f "$tmpfiles"
+    fi
+
+    # The helper patches PAM, creates/chowns the state dir and writes
+    # greeter.toml. On success its output (including the copy/paste greetd
+    # block, which this script writes itself) is noise; on failure it is the
+    # diagnosis, so keep it and print it.
+    step "Running the greeter system setup (PAM, state dir, greeter.toml)..."
+    local setup_log
+    setup_log=$(mktemp) || setup_log=""
+    if [[ -n "$setup_log" ]]; then
+        if sudo env \
+            GREETER_USER="$greeter_user" \
+            NOCTALIA_GREETER_SESSION_BIN="$session_bin" \
+            NOCTALIA_GREETER_APPLY_APPEARANCE="$apply_bin" \
+            "$setup_script" >"$setup_log" 2>&1; then
+            info "  PAM, state dir and greeter.toml are set up."
+        else
+            warn "  Greeter system setup failed:"
+            sed 's/^/    /' "$setup_log"
+        fi
+        rm -f "$setup_log"
+    else
+        sudo env \
+            GREETER_USER="$greeter_user" \
+            NOCTALIA_GREETER_SESSION_BIN="$session_bin" \
+            NOCTALIA_GREETER_APPLY_APPEARANCE="$apply_bin" \
+            "$setup_script" || warn "  Greeter system setup failed; see the output above."
+    fi
+
+    write_greetd_config "$session_bin" "$greeter_user"
+
+    current_dm=$(readlink -f "$dm_link" 2>/dev/null || true)
+    [[ "$current_dm" == /dev/null ]] && current_dm=""
+    if [[ "$current_dm" == */greetd.service ]]; then
+        info "  greetd is already the display manager."
+    else
+        if [[ -n "$current_dm" ]]; then
+            unit=$(basename "$current_dm")
+            warn "Disabling the current display manager: $unit"
+            sudo systemctl disable "$unit" || warn "  Could not disable $unit."
+        else
+            for dm in sddm gdm gdm3 lightdm lxdm xdm; do
+                if systemctl is-enabled --quiet "$dm.service" 2>/dev/null; then
+                    warn "Disabling the current display manager: $dm.service"
+                    sudo systemctl disable "$dm.service" \
+                        || warn "  Could not disable $dm.service."
+                fi
+            done
+        fi
+        sudo systemctl enable greetd.service \
+            || warn "  Could not enable greetd.service."
+        # Debian's unit carries Alias=display-manager.service, but upstream's
+        # (Arch/Fedora) does not, so create the link explicitly. Resolve the
+        # unit's real path instead of assuming /usr/lib.
+        local greetd_unit="/usr/lib/systemd/system/greetd.service" fragment
+        fragment=$(systemctl show -p FragmentPath --value greetd.service 2>/dev/null || true)
+        [[ -n "$fragment" ]] && greetd_unit="$fragment"
+        if sudo ln -sfn "$greetd_unit" "$dm_link"; then
+            info "  $dm_link -> greetd.service"
+        else
+            warn "  Could not link $dm_link."
+        fi
+    fi
+
+    if [[ "$(systemctl get-default 2>/dev/null || true)" != graphical.target ]]; then
+        sudo systemctl set-default graphical.target \
+            || warn "  Could not set graphical.target as the default."
+    fi
+
+    if [[ "$SESSION" != "yes" ]]; then
+        warn "  --no-session: the greeter has no KineticWE-Dev session entry to offer."
+    fi
+    info "  Reboot to be presented with the Noctalia greeter."
 }
 
 # ---------------------------------------------------------------------------
@@ -1477,6 +1755,19 @@ reset_local() {
         warn "Remove the greeter polkit action yourself:"
         echo "  sudo rm -f $greeter_policy"
     fi
+    if [[ -f /etc/greetd/config.toml ]] \
+        && grep -Fq -- "$KWE_PREFIX" /etc/greetd/config.toml 2>/dev/null; then
+        warn "greetd still launches the greeter from the removed prefix."
+        if [[ -f /etc/greetd/config.toml.bak ]]; then
+            echo "  sudo cp -a /etc/greetd/config.toml.bak /etc/greetd/config.toml"
+        else
+            echo "  sudoedit /etc/greetd/config.toml   # restore the old command/user"
+        fi
+    fi
+    if [[ -f /etc/tmpfiles.d/noctalia-greeter.conf ]]; then
+        warn "Remove the greeter tmpfiles drop-in yourself:"
+        echo "  sudo rm -f /etc/tmpfiles.d/noctalia-greeter.conf"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -1488,6 +1779,11 @@ GREETER="no"
 # "yes": check_host offers to apt-install missing packages; "no"
 # (--no-install-deps): only prints the command, like older versions did.
 INSTALL_DEPS="yes"
+# "yes" (default with --greeter): apply the greetd setup after the build;
+# "no" (--no-setup-greeter): only print the root steps.
+SETUP_GREETER="yes"
+# Set by ask_greeter_setup(): "yes" when the setup will be applied.
+GREETER_AUTO="no"
 while (( $# )); do
     case "$1" in
         --sid)         FLAVOR="sid" ;;
@@ -1497,6 +1793,7 @@ while (( $# )); do
         --reset-local) MODE="reset" ;;
         --no-session)  SESSION="no" ;;
         --no-install-deps) INSTALL_DEPS="no" ;;
+        --no-setup-greeter) SETUP_GREETER="no" ;;
         --greeter)     GREETER="yes" ;;
         -h|--help)     usage; exit 0 ;;
         *) error "Unknown option: $1"; usage; exit 1 ;;
@@ -1617,7 +1914,20 @@ install_kwe_run
 wire_portal
 # sid uses the distro's Spectacle (kde-spectacle 6.7); nothing to rewire.
 [[ "$FLAVOR" == trixie ]] && wire_spectacle
-[[ "$SESSION" == "yes" ]] && stage_session_entry
-[[ "$GREETER" == "yes" ]] && stage_greeter_setup
+# One prompt at the end decides whether the greeter's root setup is applied;
+# the session entry follows the same decision so it is not printed twice.
+[[ "$GREETER" == "yes" ]] && ask_greeter_setup
+[[ "$SESSION" == "yes" ]] && stage_session_entry "$GREETER_AUTO"
+if [[ "$GREETER" == "yes" ]]; then
+    if [[ "$GREETER_AUTO" == "yes" ]]; then
+        apply_greeter_setup
+    else
+        stage_greeter_setup
+    fi
+fi
 
-info "Done. Start from a TTY with: $KWE_PREFIX/bin/start-kineticwe"
+if [[ "$GREETER_AUTO" == "yes" ]]; then
+    info "Done. Reboot to be presented with the Noctalia greeter."
+else
+    info "Done. Start from a TTY with: $KWE_PREFIX/bin/start-kineticwe"
+fi
