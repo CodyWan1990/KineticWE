@@ -47,6 +47,7 @@
 #   ./build-deb-stable.sh --sid           # Full sid build (uses the distro's Qt/KF6/Plasma)
 #   ./build-deb-stable.sh --deps-only     # Only the trixie Qt + KDE stack / the sid pins
 #   ./build-deb-stable.sh --quick         # Incremental kinetic-we + portal + Noctalia rebuild
+#   ./build-deb-stable.sh --update        # Like --quick, but only components whose sources changed
 #   ./build-deb-stable.sh --no-session    # Skip the session-entry hint
 #   ./build-deb-stable.sh --reset-local   # Delete KWE_PREFIX and the build dirs
 #   ./build-deb-stable.sh --sid --greeter # Also build the Noctalia login greeter (sid only)
@@ -57,6 +58,18 @@
 #   JOBS         - Parallel build jobs (default: nproc)
 #   NOCTALIA_GREETER_REPO - Git URL of the greeter fork (default: KineticWE fork)
 #   NOCTALIA_GREETER_REF  - Branch/tag/commit to build (default: noctalia_greeter_ref from the spec)
+#
+# Incremental updates (--update):
+#   A fingerprint per component (kinetic-we, portal, Noctalia, and the greeter
+#   with --greeter) is stored in $KWE_PREFIX/share/kineticwe/deb-state. It
+#   covers the component's source tree (uncommitted edits included, git blob
+#   ids), the flavor, the KDE pins the component links against, and this script
+#   itself, so a changed build flag also counts. Full and --quick builds record
+#   fingerprints too; an install without a record is rebuilt once, then is
+#   incremental. --update never touches the trixie Qt/kde-builder stack and, on
+#   sid, only rebuilds kdecoration/kglobalacceld when their pinned revision in
+#   the spec changed (use --deps-only to refresh the stack itself). A distro
+#   Qt/KF6 upgrade is not source: after one, run --quick to relink everything.
 #
 # Switching flavors reuses the same prefix; run --reset-local first, or the
 # sid build would pick up the trixie Qt/KF6 stack from the prefix.
@@ -682,6 +695,22 @@ build_pinned_kde_repo() {
     local src="$KWE_PREFIX/src/$name"
     local build="$KWE_PREFIX/build/$name"
     local stamp="$build/.kwe-commit"
+    local cmake_pkg
+
+    case "$name" in
+        kdecoration)   cmake_pkg=KDecoration3 ;;
+        kglobalacceld) cmake_pkg=KGlobalAccelD ;;
+        *) error "Unknown KDE pin: $name"; exit 1 ;;
+    esac
+
+    # Already installed at this exact revision: no fetch, no rebuild. That is
+    # what keeps --update cheap; a changed pin still rebuilds (and, through the
+    # compositor fingerprint, the compositor too).
+    if [[ "$(cat "$stamp" 2>/dev/null)" == "$ref" \
+        && -f "$KWE_PREFIX/lib64/cmake/$cmake_pkg/${cmake_pkg}Config.cmake" ]]; then
+        info "  $name $ref already installed."
+        return
+    fi
 
     if [[ ! -d "$src/.git" ]]; then
         step "Fetching $name..."
@@ -720,6 +749,215 @@ build_kde_pins() {
 }
 
 # ---------------------------------------------------------------------------
+# 2c. Incremental update (--update): per-component source fingerprints
+# ---------------------------------------------------------------------------
+# Same model as install-arch.sh --update: a component is rebuilt only when its
+# fingerprint differs from the one stored at its last successful install, when
+# none is stored, or when it is no longer installed. Fingerprints are written
+# after every build (full or quick), so the next --update has a baseline.
+#
+# A fingerprint covers the component's own files (git blob ids, so uncommitted
+# edits count and deleted files drop out), the flavor, the pins it links
+# against, and this script itself (the build flags live here). Nothing is ever
+# written to the repository.
+UPDATE_COMPONENTS=()
+declare -A COMPONENT_LABEL=(
+    [compositor]="kinetic-we"
+    [portal]="xdg-desktop-portal-kwe"
+    [shell]="Noctalia"
+    [greeter]="Noctalia greeter"
+)
+DO_UPDATE="no"
+# Filled by plan_update: rebuild reason per component ("" = up to date).
+declare -A UPDATE_REASON=()
+
+STATE_DIR="$KWE_PREFIX/share/kineticwe/deb-state"
+# sha256 of this script, so a changed build flag invalidates the fingerprints.
+SCRIPT_FINGERPRINT=""
+if [[ -r "$0" ]]; then
+    SCRIPT_FINGERPRINT=$(sha256sum -- "$0")
+    SCRIPT_FINGERPRINT="${SCRIPT_FINGERPRINT%% *}"
+else
+    warn "Cannot read $0; --update cannot detect changes to this script's build flags."
+fi
+
+# component_pathspecs <component>: git pathspecs of the component's own files.
+# The compositor is "everything else" so a new top-level file is never missed;
+# only paths that cannot change any installed component are excluded.
+component_pathspecs() {
+    case "$1" in
+        compositor)
+            printf '%s\n' . \
+                ':(exclude)shell' ':(exclude)portal' ':(exclude)docs' ':(exclude)ci' \
+                ':(exclude)debian' ':(exclude)nix' ':(exclude)arch' \
+                ':(exclude)lgl-kineticwe-copr' ':(exclude)scripts' \
+                ':(glob,exclude)flake.*' ':(glob,exclude)build-*.sh' \
+                ':(glob,exclude)*-deps.sh' ':(exclude)install-arch.sh' \
+                ':(exclude)PKGBUILD' ':(glob,exclude)*.install' \
+                ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md' ':(exclude).gitlab-ci.yml'
+            ;;
+        portal) printf '%s\n' portal/xdg-desktop-portal-kwe ;;
+        shell)  printf '%s\n' shell/noctalia ;;
+        greeter) : ;;   # not vendored: fingerprinted by its pinned ref only
+        *) error "Unknown component: $1"; exit 1 ;;
+    esac
+}
+
+# source_fingerprint_lines <pathspec>...: one "<blob id> <path>" line per file.
+source_fingerprint_lines() {
+    local f p line blob
+    local -A dirty=()
+    while IFS= read -r -d '' f; do
+        dirty["$f"]=1
+    done < <(git -C "$SCRIPT_DIR" diff-files --name-only -z -- "$@"
+             git -C "$SCRIPT_DIR" ls-files -o --exclude-standard -z -- "$@")
+
+    while IFS= read -r -d '' line; do
+        f="${line#*$'\t'}"
+        [[ -z "${dirty[$f]:-}" ]] || continue
+        blob="${line#* }"
+        printf '%s %s\n' "${blob%% *}" "$f"
+    done < <(git -C "$SCRIPT_DIR" ls-files -s -z -- "$@")
+
+    for f in "${!dirty[@]}"; do
+        p="$SCRIPT_DIR/$f"
+        if [[ -L "$p" ]]; then
+            blob=$(readlink -- "$p" | tr -d '\n' | git -C "$SCRIPT_DIR" hash-object --stdin)
+        elif [[ -f "$p" ]]; then
+            blob=$(git -C "$SCRIPT_DIR" hash-object -- "$p")
+        else
+            continue    # deleted in the working tree: not part of the build
+        fi
+        printf '%s %s\n' "$blob" "$f"
+    done
+}
+
+# component_fingerprint <component>: sha256 over the flavor, this script, the
+# component's pinned refs and its sorted file list.
+component_fingerprint() {
+    local component="$1" sum
+    local -a specs=()
+    mapfile -t specs < <(component_pathspecs "$component")
+    sum=$(
+        {
+            printf 'flavor %s\nscript %s\n' "$FLAVOR" "$SCRIPT_FINGERPRINT"
+            case "$component" in
+                compositor)
+                    printf 'refs kdecoration %s kglobalacceld %s\n' \
+                        "$SPEC_KDECORATION_REF" "$SPEC_KGA_REF"
+                    ;;
+                greeter)
+                    printf 'ref greeter %s\n' "$NOCTALIA_GREETER_REF"
+                    ;;
+            esac
+            if (( ${#specs[@]} )); then
+                source_fingerprint_lines "${specs[@]}" | LC_ALL=C sort
+            fi
+        } | sha256sum
+    )
+    printf '%s\n' "${sum%% *}"
+}
+
+fingerprint_load() {
+    local file="$STATE_DIR/$1.fingerprint"
+    [[ -f "$file" && ! -L "$file" ]] || return 0
+    head -n 1 -- "$file"
+}
+
+# fingerprint_store <component>: recorded after every successful install, with
+# or without --update, so the next --update has a baseline.
+fingerprint_store() {
+    local component="$1" file="$STATE_DIR/$1.fingerprint" tmp
+    mkdir -p -- "$STATE_DIR"
+    if [[ -L "$file" ]]; then
+        warn "Symlinked fingerprint record ignored: $file"
+        return
+    fi
+    tmp=$(mktemp "$STATE_DIR/.fingerprint.XXXXXXXX")
+    component_fingerprint "$component" > "$tmp"
+    mv -f -- "$tmp" "$file"
+}
+
+# The portal installs its binary outside bin/; read its path from the installed
+# D-Bus service file instead of assuming libexec's exact layout.
+portal_backend_path() {
+    local service="$KWE_PREFIX/share/dbus-1/services/org.freedesktop.impl.portal.desktop.kwe.service"
+    [[ -f "$service" ]] || return 0
+    sed -n 's/^Exec=//p' "$service" | head -1
+}
+
+component_installed() {
+    local exec_path
+    case "$1" in
+        compositor) [[ -x "$KWE_PREFIX/bin/kinetic-we" ]] ;;
+        portal)
+            exec_path=$(portal_backend_path)
+            [[ -n "$exec_path" && -x "$exec_path" ]]
+            ;;
+        shell)   [[ -x "$KWE_PREFIX/bin/noctalia-kwe" ]] ;;
+        greeter) [[ -x "$KWE_PREFIX/bin/noctalia-greeter-session" ]] ;;
+        *)       return 1 ;;
+    esac
+}
+
+# plan_update: read-only. Fills UPDATE_COMPONENTS and UPDATE_REASON.
+plan_update() {
+    local component stored fp
+    UPDATE_COMPONENTS=(compositor portal shell)
+    [[ "$GREETER" == "yes" ]] && UPDATE_COMPONENTS+=(greeter)
+    UPDATE_REASON=()
+    for component in "${UPDATE_COMPONENTS[@]}"; do
+        if ! component_installed "$component"; then
+            UPDATE_REASON[$component]="not installed"
+            continue
+        fi
+        stored=$(fingerprint_load "$component")
+        if [[ -z "$stored" ]]; then
+            UPDATE_REASON[$component]="no record of the last build"
+            continue
+        fi
+        fp=$(component_fingerprint "$component")
+        if [[ "$stored" != "$fp" ]]; then
+            UPDATE_REASON[$component]="source changed"
+        else
+            UPDATE_REASON[$component]=""
+        fi
+    done
+}
+
+# component_planned <component>: true when the component will be built.
+component_planned() {
+    [[ "$DO_UPDATE" != "yes" ]] && return 0
+    [[ -n "${UPDATE_REASON[$1]:-}" ]]
+}
+
+print_update_plan() {
+    local component
+    step "Incremental update plan (--update):"
+    for component in "${UPDATE_COMPONENTS[@]}"; do
+        if [[ -n "${UPDATE_REASON[$component]:-}" ]]; then
+            info "  ${COMPONENT_LABEL[$component]}: rebuild (${UPDATE_REASON[$component]})"
+        else
+            info "  ${COMPONENT_LABEL[$component]}: up to date"
+        fi
+    done
+}
+
+print_update_result() {
+    local component
+    local -a rebuilt=() skipped=()
+    for component in "${UPDATE_COMPONENTS[@]}"; do
+        if [[ -n "${UPDATE_REASON[$component]:-}" ]]; then
+            rebuilt+=("${COMPONENT_LABEL[$component]}")
+        else
+            skipped+=("${COMPONENT_LABEL[$component]}")
+        fi
+    done
+    info "Rebuilt: ${rebuilt[*]:-nothing}"
+    info "Up to date: ${skipped[*]:-nothing}"
+}
+
+# ---------------------------------------------------------------------------
 # 3. kinetic-we
 # ---------------------------------------------------------------------------
 build_kinetic_we() {
@@ -745,6 +983,7 @@ build_kinetic_we() {
     step "Building kinetic-we..."
     cmake --build "$BUILD_DIR" --parallel "$JOBS"
     cmake --install "$BUILD_DIR"
+    fingerprint_store compositor
 }
 
 # ---------------------------------------------------------------------------
@@ -770,6 +1009,7 @@ build_portal() {
     step "Building xdg-desktop-portal-kwe..."
     cmake --build "$build" --parallel "$JOBS"
     cmake --install "$build"
+    fingerprint_store portal
 }
 
 # ---------------------------------------------------------------------------
@@ -795,6 +1035,7 @@ build_noctalia() {
     step "Building Noctalia..."
     meson compile -C "$build" -j "$JOBS"
     meson install -C "$build" --quiet
+    fingerprint_store shell
 }
 
 # ---------------------------------------------------------------------------
@@ -846,6 +1087,7 @@ build_noctalia_greeter() {
         error "noctalia-greeter-session was not installed in $KWE_PREFIX/bin."
         exit 1
     fi
+    fingerprint_store greeter
     info "  $KWE_PREFIX/bin/noctalia-greeter-session"
 }
 
@@ -1169,6 +1411,7 @@ while (( $# )); do
         --sid)         FLAVOR="sid" ;;
         --deps-only)   MODE="deps" ;;
         --quick)       MODE="quick" ;;
+        --update)      DO_UPDATE="yes" ;;
         --reset-local) MODE="reset" ;;
         --no-session)  SESSION="no" ;;
         --greeter)     GREETER="yes" ;;
@@ -1177,6 +1420,16 @@ while (( $# )); do
     esac
     shift
 done
+
+# --update is --quick plus change detection; it never represents a dependency
+# build (the trixie stack is far too expensive to enter by accident).
+if [[ "$DO_UPDATE" == "yes" ]]; then
+    case "$MODE" in
+        full)  MODE="quick" ;;
+        deps)  error "--update does not apply to --deps-only; use --quick --update."; exit 1 ;;
+        reset) error "--update does not apply to --reset-local."; exit 1 ;;
+    esac
+fi
 
 # The greeter's compositor needs wlroots-0.20, which trixie does not package.
 # Ignore the flag there rather than failing an otherwise valid trixie build.
@@ -1242,10 +1495,37 @@ case "$MODE" in
             error "kdecoration is not installed in $KWE_PREFIX - run a full --sid build first."
             exit 1
         fi
-        build_kinetic_we no
-        build_portal no
-        build_noctalia no
-        [[ "$GREETER" == "yes" ]] && build_noctalia_greeter
+        if [[ "$DO_UPDATE" == "yes" ]]; then
+            plan_update
+            print_update_plan
+            # sid: the pins are cheap to verify (unchanged ones are skipped) and
+            # a changed pin is part of the compositor fingerprint, so it also
+            # forces the compositor rebuild below.
+            [[ "$FLAVOR" == "sid" ]] && build_kde_pins
+        fi
+        if component_planned compositor; then
+            build_kinetic_we no
+        else
+            info "kinetic-we up to date, skipped."
+        fi
+        if component_planned portal; then
+            build_portal no
+        else
+            info "xdg-desktop-portal-kwe up to date, skipped."
+        fi
+        if component_planned shell; then
+            build_noctalia no
+        else
+            info "Noctalia up to date, skipped."
+        fi
+        if [[ "$GREETER" == "yes" ]]; then
+            if component_planned greeter; then
+                build_noctalia_greeter
+            else
+                info "Noctalia greeter up to date, skipped."
+            fi
+        fi
+        [[ "$DO_UPDATE" == "yes" ]] && print_update_result
         ;;
 esac
 
