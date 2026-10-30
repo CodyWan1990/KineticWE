@@ -38,9 +38,12 @@
 #   source. Trixie does not package wlroots-0.20, which the greeter needs, so
 #   the option is ignored there.
 #
-# This script NEVER uses sudo. Anything that needs root (apt packages, the
-# login-screen session entry, the portal's .portal file, the greetd setup for
-# the greeter) is printed for you to run yourself.
+# Missing Debian packages are installed for you: check_host lists them, asks
+# once on the TTY, and runs 'sudo apt-get install -y' (sudo still prompts for
+# its password). Pass --no-install-deps to only print the apt command instead,
+# which is also what happens when stdin is not a TTY. The remaining root steps
+# (the login-screen session entry, the portal's .portal file, the greetd setup
+# for the greeter) are printed for you to run yourself.
 #
 # Usage:
 #   ./build-deb-stable.sh                 # Full trixie build (first run: 1-3 hours)
@@ -49,6 +52,7 @@
 #   ./build-deb-stable.sh --quick         # Incremental kinetic-we + portal + Noctalia rebuild
 #   ./build-deb-stable.sh --update        # Like --quick, but only components whose sources changed
 #   ./build-deb-stable.sh --no-session    # Skip the session-entry hint
+#   ./build-deb-stable.sh --no-install-deps  # Only print missing apt packages
 #   ./build-deb-stable.sh --reset-local   # Delete KWE_PREFIX and the build dirs
 #   ./build-deb-stable.sh --sid --greeter # Also build the Noctalia login greeter (sid only)
 #
@@ -279,7 +283,8 @@ DEB_PACKAGES_SID=(
 #   qt6-svg-plugins,        Adwaita GTK3 theme and the Noto fonts (core, CJK,
 #   adw-gtk3-theme,         colour emoji) the session and its apps expect
 #   fonts-noto-*
-# Missing ones are only warned (this script never calls sudo). Set by
+# Missing ones go through the same apt prompt as the build deps, but are
+# optional: a package this suite/derivative does not ship only warns. Set by
 # set_flavor().
 DEB_RUNTIME_PACKAGES=()
 
@@ -427,8 +432,87 @@ check_sid_versions() {
 }
 
 # ---------------------------------------------------------------------------
-# 0. Host check (no sudo: print the apt line and stop)
+# 0. Host check (missing apt packages are installed after a prompt)
 # ---------------------------------------------------------------------------
+# apt_install_missing required|optional <package>...
+#
+# Lists the missing packages, asks once on the TTY, and installs them with
+# 'sudo apt-get install -y'. Names the package lists do not know at all are
+# split off first, so one renamed package (adw-gtk3 vs adw-gtk3-theme) cannot
+# make apt abort the whole batch. With --no-install-deps or a non-interactive
+# stdin only the apt command is printed. "required" returns 1 when packages
+# are still missing afterwards (the caller stops); "optional" only warns, so a
+# package this suite/derivative does not ship never blocks a valid build.
+apt_install_missing() {
+    local severity="$1"; shift
+    local -a wanted=("$@") known=() unknown=() still=()
+    local pkg reply="" install="no"
+
+    (( ${#wanted[@]} )) || return 0
+
+    for pkg in "${wanted[@]}"; do
+        if apt-cache show --no-all-versions "${pkg%%/*}" >/dev/null 2>&1; then
+            known+=("$pkg")
+        else
+            unknown+=("$pkg")
+        fi
+    done
+    if (( ${#unknown[@]} )); then
+        warn "Not in the package lists, skipped: ${unknown[*]}"
+        warn "  Run 'sudo apt-get update' if they should exist."
+    fi
+
+    if (( ${#known[@]} )); then
+        warn "Missing ${#known[@]} Debian package(s):"
+        echo
+        echo "  ${known[*]}"
+        echo
+
+        if [[ "$INSTALL_DEPS" == "no" ]]; then
+            error "Automatic installation disabled (--no-install-deps). Install them yourself:"
+        elif [[ ! -t 0 || ! -t 1 ]]; then
+            error "No TTY for the install prompt. Install them yourself:"
+        elif ! command -v sudo >/dev/null; then
+            error "sudo not found. Install them as root yourself:"
+        elif read -r -p "Install them now with apt? [Y/n] " reply \
+            && [[ "$reply" =~ ^([Yy]|)$ ]]; then
+            install="yes"
+        else
+            error "Not installing. Install them yourself:"
+        fi
+
+        if [[ "$install" == "yes" ]]; then
+            # apt prints its own progress; the status re-check below is the
+            # source of truth, not apt's exit code.
+            sudo apt-get install -y -- "${known[@]}" \
+                || warn "apt-get did not finish cleanly; checking what is installed."
+        else
+            echo "  sudo apt install ${known[*]}"
+            echo
+        fi
+    fi
+
+    for pkg in "${wanted[@]}"; do
+        pkg_installed "${pkg%%/*}" || still+=("$pkg")
+    done
+    if (( ${#still[@]} )); then
+        if [[ "$severity" == required ]]; then
+            error "Still missing: ${still[*]}"
+            error "Update the package lists, install them, then re-run:"
+            echo "  sudo apt-get update && sudo apt install ${still[*]}"
+            echo
+            return 1
+        fi
+        warn "Session runtime package(s) still missing (build continues):"
+        echo "  sudo apt-get update && sudo apt install ${still[*]}"
+        return 0
+    fi
+    if [[ "$install" == "yes" ]]; then
+        info "  Installed ${#known[@]} package(s)."
+    fi
+    return 0
+}
+
 check_host() {
     step "Checking host..."
 
@@ -461,11 +545,7 @@ check_host() {
     done
 
     if (( ${#missing[@]} )); then
-        error "Missing ${#missing[@]} Debian package(s). Install them yourself, then re-run:"
-        echo
-        echo "  sudo apt install ${missing[*]}"
-        echo
-        exit 1
+        apt_install_missing required "${missing[@]}" || exit 1
     fi
 
     # Build tools found via PATH (catches e.g. a package present but its
@@ -490,8 +570,7 @@ check_host() {
         fi
     done
     if (( ${#runtime_missing[@]} )); then
-        warn "Session runtime package(s) missing (build continues):"
-        echo "  sudo apt install ${runtime_missing[*]}"
+        apt_install_missing optional "${runtime_missing[@]}"
     fi
 }
 
@@ -1406,6 +1485,9 @@ reset_local() {
 MODE="full"
 SESSION="yes"
 GREETER="no"
+# "yes": check_host offers to apt-install missing packages; "no"
+# (--no-install-deps): only prints the command, like older versions did.
+INSTALL_DEPS="yes"
 while (( $# )); do
     case "$1" in
         --sid)         FLAVOR="sid" ;;
@@ -1414,6 +1496,7 @@ while (( $# )); do
         --update)      DO_UPDATE="yes" ;;
         --reset-local) MODE="reset" ;;
         --no-session)  SESSION="no" ;;
+        --no-install-deps) INSTALL_DEPS="no" ;;
         --greeter)     GREETER="yes" ;;
         -h|--help)     usage; exit 0 ;;
         *) error "Unknown option: $1"; usage; exit 1 ;;
