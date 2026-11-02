@@ -23,7 +23,7 @@
 # ===========================================================================
 
 Name:           kineticwe
-Version:        0.1.0
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
@@ -555,6 +555,19 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Mon Nov 02 2026 LGL <lgl@localhost> - 0.1.1-1
+- Build against KScreenLocker 6.8: KSldApp::inhibitSuspend, uninhibitSuspend,
+  lockScreenShown and the old lock(EstablishLock, int) overload are gone, so
+  the compositor no longer references symbols the FC44 updates libraries do
+  not export.
+- Sync the vendored Noctalia shell.
+- Move Cody's server-side shadows into the Appearance settings page.
+- Rework Grid Overview to follow the niri-style overview.
+- Fix dock blur.
+- Add install documentation for the Nix dev session.
+- Update build-deb-stable.sh, including the --sid option.
+- Make CI rebuild only the packages affected by a change.
+
 * Tue Oct 21 2026 LGL <lgl@localhost> - 0.1.0-1
 - Bump to 0.1.0.
 - Refactor the session launcher: one canonical start-kineticwe.sh, config/cache
