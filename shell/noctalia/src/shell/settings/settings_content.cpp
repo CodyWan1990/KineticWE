@@ -674,6 +674,7 @@ namespace settings {
             .scale = scale,
             .unsetPlaceholder = i18n::tr("settings.controls.keybind.unset-placeholder"),
             .recordingPlaceholder = i18n::tr("settings.controls.keybind.recording-placeholder"),
+            .escapeCancels = true,
             .flexGrow = 1.0F,
             .onCommit =
                 [commitItems, items = keybinds.items, i](KeyChord chord) mutable {
@@ -722,6 +723,7 @@ namespace settings {
             .scale = scale,
             .unsetPlaceholder = i18n::tr("settings.controls.keybind.add"),
             .recordingPlaceholder = i18n::tr("settings.controls.keybind.recording-placeholder"),
+            .escapeCancels = true,
             .flexGrow = 1.0F,
             .onCommit =
                 [commitItems, items = keybinds.items](KeyChord chord) mutable {

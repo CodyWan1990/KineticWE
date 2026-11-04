@@ -302,6 +302,7 @@ namespace settings {
           .unsetPlaceholder = i18n::tr("settings.controls.keybind.unset-placeholder"),
           .recordingPlaceholder = i18n::tr("settings.controls.keybind.recording-placeholder"),
           .modifierPolicy = policy,
+          .escapeCancels = true,
           .flexGrow = 1.0F,
           .configure = [controlHeight](KeybindRecorder& control) { control.setMinHeight(controlHeight); },
       });

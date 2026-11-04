@@ -1119,6 +1119,11 @@ void SettingsWindow::onKeyboardEvent(const KeyboardEvent& event) {
       requestRebuild();
       return;
     }
+    // Nothing transient consumed the cancel key: dismiss the settings window,
+    // matching Kinetic Settings. Popups, modals, dropdowns, keybind recording
+    // and pending edit/delete states return above.
+    close();
+    return;
   }
   if (event.pressed
       && !event.preedit
