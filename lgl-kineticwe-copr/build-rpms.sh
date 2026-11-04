@@ -14,6 +14,10 @@ set -euo pipefail
 #
 # All generated output goes to the local results/ directory.
 # The results/ directory is ignored by the packaging repository.
+#
+# Environment:
+#   DISTROBOX_NAME   container to build in (default: kineticwe-build)
+#   KWE_SKIP_UPGRADE skip the container package refresh (default: refresh)
 # =============================================================================
 
 DISTROBOX_NAME="${DISTROBOX_NAME:-kineticwe-build}"
@@ -133,6 +137,19 @@ setup_distrobox() {
             sudo dnf install -y rpm-build rpmdevtools dnf-plugins-core curl wget git || true
         fi
     "
+
+    # The container must build against the same library versions the target
+    # system runs. A stale container silently produces packages that link
+    # against symbols the host no longer exports (e.g. the KScreenLocker 6.8
+    # API removals), which only shows up as a "symbol lookup error" at login.
+    if [[ -z "${KWE_SKIP_UPGRADE:-}" ]]; then
+        step "Refreshing container packages (keeps ABI in sync with the host)..."
+        distrobox enter "$DISTROBOX_NAME" -- bash -c "
+            sudo dnf -y --refresh upgrade
+        "
+    else
+        warn "KWE_SKIP_UPGRADE set: not refreshing container packages."
+    fi
 
     local buildreqs
     # Quote pkgconfig(...) tokens: they are valid RPM spec dependencies but the
