@@ -83,6 +83,7 @@ clean_local_build() {
           ~/.local/share/applications/org.kde.kwin.*.desktop \
           ~/.local/share/applications/dev.noctalia.Noctalia.desktop \
           ~/.local/share/applications/dev.kineticwe.Noctalia.desktop \
+          ~/.local/share/applications/dev.kineticwe.Noctalia.Annotator.desktop \
           ~/.local/share/applications/dev.kineticwe.Settings.desktop
     rm -f ~/.local/share/icons/hicolor/*/apps/kwin.* \
           ~/.local/share/icons/hicolor/*/apps/kineticwe-logo.* \
