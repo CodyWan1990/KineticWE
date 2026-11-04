@@ -285,7 +285,7 @@ std::unique_ptr<Node> IconsPage::buildTile(
       .justify = FlexJustify::Center,
       .gap = Style::spaceXs * scale,
       .padding = Style::spaceXs * scale,
-      .fill = selected ? colorSpecFromRole(ColorRole::Primary, 0.15F) : colorSpecFromRole(ColorRole::SurfaceVariant),
+      .fill = selected ? colorSpecFromRole(ColorRole::Primary, 0.15F) : colorSpecFromRole(ColorRole::SurfaceContainer),
       .radius = Style::scaledRadiusMd(scale),
       .border = selected ? colorSpecFromRole(ColorRole::Primary) : clearColorSpec(),
       .borderWidth = selected ? Style::emphasizedBorderWidth : 0.0F,

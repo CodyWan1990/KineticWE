@@ -67,8 +67,9 @@ namespace shell::dock {
     float launcherHoverMainOffset = 0.0F;
     float launcherVisualScale = -1.0F;
     AnimationManager::Id launcherScaleAnimId = 0;
-    // Auto-hide: tracks visibility [0,1] driven by hover.
-    float hideOpacity = 1.0F;
+    // Auto-hide: tracks visibility [0,1] driven by hover. Starts hidden so a fade queued before the
+    // first scene build cannot animate from a visible state; the scene build sets the configured value.
+    float hideOpacity = 0.0F;
     AnimationManager::Id hideAnimId = 0;
     // smart_auto_hide: active workspace empty (or overview open) — keep the dock visible.
     bool smartAutoHidePinnedVisible = false;
@@ -110,6 +111,7 @@ namespace shell::dock {
   void resizeSurface(DockInstance& instance, const DockConfig& cfg, const ShellConfig::ShadowConfig& shadowConfig);
   void applyPanelPalette(DockInstance& instance, const DockConfig& cfg);
   void syncDockSlideLayerTransform(DockInstance& instance, const DockConfig& cfg);
+  void applyDockCompositorBlur(DockInstance& instance, const DockConfig& cfg);
   void startHideFadeOut(DockInstance& instance);
   void revealAutoHideDock(DockInstance& instance);
 

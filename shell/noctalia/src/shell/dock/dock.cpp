@@ -279,11 +279,17 @@ namespace {
 
     const auto assignments = platform.workspaceWindowAssignments(output);
     for (const auto& assignment : assignments) {
+      if (assignment.minimizeState.has_value() && assignment.minimizeState->minimized) {
+        continue;
+      }
       if (workspaceKeyMatchesAssignment(assignment.workspaceKey, *active)) {
         return true;
       }
     }
     if (!assignments.empty()) {
+      return false;
+    }
+    if (platform.hasUnminimizedToplevels(output) == false) {
       return false;
     }
     return active->occupied;
@@ -315,7 +321,7 @@ bool Dock::initialize(CompositorPlatform& platform, ConfigService* config, Rende
 
   const auto& cfg = m_config->config().dock;
   m_config->addReloadCallback(
-      [this]() {
+      [this] {
         const auto& newCfg = m_config->config().dock;
         const auto& newShadow = m_config->config().shell.shadow;
         const auto newBarLayerStack = barLayerStackSignature(m_config->config());
@@ -330,7 +336,7 @@ bool Dock::initialize(CompositorPlatform& platform, ConfigService* config, Rende
       "dock"
   );
 
-  m_appIconColorizeConn = shellAppIconColorizationChanged().connect([this]() {
+  m_appIconColorizeConn = shellAppIconColorizationChanged().connect([this] {
     if (m_config == nullptr) {
       return;
     }
@@ -546,12 +552,13 @@ bool Dock::onPointerEvent(const PointerEvent& event) {
       const float current = m_hoveredInstance->hideOpacity;
       m_hoveredInstance->hideAnimId = m_hoveredInstance->animations.animate(
           current, 1.0F, Style::animNormal, Easing::EaseOutCubic,
-          [inst = m_hoveredInstance, this](float v) {
+          [inst = m_hoveredInstance](float v) {
             inst->hideOpacity = v;
             const auto& cfg = inst->config;
             shell::dock::syncDockSlideLayerTransform(*inst, cfg);
+            shell::dock::applyDockCompositorBlur(*inst, cfg);
           },
-          [inst = m_hoveredInstance]() { inst->hideAnimId = 0; }
+          [inst = m_hoveredInstance] { inst->hideAnimId = 0; }
       );
       // Restore full input region (full surface so shadow-margin edges don't
       // cause an immediate Leave when triggered from the edge of the strip).
@@ -719,7 +726,7 @@ void Dock::scheduleSmartAutoHideReevaluation() {
     return;
   }
   m_smartAutoHideReevalQueued = true;
-  DeferredCall::callLater([this]() {
+  DeferredCall::callLater([this] {
     m_smartAutoHideReevalQueued = false;
     reevaluateSmartAutoHide();
   });
@@ -775,11 +782,11 @@ void Dock::reevaluateSmartAutoHide() {
         shell::dock::revealAutoHideDock(*instance);
         needsRedraw = true;
       }
-    } else if (!instance->pointerInside && m_popupOwnerInstance == nullptr) {
-      if (instance->hideOpacity > 0.0F || pinnedChanged) {
-        shell::dock::startHideFadeOut(*instance);
-        needsRedraw = true;
-      }
+    } else if (
+        !instance->pointerInside && m_popupOwnerInstance == nullptr && (instance->hideOpacity > 0.0F || pinnedChanged)
+    ) {
+      shell::dock::startHideFadeOut(*instance);
+      needsRedraw = true;
     }
 
     if (needsRedraw && instance->surface != nullptr) {
@@ -1139,7 +1146,7 @@ void Dock::endDrag(shell::dock::DockInstance& instance, bool commit) {
   pinnedList.insert(pinnedList.begin() + static_cast<std::ptrdiff_t>(insertAt), std::move(moved));
   ConfigService* config = m_config;
   auto path = dockPinnedOverridePath(instance);
-  DeferredCall::callLater([config, path = std::move(path), pinnedList = std::move(pinnedList)]() mutable {
+  DeferredCall::callLater([config, path = std::move(path), pinnedList = std::move(pinnedList)] mutable {
     if (config != nullptr) {
       (void)config->setOverride(path, std::move(pinnedList));
     }
@@ -1249,6 +1256,11 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
     return;
   }
 
+  if (windows.size() == 1) {
+    m_platform->activateOrMinimizeToplevelInfo(windows[0]);
+    return;
+  }
+
   const auto active = m_platform->activeToplevel();
   const auto focusedCompositorWindowId = m_platform->focusedCompositorWindowId();
   const std::string_view focusedCompositorWindowIdView =
@@ -1256,25 +1268,20 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
 
   // If any window of this app is minimized, restore the newest one.
   for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
-    if (it->minimized) {
-      m_platform->restoreToplevelInfo(*it);
+    if (it->minimizeState.has_value() && it->minimizeState->minimized) {
+      m_platform->activateToplevelInfo(*it);
       return;
     }
   }
 
-  // If the active window belongs to this app, minimize it (click-to-minimize toggle).
+  // If the active window belongs to this app, toggle it (click-to-minimize).
   if (active.has_value()) {
     for (const auto& w : windows) {
       if (matchesActiveWindow(w, *active, focusedCompositorWindowIdView, windows)) {
-        m_platform->minimizeToplevelInfo(w);
+        m_platform->activateOrMinimizeToplevelInfo(w);
         return;
       }
     }
-  }
-
-  if (windows.size() == 1) {
-    m_platform->activateToplevelInfo(windows[0]);
-    return;
   }
 
   std::string preferredIdentifier;
@@ -1295,7 +1302,7 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
     activeHandle = active->handle;
   }
 
-  auto* preferredHandle = [&]() -> zwlr_foreign_toplevel_handle_v1* {
+  auto* preferredHandle = [&] -> zwlr_foreign_toplevel_handle_v1* {
     const auto it = m_lastActiveHandleByAppIdLower.find(action.idLower);
     return it != m_lastActiveHandleByAppIdLower.end() ? it->second : nullptr;
   }();
@@ -1339,6 +1346,22 @@ void Dock::openItemMenu(shell::dock::DockInstance& instance, const shell::dock::
               m_platform->closeToplevelInfo(windows[windowIndex]);
             }
           },
+      .setWindowMinimized =
+          [this, windows](std::size_t windowIndex, bool minimized) {
+            if (windowIndex >= windows.size()) {
+              return;
+            }
+            const auto& window = windows[windowIndex];
+            const auto state = m_platform->windowMinimizeState(window);
+            if (!state.has_value() || state->minimized == minimized) {
+              return;
+            }
+            if (minimized) {
+              (void)m_platform->minimizeToplevelInfo(window);
+            } else {
+              m_platform->activateToplevelInfo(window);
+            }
+          },
       .launchAction =
           [this, entryId, entryWorkingDir, entryTerminal, entryForPin,
            output = instance.output](const DesktopAction& desktopAction) {
@@ -1364,7 +1387,7 @@ void Dock::openItemMenu(shell::dock::DockInstance& instance, const shell::dock::
             }
             (void)m_config->setOverride(pinnedPath, std::move(pinnedList));
           },
-      .closeMenu = [this]() { closeItemMenu(); },
+      .closeMenu = [this] { closeItemMenu(); },
   };
 
   auto* layerSurface =

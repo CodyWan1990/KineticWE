@@ -131,7 +131,7 @@ namespace {
         .align = FlexAlign::Start,
         .gap = Style::spaceXs * scale,
         .padding = Style::spaceMd * scale,
-        .fill = colorSpecFromRole(error ? ColorRole::Error : ColorRole::SurfaceVariant, error ? 0.12F : 0.45F),
+        .fill = colorSpecFromRole(error ? ColorRole::Error : ColorRole::SurfaceContainer, error ? 0.12F : 0.45F),
         .radius = Style::scaledRadiusMd(scale),
         .fillWidth = true,
     });
@@ -493,8 +493,8 @@ std::unique_ptr<Node> DisplayPage::buildLayout(float scale, const Callbacks& cal
   }
 
   auto canvas = ui::box({
-      .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.34F),
-      .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
+      .fill = colorSpecFromRole(ColorRole::SurfaceContainer, 0.34F),
+      .border = colorSpecFromRole(ColorRole::OutlineVariant, 0.45F),
       .borderWidth = 1.0F * scale,
       .radius = Style::scaledRadiusMd(scale),
       .width = kCanvasWidth * scale,
@@ -585,7 +585,7 @@ std::unique_ptr<Node> DisplayPage::buildLayout(float scale, const Callbacks& cal
 
     auto fill = ui::box({
         .fill = colorSpecFromRole(selected ? ColorRole::Primary : ColorRole::Surface, selected ? 0.82F : 0.90F),
-        .border = colorSpecFromRole(selected ? ColorRole::Primary : ColorRole::Outline, selected ? 0.95F : 0.75F),
+        .border = colorSpecFromRole(selected ? ColorRole::Primary : ColorRole::OutlineVariant, selected ? 0.95F : 0.75F),
         .borderWidth = (selected ? 2.0F : 1.0F) * scale,
         .radius = Style::scaledRadiusSm(scale),
         .width = width,

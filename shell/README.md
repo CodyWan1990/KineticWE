@@ -12,8 +12,26 @@ housing the **Noctalia fork** (vendored) plus our own **Kinetic Settings** modul
 
 ## Upstream sync (Noctalia)
 
-The subtree is tracked with a squashed history from upstream. To pull the newest
-Noctalia `main`:
+The subtree is tracked with a squashed history from upstream. The currently
+vendored version is **Noctalia 5.4.1** (see `noctalia/VERSION`).
+
+### Pulling a release tag
+
+Local KWin tags (`v5.0.0`, `v5.1.0`, ...) shadow Noctalia's release tags, which
+use the same `v5.x` scheme. A plain `git subtree pull ... noctalia-upstream v5.4.1`
+therefore resolves to *our* tag, not upstream's. Fetch the Noctalia tag into a
+namespaced ref first, then pull with `.` as the repository so subtree resolves
+that local ref:
+
+```sh
+git fetch --no-tags noctalia-upstream refs/tags/v5.4.1:refs/remotes/noctalia-upstream/v5.4.1
+git subtree pull --prefix=shell/noctalia . refs/remotes/noctalia-upstream/v5.4.1 --squash
+```
+
+### Pulling `main`
+
+Alternatively, to pull the newest Noctalia `main` (no tag shadowing applies
+here):
 
 ```sh
 git subtree pull --prefix=shell/noctalia noctalia-upstream main --squash
@@ -25,7 +43,8 @@ Notes:
   carry in-place patches to upstream files; these are the usual sources of
   conflicts on a pull:
   - rebranding: install paths, app/desktop ID, XDG dirs (`FileUtils::kAppDirName`)
-  - Origami default palette (`src/theme/builtin_palettes.cpp`, `config_types.h`)
+  - theme defaults: Catppuccin default palette + Origami builtin
+    (`src/theme/builtin_palettes.cpp`, `config_types.h`)
   - keybind recorder / key chords (custom keybinds, function keys)
   - window switcher + dock on KWin (`KwinThumbnailCapture`, plasma window geometry,
     switcher close fade)

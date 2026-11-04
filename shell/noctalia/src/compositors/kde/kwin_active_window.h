@@ -47,7 +47,10 @@ namespace compositors::kde {
         const std::string& title, const std::string& appId, const std::string& uuid = {}, bool warpPointer = false
     );
     void closeWindow(const std::string& title, const std::string& appId, const std::string& uuid = {});
-    void minimizeWindow(const std::string& title, const std::string& appId, const std::string& uuid = {});
+    [[nodiscard]] std::optional<WindowMinimizeState> windowMinimizeState(std::string_view uuid) const;
+    bool minimizeWindow(const std::string& uuid);
+    // Fallback for windows the script has not tracked yet (searched by uuid, else resourceClass + caption).
+    bool minimizeWindowByCaption(const std::string& title, const std::string& appId, const std::string& uuid = {});
     [[nodiscard]] bool isAvailable() const noexcept { return m_scriptInstalled; }
 
   private:
@@ -57,7 +60,7 @@ namespace compositors::kde {
       std::string title;
       std::string outputName;
       std::vector<std::string> desktopIds;
-      bool minimized = false;
+      std::optional<WindowMinimizeState> minimizeState;
     };
 
     [[nodiscard]] bool ensureScriptFile(std::string& scriptPath) const;

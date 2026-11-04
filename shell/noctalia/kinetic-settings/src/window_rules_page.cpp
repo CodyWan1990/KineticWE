@@ -1167,7 +1167,7 @@ WindowRulesPage::build(float scale, const Filter& filter, const Callbacks& callb
         .align = FlexAlign::Stretch,
         .gap = Style::spaceSm * scale,
         .padding = Style::spaceMd * scale,
-        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
+        .fill = colorSpecFromRole(ColorRole::SurfaceContainer, 0.5F),
         .radius = Style::scaledRadiusMd(scale),
         .fillWidth = true,
     });

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "system/window_state.h"
+
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -47,8 +49,7 @@ struct ToplevelInfo {
   // True when `identifier` is an exact compositor-assigned window ID suitable
   // for direct focus/close actions and stable taskbar identity.
   bool exactIdentity = false;
-  // True when the compositor reports the toplevel as minimized.
-  bool minimized = false;
+  std::optional<WindowMinimizeState> minimizeState;
 };
 
 struct WlrToplevelSnapshot {
@@ -71,6 +72,7 @@ public:
 
   [[nodiscard]] std::optional<ActiveToplevel> current() const;
   [[nodiscard]] wl_output* currentOutput() const;
+  [[nodiscard]] bool anyFullscreen() const;
   [[nodiscard]] std::optional<ActiveToplevel>
   matchByTitleAndAppId(std::string_view title, std::string_view appId, wl_output* preferredOutput) const;
   [[nodiscard]] std::vector<std::string> allAppIds(wl_output* outputFilter = nullptr) const;
@@ -80,9 +82,9 @@ public:
   [[nodiscard]] std::vector<ToplevelInfo> windowsWithoutAppId(wl_output* outputFilter = nullptr) const;
   [[nodiscard]] bool containsWlrHandle(zwlr_foreign_toplevel_handle_v1* handle) const;
   void activateHandle(zwlr_foreign_toplevel_handle_v1* handle, wl_seat* seat);
+  [[nodiscard]] bool minimizeHandle(zwlr_foreign_toplevel_handle_v1* handle);
+  [[nodiscard]] std::optional<bool> minimized(zwlr_foreign_toplevel_handle_v1* handle) const;
   void closeHandle(zwlr_foreign_toplevel_handle_v1* handle);
-  void minimizeHandle(zwlr_foreign_toplevel_handle_v1* handle);
-  void restoreHandle(zwlr_foreign_toplevel_handle_v1* handle);
 
   // Listener entrypoints called by C callbacks
   void onToplevelCreated(zwlr_foreign_toplevel_handle_v1* handle);
@@ -128,6 +130,9 @@ private:
     std::vector<wl_output*> activeOutputs;
     bool activated = false;
     bool minimized = false;
+    bool pendingMinimized = false;
+    bool ready = false;
+    bool fullscreen = false;
     bool dirty = false;
     // Set on the first output_enter, never cleared: distinguishes "never announced an output"
     // from "left every output".

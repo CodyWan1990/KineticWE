@@ -538,6 +538,7 @@ echo
 %{_bindir}/noctalia-kwe
 %{_datadir}/noctalia-kwe/
 %{_datadir}/applications/dev.kineticwe.Noctalia.desktop
+%{_datadir}/applications/dev.kineticwe.Noctalia.Annotator.desktop
 %{_datadir}/applications/dev.kineticwe.Settings.desktop
 %{_datadir}/icons/hicolor/scalable/apps/noctalia-kwe.svg
 %{_datadir}/icons/hicolor/512x512/apps/kineticwe-logo.png

@@ -1116,9 +1116,10 @@ reset_local() {
         "$TEST_PREFIX/lib/qt6/qml/org/kde/xdgdesktopportal"
         # kineticwe-noctalia (Noctalia fork shell, noctalia-kwe)
         "$TEST_PREFIX/bin/noctalia-kwe"
-        "$TEST_PREFIX/share/noctalia"
-        "$TEST_PREFIX/share/applications/dev.noctalia.Noctalia.desktop"
-        "$TEST_PREFIX/share/icons/hicolor/scalable/apps/noctalia.svg"
+        "$TEST_PREFIX/share/noctalia-kwe"
+        "$TEST_PREFIX/share/applications/dev.kineticwe.Noctalia.desktop"
+        "$TEST_PREFIX/share/applications/dev.kineticwe.Noctalia.Annotator.desktop"
+        "$TEST_PREFIX/share/icons/hicolor/scalable/apps/noctalia-kwe.svg"
         "$TEST_PREFIX/share/applications/dev.kineticwe.Settings.desktop"
         "$TEST_PREFIX/share/icons/hicolor/256x256/apps/kineticwe-logo.png"
         "$TEST_PREFIX/share/icons/hicolor/512x512/apps/kineticwe-logo.png"

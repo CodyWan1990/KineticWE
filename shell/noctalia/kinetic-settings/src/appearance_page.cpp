@@ -571,7 +571,7 @@ namespace {
         .align = FlexAlign::Center,
         .justify = FlexJustify::SpaceBetween,
         .paddingH = Style::spaceSm * scale,
-        .fill = colorSpecFromRole(ColorRole::SurfaceVariant),
+        .fill = colorSpecFromRole(ColorRole::SurfaceContainer),
         // Matches the outer radius so the titlebar corners align with the
         // window frame (Flex clipping is rectangular, not rounded).
         .radius = Style::scaledRadiusMd(scale),
@@ -631,7 +631,7 @@ namespace {
             .gap = 0.0F,
             .fill = colorSpecFromRole(ColorRole::Surface),
             .radius = Style::scaledRadiusMd(scale),
-            .border = colorSpecFromRole(ColorRole::Outline),
+            .border = colorSpecFromRole(ColorRole::OutlineVariant),
             .borderWidth = Style::borderWidth,
             .clipChildren = true,
             .width = kDecorationPreviewWidth * scale,
@@ -658,7 +658,7 @@ namespace {
         .justify = FlexJustify::Center,
         .gap = Style::spaceXs * scale,
         .padding = Style::spaceXs * scale,
-        .fill = selected ? colorSpecFromRole(ColorRole::Primary, 0.15F) : colorSpecFromRole(ColorRole::SurfaceVariant),
+        .fill = selected ? colorSpecFromRole(ColorRole::Primary, 0.15F) : colorSpecFromRole(ColorRole::SurfaceContainer),
         .radius = Style::scaledRadiusMd(scale),
         .border = selected ? colorSpecFromRole(ColorRole::Primary) : clearColorSpec(),
         .borderWidth = selected ? Style::emphasizedBorderWidth : 0.0F,
@@ -910,7 +910,7 @@ std::unique_ptr<Node> AppearancePage::buildDecorationsSection(
         .align = FlexAlign::Stretch,
         .gap = Style::spaceSm * scale,
         .padding = Style::spaceMd * scale,
-        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
+        .fill = colorSpecFromRole(ColorRole::SurfaceContainer, 0.5F),
         .radius = Style::scaledRadiusMd(scale),
         .fillWidth = true,
     });

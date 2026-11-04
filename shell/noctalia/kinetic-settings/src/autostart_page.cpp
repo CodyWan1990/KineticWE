@@ -49,7 +49,7 @@ std::unique_ptr<Node> AutostartPage::buildAddMenu(float scale, const Callbacks& 
       .align = FlexAlign::Stretch,
       .gap = Style::spaceXs * scale,
       .padding = Style::spaceXs * scale,
-      .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.5F),
+      .fill = colorSpecFromRole(ColorRole::SurfaceContainer, 0.5F),
       .radius = Style::scaledRadiusMd(scale),
       .width = 220.0F * scale,
   });
