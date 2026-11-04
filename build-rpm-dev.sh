@@ -416,6 +416,15 @@ binary_build() {
         fi
         rm -rf "\$KCFG_TEST"
 
+        # A build dir configured under a different checkout path embeds that
+        # path in build.ninja/CMakeCache; reusing it makes ninja stat the old
+        # source tree (e.g. after moving off an external SSD). Reconfigure.
+        if [[ '$incremental_kwin' == true && -d '$build_dir' ]] \\
+            && ! grep -qF 'CMAKE_HOME_DIRECTORY:INTERNAL=$SCRIPT_DIR' '$build_dir/CMakeCache.txt' 2>/dev/null; then
+            echo '[STEP] Build dir was configured for a different source path; reconfiguring...'
+            rm -rf '$build_dir'
+        fi
+
         if [[ '$incremental_kwin' == true && -d '$build_dir' ]]; then
             echo '[STEP] Reusing existing KineticWE build dir (incremental)...'
         else
@@ -517,6 +526,15 @@ noctalia_only_build() {
         export PATH='/usr/local/bin:/usr/bin:/bin'
 
         cd '$SCRIPT_DIR'
+
+        # A Meson build dir embeds its source path in build.ninja's regenerate
+        # rule. If the checkout moved, ninja would try to stat the old tree
+        # (e.g. /mnt/portablehome) and fail before compiling anything.
+        if [[ -d '$shell_build' ]] \\
+            && ! grep -qF 'regenerate $SCRIPT_DIR/shell/noctalia ' '$shell_build/build.ninja' 2>/dev/null; then
+            echo '[STEP] Build dir was configured for a different source path; reconfiguring...'
+            rm -rf '$shell_build'
+        fi
 
         if [[ ! -d '$shell_build' ]]; then
             echo '[STEP] Configuring noctalia-kwe (fresh)...'

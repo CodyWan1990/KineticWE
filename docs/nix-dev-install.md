@@ -17,7 +17,7 @@ For the packaged install see the Fedora/COPR section in the
   module hooks with `run_hooks_as_user`; the parallel path always runs hooks
   through `sudo`, which would break a per-user `nix profile`.
 - The KineticWE checkout. This guide assumes
-  `/mnt/portablehome/Projects/kineticwe`; override the path with `KWE_REPO`.
+  `~/Projects/kineticwe`; override the path with `KWE_REPO`.
   The hook builds whatever is checked out (see
   [Flake source semantics](#flake-source-semantics)); set `KWE_REF` only to
   build a clean committed ref instead.
@@ -101,7 +101,7 @@ The standard KWin loop: build, then run the compositor in a window inside your
 current session.
 
 ```bash
-cd /mnt/portablehome/Projects/kineticwe
+cd ~/Projects/kineticwe
 nix build .#kinetic-we
 
 dbus-run-session ./result/bin/kinetic-we \
