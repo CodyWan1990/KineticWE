@@ -1099,6 +1099,7 @@ void Application::initWidgetControllersAndCallbacks() {
         m_trayMenu.onFontChanged();
         m_backdrop.onFontChanged();
         m_settingsWindow.onFontChanged();
+        m_kineticSettings.onFontChanged();
         m_colorPickerDialogPopup.requestLayout();
         m_glyphPickerDialogPopup.requestLayout();
         m_fileDialogPopup.requestLayout();

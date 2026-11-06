@@ -75,14 +75,16 @@ KineticSettingsWindow::~KineticSettingsWindow() = default;
 
 void KineticSettingsWindow::initialize(
     WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
-    CustomKeybinds& customKeybinds, float uiScale
+    ConfigService& config, CustomKeybinds& customKeybinds, float uiScale
 ) {
   m_wayland = &wayland;
   m_platform = &platform;
   m_renderContext = &renderContext;
   m_bus = &bus;
+  m_config = &config;
   m_customKeybinds = &customKeybinds;
   m_uiScale = std::max(0.1F, uiScale);
+  m_fontsPage = std::make_unique<FontsPage>(*m_config);
 }
 
 void KineticSettingsWindow::open() {
@@ -233,6 +235,7 @@ void KineticSettingsWindow::open() {
   m_defaultAppsPage->reloadFromDisk();
   m_accessibilityPage->reloadFromDisk();
   m_autostartPage->reloadFromDisk();
+  m_fontsPage->reloadFromDisk();
   m_displayPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
@@ -673,6 +676,35 @@ CursorsPage::Callbacks KineticSettingsWindow::cursorsPageCallbacks() {
   };
 }
 
+FontsPage::Filter KineticSettingsWindow::fontsFilter() const {
+  return FontsPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showAdvanced = m_showAdvanced,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+FontsPage::Callbacks KineticSettingsWindow::fontsPageCallbacks() {
+  return FontsPage::Callbacks{
+      .requestRebuild =
+          [this]() { clearArmedResets(); requestSceneRebuild(); },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_fontsPage != nullptr) {
+              m_fontsPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+  };
+}
+
 DesktopEffectsPage::Filter KineticSettingsWindow::desktopEffectsFilter() const {
   return DesktopEffectsPage::Filter{
       .searchQuery = m_searchQuery,
@@ -913,6 +945,9 @@ void KineticSettingsWindow::applyActivePage() {
   case ActivePage::AppearanceCursors:
     applied = m_cursorsPage != nullptr && m_cursorsPage->applyAll();
     break;
+  case ActivePage::AppearanceFonts:
+    applied = m_fontsPage != nullptr && m_fontsPage->applyAll();
+    break;
   case ActivePage::Animations:
     applied = m_animationsPage != nullptr && m_animationsPage->applyAll();
     break;
@@ -989,6 +1024,11 @@ void KineticSettingsWindow::resetActivePage() {
   case ActivePage::AppearanceCursors:
     if (m_cursorsPage != nullptr) {
       m_cursorsPage->resetAll();
+    }
+    break;
+  case ActivePage::AppearanceFonts:
+    if (m_fontsPage != nullptr) {
+      m_fontsPage->resetAll();
     }
     break;
   case ActivePage::Animations:
@@ -1079,6 +1119,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_iconsPage != nullptr && m_iconsPage->hasPending();
   case ActivePage::AppearanceCursors:
     return m_cursorsPage != nullptr && m_cursorsPage->hasPending();
+  case ActivePage::AppearanceFonts:
+    return m_fontsPage != nullptr && m_fontsPage->hasPending();
   case ActivePage::Animations:
     return m_animationsPage != nullptr && m_animationsPage->hasPending();
   case ActivePage::DesktopEffects:
@@ -1123,6 +1165,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_iconsPage != nullptr && !m_iconsPage->resettableKeyPaths().empty();
   case ActivePage::AppearanceCursors:
     return m_cursorsPage != nullptr && !m_cursorsPage->resettableKeyPaths().empty();
+  case ActivePage::AppearanceFonts:
+    return m_fontsPage != nullptr && !m_fontsPage->resettableKeyPaths().empty();
   case ActivePage::Animations:
     return m_animationsPage != nullptr && !m_animationsPage->resettableKeyPaths().empty();
   case ActivePage::DesktopEffects:
@@ -1164,9 +1208,10 @@ bool KineticSettingsWindow::anyPageHasPending() const {
   return pending(m_tilingPage) || pending(m_workspacesPage) || pending(m_keybindsPage) || pending(m_keyboardPage)
       || pending(m_mousePage) || pending(m_touchpadPage) || pending(m_windowRulesPage)
       || pending(m_windowBehaviorPage) || pending(m_displayPage) || pending(m_appearancePage)
-      || pending(m_iconsPage) || pending(m_cursorsPage) || pending(m_desktopEffectsPage)
-      || pending(m_blurPage) || pending(m_animationsPage) || pending(m_defaultAppsPage)
-      || pending(m_accessibilityPage) || pending(m_autostartPage) || pending(m_shadowsPage);
+      || pending(m_iconsPage) || pending(m_cursorsPage) || pending(m_fontsPage)
+      || pending(m_desktopEffectsPage) || pending(m_blurPage) || pending(m_animationsPage)
+      || pending(m_defaultAppsPage) || pending(m_accessibilityPage) || pending(m_autostartPage)
+      || pending(m_shadowsPage);
 }
 
 void KineticSettingsWindow::applyAllPages() {
@@ -1187,6 +1232,7 @@ void KineticSettingsWindow::applyAllPages() {
   applyPending(m_appearancePage);
   applyPending(m_iconsPage);
   applyPending(m_cursorsPage);
+  applyPending(m_fontsPage);
   applyPending(m_desktopEffectsPage);
   applyPending(m_blurPage);
   applyPending(m_animationsPage);
@@ -1343,6 +1389,9 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
   // Selecting a sub-page updates the sidebar highlight AND the content, so the
   // whole scene (not just the content) is rebuilt.
   const auto selectPage = [this](ActivePage page) {
+    if (page != m_activePage && m_fontsPage != nullptr) {
+      m_fontsPage->cancelPicker();
+    }
     m_activePage = page;
     // Picking a page leaves global search (Noctalia clears the query the same
     // way), so the page shows its full content rather than the merged results.
@@ -1416,6 +1465,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     addSubNav(ActivePage::AppearanceTitleBars, "palette", "Title Bars");
     addSubNav(ActivePage::AppearanceIcons, "apps", "Icons");
     addSubNav(ActivePage::AppearanceCursors, "mouse-2", "Cursors");
+    addSubNav(ActivePage::AppearanceFonts, "typeface", "Fonts");
     addSubNav(ActivePage::Animations, "movie", "Animations");
     addSubNav(ActivePage::DesktopEffects, "sparkles", "Desktop Effects");
     addSubNav(ActivePage::AppearanceShadows, "shadow", "Shadows");
@@ -1470,6 +1520,8 @@ std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
     return "appearance icons icon theme";
   case ActivePage::AppearanceCursors:
     return "appearance cursors cursor theme pointer size";
+  case ActivePage::AppearanceFonts:
+    return "appearance fonts font typeface family sans sans-serif serif monospace";
   case ActivePage::Animations:
     return "appearance animations animation speed effects";
   case ActivePage::DesktopEffects:
@@ -1497,7 +1549,8 @@ std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
   case ActivePage::WindowRules:
     return "window management window rules title bar opacity";
   case ActivePage::DefaultApps:
-    return "system default apps applications browser terminal";
+    return "system default apps applications browser terminal portals portal file picker chooser gtk "
+           "xdg-desktop-portal screensharing";
   case ActivePage::Accessibility:
     return "system accessibility zoom magnifier shake pointer cursor a11y";
   case ActivePage::Autostart:
@@ -1539,6 +1592,11 @@ std::unique_ptr<Node> KineticSettingsWindow::buildPageNodeWithQuery(ActivePage p
   case ActivePage::AppearanceCursors:
     if (m_cursorsPage != nullptr) {
       return m_cursorsPage->build(uiScale(), renderer, cursorsFilter(), m_armedResetKeyPath, cursorsPageCallbacks());
+    }
+    break;
+  case ActivePage::AppearanceFonts:
+    if (m_fontsPage != nullptr) {
+      return m_fontsPage->build(uiScale(), fontsFilter(), m_armedResetKeyPath, fontsPageCallbacks());
     }
     break;
   case ActivePage::Animations:
@@ -1688,12 +1746,12 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
   // return nullptr when nothing in them matches the query.
   static constexpr ActivePage kSearchPageOrder[] = {
       ActivePage::AppearanceTitleBars, ActivePage::AppearanceIcons,   ActivePage::AppearanceCursors,
-      ActivePage::Animations,            ActivePage::DesktopEffects,    ActivePage::AppearanceShadows,
-      ActivePage::Blur,                  ActivePage::Keyboard,          ActivePage::Mouse,
-      ActivePage::Touchpad,              ActivePage::Keybinds,          ActivePage::Displays,
-      ActivePage::WindowBehavior,        ActivePage::Workspaces,        ActivePage::Tiling,
-      ActivePage::WindowRules,           ActivePage::DefaultApps,       ActivePage::Accessibility,
-      ActivePage::Autostart,
+      ActivePage::AppearanceFonts,     ActivePage::Animations,        ActivePage::DesktopEffects,
+      ActivePage::AppearanceShadows,   ActivePage::Blur,              ActivePage::Keyboard,
+      ActivePage::Mouse,               ActivePage::Touchpad,          ActivePage::Keybinds,
+      ActivePage::Displays,            ActivePage::WindowBehavior,    ActivePage::Workspaces,
+      ActivePage::Tiling,              ActivePage::WindowRules,       ActivePage::DefaultApps,
+      ActivePage::Accessibility,       ActivePage::Autostart,
   };
 
   // Title Bars (window decoration previews), Icons and Cursors rescan the
@@ -1916,6 +1974,16 @@ void KineticSettingsWindow::updateKeyboardShortcutInhibit() {
   }
 }
 
+void KineticSettingsWindow::onFontChanged() {
+  if (!isOpen()) {
+    return;
+  }
+  // The Fonts page reads the interface family live from ConfigService, so a
+  // scene rebuild is enough here. Do not reload the page: that would discard
+  // staged edits while the user is changing fonts from another surface.
+  requestSceneRebuild();
+}
+
 void KineticSettingsWindow::onKeyboardEvent(const KeyboardEvent& event) {
   if (!isOpen()) {
     return;
@@ -1925,6 +1993,13 @@ void KineticSettingsWindow::onKeyboardEvent(const KeyboardEvent& event) {
     return;
   }
   if (event.pressed && KeySymbol::isEscape(event.sym)) {
+    // An inline Fonts picker consumes Escape to cancel itself instead of
+    // closing the whole window.
+    if (m_activePage == ActivePage::AppearanceFonts && m_fontsPage != nullptr && m_fontsPage->hasOpenPicker()) {
+      m_fontsPage->cancelPicker();
+      requestContentRebuild();
+      return;
+    }
     // A recorder capture consumes Escape itself (escapeCancels); the window
     // must not interpret it as a close gesture while one is recording.
     if (m_keybindsPage == nullptr || !m_keybindsPage->isCapturing()) {

@@ -29,7 +29,10 @@ class DesktopEntry;
 // owns so the freedesktop default applies. The terminal-emulator row is the
 // exception: terminals have no MIME type, so it persists to kdeglobals
 // ([General] TerminalApplication — the location KIO and this shell resolve
-// the terminal from) through kwriteconfig6.
+// the terminal from) through kwriteconfig6. The portal file-picker row
+// persists to xdg-desktop-portal/kineticwe-portals.conf instead, setting only
+// the FileChooser backend while keeping every other interface (screen sharing,
+// ...) on the KineticWE portal.
 //
 // App options come from the shell's desktop-entry registry (desktopEntries()),
 // filtered to entries that declare support for the row's MIME types (or, for
@@ -39,12 +42,14 @@ class DesktopEntry;
 // tools like htop, not terminals).
 //
 // Like the other pages, edits are STAGED: changing a dropdown only updates an
-// in-memory pending map and nothing touches mimeapps.list until the window's
-// Apply button calls applyAll(), which writes every staged change in one save.
-// Closing the window discards staged edits.
+// in-memory pending map and nothing touches the backing config files until the
+// window's Apply button calls applyAll(), which writes every staged change in
+// one save. Closing the window discards staged edits.
 class DefaultAppsPage {
 public:
-  using Value = std::string; // desktop-entry id, or "" for "System" (no default)
+  // Desktop-entry id, "" for "System" (no default) or the built-in portal
+  // backend, or "gtk" for the GTK file picker.
+  using Value = std::string;
 
   struct Filter {
     std::string searchQuery;
@@ -68,13 +73,14 @@ public:
   void resetAll();
 
   [[nodiscard]] bool hasPending() const noexcept { return !m_pending.empty(); }
-  // Writes every staged edit (mimeapps.list rows plus the terminal row's
-  // kdeglobals key) and refreshes the desktop caches. Returns false on failure
-  // (the staged edits are kept for retry).
+  // Writes every staged edit (mimeapps.list rows, the terminal row's kdeglobals
+  // key, and the file-picker row's portal config) and refreshes the desktop
+  // caches. Returns false on failure (the staged edits are kept for retry).
   bool applyAll();
 
   void reloadFromDisk() noexcept {
     m_loaded = false;
+    m_portalLoaded = false;
     m_pending.clear();
     m_errorNotice.clear();
   }
@@ -100,6 +106,10 @@ private:
     // [General] TerminalApplication instead of mimeapps.list (see
     // writeTerminalApplication()).
     bool matchByTerminal = false;
+    // For the file-picker row: the value is the xdg-desktop-portal backend
+    // ("gtk", or "" for the built-in KineticWE portal) and persists to
+    // xdg-desktop-portal/kineticwe-portals.conf (see writePortalConfig()).
+    bool matchByPortal = false;
   };
 
   static const std::vector<Field>& fields();
@@ -107,7 +117,9 @@ private:
   [[nodiscard]] static const Field* findField(std::string_view keyPath);
 
   void ensureLoaded();
-  // Value read from mimeapps.list (ignoring staged edits); "" = no override.
+  void ensurePortalLoaded();
+  // Value read from the backing config (ignoring staged edits); "" = no
+  // override (for the portal row, "" = the built-in KineticWE backend).
   [[nodiscard]] Value fileBackedValue(const Field& field) const;
   // What the UI shows: the staged value when present, otherwise the file value.
   [[nodiscard]] Value effectiveValue(const Field& field) const;
@@ -125,6 +137,9 @@ private:
   // [General] TerminalApplication via terminal_launch::writeConfiguredTerminal.
   // Returns false (with the error notice set) on failure.
   [[nodiscard]] bool writeTerminalApplication(const Value& value);
+  // Writes the file-picker row's choice to kineticwe-portals.conf, preserving
+  // every other key. Returns false (with the error notice set) on failure.
+  [[nodiscard]] bool writePortalConfig(const Value& value);
   void stageAndRebuild(const Field& field, const Value& value, const Callbacks& callbacks);
 
   [[nodiscard]] std::unique_ptr<Node>
@@ -134,7 +149,9 @@ private:
   );
 
   KineticweKwe m_config;
+  KineticweKwe m_portalConfig;
   bool m_loaded = false;
+  bool m_portalLoaded = false;
   std::map<std::string, Value> m_pending;
   std::string m_errorNotice;
 };

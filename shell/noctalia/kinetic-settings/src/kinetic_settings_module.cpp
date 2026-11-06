@@ -24,7 +24,7 @@ KineticSettingsModule::~KineticSettingsModule() = default;
 
 void KineticSettingsModule::initialize(
     WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
-    IpcService& ipcService, const ConfigService& config, float uiScale
+    IpcService& ipcService, ConfigService& config, float uiScale
 ) {
   m_bus = &bus;
   // Custom keybind actions must exist in the daemon before the mirror replay
@@ -32,7 +32,7 @@ void KineticSettingsModule::initialize(
   m_customKeybinds = std::make_unique<CustomKeybinds>(bus, config);
   m_customKeybinds->initialize();
   m_window = std::make_unique<KineticSettingsWindow>();
-  m_window->initialize(wayland, platform, renderContext, bus, *m_customKeybinds, uiScale);
+  m_window->initialize(wayland, platform, renderContext, bus, config, *m_customKeybinds, uiScale);
   bindIpc(ipcService);
   // The compositor is already up by the time the shell (and this module)
   // initializes, so the persisted keybinds mirror can be replayed now. A
@@ -108,5 +108,11 @@ bool KineticSettingsModule::onPointerEvent(const PointerEvent& event) {
 void KineticSettingsModule::onKeyboardEvent(const KeyboardEvent& event) {
   if (m_window != nullptr) {
     m_window->onKeyboardEvent(event);
+  }
+}
+
+void KineticSettingsModule::onFontChanged() {
+  if (m_window != nullptr) {
+    m_window->onFontChanged();
   }
 }

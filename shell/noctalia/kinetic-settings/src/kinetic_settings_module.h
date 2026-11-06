@@ -29,12 +29,15 @@ public:
 
   void initialize(
       WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
-      IpcService& ipcService, const ConfigService& config, float uiScale
+      IpcService& ipcService, ConfigService& config, float uiScale
   );
 
   [[nodiscard]] bool ownsKeyboardSurface(wl_surface* surface) const noexcept;
   [[nodiscard]] bool onPointerEvent(const PointerEvent& event);
   void onKeyboardEvent(const KeyboardEvent& event);
+  // Refreshes the Kinetic Settings window (when open) after the shell font
+  // family changed.
+  void onFontChanged();
 
 private:
   void bindIpc(IpcService& ipcService);

@@ -42,6 +42,10 @@ struct ThemeInfo {
   // Returns true when a launch was attempted.
   bool openIconRoot();
 
+  // Opens an arbitrary directory using the same file-manager resolution as
+  // openIconRoot(). Returns true when a launch was attempted.
+  bool openDirectory(const std::string& dir);
+
 // Resolve a well-known icon name (e.g. "folder", "start-here") inside a
 // specific theme directory. Returns the best candidate path (SVG preferred,
 // then the largest PNG). Empty when the theme provides none of the names.

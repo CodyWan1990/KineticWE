@@ -331,7 +331,7 @@ Each module = write `.kwe`/config + call compositor-owned D-Bus + emit change si
 | Icons | `kineticwe.kwe` + real `~/.config/kdeglobals` (shared, one copy) | app-level; shell own |
 | Mouse/Touchpad | `kineticwe.kwe` `[Libinput]` | compositor reparse; `InputDevice` D-Bus for live tweaks |
 | Keyboard layouts | `kineticwe.kwe` `[Keyboard]` + `org.kde.KWin` Layouts D-Bus | immediate + config |
-| Fonts | `~/.config/fontconfig/fonts.conf` | fontconfig (non-KDE) |
+| Fonts | `~/.config/fontconfig/conf.d/99-kineticwe.conf` | fontconfig (non-KDE) |
 | Lock screen | Noctalia TOML `[lockscreen]`, `[idle.behavior.lock]` | shell-owned |
 | Effects / Animations | `kineticwe.kwe` `[Plugins]` / `[Effect-*]` | `org.kde.KWin.Plugins` D-Bus |
 | Tiling / Window rules | `kineticwe.kwe` tiling groups; `rules.kwe` | config reload |
@@ -428,6 +428,7 @@ Once modules land, fold the existing `src/noctaliasettings.cpp` shortcut bridge 
 | `~/.config/kglobalshortcutsrc` | `~/.config/kineticwe/kglobalshortcutsrc` | embedded KGlobalAccelD (in compositor) |
 | `~/.config/kdeglobals` | unchanged — one shared copy in the real config home; the compositor opens it via `KWE_REAL_CONFIG_HOME` (`kineticweKdeGlobalsPath()`) | shell theme service / KDE apps / compositor |
 | `~/.config/noctalia-kwe/config.toml` | unchanged | shell |
-| `~/.config/fontconfig/fonts.conf` | unchanged | fontconfig / Kinetic Settings |
+| `~/.config/fontconfig/fonts.conf` | unchanged | fontconfig / user |
+| `~/.config/fontconfig/conf.d/99-kineticwe.conf` | new managed file for generic font preferences | Kinetic Settings |
 
 User applications (yazi, zed, kitty, ...) are **not** affected: they keep reading/writing `~/.config` exactly as outside the KineticWE session.

@@ -367,6 +367,10 @@ bool openIconRoot() {
   return openDirectoryInFileManager(dir);
 }
 
+bool openDirectory(const std::string& dir) {
+  return openDirectoryInFileManager(dir);
+}
+
 std::string resolveIconInTheme(const std::string& themePath, const std::string& iconName) {
   std::string best;
   bool bestScalable = false;

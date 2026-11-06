@@ -9,6 +9,7 @@
 #include "kinetic-settings/src/default_apps_page.h"
 #include "kinetic-settings/src/desktop_effects_page.h"
 #include "kinetic-settings/src/display_page.h"
+#include "kinetic-settings/src/fonts_page.h"
 #include "kinetic-settings/src/icons_page.h"
 #include "kinetic-settings/src/keyboard_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
@@ -34,6 +35,7 @@
 
 class Box;
 class CompositorPlatform;
+class ConfigService;
 class CustomKeybinds;
 class Flex;
 class Input;
@@ -64,7 +66,7 @@ public:
 
   void initialize(
       WaylandConnection& wayland, CompositorPlatform& platform, RenderContext& renderContext, SessionBus& bus,
-      CustomKeybinds& customKeybinds, float uiScale
+      ConfigService& config, CustomKeybinds& customKeybinds, float uiScale
   );
 
   void open();
@@ -80,6 +82,9 @@ public:
   // shortcuts for the window so a chord that is already bound elsewhere can be
   // captured (and the conflict-overwrite prompt shown) instead of being eaten.
   void updateKeyboardShortcutInhibit();
+  // Refreshes the (open) window after the shell font family changed, so the
+  // Fonts page reflects the new selection.
+  void onFontChanged();
 
 private:
   // Sidebar/secondary nav pages, grouped under the collapsible categories.
@@ -88,6 +93,7 @@ private:
     AppearanceTitleBars,
     AppearanceIcons,
     AppearanceCursors,
+    AppearanceFonts,
     AppearanceShadows,
     Animations,
     DesktopEffects,
@@ -163,6 +169,8 @@ private:
   [[nodiscard]] IconsPage::Callbacks iconsPageCallbacks();
   [[nodiscard]] CursorsPage::Filter cursorsFilter() const;
   [[nodiscard]] CursorsPage::Callbacks cursorsPageCallbacks();
+  [[nodiscard]] FontsPage::Filter fontsFilter() const;
+  [[nodiscard]] FontsPage::Callbacks fontsPageCallbacks();
   [[nodiscard]] DesktopEffectsPage::Filter desktopEffectsFilter() const;
   [[nodiscard]] DesktopEffectsPage::Callbacks desktopEffectsPageCallbacks();
   [[nodiscard]] BlurPage::Filter blurFilter() const;
@@ -195,6 +203,7 @@ private:
   CompositorPlatform* m_platform = nullptr;
   RenderContext* m_renderContext = nullptr;
   SessionBus* m_bus = nullptr;
+  ConfigService* m_config = nullptr;
   CustomKeybinds* m_customKeybinds = nullptr;
   float m_uiScale = 1.0F;
 
@@ -213,6 +222,7 @@ private:
   std::unique_ptr<AppearancePage> m_appearancePage;
   std::unique_ptr<IconsPage> m_iconsPage;
   std::unique_ptr<CursorsPage> m_cursorsPage;
+  std::unique_ptr<FontsPage> m_fontsPage;
   std::unique_ptr<DesktopEffectsPage> m_desktopEffectsPage;
   std::unique_ptr<BlurPage> m_blurPage;
   std::unique_ptr<ShadowsPage> m_shadowsPage;
