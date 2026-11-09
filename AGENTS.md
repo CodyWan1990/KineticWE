@@ -1,4 +1,4 @@
-git checkout # AGENTS.md — Agent Rules for KineticWE
+# AGENTS.md — Agent Rules for KineticWE
 
 These rules apply to every AI agent (orchestrator and sub-agents) working in this
 repository. They override any conflicting default behavior.
