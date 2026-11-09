@@ -133,9 +133,12 @@ Shallow clones (`git rev-parse --is-shallow-repository` → `true`) get
 `?shallow=1` appended, because Nix refuses to fetch from a shallow repository
 otherwise. `git fetch --unshallow` makes the parameter unnecessary.
 
-Each sync rebuilds the KineticWE derivation from scratch (Nix builds are not
-incremental). For faster iterations use `ccache` in the daemon or fall back to
-`./build-rpm-dev.sh --kwin-only` for the compile step.
+Each sync rebuilds the KineticWE derivation. The flake builds with
+`pkgs.ccacheStdenv` and a shared `/var/cache/ccache` (enabled on NixOS by
+dcli's generated module: `programs.ccache` + `extra-sandbox-paths`), so only
+changed translation units are recompiled. `KWE_CCACHE=0` style overrides are
+not needed; use `./build-rpm-dev.sh --kwin-only` if the cache is cold or the
+daemon has no access to the cache directory.
 
 ## Alternative mode (`profile`)
 

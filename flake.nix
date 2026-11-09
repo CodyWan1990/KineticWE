@@ -53,11 +53,35 @@
           config.allowUnfree = true;
         };
 
-        kglobalacceldGit = pkgs.callPackage ./nix/kglobalacceld-git.nix { };
-        kdecorationGit = pkgs.callPackage ./nix/kdecoration-git.nix { };
+        # Incremental C/C++ builds: unchanged translation units are served from
+        # the shared ccache. On NixOS, `programs.ccache.enable = true` and
+        # `nix.settings.extra-sandbox-paths = [ "/var/cache/ccache" ]` make the
+        # directory available to the build sandbox (dcli's generated module
+        # sets both). Elsewhere the wrapper disables itself and compiles
+        # normally, so builds never fail because the cache is missing.
+        ccacheStdenv = pkgs.ccacheStdenv.override {
+          extraConfig = ''
+            if [ -d /var/cache/ccache ] && [ -w /var/cache/ccache ]; then
+              export CCACHE_COMPRESS=1
+              export CCACHE_SLOPPINESS=random_seed
+              export CCACHE_DIR=/var/cache/ccache
+              export CCACHE_UMASK=007
+            else
+              export CCACHE_DISABLE=1
+            fi
+          '';
+        };
+
+        kglobalacceldGit = pkgs.callPackage ./nix/kglobalacceld-git.nix {
+          stdenv = ccacheStdenv;
+        };
+        kdecorationGit = pkgs.callPackage ./nix/kdecoration-git.nix {
+          stdenv = ccacheStdenv;
+        };
 
         kineticWe = pkgs.callPackage ./nix/kinetic-we.nix {
           inherit kglobalacceldGit kdecorationGit;
+          stdenv = ccacheStdenv;
         };
 
         # The KineticWE portal backend (rebranded xdg-desktop-portal-kde).
@@ -66,7 +90,9 @@
         # Use the in-tree Noctalia fork that ships the Kinetic Settings module
         # and `noctalia-kwe` IPC commands. The session launcher expects a
         # `${noctalia}/bin/noctalia` path, so provide a compat symlink too.
-        noctaliaKweRaw = pkgs.callPackage ./shell/noctalia/nix/package.nix { };
+        noctaliaKweRaw = pkgs.callPackage ./shell/noctalia/nix/package.nix {
+          stdenv = ccacheStdenv;
+        };
         noctaliaKwe = pkgs.symlinkJoin {
           name = "noctalia-kwe-compat";
           paths = [ noctaliaKweRaw ];
