@@ -23,7 +23,7 @@
 # ===========================================================================
 
 Name:           kineticwe
-Version:        0.1.1
+Version:        0.2.0
 Release:        1%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
@@ -556,6 +556,11 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Thu Nov 05 2026 LGL <lgl@localhost> - 0.2.0-1
+- Sync the vendored Noctalia shell with upstream updates.
+- Blur fixes.
+- Fix the Emerge scroll bind.
+
 * Mon Nov 02 2026 LGL <lgl@localhost> - 0.1.1-1
 - Build against KScreenLocker 6.8: KSldApp::inhibitSuspend, uninhibitSuspend,
   lockScreenShown and the old lock(EstablishLock, int) overload are gone, so

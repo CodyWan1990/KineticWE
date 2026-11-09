@@ -1,4 +1,4 @@
-# AGENTS.md — Agent Rules for KineticWE
+git checkout # AGENTS.md — Agent Rules for KineticWE
 
 These rules apply to every AI agent (orchestrator and sub-agents) working in this
 repository. They override any conflicting default behavior.
@@ -139,6 +139,5 @@ Work in this repo follows an orchestrator / sub-agent model.
 
 - Follow `.clang-format` and existing KDE/KWin code style; match the
   surrounding code in `shell/noctalia` (QML) and the meson module.
-- Development happens on the `kineticwe-2.0` branch; `master` stays untouched.
 - Never commit or push unless the user explicitly asks.
 - Use absolute paths when referring to files.
