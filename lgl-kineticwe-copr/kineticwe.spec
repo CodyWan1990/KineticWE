@@ -23,7 +23,7 @@
 # ===========================================================================
 
 Name:           kineticwe
-Version:        0.2.0
+Version:        0.2.1
 Release:        1%{?dist}
 Summary:        Tiling KWin Wayland compositor
 
@@ -556,6 +556,9 @@ echo
 %{_datadir}/polkit-1/actions/org.noctalia.greeter.apply-appearance.policy
 
 %changelog
+* Tue Nov 10 2026 LGL <lgl@localhost> - 0.2.1-1
+- added fonts and gtk file picker options and other stuff
+
 * Thu Nov 05 2026 LGL <lgl@localhost> - 0.2.0-1
 - Sync the vendored Noctalia shell with upstream updates.
 - Blur fixes.
