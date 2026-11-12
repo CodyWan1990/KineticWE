@@ -56,7 +56,50 @@ stdenv.mkDerivation {
   pname = "kinetic-we";
   inherit version;
 
-  src = lib.cleanSource ../.;
+  # kinetic-we only needs the KWin tree. Keep noctalia (shell/), the portal,
+  # packaging, docs and any pre-existing build/result dirs out of the source
+  # hash so editing them does not force a full compositor rebuild.
+  src = lib.cleanSourceWith {
+    src = ../.;
+    filter = path: type:
+      let
+        rel = lib.removePrefix (toString ../. + "/") (toString path);
+        top = lib.head (lib.splitString "/" rel);
+      in
+        lib.cleanSourceFilter path type
+        && !(lib.hasPrefix "build" top)
+        && !(lib.hasPrefix "result" top)
+        && !(builtins.elem top [
+          "shell"
+          "portal"
+          "nix"
+          "docs"
+          "debian"
+          "arch"
+          "ci"
+          ".copr"
+          "lgl-kineticwe-copr"
+          "scripts"
+          "flake.nix"
+          "flake.lock"
+          "PKGBUILD"
+          "kineticwe.install"
+          "kineticwe-greeter.install"
+          "build-deb-stable.sh"
+          "build-rpm-dev.sh"
+          "install-arch.sh"
+          "install-build-deps.sh"
+          "install-runtime-deps.sh"
+          "AGENTS.md"
+          "README.md"
+          "CONTRIBUTING.md"
+          "DonNotes.md"
+          "PACKAGING-COPR.md"
+          "DEV-SPEC-FIXES-PLAN.md"
+          ".gitlab-ci.yml"
+          "cppcheck-suppressions.xml"
+        ]);
+  };
 
   patches = [
     # Allow the KWin QPA plugin to recognise the binary when wrapped

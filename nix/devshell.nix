@@ -1,52 +1,40 @@
 {
-  lib,
-  stdenv,
-  cmake,
-  ninja,
-  just,
-  meson,
-  pkg-config,
-  kdePackages,
+  pkgs,
   kineticWe,
   noctalia,
 }:
 
-stdenv.mkDerivation {
-  pname = "kineticwe-devshell";
-  version = "unstable";
+pkgs.mkShell {
+  name = "kineticwe-devshell";
 
-  src = lib.cleanSource ../.;
-
-  dontConfigure = true;
-  dontBuild = true;
-  dontInstall = true;
-
-  nativeBuildInputs = [
-    cmake
-    ninja
-    just
-    meson
-    pkg-config
-    kdePackages.extra-cmake-modules
+  # Reuse the exact dependency sets both packages build with. The package
+  # outputs are deliberately not referenced: `nix develop` would build them.
+  nativeBuildInputs = kineticWe.nativeBuildInputs ++ noctalia.nativeBuildInputs ++ [
+    pkgs.ccache
+    pkgs.git
   ];
-
-  # Build env: kinetic-we + every KDE/Plasma dep it needs at build time,
-  # plus the noctalia binary so `just configure && just build` works.
-  buildInputs = kdePackages.kwin.buildInputs or [];
+  buildInputs = kineticWe.buildInputs ++ noctalia.buildInputs;
 
   shellHook = ''
+    export CCACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/ccache"
+    export CCACHE_COMPRESS=1
+    export CCACHE_SLOPPINESS=random_seed
+    export CMAKE_C_COMPILER_LAUNCHER=ccache
+    export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+    export CMAKE_EXPORT_COMPILE_COMMANDS=ON
+    export CMAKE_GENERATOR=Ninja
+    mkdir -p "$CCACHE_DIR"
+
     echo "KineticWE development shell"
-    echo "  kinetic-we source: $(pwd)"
-    echo "  kinetic-we:    ${kineticWe}/bin/kinetic-we"
-    echo "  noctalia:      ${noctalia}/bin/noctalia"
+    echo "  source: $(pwd)"
     echo
-    echo "Build & install into a custom prefix:"
-    echo "  just configure release \"\$HOME/.local\""
-    echo "  just build release"
-    echo "  just install release"
+    echo "Persistent incremental builds (only changed files recompile):"
+    echo "  cmake -S . -B build-devnix -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF"
+    echo "  cmake --build build-devnix"
+    echo "  cmake --install build-devnix --prefix \"$HOME/.local\""
     echo
-    echo "Or build via the Nix flake:"
-    echo "  nix build .#kinetic-we"
-    echo "  nix build .#session"
+    echo "  meson setup build-devnix-noctalia shell/noctalia --prefix \"$HOME/.local\" --buildtype=release -Dtests=disabled"
+    echo "  meson compile -C build-devnix-noctalia"
+    echo "  meson install -C build-devnix-noctalia"
   '';
 }
