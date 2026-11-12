@@ -57,10 +57,6 @@ session menu, or run `start-kineticwe` from a TTY.
 
 > **Tip:** Press **Meta+Space** to open the app drawer.
 
-Working on KineticWE itself? [docs/nix-dev-install.md](docs/nix-dev-install.md)
-describes a development install that builds your checkout through the repo's
-Nix flake and installs it with dcli.
-
 Optionally, install the Noctalia greeter (greetd) and run its interactive setup:
 
 ```bash
@@ -82,6 +78,13 @@ Then reboot.
 9. `sudo dnf group install kde-desktop`
 10. `systemctl set-default graphical.target`
 11. `reboot` 
+
+## Community-maintained installation instructions
+
+The following instructions are maintained by community contributors. They are
+not part of the official Fedora COPR release and may lag behind the latest
+changes. If a command fails, please
+[open an issue](https://gitlab.com/theblackdon/kineticwe/-/issues).
 
 ### Arch Linux
 
@@ -201,3 +204,74 @@ Optionally, install the Noctalia greeter and run its setup:
 sudo zypper install kineticwe-greeter
 kineticwe-setup-greeter
 ```
+
+### Nix / NixOS
+
+KineticWE ships a flake that builds the compositor, the Noctalia shell, the
+session launcher, and the portal backend. The first build compiles KWin, so it
+can take a while. The flake builds the branch it is fetched from;
+`gitlab:theblackdon/kineticwe` resolves the stable `master` branch.
+
+#### NixOS (recommended)
+
+Add the flake as an input:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    kineticwe.url = "gitlab:theblackdon/kineticwe";
+  };
+
+  outputs = { self, nixpkgs, kineticwe, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux"; # or aarch64-linux
+      modules = [
+        kineticwe.nixosModules.default
+        { programs.kineticwe.enable = true; }
+      ];
+    };
+  };
+}
+```
+
+Then rebuild:
+
+```bash
+sudo nixos-rebuild switch --flake .#myhost
+```
+
+The module installs KineticWE, Noctalia, the decorations, and registers the
+**KineticWE** Wayland session with your display manager. Log out and pick it
+from the session menu.
+
+#### Other Nix installations
+
+Install the session and its runtime packages into your profile:
+
+```bash
+nix profile install \
+  gitlab:theblackdon/kineticwe#kinetic-we \
+  gitlab:theblackdon/kineticwe#noctalia \
+  gitlab:theblackdon/kineticwe#kdecoration \
+  gitlab:theblackdon/kineticwe#kglobalacceld \
+  gitlab:theblackdon/kineticwe#session
+```
+
+The session entry is installed at
+`~/.nix-profile/share/wayland-sessions/KineticWE.desktop`. If your display
+manager does not scan that directory, copy it into the system session directory:
+
+```bash
+sudo install -Dm644 ~/.nix-profile/share/wayland-sessions/KineticWE.desktop \
+  /usr/local/share/wayland-sessions/KineticWE.desktop
+```
+
+Then log out and select **KineticWE**, or run `start-kineticwe` from a TTY.
+Update later with `nix profile upgrade --all`.
+
+#### Development install
+
+Working on KineticWE itself? See
+[docs/nix-dev-install.md](docs/nix-dev-install.md) for a development install
+that builds your checkout through the flake and installs it with dcli.
