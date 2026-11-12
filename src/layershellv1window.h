@@ -22,7 +22,7 @@ class LayerSurfaceV1Interface;
 class LogicalOutput;
 class LayerShellV1Integration;
 
-class LayerShellV1Window : public WaylandWindow
+class KWIN_EXPORT LayerShellV1Window : public WaylandWindow
 {
     Q_OBJECT
 
