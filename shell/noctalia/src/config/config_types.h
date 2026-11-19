@@ -1345,6 +1345,7 @@ struct ShellConfig {
   bool cardBorders = true;
   bool showCloseButtons = true;
   std::string fontFamily = "sans-serif";
+  std::int32_t fontSize = 14; // base interface text size in logical px
   std::string lang; // empty = auto-detect from $LC_ALL/$LC_MESSAGES/$LANG
   std::string timeFormat = "{:%H:%M}";
   std::string dateFormat = "%A, %x";

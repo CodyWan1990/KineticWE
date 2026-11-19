@@ -333,6 +333,7 @@ public:
     ScreenEdgeGestureRecognizer *gestureRecognizer() const;
 
     bool remainActiveOnFullscreen() const;
+    bool hotCornersEnabled() const;
     const std::vector<std::unique_ptr<Edge>> &edges() const;
 
     void checkBlocking();
@@ -402,6 +403,7 @@ private:
     std::unique_ptr<ScreenEdgeGestureRecognizer> m_gestureRecognizer;
     bool m_remainActiveOnFullscreen = false;
     bool m_allScreenCorners = true;
+    bool m_hotCornersEnabled = true;
 };
 
 /**********************************************************
@@ -535,6 +537,11 @@ inline bool ScreenEdges::isDesktopSwitchingMovingClients() const
 inline bool ScreenEdges::isAllScreenCorners() const
 {
     return m_allScreenCorners;
+}
+
+inline bool ScreenEdges::hotCornersEnabled() const
+{
+    return m_hotCornersEnabled;
 }
 
 inline std::chrono::milliseconds ScreenEdges::reActivationThreshold() const

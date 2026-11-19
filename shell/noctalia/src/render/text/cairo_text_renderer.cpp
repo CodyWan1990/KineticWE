@@ -337,6 +337,15 @@ void CairoTextRenderer::setFontFamily(std::string family) {
   clearCaches();
 }
 
+void CairoTextRenderer::setFontScale(float scale) {
+  const float clamped = std::clamp(scale, 0.1F, 4.0F);
+  if (m_fontScale == clamped) {
+    return;
+  }
+  m_fontScale = clamped;
+  clearCaches();
+}
+
 void CairoTextRenderer::setBaseDirection(bool rtl) {
   if (m_baseDirRtl == rtl) {
     return;
@@ -386,7 +395,7 @@ PangoLayout* CairoTextRenderer::buildLayout(
                                                                               : PANGO_ELLIPSIZE_END;
   PangoLayout* layout = pango_layout_new(m_pangoContext);
 
-  PangoFontDescription* desc = newFontDescription(font, std::max(1.0F, fontSize * contentScale));
+  PangoFontDescription* desc = newFontDescription(font, std::max(1.0F, fontSize * contentScale * m_fontScale));
   pango_layout_set_font_description(layout, desc);
   pango_font_description_free(desc);
 
@@ -545,7 +554,7 @@ CairoTextRenderer::measureFont(float contentScale, float fontSize, const TextFon
     return it->second;
   }
 
-  PangoFontDescription* desc = newFontDescription(font, std::max(1.0F, fontSize * contentScale));
+  PangoFontDescription* desc = newFontDescription(font, std::max(1.0F, fontSize * contentScale * m_fontScale));
 
   PangoFontMetrics* metrics = pango_context_get_metrics(m_pangoContext, desc, pango_language_get_default());
   if (metrics == nullptr) {
@@ -638,7 +647,7 @@ void CairoTextRenderer::measureCursorStopsWrapped(
   if (byteOffsets.empty()) {
     return;
   }
-  const float fallbackHeight = fontSize > 0.0F ? fontSize : 1.0F;
+  const float fallbackHeight = fontSize > 0.0F ? fontSize * m_fontScale : 1.0F;
   if (m_pangoContext == nullptr || text.empty()) {
     outStops.resize(byteOffsets.size(), TextCursorStop{0.0F, 0.0F, fallbackHeight});
     return;

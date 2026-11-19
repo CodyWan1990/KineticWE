@@ -63,6 +63,10 @@ private:
   [[nodiscard]] std::string interfaceButtonLabel() const;
   [[nodiscard]] bool interfaceOverridden() const;
 
+  // Effective interface text size in logical px.
+  [[nodiscard]] int fontSizeValue() const;
+  [[nodiscard]] bool fontSizeOverridden() const;
+
   // Effective generic-family alias ("" = the system default).
   [[nodiscard]] std::string aliasValue(std::string_view generic) const;
   [[nodiscard]] std::string aliasFamily(std::string_view generic) const;
@@ -71,6 +75,7 @@ private:
 
   void ensureAliasesLoaded();
   void stageInterface(std::string value);
+  void stageFontSize(int value);
   void stageAlias(std::string generic, std::string value);
   // Writes (or removes, when every alias is empty) the managed fontconfig
   // file. Returns false with m_errorNotice set on failure.
@@ -78,6 +83,8 @@ private:
 
   [[nodiscard]] std::unique_ptr<Node>
   buildInterfaceRow(float scale, std::string_view armedResetKey, const Callbacks& callbacks);
+  [[nodiscard]] std::unique_ptr<Node>
+  buildFontSizeRow(float scale, std::string_view armedResetKey, const Callbacks& callbacks);
   [[nodiscard]] std::unique_ptr<Node> buildAliasRow(
       std::string_view generic, float scale, std::string_view armedResetKey, const Callbacks& callbacks
   );
@@ -87,6 +94,7 @@ private:
 
   ConfigService& m_config;
   std::optional<std::string> m_pendingInterface;
+  std::optional<int> m_pendingFontSize;
   std::map<std::string, std::string> m_pendingAliases;
   std::map<std::string, std::string> m_aliases;
   bool m_aliasesLoaded = false;

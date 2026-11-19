@@ -13,6 +13,7 @@
 #include "core/rendertarget.h"
 #include "core/renderviewport.h"
 #include "effect/effecthandler.h"
+#include "layershellv1window.h"
 #include "opengl/glplatform.h"
 #include "rules.h"
 #include "scene/backgroundeffectitem.h"
@@ -22,6 +23,7 @@
 #include "scene/windowitem.h"
 #include "wayland/backgroundeffect_v1.h"
 #include "wayland/display.h"
+#include "wayland/layershell_v1.h"
 #include "wayland/surface.h"
 #include "wayland_server.h"
 #include "window.h"
@@ -60,10 +62,9 @@ namespace KWin
 static const QByteArray s_blurAtomName = QByteArrayLiteral("_KDE_NET_WM_BLUR_BEHIND_REGION");
 
 // The Noctalia shell owns the bar, panels, dock, notifications, wallpaper,
-// switcher, and its settings windows. The settings windows are real app
-// windows and must blur like any other application, but the shell chrome must
-// never blur -- not even when it requests blur itself through the normal
-// surface request path below.
+// switcher, and its settings windows. The shell chrome must never blur,
+// including explicit compositor_blur requests; the settings windows are real
+// app windows and still blur like normal applications.
 static bool isNoctaliaSettingsWindow(const Window *window)
 {
     const QString desktopFileName = window->desktopFileName();
@@ -71,10 +72,32 @@ static bool isNoctaliaSettingsWindow(const Window *window)
         || desktopFileName == QLatin1String("dev.kineticwe.Noctalia");
 }
 
+static bool isNoctaliaLayerShellWindow(const Window *window)
+{
+    // Layer-shell surfaces have no app id, so they are identified by namespace.
+    const auto *layerShellWindow = qobject_cast<const LayerShellV1Window *>(window);
+    if (!layerShellWindow) {
+        return false;
+    }
+    const auto *shellSurface = layerShellWindow->shellSurface();
+    if (!shellSurface) {
+        return false;
+    }
+    const QString scope = shellSurface->scope().toLower();
+    return scope.startsWith(QStringLiteral("noctalia"));
+}
+
 static bool isNoctaliaShellWindow(const Window *window)
 {
+    // Deleted windows outlive their shell surface; touching either crashes.
+    if (window->isDeleted()) {
+        return false;
+    }
     if (isNoctaliaSettingsWindow(window)) {
         return false;
+    }
+    if (isNoctaliaLayerShellWindow(window)) {
+        return true;
     }
     if (window->resourceName().contains(QLatin1StringView("noctalia"), Qt::CaseInsensitive)
         || window->resourceClass().contains(QLatin1StringView("noctalia"), Qt::CaseInsensitive)) {
@@ -375,6 +398,12 @@ void BlurEffect::updateBlurRegion(EffectWindow *w)
         if (w->decorationHasAlpha() && decorationSupportsBlurBehind(w)) {
             frame = decorationBlurRegion(w);
         }
+    }
+
+    if (isShellWindow) {
+        // The shell chrome never blurs, even when it requests blur itself.
+        content.reset();
+        frame.reset();
     }
 
     if (content.has_value() || frame.has_value()) {
