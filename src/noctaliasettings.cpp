@@ -52,9 +52,13 @@ NoctaliaSettings::NoctaliaSettings(QObject *parent)
                      i18n("Reload Noctalia Config"),
                      {QStringLiteral("msg"), QStringLiteral("config-reload")});
 
+    // Restart the unit; the path-anchored pkill fallback covers the supervised
+    // launcher and skips the ".noctalia-kwe-w" wrapper and the plugin daemons.
     registerProcessAction(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaRestartShell"),
                           i18n("Restart Noctalia Shell"),
-                          {QStringLiteral("pkill"), QStringLiteral("-x"), QStringLiteral("noctalia-kwe")},
+                          {QStringLiteral("/bin/sh"), QStringLiteral("-c"),
+                           QStringLiteral("systemctl --user restart kineticwe-shell.service 2>/dev/null || "
+                                          "pkill -f '/noctalia-kwe$'")},
                           QKeySequence(Qt::META | Qt::ALT | Qt::Key_R));
 
     registerShortcut(s_noctaliaComponent, s_noctaliaDisplay, QStringLiteral("NoctaliaToggleSettings"),

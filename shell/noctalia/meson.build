@@ -1107,6 +1107,7 @@ _noctalia_sources = files(
   'kinetic-settings/src/layout_catalog.cpp',
   'kinetic-settings/src/window_rules_page.cpp',
   'kinetic-settings/src/window_behavior_page.cpp',
+  'kinetic-settings/src/hot_corners_page.cpp',
   'kinetic-settings/src/custom_keybinds.cpp',
   'kinetic-settings/src/kinetic_settings_module.cpp',
   'kinetic-settings/src/title_font_sync.cpp',

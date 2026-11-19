@@ -1808,6 +1808,7 @@ namespace noctalia::config::schema {
             },
             [](toml::table& tbl, const ShellConfig& in) { tbl.insert_or_assign("font_family", in.fontFamily); }
         ),
+        field(&ShellConfig::fontSize, "font_size", kShellFontSizeRange),
         stringIfNonEmptyField(&ShellConfig::lang, "lang"),
         field(&ShellConfig::timeFormat, "time_format"),
         field(&ShellConfig::dateFormat, "date_format"),

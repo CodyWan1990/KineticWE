@@ -293,9 +293,28 @@ else
     KWIN_PID=$!
 fi
 
+# Publish the compositor PID for kineticwe-shell.service's ExecCondition, so a
+# Restart=always attempt cannot resurrect the shell after this session ends.
+KWE_COMPOSITOR_PIDFILE="$RUNTIME_DIR/kineticwe-compositor.pid"
+
+_kwe_drop_compositor_pidfile() {
+    local pid
+    [[ -r "$KWE_COMPOSITOR_PIDFILE" ]] || return 0
+    IFS= read -r pid < "$KWE_COMPOSITOR_PIDFILE" || true
+    [[ -n "$pid" ]] || return 0
+    if [[ "$pid" == "$KWIN_PID" ]]; then
+        rm -f "$KWE_COMPOSITOR_PIDFILE" || true
+    fi
+    return 0
+}
+
+if ! printf '%s\n' "$KWIN_PID" > "$KWE_COMPOSITOR_PIDFILE"; then
+    echo "kineticwe: cannot write $KWE_COMPOSITOR_PIDFILE; kineticwe-shell.service will skip" >&2
+fi
+
 # If this script dies (logout, Ctrl-C, logind teardown), take the compositor
 # down, and the shell unit with the session target (a no-op before step 6b).
-trap 'kill "$KWIN_PID" 2>/dev/null || true; systemctl --user stop kineticwe-session.target 2>/dev/null || true' EXIT
+trap '_kwe_drop_compositor_pidfile; kill "$KWIN_PID" 2>/dev/null || true; systemctl --user stop kineticwe-session.target 2>/dev/null || true' EXIT
 
 WAYLAND_SOCK=""
 for _ in $(seq 1 20); do
@@ -416,15 +435,25 @@ systemctl --user start --no-block xdg-desktop-portal.service 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 7. Start the shell (Noctalia fork, noctalia-kwe) as kineticwe-shell.service:
-#    systemd restarts it (including Meta+Alt+R's pkill), logs it to the journal
+#    systemd restarts it (Meta+Alt+R restarts this unit), logs it to the journal
 #    (journalctl --user -u kineticwe-shell) and stops it with the session
 #    target. restart, not start: a unit left running by a session that died
 #    uncleanly would still point at the old WAYLAND_DISPLAY.
-#    Fallback when the unit is not installed: supervise it from here, as before.
+#    The unit's ExecCondition also checks our compositor PID file, so it skips
+#    (rather than starting) when that compositor is gone.
+#    Fallback when the unit is not installed, or when the guard skipped it:
+#    supervise it from here, as before.
 # ---------------------------------------------------------------------------
 SHELL_PID=""
-if ! systemctl --user restart kineticwe-shell.service 2>/dev/null; then
-    echo "kineticwe: kineticwe-shell.service unavailable; supervising noctalia-kwe from the launcher" >&2
+# The unit's ExecCondition can skip the start while systemctl still returns
+# success. Detect that (and a missing unit) and fall back to supervision. The
+# probe runs even when the restart fails, so a failed stop cannot leave a
+# supervised duplicate beside a still-running unit.
+_kwe_shell_state=""
+systemctl --user restart kineticwe-shell.service 2>/dev/null || true
+_kwe_shell_state="$(systemctl --user show -p ActiveState --value kineticwe-shell.service 2>/dev/null || true)"
+if [[ "$_kwe_shell_state" != "active" && "$_kwe_shell_state" != "activating" && "$_kwe_shell_state" != "reloading" && "$_kwe_shell_state" != "deactivating" ]]; then
+    echo "kineticwe: kineticwe-shell.service did not start (unit missing or compositor PID guard failed); supervising noctalia-kwe from the launcher" >&2
     (
         while true; do
             noctalia-kwe >>"$HOME/.local/share/noctalia-kwe.log" 2>&1
@@ -434,18 +463,21 @@ if ! systemctl --user restart kineticwe-shell.service 2>/dev/null; then
     ) &
     SHELL_PID=$!
 fi
+unset _kwe_shell_state
 
 # ---------------------------------------------------------------------------
 # 8. Wait on the compositor; its exit ends the session
 # ---------------------------------------------------------------------------
 wait "$KWIN_PID" || true
 
-# Compositor exited — take the session down. Stopping the session target stops
+# Compositor exited — withdraw the guard PID first so any queued Restart=always
+# attempt skips, then take the session down. Stopping the session target stops
 # the shell unit (PartOf=) and lets graphical-session.target, which nothing else
 # holds, go down with it; then the greeter returns.
+_kwe_drop_compositor_pidfile
 systemctl --user stop kineticwe-session.target 2>/dev/null || true
 if [[ -n "$SHELL_PID" ]]; then
     kill "$SHELL_PID" 2>/dev/null || true
-    pkill -x noctalia-kwe 2>/dev/null || true
+    pkill -f '/noctalia-kwe$' 2>/dev/null || true
 fi
 trap - EXIT

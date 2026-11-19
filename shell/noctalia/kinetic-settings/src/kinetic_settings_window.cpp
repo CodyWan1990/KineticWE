@@ -187,6 +187,9 @@ void KineticSettingsWindow::open() {
       }
     });
   }
+  if (m_hotCornersPage == nullptr) {
+    m_hotCornersPage = std::make_unique<HotCornersPage>(*m_bus);
+  }
   if (m_appearancePage == nullptr) {
     m_appearancePage = std::make_unique<AppearancePage>(*m_bus);
   }
@@ -237,6 +240,7 @@ void KineticSettingsWindow::open() {
   m_autostartPage->reloadFromDisk();
   m_fontsPage->reloadFromDisk();
   m_displayPage->reloadFromDisk();
+  m_hotCornersPage->reloadFromDisk();
   m_selectPopup = std::make_unique<SelectDropdownPopup>(*m_wayland, *m_renderContext);
   m_selectPopup->setParent(m_surface->xdgSurface(), m_surface->wlSurface(), m_output);
   m_surface->requestLayout();
@@ -882,6 +886,38 @@ DisplayPage::Callbacks KineticSettingsWindow::displayPageCallbacks() {
   };
 }
 
+HotCornersPage::Filter KineticSettingsWindow::hotCornersFilter() const {
+  return HotCornersPage::Filter{
+      .searchQuery = m_searchQuery,
+      .showOverriddenOnly = m_showOverriddenOnly,
+  };
+}
+
+HotCornersPage::Callbacks KineticSettingsWindow::hotCornersPageCallbacks() {
+  return HotCornersPage::Callbacks{
+      .requestRebuild =
+          [this]() {
+            clearArmedResets();
+            requestSceneRebuild();
+          },
+      .armReset =
+          [this](std::string keyPath) {
+            m_armedResetKeyPath = std::move(keyPath);
+            m_resetPageArmed = false;
+            requestContentRebuild();
+          },
+      .confirmReset =
+          [this](std::string keyPath) {
+            clearArmedResets();
+            if (m_hotCornersPage != nullptr) {
+              m_hotCornersPage->resetKeyPath(keyPath);
+            }
+            requestSceneRebuild();
+          },
+      .jumpRow = m_groupJumpRow,
+  };
+}
+
 AccessibilityPage::Filter KineticSettingsWindow::accessibilityFilter() const {
   return AccessibilityPage::Filter{
       .searchQuery = m_searchQuery,
@@ -986,6 +1022,9 @@ void KineticSettingsWindow::applyActivePage() {
     break;
   case ActivePage::Displays:
     applied = m_displayPage != nullptr && m_displayPage->applyAll();
+    break;
+  case ActivePage::HotCorners:
+    applied = m_hotCornersPage != nullptr && m_hotCornersPage->applyAll();
     break;
   case ActivePage::DefaultApps:
     applied = m_defaultAppsPage != nullptr && m_defaultAppsPage->applyAll();
@@ -1096,6 +1135,11 @@ void KineticSettingsWindow::resetActivePage() {
       m_displayPage->resetAll();
     }
     break;
+  case ActivePage::HotCorners:
+    if (m_hotCornersPage != nullptr) {
+      m_hotCornersPage->resetAll();
+    }
+    break;
   case ActivePage::DefaultApps:
     if (m_defaultAppsPage != nullptr) {
       m_defaultAppsPage->resetAll();
@@ -1147,6 +1191,8 @@ bool KineticSettingsWindow::activeHasPending() const {
     return m_keybindsPage != nullptr && m_keybindsPage->hasPending();
   case ActivePage::Displays:
     return m_displayPage != nullptr && m_displayPage->hasPending();
+  case ActivePage::HotCorners:
+    return m_hotCornersPage != nullptr && m_hotCornersPage->hasPending();
   case ActivePage::DefaultApps:
     return m_defaultAppsPage != nullptr && m_defaultAppsPage->hasPending();
   case ActivePage::Accessibility:
@@ -1193,6 +1239,8 @@ bool KineticSettingsWindow::activeHasResettableSettings() const {
     return m_keybindsPage != nullptr && !m_keybindsPage->resettableKeyPaths().empty();
   case ActivePage::Displays:
     return m_displayPage != nullptr && !m_displayPage->resettableKeyPaths().empty();
+  case ActivePage::HotCorners:
+    return m_hotCornersPage != nullptr && !m_hotCornersPage->resettableKeyPaths().empty();
   case ActivePage::DefaultApps:
     return m_defaultAppsPage != nullptr && !m_defaultAppsPage->resettableKeyPaths().empty();
   case ActivePage::Accessibility:
@@ -1207,8 +1255,8 @@ bool KineticSettingsWindow::anyPageHasPending() const {
   const auto pending = [](const auto& page) { return page != nullptr && page->hasPending(); };
   return pending(m_tilingPage) || pending(m_workspacesPage) || pending(m_keybindsPage) || pending(m_keyboardPage)
       || pending(m_mousePage) || pending(m_touchpadPage) || pending(m_windowRulesPage)
-      || pending(m_windowBehaviorPage) || pending(m_displayPage) || pending(m_appearancePage)
-      || pending(m_iconsPage) || pending(m_cursorsPage) || pending(m_fontsPage)
+      || pending(m_windowBehaviorPage) || pending(m_displayPage) || pending(m_hotCornersPage)
+      || pending(m_appearancePage) || pending(m_iconsPage) || pending(m_cursorsPage) || pending(m_fontsPage)
       || pending(m_desktopEffectsPage) || pending(m_blurPage) || pending(m_animationsPage)
       || pending(m_defaultAppsPage) || pending(m_accessibilityPage) || pending(m_autostartPage)
       || pending(m_shadowsPage);
@@ -1229,6 +1277,7 @@ void KineticSettingsWindow::applyAllPages() {
   applyPending(m_windowRulesPage);
   applyPending(m_windowBehaviorPage);
   applyPending(m_displayPage);
+  applyPending(m_hotCornersPage);
   applyPending(m_appearancePage);
   applyPending(m_iconsPage);
   applyPending(m_cursorsPage);
@@ -1483,6 +1532,7 @@ std::unique_ptr<Node> KineticSettingsWindow::buildSidebar(float scale) {
     addSubNav(ActivePage::Touchpad, "mouse-2", "Touchpad");
     addSubNav(ActivePage::Keybinds, "keyboard", "Kwebinds");
     addSubNav(ActivePage::Displays, "device-desktop", "Displays");
+    addSubNav(ActivePage::HotCorners, "border-corners", "Hot Corners");
   }
 
   addCategory("Window Management", m_windowManagementExpanded, [this]() {
@@ -1521,7 +1571,7 @@ std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
   case ActivePage::AppearanceCursors:
     return "appearance cursors cursor theme pointer size";
   case ActivePage::AppearanceFonts:
-    return "appearance fonts font typeface family sans sans-serif serif monospace";
+    return "appearance fonts font typeface family size text scale sans sans-serif serif monospace";
   case ActivePage::Animations:
     return "appearance animations animation speed effects";
   case ActivePage::DesktopEffects:
@@ -1540,6 +1590,8 @@ std::string_view KineticSettingsWindow::pageKeywords(ActivePage page) {
     return "input output keybinds keyboard shortcuts keys bindings";
   case ActivePage::Displays:
     return "input output displays display monitor screen";
+  case ActivePage::HotCorners:
+    return "input output hot corners corner screen edge edges electric border overview present windows";
   case ActivePage::WindowBehavior:
     return "window management window behavior focus raise";
   case ActivePage::Workspaces:
@@ -1680,6 +1732,11 @@ std::unique_ptr<Node> KineticSettingsWindow::buildPageNodeWithQuery(ActivePage p
       return m_displayPage->build(uiScale(), displayFilter(), m_armedResetKeyPath, displayPageCallbacks());
     }
     break;
+  case ActivePage::HotCorners:
+    if (m_hotCornersPage != nullptr) {
+      return m_hotCornersPage->build(uiScale(), hotCornersFilter(), m_armedResetKeyPath, hotCornersPageCallbacks());
+    }
+    break;
   case ActivePage::DefaultApps:
     if (m_defaultAppsPage != nullptr) {
       return m_defaultAppsPage->build(
@@ -1749,9 +1806,9 @@ void KineticSettingsWindow::rebuildSearchResults(Renderer& renderer) {
       ActivePage::AppearanceFonts,     ActivePage::Animations,        ActivePage::DesktopEffects,
       ActivePage::AppearanceShadows,   ActivePage::Blur,              ActivePage::Keyboard,
       ActivePage::Mouse,               ActivePage::Touchpad,          ActivePage::Keybinds,
-      ActivePage::Displays,            ActivePage::WindowBehavior,    ActivePage::Workspaces,
-      ActivePage::Tiling,              ActivePage::WindowRules,       ActivePage::DefaultApps,
-      ActivePage::Accessibility,       ActivePage::Autostart,
+      ActivePage::Displays,            ActivePage::HotCorners,        ActivePage::WindowBehavior,
+      ActivePage::Workspaces,          ActivePage::Tiling,            ActivePage::WindowRules,
+      ActivePage::DefaultApps,         ActivePage::Accessibility,     ActivePage::Autostart,
   };
 
   // Title Bars (window decoration previews), Icons and Cursors rescan the

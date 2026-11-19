@@ -11,12 +11,14 @@
 #include "ui/controls/glyph.h"
 #include "ui/controls/label.h"
 #include "ui/controls/search_picker.h"
+#include "ui/controls/stepper.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -38,12 +40,19 @@ namespace {
   constexpr float kValueButtonWidth = 230.0F;
 
   constexpr std::string_view kInterfaceKeyPath = "Fonts.Interface";
+  constexpr std::string_view kFontSizeKeyPath = "Fonts.FontSize";
   constexpr const char* kPickerInterface = "interface";
+  constexpr int kDefaultFontSize = static_cast<int>(Style::fontSizeBody);
+  constexpr int kMinFontSize = 10;
+  constexpr int kMaxFontSize = 20;
   constexpr std::string_view kInterfaceSubtitle =
       "Typeface used by the shell and, when enabled, window title bars. Takes effect on Apply.";
+  constexpr std::string_view kFontSizeSubtitle =
+      "Base size of interface text. Scales shell text only; apps and window title bars keep their own font sizes. "
+      "The default is 14 px.";
   constexpr std::string_view kPageDescription =
-      "Applying the interface font takes effect immediately; system font preferences apply to newly started "
-      "applications. Fonts installed during this session may need a shell restart.";
+      "Applying the interface font and size takes effect immediately; system font preferences apply to newly "
+      "started applications. Fonts installed during this session may need a shell restart.";
   constexpr std::string_view kSystemDescription =
       "Preferred families for generic font requests in GTK, Qt, and other fontconfig applications. Applies to "
       "newly started applications; restart running apps to update them.";
@@ -424,6 +433,17 @@ bool FontsPage::interfaceOverridden() const {
   return !interfaceValue().empty();
 }
 
+int FontsPage::fontSizeValue() const {
+  if (m_pendingFontSize.has_value()) {
+    return *m_pendingFontSize;
+  }
+  return std::clamp(static_cast<int>(m_config.config().shell.fontSize), kMinFontSize, kMaxFontSize);
+}
+
+bool FontsPage::fontSizeOverridden() const {
+  return fontSizeValue() != kDefaultFontSize;
+}
+
 std::string FontsPage::aliasValue(std::string_view generic) const {
   const std::string key(generic);
   const auto pending = m_pendingAliases.find(key);
@@ -473,6 +493,16 @@ void FontsPage::stageInterface(std::string value) {
   }
 }
 
+void FontsPage::stageFontSize(int value) {
+  const int clamped = std::clamp(value, kMinFontSize, kMaxFontSize);
+  const int fileValue = std::clamp(static_cast<int>(m_config.config().shell.fontSize), kMinFontSize, kMaxFontSize);
+  if (clamped == fileValue) {
+    m_pendingFontSize.reset();
+  } else {
+    m_pendingFontSize = clamped;
+  }
+}
+
 void FontsPage::stageAlias(std::string generic, std::string value) {
   ensureAliasesLoaded();
   const auto stored = m_aliases.find(generic);
@@ -486,8 +516,9 @@ void FontsPage::stageAlias(std::string generic, std::string value) {
 
 std::vector<std::string> FontsPage::resettableKeyPaths() const {
   std::vector<std::string> paths;
-  paths.reserve(aliasFields().size() + 1);
+  paths.reserve(aliasFields().size() + 2);
   paths.emplace_back(kInterfaceKeyPath);
+  paths.emplace_back(kFontSizeKeyPath);
   for (const AliasField& field : aliasFields()) {
     paths.emplace_back(field.keyPath);
   }
@@ -499,6 +530,10 @@ void FontsPage::resetKeyPath(std::string_view keyPath) {
     stageInterface({});
     return;
   }
+  if (keyPath == kFontSizeKeyPath) {
+    stageFontSize(kDefaultFontSize);
+    return;
+  }
   if (const AliasField* field = findAliasFieldByKeyPath(keyPath); field != nullptr) {
     stageAlias(std::string(field->generic), {});
   }
@@ -506,13 +541,14 @@ void FontsPage::resetKeyPath(std::string_view keyPath) {
 
 void FontsPage::resetAll() {
   stageInterface({});
+  stageFontSize(kDefaultFontSize);
   for (const AliasField& field : aliasFields()) {
     stageAlias(std::string(field.generic), {});
   }
 }
 
 bool FontsPage::hasPending() const noexcept {
-  return m_pendingInterface.has_value() || !m_pendingAliases.empty();
+  return m_pendingInterface.has_value() || m_pendingFontSize.has_value() || !m_pendingAliases.empty();
 }
 
 // ---------------------------------------------------------------------------
@@ -623,33 +659,37 @@ bool FontsPage::writeAliases(const std::map<std::string, std::string>& aliases) 
 }
 
 bool FontsPage::applyAll() {
-  if (!m_pendingInterface.has_value() && m_pendingAliases.empty()) {
+  if (!m_pendingInterface.has_value() && !m_pendingFontSize.has_value() && m_pendingAliases.empty()) {
     m_errorNotice.clear();
     return true;
   }
 
-  // The interface font goes first: it applies immediately through the shell's
-  // config reload, so a later alias failure must not hold it back.
+  // Both shell values go in one commit so a single reload applies the pair.
+  std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides;
   if (m_pendingInterface.has_value()) {
-    const std::string value = *m_pendingInterface;
-    bool applied = true;
-    if (value.empty()) {
-      // Persist an explicit sans-serif override: the custom family may come
-      // from a hand-authored config file rather than the override layer, so
-      // merely clearing the override would not reliably restore the default.
-      applied = m_config.setOverride({"shell", "font_family"}, std::string("sans-serif"));
-    } else {
-      applied = m_config.setOverride({"shell", "font_family"}, value);
-    }
-    if (!applied) {
+    // Persist an explicit sans-serif override: the custom family may come
+    // from a hand-authored config file rather than the override layer, so
+    // merely clearing the override would not reliably restore the default.
+    const std::string value = m_pendingInterface->empty() ? std::string("sans-serif") : *m_pendingInterface;
+    overrides.emplace_back(std::vector<std::string>{"shell", "font_family"}, value);
+  }
+  if (m_pendingFontSize.has_value()) {
+    overrides.emplace_back(
+        std::vector<std::string>{"shell", "font_size"}, static_cast<std::int64_t>(*m_pendingFontSize)
+    );
+  }
+
+  if (!overrides.empty()) {
+    if (!m_config.setOverrides(overrides)) {
       m_errorNotice = m_config.lastMutationError();
       if (m_errorNotice.empty()) {
-        m_errorNotice = "Failed to apply the interface font. Your changes were kept; try Apply again.";
+        m_errorNotice = "Failed to apply the interface font settings. Your changes were kept; try Apply again.";
       }
-      kLog.warn("kinetic-settings: failed to apply interface font '{}'", value);
+      kLog.warn("kinetic-settings: failed to apply interface font settings");
       return false;
     }
     m_pendingInterface.reset();
+    m_pendingFontSize.reset();
   }
 
   if (!m_pendingAliases.empty()) {
@@ -672,6 +712,7 @@ bool FontsPage::applyAll() {
 
 void FontsPage::reloadFromDisk() noexcept {
   m_pendingInterface.reset();
+  m_pendingFontSize.reset();
   m_pendingAliases.clear();
   m_aliases.clear();
   m_aliasesLoaded = false;
@@ -778,6 +819,11 @@ FontsPage::buildInterfaceRow(float scale, std::string_view armedResetKey, const 
   const bool overridden = interfaceOverridden();
   const std::string keyPath(kInterfaceKeyPath);
   const std::string family = interfaceFamily();
+  // The renderer already applies the saved font scale globally; scale the
+  // preview from the saved size so a staged change previews its real size.
+  const int appliedFontSize =
+      std::clamp(static_cast<int>(m_config.config().shell.fontSize), kMinFontSize, kMaxFontSize);
+  const float previewFontScale = static_cast<float>(fontSizeValue()) / static_cast<float>(appliedFontSize);
 
   auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
   copy->addChild(makeLabel(
@@ -822,13 +868,13 @@ FontsPage::buildInterfaceRow(float scale, std::string_view armedResetKey, const 
   });
   preview->addChild(ui::label({
       .text = std::string(kInterfaceSample),
-      .fontSize = Style::fontSizeTitle * scale,
+      .fontSize = Style::fontSizeTitle * scale * previewFontScale,
       .fontFamily = family,
       .color = colorSpecFromRole(ColorRole::OnSurface),
   }));
   preview->addChild(ui::label({
       .text = "0123456789",
-      .fontSize = Style::fontSizeBody * scale,
+      .fontSize = Style::fontSizeBody * scale * previewFontScale,
       .fontFamily = family,
       .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
   }));
@@ -839,6 +885,58 @@ FontsPage::buildInterfaceRow(float scale, std::string_view armedResetKey, const 
   if (m_pickerTarget == kPickerInterface) {
     container->addChild(buildFontPicker(scale, kPickerInterface, interfaceValue(), callbacks));
   }
+  return container;
+}
+
+std::unique_ptr<Node>
+FontsPage::buildFontSizeRow(float scale, std::string_view armedResetKey, const Callbacks& callbacks) {
+  const bool overridden = fontSizeOverridden();
+  const std::string keyPath(kFontSizeKeyPath);
+
+  auto copy = ui::column({.align = FlexAlign::Start, .gap = Style::spaceXs * scale, .flexGrow = 1.0F});
+  copy->addChild(makeLabel(
+      "Font size", Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+  ));
+  copy->addChild(ui::label({
+      .text = std::string(kFontSizeSubtitle),
+      .fontSize = Style::fontSizeCaption * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      .maxLines = kSettingDescriptionMaxLines,
+  }));
+
+  auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  if (overridden) {
+    actions->addChild(makeOverrideBadge(scale));
+    actions->addChild(makeResetButton(keyPath, armedResetKey == keyPath, scale, callbacks));
+  }
+  actions->addChild(ui::stepper({
+      .minValue = kMinFontSize,
+      .maxValue = kMaxFontSize,
+      .step = 1,
+      .value = fontSizeValue(),
+      .scale = scale,
+      .valueSuffix = " px",
+      .onValueCommitted =
+          [this, callbacks](int committed) {
+            stageFontSize(committed);
+            if (callbacks.requestRebuild) {
+              callbacks.requestRebuild();
+            }
+          },
+  }));
+
+  auto row = ui::row(
+      {.align = FlexAlign::Center,
+       .justify = FlexJustify::SpaceBetween,
+       .gap = Style::spaceXs * scale,
+       .paddingV = 2.0F * scale,
+       .fillWidth = true}
+  );
+  row->addChild(std::move(copy));
+  row->addChild(std::move(actions));
+
+  auto container = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale, .fillWidth = true});
+  container->addChild(std::move(row));
   return container;
 }
 
@@ -913,6 +1011,11 @@ std::unique_ptr<Node> FontsPage::build(
       {"Interface font", kInterfaceSubtitle, "Interface", interfaceLabel}
   );
 
+  const std::string fontSizeLabel = std::to_string(fontSizeValue()) + " px";
+  const bool showFontSize = rowMatches(
+      filter, fontSizeOverridden(), {"Font size", kFontSizeSubtitle, "Interface", fontSizeLabel}
+  );
+
   std::vector<const AliasField*> visibleAliases;
   for (const AliasField& field : aliasFields()) {
     const std::string aliasLabel = aliasButtonLabel(field.generic);
@@ -941,7 +1044,7 @@ std::unique_ptr<Node> FontsPage::build(
     }
   }
 
-  if (!showInterface && visibleAliases.empty()) {
+  if (!showInterface && !showFontSize && visibleAliases.empty()) {
     // Global search merges hits from every page and drops pages with none.
     if (!filter.searchQuery.empty()) {
       return nullptr;
@@ -1060,12 +1163,17 @@ std::unique_ptr<Node> FontsPage::build(
   }
 
   bool sectionStarted = false;
-  if (showInterface) {
+  if (showInterface || showFontSize) {
     root->addChild(makeSectionTitle("Interface", scale));
-    if (families.empty()) {
-      root->addChild(makeInfoNotice(kNoFamilies, scale));
+    if (showInterface) {
+      if (families.empty()) {
+        root->addChild(makeInfoNotice(kNoFamilies, scale));
+      }
+      root->addChild(buildInterfaceRow(scale, armedResetKey, callbacks));
     }
-    root->addChild(buildInterfaceRow(scale, armedResetKey, callbacks));
+    if (showFontSize) {
+      root->addChild(buildFontSizeRow(scale, armedResetKey, callbacks));
+    }
     sectionStarted = true;
   }
 

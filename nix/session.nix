@@ -21,6 +21,7 @@ let
   # component that has no such dir, so listing a package without
   # lib/qt-6/qml is harmless. qt6ct supplies the platform theme the launcher
   # selects via QT_QPA_PLATFORMTHEME (avoids the crashing QKdeTheme path).
+  # kirigami's wrapper ships no QML dir; only .unwrapped carries it.
   qtDeps = [
     qt6.qtbase
     qt6.qtdeclarative
@@ -29,7 +30,7 @@ let
     qt6Packages.qt6ct
     kdePackages.libplasma
     kdePackages.plasma-workspace
-    kdePackages.kirigami
+    kdePackages.kirigami.unwrapped
     kdePackages.kconfig
     kdePackages.kcoreaddons
     kdePackages.kwindowsystem

@@ -79,12 +79,20 @@ static bool isNoctaliaLayerShellWindow(const Window *window)
     if (!layerShellWindow) {
         return false;
     }
-    const QString scope = layerShellWindow->shellSurface()->scope().toLower();
+    const auto *shellSurface = layerShellWindow->shellSurface();
+    if (!shellSurface) {
+        return false;
+    }
+    const QString scope = shellSurface->scope().toLower();
     return scope.startsWith(QStringLiteral("noctalia"));
 }
 
 static bool isNoctaliaShellWindow(const Window *window)
 {
+    // Deleted windows outlive their shell surface; touching either crashes.
+    if (window->isDeleted()) {
+        return false;
+    }
     if (isNoctaliaSettingsWindow(window)) {
         return false;
     }
