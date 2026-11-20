@@ -577,7 +577,7 @@ echo
 - Update build-deb-stable.sh, including the --sid option.
 - Make CI rebuild only the packages affected by a change.
 
-* Tue Oct 21 2026 LGL <lgl@localhost> - 0.1.0-1
+* Wed Oct 21 2026 LGL <lgl@localhost> - 0.1.0-1
 - Bump to 0.1.0.
 - Refactor the session launcher: one canonical start-kineticwe.sh, config/cache
   redirect kept out of child processes, shell runs as kineticwe-shell.service,
@@ -586,11 +586,11 @@ echo
 - Fix GTK apps not picking up icon theme changes.
 - Fix Meta+Shift+Scroll in Emerge.
 
-* Sun Oct 19 2026 LGL <lgl@localhost> - 0.0.1-19
+* Mon Oct 19 2026 LGL <lgl@localhost> - 0.0.1-19
 - Add Kinetic Settings support for configuring keyboard layouts and layout switching.
 - Add the xkbregistry build requirement needed by the keyboard-layout catalog.
 
-* Sun Oct 19 2026 LGL <lgl@localhost> - 0.0.1-18
+* Mon Oct 19 2026 LGL <lgl@localhost> - 0.0.1-18
 - Add compatibility with the KScreenLocker 6.8 API used by Fedora Rawhide.
 - Sync the vendored Noctalia shell to 5.3.0 and fix active_monitor_only handling.
 - Update Emerge appearance and tiling behavior.

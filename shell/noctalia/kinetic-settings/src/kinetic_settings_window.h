@@ -10,6 +10,7 @@
 #include "kinetic-settings/src/desktop_effects_page.h"
 #include "kinetic-settings/src/display_page.h"
 #include "kinetic-settings/src/fonts_page.h"
+#include "kinetic-settings/src/hot_corners_page.h"
 #include "kinetic-settings/src/icons_page.h"
 #include "kinetic-settings/src/keyboard_page.h"
 #include "kinetic-settings/src/keybinds_page.h"
@@ -107,6 +108,7 @@ private:
     Touchpad,
     Keybinds,
     Displays,
+    HotCorners,
     DefaultApps,
     Accessibility,
     Autostart,
@@ -183,6 +185,8 @@ private:
   [[nodiscard]] DefaultAppsPage::Callbacks defaultAppsPageCallbacks();
   [[nodiscard]] DisplayPage::Filter displayFilter() const;
   [[nodiscard]] DisplayPage::Callbacks displayPageCallbacks();
+  [[nodiscard]] HotCornersPage::Filter hotCornersFilter() const;
+  [[nodiscard]] HotCornersPage::Callbacks hotCornersPageCallbacks();
   [[nodiscard]] AccessibilityPage::Filter accessibilityFilter() const;
   [[nodiscard]] AccessibilityPage::Callbacks accessibilityPageCallbacks();
   [[nodiscard]] AutostartPage::Filter autostartFilter() const;
@@ -219,6 +223,7 @@ private:
   std::unique_ptr<WindowRulesPage> m_windowRulesPage;
   std::unique_ptr<WindowBehaviorPage> m_windowBehaviorPage;
   std::unique_ptr<DisplayPage> m_displayPage;
+  std::unique_ptr<HotCornersPage> m_hotCornersPage;
   std::unique_ptr<AppearancePage> m_appearancePage;
   std::unique_ptr<IconsPage> m_iconsPage;
   std::unique_ptr<CursorsPage> m_cursorsPage;

@@ -217,6 +217,10 @@ void Edge::unreserve(QObject *object)
 
 bool Edge::activatesForPointer() const
 {
+    if (isCorner() && !m_edges->hotCornersEnabled()) {
+        return false;
+    }
+
     if (input()->pointer()->isConstrained()) {
         return false;
     }
@@ -262,6 +266,9 @@ bool Edge::activatesForPointer() const
 
 bool Edge::activatesForTouchGesture() const
 {
+    if (isCorner() && !m_edges->hotCornersEnabled()) {
+        return false;
+    }
     if (!isScreenEdge()) {
         return false;
     }
@@ -799,6 +806,7 @@ void ScreenEdges::reconfigure()
     }
     KConfigGroup screenEdgesConfig = m_config->group(QStringLiteral("ScreenEdges"));
     setRemainActiveOnFullscreen(screenEdgesConfig.readEntry("RemainActiveOnFullscreen", false));
+    m_hotCornersEnabled = screenEdgesConfig.readEntry("HotCornersEnabled", true);
     m_touchTarget = screenEdgesConfig.readEntry("TouchTarget", 8);
 
     // TODO: migrate settings to a group ScreenEdges

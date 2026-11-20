@@ -88,7 +88,7 @@ nix build --out-link ~/.local/state/kineticwe/nix/kinetic-we .#kinetic-we
 |---|---|---|
 | Compositor (`src/`) | New session: log out and pick the dev session again | **Yes** |
 | A nested compositor for iteration | see below | No |
-| Shell QML (`shell/noctalia`) | `local`: `systemctl --user restart kineticwe-shell` (or Meta+Alt+R)<br>`profile`: `pkill -x noctalia-kwe`, the supervisor restarts it | No |
+| Shell QML (`shell/noctalia`) | `local`: `systemctl --user restart kineticwe-shell` (or Meta+Alt+R)<br>`profile`: `pkill -f '/noctalia-kwe$'`, the supervisor restarts it | No |
 | Compositor/shell config | hot-reloaded (~200 ms) | No |
 | Portal backend | `systemctl --user restart xdg-desktop-portal` | No |
 

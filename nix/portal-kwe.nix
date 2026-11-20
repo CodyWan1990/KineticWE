@@ -9,19 +9,21 @@
   pipewire,
   wayland,
   wayland-protocols,
-  plasma-wayland-protocols,
   libepoxy,
-  kio-fuse,
-  xkbcommon,
+  libxkbcommon,
   version ? "6.7.4",
 }:
 
 let
   inherit (kdePackages)
-    kcoreaddons kconfig ki18n kglobalaccel kio kirigami qqc2-desktop-style
+    kcoreaddons kconfig ki18n kglobalaccel kio kitemmodels kirigami
+    qqc2-desktop-style
     knotifications kservice kwidgetsaddons kwindowsystem
     kiconthemes kstatusnotifieritem kcrash kwayland
+    kpipewire
     extra-cmake-modules
+    kio-fuse
+    plasma-wayland-protocols
     ;
 in
 stdenv.mkDerivation {
@@ -51,6 +53,8 @@ stdenv.mkDerivation {
     ki18n
     kglobalaccel
     kio
+    kitemmodels
+    kpipewire
     kirigami
     qqc2-desktop-style # org.kde.desktop style forced by the portal
     knotifications
@@ -68,7 +72,7 @@ stdenv.mkDerivation {
     pipewire
     libepoxy
     kio-fuse
-    xkbcommon
+    libxkbcommon
   ];
 
   cmakeFlags = [

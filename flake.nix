@@ -141,7 +141,7 @@
         devShells = {
           default = pkgs.callPackage ./nix/devshell.nix {
             inherit kineticWe;
-            noctalia = noctaliaKwe;
+            noctalia = noctaliaKweRaw;
           };
         };
       }

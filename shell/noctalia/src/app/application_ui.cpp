@@ -55,6 +55,7 @@
 #include "ui/style.h"
 #include "util/string_utils.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <optional>
@@ -108,6 +109,9 @@ void Application::initUiRenderSurfacesAndSettings() {
     m_asyncTextureCache.setMakeCurrentCallback([this] { m_renderContext.backend().makeCurrentNoSurface(); });
   }
   m_renderContext.setTextFontFamily(m_configService.config().shell.fontFamily);
+  m_renderContext.setTextFontScale(
+      std::max(0.1F, static_cast<float>(m_configService.config().shell.fontSize) / Style::fontSizeBody)
+  );
   Style::setRtl(i18n::Service::instance().rtl());
   m_renderContext.setTextBaseDirection(i18n::Service::instance().rtl());
   m_wallpaper.initialize(m_wayland, &m_configService, &m_renderContext, &m_sharedTextureCache, &m_themeService);
@@ -1078,17 +1082,30 @@ void Application::initWidgetControllersAndCallbacks() {
   m_iconThemePollSource.setChangeCallback([this] { onIconThemeChanged(); });
 
   std::string lastShellFontFamily = m_configService.config().shell.fontFamily;
+  std::int32_t lastShellFontSize = m_configService.config().shell.fontSize;
   m_configService.addReloadCallback(
-      [this, lastShellFontFamily] mutable {
-        const std::string& newShellFontFamily = m_configService.config().shell.fontFamily;
-        if (newShellFontFamily == lastShellFontFamily) {
+      [this, lastShellFontFamily, lastShellFontSize] mutable {
+        const ShellConfig& shell = m_configService.config().shell;
+        const bool familyChanged = shell.fontFamily != lastShellFontFamily;
+        const bool sizeChanged = shell.fontSize != lastShellFontSize;
+        if (!familyChanged && !sizeChanged) {
           return;
         }
 
-        lastShellFontFamily = newShellFontFamily;
-        text::invalidateFontWeightCatalogCache();
-        m_renderContext.setTextFontFamily(newShellFontFamily);
-        m_bar.reload();
+        if (familyChanged) {
+          lastShellFontFamily = shell.fontFamily;
+          text::invalidateFontWeightCatalogCache();
+          m_renderContext.setTextFontFamily(shell.fontFamily);
+        }
+        if (sizeChanged) {
+          lastShellFontSize = shell.fontSize;
+          m_renderContext.setTextFontScale(std::max(0.1F, static_cast<float>(shell.fontSize) / Style::fontSizeBody));
+        }
+        if (familyChanged) {
+          // Rebuilds bar widgets so their labels pick up the new family.
+          m_bar.reload();
+        }
+        m_bar.requestLayout();
         m_dock.requestLayout();
         m_desktopWidgetsController.requestLayout();
         m_lockscreenWidgetsController.requestLayout();
@@ -1106,7 +1123,7 @@ void Application::initWidgetControllersAndCallbacks() {
         m_searchPickerDialogPopup.requestLayout();
         scheduleGreeterAutoSync();
       },
-      "shell-font-family"
+      "shell-font"
   );
 
   bool lastRtl = i18n::Service::instance().rtl();
